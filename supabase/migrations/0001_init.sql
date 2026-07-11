@@ -140,7 +140,7 @@ insert into senseis (id, name, rank, school_id) values
   ('b1000000-0000-0000-0000-000000000003', 'Sensei Muthu Krishnan', 'Sandan', 'a1000000-0000-0000-0000-000000000003');
 
 insert into competitions (id, name, venue, event_date, registration_deadline, registration_fee_myr, status, description) values
-  ('c1000000-0000-0000-0000-000000000001', 'Malaysia IKO Goju-ryu Kata Championship 2025', 'Dewan Belia Chow Kit, Kuala Lumpur', '2025-09-20', '2025-08-31', 80.00, 'open', 'The official Malaysia IKO Goju-ryu Karate-do Kata competition open to all registered IKO members. Perform Kaishu or Heishu kata in your division.');
+  ('c1000000-0000-0000-0000-000000000001', 'Malaysia IKO Goju-ryu Kata Championship 2026', 'Dewan Belia Chow Kit, Kuala Lumpur', '2026-09-20', '2026-08-31', 80.00, 'open', 'The official Malaysia IKO Goju-ryu Karate-do Kata competition open to all registered IKO members. Perform Kaishu or Heishu kata in your division.');
 
 insert into categories (id, competition_id, name, age_min, age_max, belt_group, gender) values
   ('d1000000-0000-0000-0000-000000000001', 'c1000000-0000-0000-0000-000000000001', 'Junior Male Kyu', 12, 17, 'kyu', 'male'),
@@ -165,5 +165,5 @@ insert into registrations (id, competition_id, participant_id, category_id, paym
   ('f1000000-0000-0000-0000-000000000006', 'c1000000-0000-0000-0000-000000000001', 'e1000000-0000-0000-0000-000000000006', 'd1000000-0000-0000-0000-000000000004', 'rejected', 'INVALID-REF');
 
 insert into announcements (id, competition_id, title, body, published) values
-  ('g1000000-0000-0000-0000-000000000001', 'c1000000-0000-0000-0000-000000000001', 'Registration Now Open — Malaysia IKO Goju-ryu Kata Championship 2025', 'Registration is officially open for all IKO Malaysia Goju-ryu members. Deadline is **31 August 2025**. Fee: RM 80 per participant. Transfer to Maybank 5121-2345-6789 (Malaysia IKO Goju-ryu Association) and WhatsApp your receipt to the organiser.', true),
-  ('g1000000-0000-0000-0000-000000000002', 'c1000000-0000-0000-0000-000000000001', 'Kata Requirements & Rules Briefing', 'All competitors must perform a **Goju-ryu Kata** from the approved IKO list. Heishu kata (Sanchin, Tensho) are permitted for Dan divisions. Kyu divisions must perform Kaishu kata. Full rules document will be emailed upon confirmed payment.', true);
+  ('91000000-0000-0000-0000-000000000001', 'c1000000-0000-0000-0000-000000000001', 'Registration Now Open — Malaysia IKO Goju-ryu Kata Championship 2026', 'Registration is officially open for all IKO Malaysia Goju-ryu members. Deadline is **31 August 2026**. Fee: RM 80 per participant. Transfer to Maybank 5121-2345-6789 (Malaysia IKO Goju-ryu Association) and WhatsApp your receipt to the organiser.', true),
+  ('91000000-0000-0000-0000-000000000002', 'c1000000-0000-0000-0000-000000000001', 'Kata Requirements & Rules Briefing', 'All competitors must perform a **Goju-ryu Kata** from the approved IKO list. Heishu kata (Sanchin, Tensho) are permitted for Dan divisions. Kyu divisions must perform Kaishu kata. Full rules document will be emailed upon confirmed payment.', true);
