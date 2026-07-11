@@ -1,5 +1,5 @@
 {
-  "name": "vibe-stack-supabase",
+  "name": "malaysia-iko-gojuryu-kata-competition",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -26,6 +26,5 @@
     "eslint-config-next": "^15.0.0",
     "tailwindcss": "^4.0.0",
     "typescript": "^5"
-  },
-  "packageManager": "bun@1.1.30"
+  }
 }
