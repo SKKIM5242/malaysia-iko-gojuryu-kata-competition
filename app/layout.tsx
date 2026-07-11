@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "vibe-stack-supabase",
-  description: "Next.js + Supabase starter",
+  title: "Malaysia IKO Goju-ryu Kata Competition",
+  description:
+    "Official platform of the Malaysia IKO Goju-ryu Kata competition — event info, announcements, participant list, and online registration.",
 };
 
 export default function RootLayout({
@@ -13,7 +14,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="antialiased">{children}</body>
+      <body className="min-h-screen bg-neutral-100 text-neutral-900 antialiased">{children}</body>
     </html>
   );
 }

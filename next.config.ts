@@ -6,6 +6,12 @@ const nextConfig: NextConfig = {
   // so we don't let them block a deployment.
   typescript: { ignoreBuildErrors: true },
   eslint: { ignoreDuringBuilds: true },
+  // exFAT drives fail readlink() with EISDIR; skip symlink resolution so
+  // local `next build` works there. No effect on Vercel builds.
+  webpack: (config) => {
+    config.resolve.symlinks = false;
+    return config;
+  },
 };
 
 export default nextConfig;
