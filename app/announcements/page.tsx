@@ -4,7 +4,7 @@ import { EmptyState, SetupNotice, SiteFooter, SiteHeader, formatDate } from "@/c
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "Announcements — Malaysia IKO Goju-ryu Kata Competition" };
+export const metadata = { title: "Announcements" };
 
 export default async function AnnouncementsPage() {
   const ready = await schemaReady();

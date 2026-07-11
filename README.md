@@ -1,41 +1,62 @@
-# vibe-stack-supabase
+# Malaysia IKO Goju-ryu Kata Competition
 
-Next.js 15 + Supabase starter for shipping vibe-coded apps fast. Clone, provision, build.
+Owner-controlled competition platform for the Malaysia IKO Goju-ryu community:
+public event info + announcements, online participant registration, and an
+admin panel where the organiser confirms payments and manages every record.
 
-## Stack
+**Stack:** Next.js 15 (App Router) · Supabase (Postgres + Auth + RLS) · Tailwind CSS 4 · Vercel
 
-| Layer | Choice |
-|---|---|
-| Framework | Next.js 15 (App Router, React 19, Server Actions) |
-| Language | TypeScript strict |
-| Styles | Tailwind CSS v4 (CSS-first, no config file) |
-| Auth + DB | Supabase (`@supabase/ssr`) |
-| Package manager | Bun |
-| Deploy | Vercel |
+## How it works
 
-## Quick start
+1. A visitor opens `/` — sees the active competition, categories, and announcements.
+2. They submit the registration form at `/register` → a `participant` +
+   `registration` (payment status `pending`) row is written, and they get a
+   reference ID.
+3. They bank-transfer the fee and send the receipt to the organiser.
+4. The organiser logs into `/admin/registrations` and clicks **Mark Paid**.
+5. The participant immediately appears on the public `/participants` list.
+
+Every state change is written to the append-only `audit_logs` table.
+
+## Local setup
 
 ```bash
-bun install
-cp .env.example .env.local   # fill in your Supabase keys
-bun dev
+npm install
+npx vercel link            # link to the Vercel project
+npx vercel env pull .env.local
+npm run dev                # Turbopack dev server on :3000
 ```
 
-Open http://localhost:3000. Edit `app/page.tsx` to start building.
+## Database
 
-## Provisioning a new project
+Migrations live in `supabase/migrations/` and are applied via the Supabase
+SQL editor (or `supabase db push`):
 
-Use the `/new-vibe-project <name>` skill (see `claude-dotfiles` repo) which:
-1. Clones this template and renames it
-2. Creates a new GitHub repo and pushes
-3. Creates a Supabase project and injects URL + anon key
-4. Creates a Vercel project linked to the GitHub repo
-5. Triggers first deploy and returns the preview URL
+- `0001_init.sql` — all tables, v1 open RLS policies, and seed demo data
+  (3 schools, 3 senseis, 1 competition, 4 categories, 6 participants,
+  6 registrations, 2 announcements).
+- `0002_lockdown.sql` — Sprint 4 lock-down: authenticated-only writes,
+  public reads limited to published/paid/confirmed rows, anonymous INSERT
+  retained for the registration form, plus the `ic_already_registered`
+  duplicate-check function.
 
-## Working with AI
+## Admin access
 
-See [CLAUDE.md](CLAUDE.md) for conventions. This repo is pre-wired for gstack — start with `/office-hours`.
+`/admin/*` requires a Supabase Auth session (redirects to `/login`).
+Create the owner account in the Supabase dashboard → Authentication →
+Users → **Add user** (tick auto-confirm), then sign in at `/login`.
 
-## Switching to Neon
+## Deploy
 
-If you need Postgres without Supabase (e.g. prefer Drizzle ORM + Clerk for auth), a `vibe-stack-neon` variant is planned. For now: fork this and swap `@supabase/ssr` for `drizzle-orm` + `@neondatabase/serverless`, add Clerk or NextAuth.
+Push to `main` — Vercel auto-deploys from GitHub. Never deploy with the
+Vercel CLI directly; git is the source of truth.
+
+```bash
+git add -A && git commit -m "…" && git push
+```
+
+## Manual test plan
+
+See [docs/TEST_PLAN.md](docs/TEST_PLAN.md). The core scenario: anonymous
+visitor registers → row appears in `/admin/registrations` as `pending` →
+owner clicks Mark Paid → participant shows on public `/participants`.

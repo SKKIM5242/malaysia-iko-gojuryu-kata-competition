@@ -10,7 +10,7 @@ import RegisterForm from "@/components/RegisterForm";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "Register — Malaysia IKO Goju-ryu Kata Competition" };
+export const metadata = { title: "Register" };
 
 export default async function RegisterPage() {
   const ready = await schemaReady();
