@@ -65,14 +65,24 @@ export async function submitRegistration(
     return { ok: false, error: "The registration deadline has passed." };
   }
 
-  // Duplicate IC + competition check
-  const { data: existing } = await supabase
-    .from("participants")
-    .select("id, registrations!inner(id, competition_id)")
-    .eq("ic_passport", values.ic_passport)
-    .eq("registrations.competition_id", values.competition_id)
-    .limit(1);
-  if (existing && existing.length > 0) {
+  // Duplicate IC + competition check. Prefer the security-definer function
+  // (works for anonymous visitors after the RLS lock-down); fall back to a
+  // direct query under the v1 open policies where the function may not exist.
+  const { data: dup, error: dupErr } = await supabase.rpc("ic_already_registered", {
+    p_ic: values.ic_passport,
+    p_competition: values.competition_id,
+  });
+  let isDuplicate = dup === true;
+  if (dupErr) {
+    const { data: existing } = await supabase
+      .from("participants")
+      .select("id, registrations!inner(id, competition_id)")
+      .eq("ic_passport", values.ic_passport)
+      .eq("registrations.competition_id", values.competition_id)
+      .limit(1);
+    isDuplicate = !!existing && existing.length > 0;
+  }
+  if (isDuplicate) {
     return {
       ok: false,
       error: "This IC / passport is already registered for this competition.",
@@ -80,46 +90,45 @@ export async function submitRegistration(
     };
   }
 
-  const { data: participant, error: pErr } = await supabase
-    .from("participants")
-    .insert({
-      full_name: values.full_name,
-      ic_passport: values.ic_passport,
-      date_of_birth: values.date_of_birth,
-      gender: values.gender,
-      belt_rank: values.belt_rank,
-      school_id: values.school_id,
-      sensei_id: values.sensei_id,
-    })
-    .select("id")
-    .single();
-  if (pErr || !participant) {
+  // Generate ids here — anonymous inserts can't SELECT their own rows back
+  // under the locked-down RLS, so INSERT ... RETURNING would fail.
+  const participantId = crypto.randomUUID();
+  const registrationId = crypto.randomUUID();
+
+  const { error: pErr } = await supabase.from("participants").insert({
+    id: participantId,
+    full_name: values.full_name,
+    ic_passport: values.ic_passport,
+    date_of_birth: values.date_of_birth,
+    gender: values.gender,
+    belt_rank: values.belt_rank,
+    school_id: values.school_id,
+    sensei_id: values.sensei_id,
+  });
+  if (pErr) {
     return { ok: false, error: "Could not save participant. Please try again." };
   }
 
-  const { data: registration, error: rErr } = await supabase
-    .from("registrations")
-    .insert({
-      competition_id: values.competition_id,
-      participant_id: participant.id,
-      category_id: values.category_id,
-      payment_status: "pending",
-      payment_reference: values.payment_reference || null,
-    })
-    .select("id")
-    .single();
-  if (rErr || !registration) {
+  const { error: rErr } = await supabase.from("registrations").insert({
+    id: registrationId,
+    competition_id: values.competition_id,
+    participant_id: participantId,
+    category_id: values.category_id,
+    payment_status: "pending",
+    payment_reference: values.payment_reference || null,
+  });
+  if (rErr) {
     // roll back the orphan participant so a retry doesn't trip the duplicate check
-    await supabase.from("participants").delete().eq("id", participant.id);
+    await supabase.from("participants").delete().eq("id", participantId);
     return { ok: false, error: "Could not save registration. Please try again." };
   }
 
   await writeAudit(supabase, {
     table_name: "registrations",
-    record_id: registration.id,
+    record_id: registrationId,
     action: "registration_submitted",
     new_value: {
-      participant_id: participant.id,
+      participant_id: participantId,
       category_id: values.category_id,
       payment_status: "pending",
     },
@@ -127,6 +136,6 @@ export async function submitRegistration(
 
   return {
     ok: true,
-    referenceId: registration.id.slice(0, 8).toUpperCase(),
+    referenceId: registrationId.slice(0, 8).toUpperCase(),
   };
 }

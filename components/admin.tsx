@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { signOut } from "@/app/actions/auth";
 
 export function AdminShell({
   title,
@@ -29,7 +30,14 @@ export function AdminShell({
             <span className="flex h-7 w-7 items-center justify-center rounded-full bg-red-700 text-sm">剛</span>
             Admin Panel
           </Link>
-          <Link href="/" className="text-sm text-neutral-400 hover:text-white">← Public site</Link>
+          <div className="flex items-center gap-3 text-sm">
+            <Link href="/" className="text-neutral-400 hover:text-white">← Public site</Link>
+            <form action={signOut}>
+              <button className="rounded border border-neutral-700 px-3 py-1 text-neutral-300 hover:bg-neutral-800">
+                Log out
+              </button>
+            </form>
+          </div>
         </div>
         <nav className="mx-auto flex max-w-6xl flex-wrap gap-1 overflow-x-auto px-4 pb-2 text-sm">
           {nav.map(([label, href]) => (
