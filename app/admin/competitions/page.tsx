@@ -1,0 +1,199 @@
+import Link from "next/link";
+import { getAllCompetitions } from "@/lib/admin-data";
+import { getCategories, schemaReady } from "@/lib/data";
+import { saveCompetition, saveCategory, deleteCategory } from "@/app/actions/admin";
+import { AdminShell, Card, adminBtn, adminInput, adminLabel } from "@/components/admin";
+import { EmptyState, SetupNotice, formatDate, formatMYR } from "@/components/ui";
+import type { Category } from "@/lib/types";
+
+export const dynamic = "force-dynamic";
+
+export default async function AdminCompetitions({
+  searchParams,
+}: {
+  searchParams: Promise<{ edit?: string; ok?: string; error?: string }>;
+}) {
+  const params = await searchParams;
+  const ready = await schemaReady();
+  if (!ready) {
+    return (
+      <AdminShell title="Competitions" active="/admin/competitions">
+        <SetupNotice />
+      </AdminShell>
+    );
+  }
+
+  const competitions = await getAllCompetitions();
+  const editing = params.edit ? competitions.find((c) => c.id === params.edit) : undefined;
+  const categoriesByCompetition = new Map<string, Category[]>();
+  for (const c of competitions) {
+    categoriesByCompetition.set(c.id, await getCategories(c.id));
+  }
+
+  return (
+    <AdminShell
+      title="Competitions"
+      active="/admin/competitions"
+      flash={{ ok: params.ok, error: params.error }}
+    >
+      <div className="grid gap-8 lg:grid-cols-2">
+        <div>
+          <h2 className="mb-3 text-lg font-bold">{editing ? "Edit competition" : "Create competition"}</h2>
+          <Card>
+            <form action={saveCompetition} className="space-y-4">
+              {editing && <input type="hidden" name="id" value={editing.id} />}
+              <div>
+                <label htmlFor="name" className={adminLabel}>Name *</label>
+                <input id="name" name="name" required defaultValue={editing?.name ?? ""} className={adminInput} />
+              </div>
+              <div>
+                <label htmlFor="venue" className={adminLabel}>Venue</label>
+                <input id="venue" name="venue" defaultValue={editing?.venue ?? ""} className={adminInput} />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="event_date" className={adminLabel}>Event date</label>
+                  <input id="event_date" name="event_date" type="date" defaultValue={editing?.event_date ?? ""} className={adminInput} />
+                </div>
+                <div>
+                  <label htmlFor="registration_deadline" className={adminLabel}>Registration deadline</label>
+                  <input id="registration_deadline" name="registration_deadline" type="date" defaultValue={editing?.registration_deadline ?? ""} className={adminInput} />
+                </div>
+                <div>
+                  <label htmlFor="registration_fee_myr" className={adminLabel}>Fee (RM)</label>
+                  <input id="registration_fee_myr" name="registration_fee_myr" type="number" step="0.01" min="0" defaultValue={editing?.registration_fee_myr ?? ""} className={adminInput} />
+                </div>
+                <div>
+                  <label htmlFor="status" className={adminLabel}>Status</label>
+                  <select id="status" name="status" defaultValue={editing?.status ?? "draft"} className={adminInput}>
+                    <option value="draft">Draft</option>
+                    <option value="open">Open (registration live)</option>
+                    <option value="closed">Closed</option>
+                    <option value="completed">Completed</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label htmlFor="description" className={adminLabel}>Description</label>
+                <textarea id="description" name="description" rows={3} defaultValue={editing?.description ?? ""} className={adminInput} />
+              </div>
+              <div className="flex gap-2">
+                <button type="submit" className={adminBtn}>
+                  {editing ? "Save changes" : "Create competition"}
+                </button>
+                {editing && (
+                  <Link href="/admin/competitions" className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-semibold text-neutral-600 hover:bg-neutral-50">
+                    Cancel
+                  </Link>
+                )}
+              </div>
+            </form>
+          </Card>
+
+          {editing && (
+            <div className="mt-6">
+              <h2 className="mb-3 text-lg font-bold">Add category to “{editing.name}”</h2>
+              <Card>
+                <form action={saveCategory} className="space-y-4">
+                  <input type="hidden" name="competition_id" value={editing.id} />
+                  <div>
+                    <label htmlFor="cat_name" className={adminLabel}>Category name *</label>
+                    <input id="cat_name" name="name" required className={adminInput} placeholder="e.g. Junior Male Kyu" />
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label htmlFor="age_min" className={adminLabel}>Min age</label>
+                      <input id="age_min" name="age_min" type="number" min="0" className={adminInput} />
+                    </div>
+                    <div>
+                      <label htmlFor="age_max" className={adminLabel}>Max age</label>
+                      <input id="age_max" name="age_max" type="number" min="0" className={adminInput} />
+                    </div>
+                    <div>
+                      <label htmlFor="belt_group" className={adminLabel}>Belt group</label>
+                      <select id="belt_group" name="belt_group" defaultValue="" className={adminInput}>
+                        <option value="">Any</option>
+                        <option value="kyu">Kyu</option>
+                        <option value="dan">Dan</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label htmlFor="cat_gender" className={adminLabel}>Gender</label>
+                      <select id="cat_gender" name="gender" defaultValue="open" className={adminInput}>
+                        <option value="open">Open</option>
+                        <option value="male">Male</option>
+                        <option value="female">Female</option>
+                      </select>
+                    </div>
+                  </div>
+                  <button type="submit" className={adminBtn}>Add category</button>
+                </form>
+              </Card>
+            </div>
+          )}
+        </div>
+
+        <div>
+          <h2 className="mb-3 text-lg font-bold">All competitions</h2>
+          {competitions.length === 0 ? (
+            <EmptyState>No competitions yet — create one on the left.</EmptyState>
+          ) : (
+            <div className="space-y-4">
+              {competitions.map((c) => (
+                <Card key={c.id}>
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <p className="font-bold text-neutral-900">{c.name}</p>
+                      <p className="mt-0.5 text-sm text-neutral-500">
+                        {formatDate(c.event_date)} · {c.venue ?? "Venue TBA"} · {formatMYR(c.registration_fee_myr)}
+                      </p>
+                      <p className="mt-0.5 text-xs uppercase tracking-wide">
+                        <span className={c.status === "open" ? "text-green-600 font-semibold" : "text-neutral-400"}>
+                          {c.status}
+                        </span>
+                        {" · deadline "}{formatDate(c.registration_deadline)}
+                      </p>
+                    </div>
+                    <Link
+                      href={`/admin/competitions?edit=${c.id}`}
+                      className="rounded border border-neutral-300 px-3 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
+                    >
+                      Edit
+                    </Link>
+                  </div>
+                  <div className="mt-3 border-t border-neutral-100 pt-3">
+                    <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-neutral-400">Categories</p>
+                    {(categoriesByCompetition.get(c.id) ?? []).length === 0 ? (
+                      <p className="text-sm text-neutral-400">None yet — edit this competition to add categories.</p>
+                    ) : (
+                      <ul className="space-y-1.5">
+                        {(categoriesByCompetition.get(c.id) ?? []).map((cat) => (
+                          <li key={cat.id} className="flex items-center justify-between gap-2 text-sm">
+                            <span>
+                              {cat.name}
+                              <span className="text-neutral-400">
+                                {cat.age_min != null && cat.age_max != null ? ` · ${cat.age_min}–${cat.age_max} yrs` : ""}
+                                {cat.belt_group ? ` · ${cat.belt_group}` : ""}
+                                {cat.gender ? ` · ${cat.gender}` : ""}
+                              </span>
+                            </span>
+                            <form action={deleteCategory}>
+                              <input type="hidden" name="id" value={cat.id} />
+                              <button className="rounded border border-red-200 px-2 py-0.5 text-xs text-red-600 hover:bg-red-50">
+                                Delete
+                              </button>
+                            </form>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </AdminShell>
+  );
+}
