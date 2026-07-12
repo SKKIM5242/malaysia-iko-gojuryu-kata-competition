@@ -78,7 +78,7 @@ export default async function AdminCompetitions({
                   <input id="registration_deadline" name="registration_deadline" type="date" defaultValue={editing?.registration_deadline ?? ""} className={adminInput} />
                 </div>
                 <div>
-                  <label htmlFor="registration_fee_usd" className={adminLabel}>Fee (RM)</label>
+                  <label htmlFor="registration_fee_usd" className={adminLabel}>Fee (USD)</label>
                   <input id="registration_fee_usd" name="registration_fee_usd" type="number" step="0.01" min="0" defaultValue={editing?.registration_fee_usd ?? ""} className={adminInput} />
                 </div>
                 <div>

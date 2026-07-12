@@ -31,7 +31,7 @@ from (values
   (11, 'Kata Seiyunchin'),
   (12, 'Kata Saifa'),
   (13, 'Kata Shisochin'),
-  (14, 'Kata Sesan'),
+  (14, 'Kata Sesan or Seisan (The Cat Version)'),
   (15, 'Kata Sepai'),
   (16, 'Kata Kururunfa'),
   (17, 'Kata Suparinpei'),
