@@ -3,7 +3,7 @@ import { getAllParticipants } from "@/lib/admin-data";
 import { getSchools, getSenseis, schemaReady } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
 import { saveParticipant, deleteParticipant } from "@/app/actions/admin";
-import { AdminShell, Card, adminBtn, adminInput, adminLabel } from "@/components/admin";
+import { AdminShell, Card, CertificateField, adminBtn, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice, formatDate } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -90,6 +90,11 @@ export default async function AdminParticipants({
                   </select>
                 </div>
                 <div className="sm:col-span-2">
+                  <CertificateField
+                    currentUrl={editing?.certificate_path ? certUrls.get(editing.certificate_path) : undefined}
+                  />
+                </div>
+                <div className="sm:col-span-2">
                   <label htmlFor="home_address" className={adminLabel}>Home address</label>
                   <input id="home_address" name="home_address" defaultValue={editing?.home_address ?? ""} className={adminInput} />
                 </div>
@@ -99,7 +104,7 @@ export default async function AdminParticipants({
                 </div>
                 <div>
                   <label htmlFor="home_country" className={adminLabel}>Home country</label>
-                  <input id="home_country" name="home_country" defaultValue={editing?.home_country ?? ""} className={adminInput} />
+                  <input id="home_country" name="home_country" defaultValue={editing?.home_country ?? (editing ? "" : "Malaysia")} className={adminInput} />
                 </div>
                 <div>
                   <label htmlFor="school_id" className={adminLabel}>School</label>

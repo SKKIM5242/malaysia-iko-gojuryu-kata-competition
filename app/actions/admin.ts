@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { writeAudit } from "@/lib/audit";
 import type { PaymentStatus } from "@/lib/types";
@@ -22,6 +23,28 @@ async function getActor() {
 function backTo(path: string, params: Record<string, string>) {
   const q = new URLSearchParams(params).toString();
   redirect(`${path}${q ? `?${q}` : ""}`);
+}
+
+/** Uploads an optional "certificate" file field to the private bucket; returns
+ * the new path, or null when no file was submitted (existing value untouched). */
+async function uploadCertificateIfPresent(
+  supabase: SupabaseClient,
+  formData: FormData,
+  prefix: string,
+  returnTo: string,
+): Promise<string | null> {
+  const certificate = formData.get("certificate");
+  if (!(certificate instanceof File) || certificate.size === 0) return null;
+  if (certificate.size > 10 * 1024 * 1024) {
+    backTo(returnTo, { error: "Certificate file is too large (max 10 MB)." });
+  }
+  const ext = (certificate.name.split(".").pop() || "jpg").toLowerCase().slice(0, 5);
+  const path = `${prefix}-${crypto.randomUUID()}.${ext}`;
+  const { error } = await supabase.storage
+    .from("certificates")
+    .upload(path, certificate, { contentType: certificate.type || "image/jpeg" });
+  if (error) backTo(returnTo, { error: "Could not upload the certificate. Please try again." });
+  return path;
 }
 
 // ── Registrations ────────────────────────────────────────────────────────────
@@ -292,6 +315,9 @@ export async function saveSchool(formData: FormData) {
     name: String(formData.get("name") ?? "").trim(),
     state: String(formData.get("state") ?? "").trim() || null,
     affiliation_code: String(formData.get("affiliation_code") ?? "").trim() || null,
+    home_address: String(formData.get("home_address") ?? "").trim() || null,
+    city_town: String(formData.get("city_town") ?? "").trim() || null,
+    home_country: String(formData.get("home_country") ?? "").trim() || null,
   };
   if (!values.name) backTo(returnTo, { error: "School name is required." });
   const { supabase, actorId } = await getActor();
@@ -341,9 +367,15 @@ export async function saveSensei(formData: FormData) {
     name: String(formData.get("name") ?? "").trim(),
     rank: String(formData.get("rank") ?? "").trim() || null,
     school_id: String(formData.get("school_id") ?? "") || null,
+    home_address: String(formData.get("home_address") ?? "").trim() || null,
+    city_town: String(formData.get("city_town") ?? "").trim() || null,
+    home_country: String(formData.get("home_country") ?? "").trim() || null,
   };
   if (!values.name) backTo(returnTo, { error: "Sensei name is required." });
   const { supabase, actorId } = await getActor();
+
+  const certificatePath = await uploadCertificateIfPresent(supabase, formData, "sensei", returnTo);
+
   if (!id) {
     // Guard against duplicate submissions (e.g. double-clicks)
     let dupQuery = supabase.from("senseis").select("id").ilike("name", values.name).limit(1);
@@ -356,14 +388,20 @@ export async function saveSensei(formData: FormData) {
     }
   }
   if (id) {
-    const { error } = await supabase.from("senseis").update(values).eq("id", id);
+    const { error } = await supabase
+      .from("senseis")
+      .update(certificatePath ? { ...values, certificate_path: certificatePath } : values)
+      .eq("id", id);
     if (error) backTo(returnTo, { error: "Could not update sensei." });
     await writeAudit(supabase, {
       table_name: "senseis", record_id: id, action: "sensei_updated",
       new_value: values, actor_id: actorId,
     });
   } else {
-    const { data, error } = await supabase.from("senseis").insert(values).select("id").single();
+    const { data, error } = await supabase
+      .from("senseis")
+      .insert({ ...values, certificate_path: certificatePath })
+      .select("id").single();
     if (error) backTo(returnTo, { error: "Could not create sensei." });
     await writeAudit(supabase, {
       table_name: "senseis", record_id: data!.id, action: "sensei_created",
@@ -414,6 +452,70 @@ export async function updateCommunityStatus(formData: FormData) {
   backTo(returnTo, { ok: "Updated." });
 }
 
+export async function saveReferee(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const returnTo = "/admin/community";
+  const values = {
+    full_name: String(formData.get("full_name") ?? "").trim(),
+    ic_passport: String(formData.get("ic_passport") ?? "").trim(),
+    date_of_birth: String(formData.get("date_of_birth") ?? "") || null,
+    gender: String(formData.get("gender") ?? "") || null,
+    karate_rank: String(formData.get("karate_rank") ?? "").trim() || null,
+    school: String(formData.get("school") ?? "").trim() || null,
+    email: String(formData.get("email") ?? "").trim() || null,
+    phone: String(formData.get("phone") ?? "").trim() || null,
+    home_address: String(formData.get("home_address") ?? "").trim() || null,
+    city_town: String(formData.get("city_town") ?? "").trim() || null,
+    home_country: String(formData.get("home_country") ?? "").trim() || null,
+    bank_name: String(formData.get("bank_name") ?? "").trim() || null,
+    bank_account_no: String(formData.get("bank_account_no") ?? "").trim() || null,
+    bank_account_name: String(formData.get("bank_account_name") ?? "").trim() || null,
+    invitation_code: String(formData.get("invitation_code") ?? "").trim() || null,
+  };
+  if (!values.full_name || !values.ic_passport) {
+    backTo(returnTo, { error: "Name and IC/passport are required." });
+  }
+  const { supabase, actorId } = await getActor();
+
+  const certificatePath = await uploadCertificateIfPresent(supabase, formData, "referee", returnTo);
+
+  if (id) {
+    const { data: before } = await supabase.from("referees").select("*").eq("id", id).maybeSingle();
+    const { error } = await supabase
+      .from("referees")
+      .update(certificatePath ? { ...values, certificate_path: certificatePath } : values)
+      .eq("id", id);
+    if (error) backTo(returnTo, { error: "Could not update referee." });
+    await writeAudit(supabase, {
+      table_name: "referees", record_id: id, action: "referee_updated",
+      old_value: before, new_value: values, actor_id: actorId,
+    });
+  } else {
+    const { data, error } = await supabase
+      .from("referees")
+      .insert({ ...values, certificate_path: certificatePath })
+      .select("id").single();
+    if (error) backTo(returnTo, { error: "Could not create referee." });
+    await writeAudit(supabase, {
+      table_name: "referees", record_id: data!.id, action: "referee_created_by_admin",
+      new_value: values, actor_id: actorId,
+    });
+  }
+  backTo(returnTo, { ok: "Referee saved." });
+}
+
+export async function deleteReferee(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const returnTo = "/admin/community";
+  const { supabase, actorId } = await getActor();
+  const { error } = await supabase.from("referees").delete().eq("id", id);
+  if (error) backTo(returnTo, { error: "Could not delete referee." });
+  await writeAudit(supabase, {
+    table_name: "referees", record_id: id, action: "referee_deleted", actor_id: actorId,
+  });
+  backTo(returnTo, { ok: "Referee deleted." });
+}
+
 // ── Participants ─────────────────────────────────────────────────────────────
 
 export async function saveParticipant(formData: FormData) {
@@ -441,18 +543,27 @@ export async function saveParticipant(formData: FormData) {
     bank_account_name: String(formData.get("bank_account_name") ?? "").trim(),
   };
   const { supabase, actorId } = await getActor();
+
+  const certificatePath = await uploadCertificateIfPresent(supabase, formData, "participant", returnTo);
+
   let targetId = id;
   if (id) {
     const { data: before } = await supabase
       .from("participants").select("*").eq("id", id).maybeSingle();
-    const { error } = await supabase.from("participants").update(values).eq("id", id);
+    const { error } = await supabase
+      .from("participants")
+      .update(certificatePath ? { ...values, certificate_path: certificatePath } : values)
+      .eq("id", id);
     if (error) backTo(returnTo, { error: "Could not update participant." });
     await writeAudit(supabase, {
       table_name: "participants", record_id: id, action: "participant_updated",
       old_value: before, new_value: values, actor_id: actorId,
     });
   } else {
-    const { data, error } = await supabase.from("participants").insert(values).select("id").single();
+    const { data, error } = await supabase
+      .from("participants")
+      .insert({ ...values, certificate_path: certificatePath })
+      .select("id").single();
     if (error) backTo(returnTo, { error: "Could not create participant." });
     targetId = data!.id;
     await writeAudit(supabase, {

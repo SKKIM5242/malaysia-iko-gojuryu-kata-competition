@@ -20,6 +20,9 @@ export interface School {
   name: string;
   state: string | null;
   affiliation_code: string | null;
+  home_address: string | null;
+  home_country: string | null;
+  city_town: string | null;
   created_at: string;
 }
 
@@ -29,6 +32,11 @@ export interface Sensei {
   name: string;
   rank: string | null;
   school_id: string | null;
+  home_address: string | null;
+  home_country: string | null;
+  city_town: string | null;
+  certificate_path: string | null;
+  registered_by: string | null;
   created_at: string;
   school?: Pick<School, "id" | "name"> | null;
 }

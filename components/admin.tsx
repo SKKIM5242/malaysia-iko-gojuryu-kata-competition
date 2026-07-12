@@ -90,3 +90,38 @@ export function Card({ children }: { children: ReactNode }) {
     <div className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">{children}</div>
   );
 }
+
+/** Upload-or-take-a-picture field for a latest rank certificate. Reused on
+ * the Sensei, Participant, and Referee/Judge admin forms (Schools have no
+ * rank, so they don't get this field). */
+export function CertificateField({ currentUrl }: { currentUrl?: string | null }) {
+  return (
+    <div>
+      <label htmlFor="certificate" className={adminLabel}>
+        Latest rank certificate{" "}
+        <span className="font-normal text-neutral-400">(upload a file or take a picture)</span>
+      </label>
+      <input
+        id="certificate"
+        name="certificate"
+        type="file"
+        accept="image/*,application/pdf"
+        capture="environment"
+        className="w-full rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm file:mr-3 file:rounded file:border-0 file:bg-neutral-900 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-white"
+      />
+      <div className="mt-1 flex items-center gap-3">
+        <p className="text-xs text-neutral-400">Max 10 MB. Leave blank to keep the existing certificate.</p>
+        {currentUrl && (
+          <a
+            href={currentUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="whitespace-nowrap text-xs font-semibold text-green-700 underline underline-offset-2"
+          >
+            View current
+          </a>
+        )}
+      </div>
+    </div>
+  );
+}

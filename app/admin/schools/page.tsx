@@ -56,6 +56,18 @@ export default async function AdminSchools({
                   <label htmlFor="affiliation_code" className={adminLabel}>IKO affiliation code</label>
                   <input id="affiliation_code" name="affiliation_code" defaultValue={editing?.affiliation_code ?? ""} className={adminInput} placeholder="e.g. IKO-MY-KL-001" />
                 </div>
+                <div className="sm:col-span-2">
+                  <label htmlFor="home_address" className={adminLabel}>Home address</label>
+                  <input id="home_address" name="home_address" defaultValue={editing?.home_address ?? ""} className={adminInput} />
+                </div>
+                <div>
+                  <label htmlFor="city_town" className={adminLabel}>City / Town</label>
+                  <input id="city_town" name="city_town" defaultValue={editing?.city_town ?? ""} className={adminInput} />
+                </div>
+                <div>
+                  <label htmlFor="home_country" className={adminLabel}>Home country</label>
+                  <input id="home_country" name="home_country" defaultValue={editing?.home_country ?? (editing ? "" : "Malaysia")} className={adminInput} />
+                </div>
               </div>
               <div className="flex gap-2">
                 <button type="submit" className={adminBtn}>{editing ? "Save changes" : "Add school"}</button>
@@ -81,6 +93,7 @@ export default async function AdminSchools({
                     <th className="px-4 py-3">Name</th>
                     <th className="px-4 py-3">State</th>
                     <th className="px-4 py-3">Code</th>
+                    <th className="px-4 py-3">Location</th>
                     <th className="px-4 py-3">Actions</th>
                   </tr>
                 </thead>
@@ -90,6 +103,9 @@ export default async function AdminSchools({
                       <td className="max-w-[240px] truncate px-4 py-3 font-medium" title={s.name}>{s.name}</td>
                       <td className="px-4 py-3">{s.state ?? "—"}</td>
                       <td className="px-4 py-3 font-mono text-xs">{s.affiliation_code ?? "—"}</td>
+                      <td className="px-4 py-3 text-xs" title={[s.home_address, s.city_town].filter(Boolean).join(", ") || undefined}>
+                        {s.home_country ?? "—"}
+                      </td>
                       <td className="px-4 py-3">
                         <div className="flex gap-1.5">
                           <Link
