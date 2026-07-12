@@ -116,6 +116,64 @@ export interface Announcement {
   created_at: string;
 }
 
+export interface Student {
+  id: string;
+  full_name: string;
+  ic_passport: string | null;
+  date_of_birth: string | null;
+  gender: string | null;
+  category: "student" | "adult";
+  email: string | null;
+  phone: string | null;
+  home_address: string | null;
+  city_town: string | null;
+  home_country: string | null;
+  join_date: string | null;
+  status: "active" | "inactive";
+  notes: string | null;
+  created_at: string;
+}
+
+export interface FeePlan {
+  id: string;
+  name: string;
+  kind: "membership_yearly" | "training_monthly" | "grading";
+  amount_myr: number | null;
+  billing_interval: "yearly" | "monthly" | "bimonthly" | "quarterly";
+  audience: "student" | "adult" | "all";
+  active: boolean;
+  created_at: string;
+}
+
+export interface ClassEnrollment {
+  id: string;
+  student_id: string;
+  fee_plan_id: string;
+  start_date: string;
+  next_billing_date: string;
+  status: "active" | "paused" | "cancelled";
+  created_at: string;
+  student?: Pick<Student, "id" | "full_name" | "category"> | null;
+  fee_plan?: Pick<FeePlan, "id" | "name" | "amount_myr" | "billing_interval"> | null;
+}
+
+export interface ClassInvoice {
+  id: string;
+  student_id: string;
+  fee_plan_id: string | null;
+  description: string;
+  amount_myr: number;
+  period_start: string | null;
+  period_end: string | null;
+  due_date: string | null;
+  status: "unpaid" | "paid" | "void";
+  payment_reference: string | null;
+  stripe_invoice_id: string | null;
+  created_at: string;
+  student?: Pick<Student, "id" | "full_name" | "phone"> | null;
+  fee_plan?: Pick<FeePlan, "id" | "name"> | null;
+}
+
 export interface AuditLog {
   id: string;
   table_name: string | null;
