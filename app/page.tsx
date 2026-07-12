@@ -53,12 +53,22 @@ export default async function Home() {
         ) : (
           <section className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
             <div className="bg-neutral-950 px-6 py-8 text-white sm:px-10">
-              <p className="text-xs font-semibold uppercase tracking-widest text-red-500">
-                {competition.status === "open" ? "Registration open" : `Status: ${competition.status}`}
-              </p>
-              <h1 className="mt-2 text-2xl font-bold tracking-tight sm:text-4xl">{competition.name}</h1>
+              <div className="flex flex-col-reverse items-start gap-6 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-widest text-red-500">
+                    {competition.status === "open" ? "Registration open" : `Status: ${competition.status}`}
+                  </p>
+                  <h1 className="mt-2 text-2xl font-bold tracking-tight sm:text-4xl">{competition.name}</h1>
+                </div>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/logo.svg"
+                  alt="Malaysia IKO Goju-ryu Karate-do crest"
+                  className="h-28 w-28 shrink-0 rounded-2xl bg-white p-1.5 sm:h-36 sm:w-36"
+                />
+              </div>
               {competition.description && (
-                <p className="mt-3 max-w-3xl text-sm text-neutral-300 sm:text-base">{competition.description}</p>
+                <p className="mt-3 max-w-3xl whitespace-pre-line text-sm text-neutral-300 sm:text-base">{competition.description}</p>
               )}
             </div>
             <div className="grid gap-6 px-6 py-6 sm:grid-cols-2 sm:px-10 lg:grid-cols-4">

@@ -11,7 +11,12 @@ export default function LoginPage() {
     <main className="flex min-h-screen items-center justify-center bg-neutral-950 px-4">
       <div className="w-full max-w-sm">
         <div className="mb-6 text-center text-white">
-          <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-700 text-xl font-bold">剛</span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/logo.svg"
+            alt="Malaysia IKO Goju-ryu Karate-do crest"
+            className="mx-auto h-20 w-20 rounded-xl bg-white p-1"
+          />
           <h1 className="mt-3 text-xl font-bold">Organiser login</h1>
           <p className="mt-1 text-sm text-neutral-400">Malaysia Open — IKO Goju-ryu Karate-do — Kata Competition — Goju-ryu Version Only</p>
         </div>

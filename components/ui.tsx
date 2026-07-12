@@ -65,7 +65,12 @@ export function SiteHeader() {
     <header className="border-b border-neutral-200 bg-neutral-950 text-white">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-4">
         <Link href="/" className="flex items-center gap-3">
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-red-700 font-bold">剛</span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/logo.svg"
+            alt="Malaysia IKO Goju-ryu Karate-do crest"
+            className="h-11 w-11 rounded-lg bg-white p-0.5"
+          />
           <span className="leading-tight">
             <span className="block text-sm font-bold tracking-wide">MALAYSIA OPEN — IKO GOJU-RYU KARATE-DO</span>
             <span className="block text-xs text-neutral-400">Kata Competition — Goju-ryu Version Only</span>

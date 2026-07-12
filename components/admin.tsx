@@ -27,7 +27,12 @@ export function AdminShell({
       <header className="border-b border-neutral-800 bg-neutral-950 text-white">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-3">
           <Link href="/admin" className="flex items-center gap-2 font-bold">
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-red-700 text-sm">剛</span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logo.svg"
+              alt="Malaysia IKO Goju-ryu Karate-do crest"
+              className="h-8 w-8 rounded-md bg-white p-0.5"
+            />
             Admin Panel
           </Link>
           <div className="flex items-center gap-3 text-sm">
