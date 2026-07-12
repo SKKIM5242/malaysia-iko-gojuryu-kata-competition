@@ -4,7 +4,9 @@ import { schemaReady } from "@/lib/data";
 import {
   saveStudent, deleteStudent, saveFeePlan, enrollStudent,
   updateEnrollmentStatus, generateDueInvoices, createManualInvoice, updateInvoiceStatus,
+  generateInvoicePaymentLink,
 } from "@/app/actions/classes";
+import { paymentsEnabled } from "@/lib/payments";
 import { AdminShell, Card, adminBtn, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice, formatDate } from "@/components/ui";
 import type { ClassEnrollment, ClassInvoice, FeePlan, Student } from "@/lib/types";
@@ -530,6 +532,26 @@ export default async function AdminClasses({
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex flex-wrap gap-1.5">
+                              {inv.status === "unpaid" && paymentsEnabled() && (
+                                inv.checkout_url ? (
+                                  <a
+                                    href={inv.checkout_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="rounded bg-neutral-900 px-2.5 py-1 text-xs font-semibold text-white hover:bg-neutral-700"
+                                    title="Open the Stripe payment page — copy this link and send it to the payer"
+                                  >
+                                    Payment link ↗
+                                  </a>
+                                ) : (
+                                  <form action={generateInvoicePaymentLink}>
+                                    <input type="hidden" name="id" value={inv.id} />
+                                    <button className="rounded bg-neutral-900 px-2.5 py-1 text-xs font-semibold text-white hover:bg-neutral-700">
+                                      Get payment link
+                                    </button>
+                                  </form>
+                                )
+                              )}
                               {inv.status !== "paid" && (
                                 <form action={updateInvoiceStatus}>
                                   <input type="hidden" name="id" value={inv.id} />

@@ -8,6 +8,44 @@ export type FinalizeResult =
   | { status: "error"; message: string };
 
 /**
+ * Marks a class invoice paid after its Stripe Checkout session succeeds.
+ * Idempotent — safe to call from both the webhook and the thank-you page.
+ */
+export async function finalizeInvoiceSession(sessionId: string): Promise<FinalizeResult> {
+  const stripe = getStripe();
+  let session;
+  try {
+    session = await stripe.checkout.sessions.retrieve(sessionId);
+  } catch {
+    return { status: "error", message: "Payment session not found." };
+  }
+  if (session.payment_status !== "paid") return { status: "unpaid" };
+  const invoiceId = session.metadata?.invoice_id;
+  if (!invoiceId) return { status: "error", message: "No invoice reference on this payment." };
+
+  const admin = createAdminClient();
+  const { data: invoice } = await admin
+    .from("class_invoices")
+    .select("id, status")
+    .eq("id", invoiceId)
+    .maybeSingle();
+  if (!invoice) return { status: "error", message: "Invoice not found." };
+  if (invoice.status !== "paid") {
+    await admin
+      .from("class_invoices")
+      .update({ status: "paid", payment_reference: sessionId })
+      .eq("id", invoiceId);
+    await writeAudit(admin, {
+      table_name: "class_invoices",
+      record_id: invoiceId,
+      action: "invoice_paid_online",
+      new_value: { stripe_session: sessionId },
+    });
+  }
+  return { status: "paid", referenceId: invoiceId.slice(0, 8).toUpperCase() };
+}
+
+/**
  * Turn a paid Stripe Checkout session into real participant + bank-details +
  * registration rows. Idempotent: called by both the webhook and the success
  * page, whichever wins; the loser finds the existing registration by

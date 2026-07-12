@@ -3,7 +3,8 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { writeAudit } from "@/lib/audit";
-import type { ClassEnrollment, FeePlan } from "@/lib/types";
+import { getStripe, paymentsEnabled } from "@/lib/payments";
+import type { ClassEnrollment, ClassInvoice, FeePlan } from "@/lib/types";
 
 /** Dojo class billing actions — admin only (RLS: authenticated). */
 
@@ -228,6 +229,58 @@ export async function createManualInvoice(formData: FormData) {
     new_value: { student_id, description, amount }, actor_id: actorId,
   });
   backTo("invoices", { ok: "Invoice created." });
+}
+
+/**
+ * Creates a Stripe Checkout link (MYR) for an unpaid class invoice. The
+ * owner sends the link to the payer (e.g. via WhatsApp); the webhook or
+ * thank-you page marks the invoice paid automatically on success.
+ */
+export async function generateInvoicePaymentLink(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  if (!paymentsEnabled()) {
+    backTo("invoices", { error: "Online payment is not configured yet." });
+  }
+  const { supabase, actorId } = await getActor();
+  const { data } = await supabase
+    .from("class_invoices")
+    .select("*, student:students(id, full_name)")
+    .eq("id", id)
+    .maybeSingle();
+  const invoice = data as unknown as ClassInvoice | null;
+  if (!invoice) backTo("invoices", { error: "Invoice not found." });
+  if (invoice!.status !== "unpaid") backTo("invoices", { error: "Only unpaid invoices can be charged." });
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  try {
+    const session = await getStripe().checkout.sessions.create({
+      mode: "payment",
+      line_items: [
+        {
+          price_data: {
+            currency: "myr",
+            unit_amount: Math.round(Number(invoice!.amount_myr) * 100),
+            product_data: {
+              name: invoice!.description,
+              description: `Payer: ${invoice!.student?.full_name ?? "student"} — IKO GOJU-RYU KARATE-DO MALAYSIA SDN BHD`,
+            },
+          },
+          quantity: 1,
+        },
+      ],
+      metadata: { invoice_id: invoice!.id },
+      success_url: `${appUrl}/pay/thanks?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${appUrl}/pay/thanks?cancelled=1`,
+    });
+    await supabase.from("class_invoices").update({ checkout_url: session.url }).eq("id", id);
+    await writeAudit(supabase, {
+      table_name: "class_invoices", record_id: id, action: "invoice_payment_link_created",
+      new_value: { stripe_session: session.id }, actor_id: actorId,
+    });
+  } catch {
+    backTo("invoices", { error: "Stripe did not return a payment link. Please try again." });
+  }
+  backTo("invoices", { ok: "Payment link created — click “Payment link” on the invoice to open or copy it." });
 }
 
 export async function updateInvoiceStatus(formData: FormData) {

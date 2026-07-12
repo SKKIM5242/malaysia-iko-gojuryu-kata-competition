@@ -227,7 +227,7 @@ export default function RegisterForm({
         {pending
           ? payOnline ? "Redirecting to payment…" : "Submitting…"
           : payOnline
-            ? `Proceed to secure payment — RM ${Number(competition.registration_fee_usd ?? 0).toFixed(2)}`
+            ? `Proceed to secure payment — USD ${Number(competition.registration_fee_usd ?? 0).toFixed(2)}`
             : "Submit registration"}
       </button>
       {payOnline && (

@@ -169,6 +169,7 @@ export interface ClassInvoice {
   status: "unpaid" | "paid" | "void";
   payment_reference: string | null;
   stripe_invoice_id: string | null;
+  checkout_url: string | null;
   created_at: string;
   student?: Pick<Student, "id" | "full_name" | "phone"> | null;
   fee_plan?: Pick<FeePlan, "id" | "name"> | null;
