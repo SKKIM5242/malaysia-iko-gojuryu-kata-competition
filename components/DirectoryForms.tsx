@@ -70,6 +70,14 @@ export function SchoolForm() {
           <label htmlFor="affiliation_code" className={labelCls}>IKO affiliation code (if any)</label>
           <input id="affiliation_code" name="affiliation_code" className={inputCls} placeholder="e.g. IKO-MY-JB-004" />
         </div>
+        <div>
+          <label htmlFor="school_email" className={labelCls}>Email address *</label>
+          <input id="school_email" name="email" type="email" required className={inputCls} placeholder="dojo@example.com" />
+        </div>
+        <div>
+          <label htmlFor="school_phone" className={labelCls}>Mobile phone *</label>
+          <input id="school_phone" name="phone" type="tel" required className={inputCls} placeholder="+60…" />
+        </div>
       </div>
       <button
         type="submit"
@@ -137,6 +145,14 @@ export function SenseiForm({ schools, defaultBy }: { schools: School[]; defaultB
               <option key={s.id} value={s.id}>{s.name}{s.state ? ` — ${s.state}` : ""}</option>
             ))}
           </select>
+        </div>
+        <div>
+          <label htmlFor="sensei_email" className={labelCls}>Email address *</label>
+          <input id="sensei_email" name="email" type="email" required className={inputCls} placeholder="name@example.com" />
+        </div>
+        <div>
+          <label htmlFor="sensei_phone" className={labelCls}>Mobile phone *</label>
+          <input id="sensei_phone" name="phone" type="tel" required className={inputCls} placeholder="+60…" />
         </div>
       </div>
       <p className="text-xs text-neutral-500">

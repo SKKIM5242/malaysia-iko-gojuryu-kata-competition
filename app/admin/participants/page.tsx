@@ -107,6 +107,14 @@ export default async function AdminParticipants({
                   <input id="home_country" name="home_country" defaultValue={editing?.home_country ?? (editing ? "" : "Malaysia")} className={adminInput} />
                 </div>
                 <div>
+                  <label htmlFor="email" className={adminLabel}>Email address</label>
+                  <input id="email" name="email" type="email" defaultValue={editing?.email ?? ""} className={adminInput} />
+                </div>
+                <div>
+                  <label htmlFor="phone" className={adminLabel}>Mobile phone</label>
+                  <input id="phone" name="phone" type="tel" defaultValue={editing?.phone ?? ""} className={adminInput} placeholder="+60…" />
+                </div>
+                <div>
                   <label htmlFor="school_id" className={adminLabel}>School</label>
                   <select id="school_id" name="school_id" defaultValue={editing?.school_id ?? ""} className={adminInput}>
                     <option value="">— None —</option>

@@ -79,6 +79,14 @@ export default async function AdminSenseis({
                   <label htmlFor="home_country" className={adminLabel}>Home country</label>
                   <input id="home_country" name="home_country" defaultValue={editing?.home_country ?? (editing ? "" : "Malaysia")} className={adminInput} />
                 </div>
+                <div>
+                  <label htmlFor="email" className={adminLabel}>Email address</label>
+                  <input id="email" name="email" type="email" defaultValue={editing?.email ?? ""} className={adminInput} />
+                </div>
+                <div>
+                  <label htmlFor="phone" className={adminLabel}>Mobile phone</label>
+                  <input id="phone" name="phone" type="tel" defaultValue={editing?.phone ?? ""} className={adminInput} placeholder="+60…" />
+                </div>
               </div>
               <div className="flex gap-2">
                 <button type="submit" className={adminBtn}>{editing ? "Save changes" : "Add sensei"}</button>
@@ -105,6 +113,7 @@ export default async function AdminSenseis({
                     <th className="px-4 py-3">Rank</th>
                     <th className="px-4 py-3">Certificate</th>
                     <th className="px-4 py-3">Location</th>
+                    <th className="px-4 py-3">Contact</th>
                     <th className="px-4 py-3">School</th>
                     <th className="px-4 py-3">Actions</th>
                   </tr>
@@ -130,6 +139,10 @@ export default async function AdminSenseis({
                       </td>
                       <td className="px-4 py-3 text-xs" title={[s.home_address, s.city_town].filter(Boolean).join(", ") || undefined}>
                         {s.home_country ?? "—"}
+                      </td>
+                      <td className="px-4 py-3 text-xs">
+                        {s.email ?? "—"}
+                        {s.phone && <span className="block text-neutral-500">{s.phone}</span>}
                       </td>
                       <td className="max-w-[220px] truncate px-4 py-3" title={s.school?.name ?? undefined}>
                         {s.school?.name ?? "—"}

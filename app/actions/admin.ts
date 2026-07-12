@@ -318,6 +318,8 @@ export async function saveSchool(formData: FormData) {
     home_address: String(formData.get("home_address") ?? "").trim() || null,
     city_town: String(formData.get("city_town") ?? "").trim() || null,
     home_country: String(formData.get("home_country") ?? "").trim() || null,
+    email: String(formData.get("email") ?? "").trim() || null,
+    phone: String(formData.get("phone") ?? "").trim() || null,
   };
   if (!values.name) backTo(returnTo, { error: "School name is required." });
   const { supabase, actorId } = await getActor();
@@ -370,6 +372,8 @@ export async function saveSensei(formData: FormData) {
     home_address: String(formData.get("home_address") ?? "").trim() || null,
     city_town: String(formData.get("city_town") ?? "").trim() || null,
     home_country: String(formData.get("home_country") ?? "").trim() || null,
+    email: String(formData.get("email") ?? "").trim() || null,
+    phone: String(formData.get("phone") ?? "").trim() || null,
   };
   if (!values.name) backTo(returnTo, { error: "Sensei name is required." });
   const { supabase, actorId } = await getActor();
@@ -531,6 +535,8 @@ export async function saveParticipant(formData: FormData) {
     home_address: String(formData.get("home_address") ?? "").trim() || null,
     city_town: String(formData.get("city_town") ?? "").trim() || null,
     home_country: String(formData.get("home_country") ?? "").trim() || null,
+    email: String(formData.get("email") ?? "").trim() || null,
+    phone: String(formData.get("phone") ?? "").trim() || null,
     school_id: String(formData.get("school_id") ?? "") || null,
     sensei_id: String(formData.get("sensei_id") ?? "") || null,
   };

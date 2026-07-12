@@ -68,6 +68,14 @@ export default async function AdminSchools({
                   <label htmlFor="home_country" className={adminLabel}>Home country</label>
                   <input id="home_country" name="home_country" defaultValue={editing?.home_country ?? (editing ? "" : "Malaysia")} className={adminInput} />
                 </div>
+                <div>
+                  <label htmlFor="email" className={adminLabel}>Email address</label>
+                  <input id="email" name="email" type="email" defaultValue={editing?.email ?? ""} className={adminInput} />
+                </div>
+                <div>
+                  <label htmlFor="phone" className={adminLabel}>Mobile phone</label>
+                  <input id="phone" name="phone" type="tel" defaultValue={editing?.phone ?? ""} className={adminInput} placeholder="+60…" />
+                </div>
               </div>
               <div className="flex gap-2">
                 <button type="submit" className={adminBtn}>{editing ? "Save changes" : "Add school"}</button>
@@ -94,6 +102,7 @@ export default async function AdminSchools({
                     <th className="px-4 py-3">State</th>
                     <th className="px-4 py-3">Code</th>
                     <th className="px-4 py-3">Location</th>
+                    <th className="px-4 py-3">Contact</th>
                     <th className="px-4 py-3">Actions</th>
                   </tr>
                 </thead>
@@ -105,6 +114,10 @@ export default async function AdminSchools({
                       <td className="px-4 py-3 font-mono text-xs">{s.affiliation_code ?? "—"}</td>
                       <td className="px-4 py-3 text-xs" title={[s.home_address, s.city_town].filter(Boolean).join(", ") || undefined}>
                         {s.home_country ?? "—"}
+                      </td>
+                      <td className="px-4 py-3 text-xs">
+                        {s.email ?? "—"}
+                        {s.phone && <span className="block text-neutral-500">{s.phone}</span>}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex gap-1.5">

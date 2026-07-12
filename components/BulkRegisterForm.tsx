@@ -15,6 +15,8 @@ const emptyRow = (): BulkRow => ({
   gender: "",
   belt_rank: "",
   rank_confirmation: "",
+  email: "",
+  phone: "",
   home_address: "",
   city_town: "",
   home_country: "Malaysia",
@@ -120,7 +122,7 @@ export default function BulkRegisterForm({
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white shadow-sm">
-        <table className="w-full min-w-[1700px] text-left">
+        <table className="w-full min-w-[2000px] text-left">
           <thead className="border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
             <tr>
               <th className="px-2 py-2 w-10">No.</th>
@@ -130,6 +132,8 @@ export default function BulkRegisterForm({
               <th className="px-2 py-2">Gender *</th>
               <th className="px-2 py-2">Belt rank *</th>
               <th className="px-2 py-2">Rank confirmation *</th>
+              <th className="px-2 py-2">Email *</th>
+              <th className="px-2 py-2">Mobile phone *</th>
               <th className="px-2 py-2">Home address *</th>
               <th className="px-2 py-2">City/Town *</th>
               <th className="px-2 py-2">Country *</th>
@@ -162,6 +166,8 @@ export default function BulkRegisterForm({
                     <option value="pending_confirmation">Pending Confirmation</option>
                   </select>
                 </td>
+                <td className="px-2 py-1.5"><input aria-label={`Row ${i + 1} email`} type="email" className={cell} value={row.email} onChange={(e) => update(i, "email", e.target.value)} /></td>
+                <td className="px-2 py-1.5"><input aria-label={`Row ${i + 1} mobile phone`} type="tel" className={cell} value={row.phone} onChange={(e) => update(i, "phone", e.target.value)} /></td>
                 <td className="px-2 py-1.5"><input aria-label={`Row ${i + 1} home address`} className={cell} value={row.home_address} onChange={(e) => update(i, "home_address", e.target.value)} /></td>
                 <td className="px-2 py-1.5"><input aria-label={`Row ${i + 1} city or town`} className={cell} value={row.city_town} onChange={(e) => update(i, "city_town", e.target.value)} /></td>
                 <td className="px-2 py-1.5"><input aria-label={`Row ${i + 1} home country`} className={cell} value={row.home_country} onChange={(e) => update(i, "home_country", e.target.value)} /></td>

@@ -17,7 +17,11 @@ export async function registerSchool(
   const name = String(formData.get("name") ?? "").trim();
   const state = String(formData.get("state") ?? "").trim();
   const affiliation_code = String(formData.get("affiliation_code") ?? "").trim();
+  const email = String(formData.get("email") ?? "").trim();
+  const phone = String(formData.get("phone") ?? "").trim();
   if (!name) return { ok: false, error: "School / dojo name is required." };
+  if (!email) return { ok: false, error: "Email address is required." };
+  if (!phone) return { ok: false, error: "Mobile phone is required." };
 
   const supabase = await createClient();
   const { data: existing } = await supabase
@@ -35,6 +39,8 @@ export async function registerSchool(
     name,
     state: state || null,
     affiliation_code: affiliation_code || null,
+    email,
+    phone,
   });
   if (error) return { ok: false, error: "Could not register the school. Please try again." };
 
@@ -58,8 +64,12 @@ export async function registerSensei(
   const registered_by = ["self", "student", "other"].includes(String(formData.get("registered_by")))
     ? String(formData.get("registered_by"))
     : "other";
+  const email = String(formData.get("email") ?? "").trim();
+  const phone = String(formData.get("phone") ?? "").trim();
   if (!name) return { ok: false, error: "Sensei / coach name is required." };
   if (!school_id) return { ok: false, error: "Select the sensei's school / dojo." };
+  if (!email) return { ok: false, error: "Email address is required." };
+  if (!phone) return { ok: false, error: "Mobile phone is required." };
 
   const supabase = await createClient();
   const { data: existing } = await supabase
@@ -79,6 +89,8 @@ export async function registerSensei(
     rank: rank || null,
     school_id,
     registered_by,
+    email,
+    phone,
   });
   if (error) return { ok: false, error: "Could not register the sensei. Please try again." };
 

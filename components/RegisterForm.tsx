@@ -102,6 +102,18 @@ export default function RegisterForm({
         </div>
 
         <div>
+          <label htmlFor="email" className={labelCls}>Email address *</label>
+          <input id="email" name="email" type="email" required className={inputCls} placeholder="name@example.com" />
+          <FieldError message={err.email} />
+        </div>
+
+        <div>
+          <label htmlFor="phone" className={labelCls}>Mobile phone *</label>
+          <input id="phone" name="phone" type="tel" required className={inputCls} placeholder="+60…" />
+          <FieldError message={err.phone} />
+        </div>
+
+        <div>
           <label htmlFor="certificate" className={labelCls}>
             Latest rank certificate{" "}
             <span className="font-normal text-neutral-400">(photo or file — take a picture with your phone)</span>

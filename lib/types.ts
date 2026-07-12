@@ -23,6 +23,8 @@ export interface School {
   home_address: string | null;
   home_country: string | null;
   city_town: string | null;
+  email: string | null;
+  phone: string | null;
   created_at: string;
 }
 
@@ -37,6 +39,8 @@ export interface Sensei {
   city_town: string | null;
   certificate_path: string | null;
   registered_by: string | null;
+  email: string | null;
+  phone: string | null;
   created_at: string;
   school?: Pick<School, "id" | "name"> | null;
 }
@@ -75,6 +79,8 @@ export interface Participant {
   city_town: string | null;
   certificate_path: string | null;
   rank_confirmation: string | null;
+  email: string | null;
+  phone: string | null;
   school_id: string | null;
   sensei_id: string | null;
   created_at: string;

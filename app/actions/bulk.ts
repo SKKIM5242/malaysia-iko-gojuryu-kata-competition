@@ -13,6 +13,8 @@ export interface BulkRow {
   gender: string;
   belt_rank: string;
   rank_confirmation: string;
+  email: string;
+  phone: string;
   home_address: string;
   city_town: string;
   home_country: string;
@@ -43,6 +45,8 @@ const ROW_REQUIRED: Array<[keyof BulkRow, string]> = [
   ["gender", "gender"],
   ["belt_rank", "belt rank"],
   ["rank_confirmation", "rank confirmation"],
+  ["email", "email"],
+  ["phone", "mobile phone"],
   ["home_address", "home address"],
   ["city_town", "city/town"],
   ["home_country", "home country"],
@@ -149,6 +153,8 @@ export async function bulkRegister(_prev: BulkState, formData: FormData): Promis
       belt_rank: row.belt_rank.trim(),
       rank_confirmation:
         row.rank_confirmation === "sensei_confirmed" ? "sensei_confirmed" : "pending_confirmation",
+      email: row.email.trim(),
+      phone: row.phone.trim(),
       home_address: row.home_address.trim(),
       city_town: row.city_town.trim(),
       home_country: row.home_country.trim(),
@@ -194,8 +200,8 @@ export async function bulkRegister(_prev: BulkState, formData: FormData): Promis
 
 const CSV_COLUMNS = [
   "full_name", "ic_passport", "date_of_birth", "gender", "belt_rank",
-  "rank_confirmation", "home_address", "city_town", "home_country",
-  "kata_event", "bank_name", "bank_account_no", "bank_account_name",
+  "rank_confirmation", "email", "phone", "home_address", "city_town",
+  "home_country", "kata_event", "bank_name", "bank_account_no", "bank_account_name",
 ] as const;
 
 export interface CsvBulkState {
@@ -277,7 +283,8 @@ export async function bulkRegisterCsv(_prev: CsvBulkState, formData: FormData): 
   // Validate all rows first
   type Valid = {
     row: number; full_name: string; ic: string; dob: string; gender: string;
-    belt: string; rankConf: string; address: string; city: string; country: string;
+    belt: string; rankConf: string; email: string; phone: string;
+    address: string; city: string; country: string;
     categoryId: string; bank: [string, string, string];
   };
   const failures: Array<{ row: number; name: string; error: string }> = [];
@@ -323,6 +330,8 @@ export async function bulkRegisterCsv(_prev: CsvBulkState, formData: FormData): 
       rankConf: /confirm/i.test(get(r, "rank_confirmation")) && !/pending/i.test(get(r, "rank_confirmation"))
         ? "sensei_confirmed"
         : "pending_confirmation",
+      email: get(r, "email"),
+      phone: get(r, "phone"),
       address: get(r, "home_address"),
       city: get(r, "city_town"),
       country: get(r, "home_country"),
@@ -369,6 +378,8 @@ export async function bulkRegisterCsv(_prev: CsvBulkState, formData: FormData): 
         gender: v.gender,
         belt_rank: v.belt,
         rank_confirmation: v.rankConf,
+        email: v.email,
+        phone: v.phone,
         home_address: v.address,
         city_town: v.city,
         home_country: v.country,

@@ -1,3 +1,3 @@
-full_name,ic_passport,date_of_birth,gender,belt_rank,rank_confirmation,home_address,city_town,home_country,kata_event,bank_name,bank_account_no,bank_account_name
-Ahmad Faris bin Razali,081234-14-5671,2008-03-12,male,3rd Kyu,Sensei Confirmed,12 Jalan Melati,Kuala Lumpur,Malaysia,Kata Saifa,Maybank,1234-5678-9012,Ahmad Faris bin Razali
-Lee Mei Ling,020202-10-2244,2002-02-02,female,1st Dan,Pending Confirmation,8 Lorong Cempaka,George Town,Malaysia,Kata Tensho,CIMB,9876-5432-1098,Lee Mei Ling
+full_name,ic_passport,date_of_birth,gender,belt_rank,rank_confirmation,email,phone,home_address,city_town,home_country,kata_event,bank_name,bank_account_no,bank_account_name
+Ahmad Faris bin Razali,081234-14-5671,2008-03-12,male,3rd Kyu,Sensei Confirmed,ahmad@example.com,+60121234567,12 Jalan Melati,Kuala Lumpur,Malaysia,Kata Saifa,Maybank,1234-5678-9012,Ahmad Faris bin Razali
+Lee Mei Ling,020202-10-2244,2002-02-02,female,1st Dan,Pending Confirmation,meiling@example.com,+60137654321,8 Lorong Cempaka,George Town,Malaysia,Kata Tensho,CIMB,9876-5432-1098,Lee Mei Ling
