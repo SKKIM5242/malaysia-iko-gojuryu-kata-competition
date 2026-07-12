@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useActionState } from "react";
 import Link from "next/link";
 import { bulkRegister, type BulkRow, type BulkState } from "@/app/actions/bulk";
-import type { Category, Competition, School, Sensei } from "@/lib/types";
+import type { Competition, School, Sensei } from "@/lib/types";
 
 const initial: BulkState = { done: false };
 
@@ -14,7 +14,7 @@ const emptyRow = (): BulkRow => ({
   date_of_birth: "",
   gender: "",
   belt_rank: "",
-  category_id: "",
+  kata_base: "",
   bank_name: "",
   bank_account_no: "",
   bank_account_name: "",
@@ -24,12 +24,12 @@ const cell = "w-full rounded border border-neutral-300 bg-white px-2 py-1.5 text
 
 export default function BulkRegisterForm({
   competition,
-  categories,
+  kataBases,
   schools,
   senseis,
 }: {
   competition: Competition;
-  categories: Category[];
+  kataBases: string[];
   schools: School[];
   senseis: Sensei[];
 }) {
@@ -125,7 +125,7 @@ export default function BulkRegisterForm({
               <th className="px-2 py-2">Date of birth *</th>
               <th className="px-2 py-2">Gender *</th>
               <th className="px-2 py-2">Belt rank *</th>
-              <th className="px-2 py-2">Kata category *</th>
+              <th className="px-2 py-2">Kata event *</th>
               <th className="px-2 py-2">Bank name *</th>
               <th className="px-2 py-2">Bank account no. *</th>
               <th className="px-2 py-2">Account holder *</th>
@@ -148,10 +148,10 @@ export default function BulkRegisterForm({
                 </td>
                 <td className="px-2 py-1.5"><input aria-label={`Row ${i + 1} belt rank`} className={cell} placeholder="e.g. 3rd Kyu" value={row.belt_rank} onChange={(e) => update(i, "belt_rank", e.target.value)} /></td>
                 <td className="px-2 py-1.5">
-                  <select aria-label={`Row ${i + 1} category`} className={cell} value={row.category_id} onChange={(e) => update(i, "category_id", e.target.value)}>
+                  <select aria-label={`Row ${i + 1} kata event`} className={cell} value={row.kata_base} onChange={(e) => update(i, "kata_base", e.target.value)}>
                     <option value=""></option>
-                    {categories.map((c) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
+                    {kataBases.map((k) => (
+                      <option key={k} value={k}>{k}</option>
                     ))}
                   </select>
                 </td>

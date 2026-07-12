@@ -4,7 +4,7 @@ import { useActionState } from "react";
 import Link from "next/link";
 import { submitRegistration, type RegisterState } from "@/app/actions/register";
 import { OrganiserContact } from "@/components/ui";
-import type { Category, Competition, School, Sensei } from "@/lib/types";
+import type { Competition, School, Sensei } from "@/lib/types";
 
 const initialState: RegisterState = { ok: false };
 
@@ -19,13 +19,13 @@ function FieldError({ message }: { message?: string }) {
 
 export default function RegisterForm({
   competition,
-  categories,
+  kataBases,
   schools,
   senseis,
   payOnline,
 }: {
   competition: Competition;
-  categories: Category[];
+  kataBases: string[];
   schools: School[];
   senseis: Sensei[];
   payOnline: boolean;
@@ -124,17 +124,18 @@ export default function RegisterForm({
         </div>
 
         <div className="sm:col-span-2">
-          <label htmlFor="category_id" className={labelCls}>Competition category *</label>
-          <select id="category_id" name="category_id" required className={inputCls} defaultValue="">
-            <option value="" disabled>Select category</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-                {c.age_min != null && c.age_max != null ? ` (ages ${c.age_min}–${c.age_max})` : ""}
-              </option>
+          <label htmlFor="kata_base" className={labelCls}>Kata event *</label>
+          <select id="kata_base" name="kata_base" required className={inputCls} defaultValue="">
+            <option value="" disabled>Select kata</option>
+            {kataBases.map((k) => (
+              <option key={k} value={k}>{k}</option>
             ))}
           </select>
-          <FieldError message={err.category_id} />
+          <p className="mt-1 text-xs text-neutral-400">
+            Your belt sub-category (Color/Kyu Belt or Black Belt &amp; Dan Holders) and age group
+            (4–14, 15–40, 41–65, 66–99) are assigned automatically from your belt rank and date of birth.
+          </p>
+          <FieldError message={err.kata_base} />
         </div>
 
         <div className="sm:col-span-2 mt-2 rounded-md border border-neutral-200 bg-neutral-50 p-4">

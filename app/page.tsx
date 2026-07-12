@@ -15,6 +15,7 @@ import {
   formatUSD,
 } from "@/components/ui";
 import { Markdown } from "@/lib/markdown";
+import { kataBases } from "@/lib/division";
 
 export const dynamic = "force-dynamic";
 
@@ -100,22 +101,23 @@ export default async function Home() {
 
         {competition && (
           <section className="mt-12">
-            <SectionTitle>Competition categories</SectionTitle>
+            <SectionTitle>Kata events</SectionTitle>
             {categories.length === 0 ? (
               <EmptyState>Categories have not been published yet.</EmptyState>
             ) : (
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                {categories.map((c) => (
-                  <div key={c.id} className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
-                    <p className="font-semibold text-neutral-900">{c.name}</p>
-                    <p className="mt-1 text-sm text-neutral-500">
-                      {c.age_min != null && c.age_max != null ? `Ages ${c.age_min}–${c.age_max}` : "All ages"}
-                      {c.belt_group ? ` · ${c.belt_group.toUpperCase()} belts` : ""}
-                    </p>
-                    <p className="text-sm capitalize text-neutral-500">{c.gender ?? "open"}</p>
-                  </div>
-                ))}
-              </div>
+              <>
+                <p className="mb-4 text-sm text-neutral-500">
+                  Every kata event is divided into <strong>Color/Kyu Belt</strong> and{" "}
+                  <strong>Black Belt &amp; Dan Holders</strong> sub-categories, each with age groups{" "}
+                  <strong>4–14</strong>, <strong>15–40</strong>, <strong>41–65</strong> and{" "}
+                  <strong>66–99</strong>. Your sub-category is assigned automatically when you register.
+                </p>
+                <ol className="grid list-inside list-decimal gap-x-8 gap-y-2 rounded-lg border border-neutral-200 bg-white p-6 shadow-sm sm:grid-cols-2">
+                  {kataBases(categories).map((k) => (
+                    <li key={k} className="text-sm font-medium text-neutral-800">{k}</li>
+                  ))}
+                </ol>
+              </>
             )}
           </section>
         )}

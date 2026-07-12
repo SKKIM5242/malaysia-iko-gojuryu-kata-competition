@@ -7,6 +7,7 @@ import {
   schemaReady,
 } from "@/lib/data";
 import { EmptyState, SetupNotice, SiteFooter, SiteHeader } from "@/components/ui";
+import { kataBases } from "@/lib/division";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,7 @@ const PAGE_SIZE = 25;
 export default async function ParticipantsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ category?: string; school?: string; page?: string }>;
+  searchParams: Promise<{ kata?: string; school?: string; page?: string }>;
 }) {
   const params = await searchParams;
   const ready = await schemaReady();
@@ -48,18 +49,19 @@ export default async function ParticipantsPage({
     getCategories(competition.id),
     getSchools(),
     getConfirmedRegistrations(competition.id, {
-      categoryId: params.category || undefined,
+      kataBase: params.kata || undefined,
       schoolId: params.school || undefined,
       page,
       pageSize: PAGE_SIZE,
     }),
   ]);
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const bases = kataBases(categories);
 
   const filterHref = (overrides: Record<string, string | undefined>) => {
     const q = new URLSearchParams();
-    const merged = { category: params.category, school: params.school, ...overrides };
-    if (merged.category) q.set("category", merged.category);
+    const merged = { kata: params.kata, school: params.school, ...overrides };
+    if (merged.kata) q.set("kata", merged.kata);
     if (merged.school) q.set("school", merged.school);
     if (overrides.page) q.set("page", overrides.page);
     const s = q.toString();
@@ -77,18 +79,18 @@ export default async function ParticipantsPage({
 
         <form method="GET" action="/participants" className="mt-6 flex flex-wrap items-end gap-3">
           <div>
-            <label htmlFor="category" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-neutral-500">
-              Category
+            <label htmlFor="kata" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-neutral-500">
+              Kata event
             </label>
             <select
-              id="category"
-              name="category"
-              defaultValue={params.category ?? ""}
+              id="kata"
+              name="kata"
+              defaultValue={params.kata ?? ""}
               className="rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm"
             >
-              <option value="">All categories</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
+              <option value="">All kata events</option>
+              {bases.map((k) => (
+                <option key={k} value={k}>{k}</option>
               ))}
             </select>
           </div>
@@ -114,7 +116,7 @@ export default async function ParticipantsPage({
           >
             Filter
           </button>
-          {(params.category || params.school) && (
+          {(params.kata || params.school) && (
             <Link href="/participants" className="py-2 text-sm text-red-700 underline underline-offset-2">
               Clear filters
             </Link>

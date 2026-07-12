@@ -1,12 +1,15 @@
+import type { Category } from "@/lib/types";
+
 /**
- * Competition divisions are derived, not picked: each kata event is split by
- * age group (at event date), belt group (Kyu/colour vs Dan), and gender.
+ * Categories are a hierarchy: Kata event → belt sub-category (Color/Kyu vs
+ * Black Belt & Dan) → age sub-sub-category. Names follow
+ * "«kata» — «belt label» — Age «lo»–«hi»". The registrant picks only the
+ * kata; the correct sub-category is resolved from belt rank + date of birth.
  */
 
-const AGE_GROUPS: Array<[number, number]> = [
-  [4, 12],
-  [13, 21],
-  [22, 40],
+export const AGE_BRACKETS: Array<[number, number]> = [
+  [4, 14],
+  [15, 40],
   [41, 65],
   [66, 99],
 ];
@@ -20,19 +23,55 @@ export function ageAt(dateOfBirth: string, onDate: string | null | undefined): n
   return age;
 }
 
-export function beltGroup(beltRank: string): "Dan" | "Kyu" {
-  return /dan/i.test(beltRank) ? "Dan" : "Kyu";
+export function beltGroup(beltRank: string): "dan" | "kyu" {
+  return /dan|black/i.test(beltRank) ? "dan" : "kyu";
 }
 
-export function computeDivision(
+/** The kata event part of a hierarchical category name. */
+export function kataBaseOf(categoryName: string): string {
+  return categoryName.split(" — ")[0];
+}
+
+/** Unique kata event names, in listing (sort_order) order. */
+export function kataBases(categories: Category[]): string[] {
+  const seen = new Set<string>();
+  const bases: string[] = [];
+  for (const c of categories) {
+    const base = kataBaseOf(c.name);
+    if (!seen.has(base)) {
+      seen.add(base);
+      bases.push(base);
+    }
+  }
+  return bases;
+}
+
+/**
+ * Resolve the exact sub-category for a registrant. Returns the category or
+ * an error message when the age falls outside every bracket.
+ */
+export function resolveCategory(
+  categories: Category[],
+  kataBase: string,
   dateOfBirth: string,
   beltRank: string,
-  gender: string,
   eventDate: string | null | undefined,
-): string {
+): { category?: Category; error?: string } {
   const age = ageAt(dateOfBirth, eventDate);
-  const group = AGE_GROUPS.find(([min, max]) => age >= min && age <= max);
-  const ageLabel = group ? `Age ${group[0]}–${group[1]}` : `Age ${age}`;
-  const g = gender.toLowerCase() === "female" ? "Female" : "Male";
-  return `${ageLabel} · ${beltGroup(beltRank)} · ${g}`;
+  const grp = beltGroup(beltRank);
+  const match = categories.find(
+    (c) =>
+      kataBaseOf(c.name) === kataBase &&
+      c.belt_group === grp &&
+      c.age_min != null &&
+      c.age_max != null &&
+      age >= c.age_min &&
+      age <= c.age_max,
+  );
+  if (!match) {
+    return {
+      error: `No ${grp === "dan" ? "Black Belt & Dan" : "Color/Kyu Belt"} age category covers age ${age} for this kata.`,
+    };
+  }
+  return { category: match };
 }

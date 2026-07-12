@@ -8,6 +8,7 @@ import {
 import { EmptyState, SetupNotice, SiteFooter, SiteHeader, formatDate, formatUSD } from "@/components/ui";
 import RegisterForm from "@/components/RegisterForm";
 import { paymentsEnabled } from "@/lib/payments";
+import { kataBases } from "@/lib/division";
 
 export const dynamic = "force-dynamic";
 
@@ -89,7 +90,7 @@ export default async function RegisterPage() {
               </div>
               <RegisterForm
                 competition={competition}
-                categories={categories}
+                kataBases={kataBases(categories)}
                 schools={schools}
                 senseis={senseis}
                 payOnline={paymentsEnabled() && Number(competition.registration_fee_usd ?? 0) > 0}

@@ -5,7 +5,8 @@ import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { writeAudit } from "@/lib/audit";
 import { getStripe, paymentsEnabled } from "@/lib/payments";
-import { computeDivision } from "@/lib/division";
+import { resolveCategory } from "@/lib/division";
+import type { Category } from "@/lib/types";
 
 export interface RegisterState {
   ok: boolean;
@@ -21,7 +22,7 @@ const REQUIRED: Array<[string, string]> = [
   ["gender", "Gender is required"],
   ["belt_rank", "Belt rank is required"],
   ["school_id", "School is required"],
-  ["category_id", "Category is required"],
+  ["kata_base", "Kata event is required"],
   ["sensei_id", "Coach / sensei is required"],
   ["bank_name", "Bank name is required"],
   ["bank_account_no", "Bank account number is required"],
@@ -97,13 +98,29 @@ export async function submitRegistration(
     };
   }
 
-  // Division is derived, not picked: age group at event date × Kyu/Dan × gender
-  values.division = computeDivision(
+  // The registrant picks the kata; the belt (Color/Kyu vs Black Belt & Dan)
+  // and age sub-categories are resolved from their belt rank + date of birth.
+  const { data: catRows } = await supabase
+    .from("categories")
+    .select("*")
+    .eq("competition_id", values.competition_id)
+    .order("sort_order");
+  const resolved = resolveCategory(
+    (catRows as Category[]) ?? [],
+    values.kata_base,
     values.date_of_birth,
     values.belt_rank,
-    values.gender,
     competition.event_date,
   );
+  if (!resolved.category) {
+    return {
+      ok: false,
+      error: resolved.error ?? "No matching category for this kata / age / belt.",
+      fieldErrors: { kata_base: resolved.error ?? "No matching category" },
+    };
+  }
+  values.category_id = resolved.category.id;
+  values.division = values.gender.toLowerCase() === "female" ? "Female" : "Male";
 
   // ── Pay-before-submit: when the gateway is configured and the competition
   // has a fee, no registration row is written yet. The validated payload is

@@ -7,6 +7,7 @@ import {
 } from "@/lib/data";
 import { EmptyState, SetupNotice, SiteFooter, SiteHeader, formatDate, formatUSD } from "@/components/ui";
 import BulkRegisterForm from "@/components/BulkRegisterForm";
+import { kataBases } from "@/lib/division";
 
 export const dynamic = "force-dynamic";
 
@@ -59,7 +60,7 @@ export default async function BulkRegisterPage() {
               </div>
               <BulkRegisterForm
                 competition={competition}
-                categories={categories}
+                kataBases={kataBases(categories)}
                 schools={schools}
                 senseis={senseis}
               />

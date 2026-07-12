@@ -41,6 +41,7 @@ export async function getCategories(competitionId: string): Promise<Category[]> 
     .from("categories")
     .select("*")
     .eq("competition_id", competitionId)
+    .order("sort_order")
     .order("name");
   return (data as Category[]) ?? [];
 }
@@ -69,6 +70,7 @@ export async function getAnnouncement(id: string): Promise<Announcement | null> 
 
 export interface ParticipantFilters {
   categoryId?: string;
+  kataBase?: string;
   schoolId?: string;
   page?: number;
   pageSize?: number;
@@ -99,6 +101,9 @@ export async function getConfirmedRegistrations(
   if (filters.categoryId) query = query.eq("category_id", filters.categoryId);
   const { data, count } = await query;
   let rows = (data as unknown as ConfirmedRegistration[]) ?? [];
+  if (filters.kataBase) {
+    rows = rows.filter((r) => r.category?.name?.startsWith(filters.kataBase!));
+  }
   if (filters.schoolId) {
     rows = rows.filter((r) => r.participant?.school_id === filters.schoolId);
   }

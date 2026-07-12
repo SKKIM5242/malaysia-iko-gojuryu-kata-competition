@@ -8,6 +8,16 @@ import type { Category } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
+function groupByKata(categories: Category[]): Array<[string, Category[]]> {
+  const groups = new Map<string, Category[]>();
+  for (const c of categories) {
+    const base = c.name.split(" — ")[0];
+    if (!groups.has(base)) groups.set(base, []);
+    groups.get(base)!.push(c);
+  }
+  return [...groups.entries()];
+}
+
 export default async function AdminCompetitions({
   searchParams,
 }: {
@@ -187,34 +197,38 @@ export default async function AdminCompetitions({
                     {(categoriesByCompetition.get(c.id) ?? []).length === 0 ? (
                       <p className="text-sm text-neutral-400">None yet — edit this competition to add categories.</p>
                     ) : (
-                      <ul className="space-y-1.5">
-                        {(categoriesByCompetition.get(c.id) ?? []).map((cat) => (
-                          <li key={cat.id} className="flex items-center justify-between gap-2 text-sm">
-                            <span>
-                              {cat.name}
-                              <span className="text-neutral-400">
-                                {cat.age_min != null && cat.age_max != null ? ` · ${cat.age_min}–${cat.age_max} yrs` : ""}
-                                {cat.belt_group ? ` · ${cat.belt_group}` : ""}
-                                {cat.gender ? ` · ${cat.gender}` : ""}
-                              </span>
-                            </span>
-                            <span className="flex shrink-0 gap-1">
-                              <Link
-                                href={`/admin/competitions?editcat=${cat.id}`}
-                                className="rounded border border-neutral-300 px-2 py-0.5 text-xs text-neutral-600 hover:bg-neutral-50"
-                              >
-                                Edit
-                              </Link>
-                              <form action={deleteCategory}>
-                                <input type="hidden" name="id" value={cat.id} />
-                                <button className="rounded border border-red-200 px-2 py-0.5 text-xs text-red-600 hover:bg-red-50">
-                                  Delete
-                                </button>
-                              </form>
-                            </span>
-                          </li>
+                      <div className="space-y-2">
+                        {groupByKata(categoriesByCompetition.get(c.id) ?? []).map(([base, cats]) => (
+                          <details key={base} className="rounded border border-neutral-100">
+                            <summary className="cursor-pointer px-2 py-1.5 text-sm font-semibold text-neutral-800 hover:bg-neutral-50">
+                              {base} <span className="font-normal text-neutral-400">({cats.length} sub-categories)</span>
+                            </summary>
+                            <ul className="space-y-1 px-2 pb-2 pl-5">
+                              {cats.map((cat) => (
+                                <li key={cat.id} className="flex items-center justify-between gap-2 text-sm">
+                                  <span className="text-neutral-600">
+                                    {cat.name.split(" — ").slice(1).join(" — ") || cat.name}
+                                  </span>
+                                  <span className="flex shrink-0 gap-1">
+                                    <Link
+                                      href={`/admin/competitions?editcat=${cat.id}`}
+                                      className="rounded border border-neutral-300 px-2 py-0.5 text-xs text-neutral-600 hover:bg-neutral-50"
+                                    >
+                                      Edit
+                                    </Link>
+                                    <form action={deleteCategory}>
+                                      <input type="hidden" name="id" value={cat.id} />
+                                      <button className="rounded border border-red-200 px-2 py-0.5 text-xs text-red-600 hover:bg-red-50">
+                                        Delete
+                                      </button>
+                                    </form>
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          </details>
                         ))}
-                      </ul>
+                      </div>
                     )}
                   </div>
                 </Card>

@@ -41,6 +41,7 @@ export interface Category {
   age_max: number | null;
   belt_group: string | null;
   gender: string | null;
+  sort_order: number;
   created_at: string;
 }
 

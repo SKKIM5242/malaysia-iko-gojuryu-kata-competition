@@ -2,7 +2,8 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { writeAudit } from "@/lib/audit";
-import { computeDivision } from "@/lib/division";
+import { resolveCategory } from "@/lib/division";
+import type { Category } from "@/lib/types";
 
 export interface BulkRow {
   full_name: string;
@@ -10,7 +11,7 @@ export interface BulkRow {
   date_of_birth: string;
   gender: string;
   belt_rank: string;
-  category_id: string;
+  kata_base: string;
   bank_name: string;
   bank_account_no: string;
   bank_account_name: string;
@@ -36,7 +37,7 @@ const ROW_REQUIRED: Array<[keyof BulkRow, string]> = [
   ["date_of_birth", "date of birth"],
   ["gender", "gender"],
   ["belt_rank", "belt rank"],
-  ["category_id", "category"],
+  ["kata_base", "kata event"],
   ["bank_name", "bank name"],
   ["bank_account_no", "bank account no."],
   ["bank_account_name", "bank account holder"],
@@ -77,6 +78,13 @@ export async function bulkRegister(_prev: BulkState, formData: FormData): Promis
     return { done: false, error: "The registration deadline has passed." };
   }
 
+  const { data: catRows } = await supabase
+    .from("categories")
+    .select("*")
+    .eq("competition_id", competitionId)
+    .order("sort_order");
+  const categories = (catRows as Category[]) ?? [];
+
   const results: BulkRowResult[] = [];
   const seenICs = new Set<string>();
 
@@ -108,6 +116,18 @@ export async function bulkRegister(_prev: BulkState, formData: FormData): Promis
       continue;
     }
 
+    const resolved = resolveCategory(
+      categories,
+      row.kata_base,
+      row.date_of_birth,
+      row.belt_rank,
+      competition.event_date,
+    );
+    if (!resolved.category) {
+      results.push({ row: i + 1, name: label, ok: false, error: resolved.error ?? "No matching category" });
+      continue;
+    }
+
     const participantId = crypto.randomUUID();
     const registrationId = crypto.randomUUID();
 
@@ -135,8 +155,8 @@ export async function bulkRegister(_prev: BulkState, formData: FormData): Promis
       id: registrationId,
       competition_id: competitionId,
       participant_id: participantId,
-      category_id: row.category_id,
-      division: computeDivision(row.date_of_birth, row.belt_rank, row.gender, competition.event_date),
+      category_id: resolved.category.id,
+      division: row.gender.toLowerCase() === "female" ? "Female" : "Male",
       payment_status: "pending",
     });
     if (rErr) {
@@ -148,7 +168,7 @@ export async function bulkRegister(_prev: BulkState, formData: FormData): Promis
       table_name: "registrations",
       record_id: registrationId,
       action: "bulk_registration_submitted",
-      new_value: { participant_id: participantId, category_id: row.category_id, sensei_id: senseiId },
+      new_value: { participant_id: participantId, category_id: resolved.category.id, sensei_id: senseiId },
     });
     results.push({ row: i + 1, name: label, ok: true, referenceId: registrationId.slice(0, 8).toUpperCase() });
   }
