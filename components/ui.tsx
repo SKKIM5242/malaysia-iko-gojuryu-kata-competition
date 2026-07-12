@@ -73,7 +73,7 @@ export function SiteHeader() {
           />
           <span className="leading-tight">
             <span className="block text-sm font-bold tracking-wide">MALAYSIA OPEN — IKO GOJU-RYU KARATE-DO</span>
-            <span className="block text-xs text-neutral-400">Kata Competition — Goju-ryu Version Only</span>
+            <span className="block text-sm font-bold tracking-wide">Kata Competition — Goju-ryu Version Only</span>
           </span>
         </Link>
         <nav className="flex flex-wrap items-center gap-1 text-sm">
@@ -102,7 +102,17 @@ export function SiteFooter() {
         <p className="font-semibold text-neutral-700">
           Malaysia Open — IKO Goju-ryu Karate-do — Kata Competition — Goju-ryu Version Only
         </p>
-        <p className="mt-1">Organiser: IKO GOJU-RYU KARATE-DO MALAYSIA SDN BHD</p>
+        <p className="mt-1">
+          Organiser:{" "}
+          <a
+            href="https://www.mixo.io/site/iko-goju-ryu-karate-do-m-sdn-bhd-wt9nk"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-semibold underline underline-offset-2 hover:text-neutral-900"
+          >
+            IKO GOJU-RYU KARATE-DO MALAYSIA SDN BHD
+          </a>
+        </p>
         <p className="mt-1">
           <Link href="/announcements" className="underline underline-offset-2">Announcements</Link> ·{" "}
           <Link href="/participants" className="underline underline-offset-2">Participants</Link> ·{" "}
