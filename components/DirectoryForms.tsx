@@ -82,7 +82,7 @@ export function SchoolForm() {
   );
 }
 
-export function SenseiForm({ schools }: { schools: School[] }) {
+export function SenseiForm({ schools, defaultBy }: { schools: School[]; defaultBy?: string }) {
   const [state, formAction, pending] = useActionState(registerSensei, initial);
   if (state.ok && state.name) {
     return (
@@ -105,6 +105,21 @@ export function SenseiForm({ schools }: { schools: School[] }) {
           {state.error}
         </div>
       )}
+      <div>
+        <label htmlFor="registered_by" className={labelCls}>Who is registering? *</label>
+        <select
+          id="registered_by"
+          name="registered_by"
+          required
+          defaultValue={defaultBy === "self" || defaultBy === "student" ? defaultBy : ""}
+          className={inputCls}
+        >
+          <option value="" disabled>Select</option>
+          <option value="self">The sensei / coach themselves (self-registration)</option>
+          <option value="student">A student registering their sensei / coach</option>
+          <option value="other">School / club representative</option>
+        </select>
+      </div>
       <div>
         <label htmlFor="name" className={labelCls}>Sensei / Coach name *</label>
         <input id="name" name="name" required className={inputCls} />

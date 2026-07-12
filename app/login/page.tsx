@@ -13,7 +13,7 @@ export default function LoginPage() {
         <div className="mb-6 text-center text-white">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/logo.svg"
+            src="/logo.jpg"
             alt="Malaysia IKO Goju-ryu Karate-do crest"
             className="mx-auto h-20 w-20 rounded-xl bg-white p-1"
           />

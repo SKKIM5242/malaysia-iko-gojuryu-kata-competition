@@ -385,6 +385,35 @@ export async function deleteSensei(formData: FormData) {
   backTo(returnTo, { ok: "Sensei deleted." });
 }
 
+// ── Community (referees / audiences / staff applications) ───────────────────
+
+export async function updateCommunityStatus(formData: FormData) {
+  const table = String(formData.get("table") ?? "");
+  const id = String(formData.get("id") ?? "");
+  const field = String(formData.get("field") ?? "");
+  const value = String(formData.get("value") ?? "");
+  const returnTo = "/admin/community";
+  const allowed: Record<string, Record<string, string[]>> = {
+    referees: {
+      payment_status: ["pending", "paid", "waived", "refunded", "forfeited"],
+      status: ["pending", "approved", "rejected"],
+    },
+    audiences: { payment_status: ["pending", "paid", "waived"] },
+    staff_applications: { status: ["pending", "approved", "rejected"] },
+  };
+  if (!allowed[table]?.[field]?.includes(value) || !id) {
+    backTo(returnTo, { error: "Invalid update." });
+  }
+  const { supabase, actorId } = await getActor();
+  const { error } = await supabase.from(table).update({ [field]: value }).eq("id", id);
+  if (error) backTo(returnTo, { error: "Update failed — please try again." });
+  await writeAudit(supabase, {
+    table_name: table, record_id: id, action: `${field}_changed`,
+    new_value: { [field]: value }, actor_id: actorId,
+  });
+  backTo(returnTo, { ok: "Updated." });
+}
+
 // ── Participants ─────────────────────────────────────────────────────────────
 
 export async function saveParticipant(formData: FormData) {

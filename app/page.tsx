@@ -62,7 +62,7 @@ export default async function Home() {
                 </div>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src="/logo.svg"
+                  src="/logo.jpg"
                   alt="Malaysia IKO Goju-ryu Karate-do crest"
                   className="h-28 w-28 shrink-0 rounded-2xl bg-white p-1.5 sm:h-36 sm:w-36"
                 />

@@ -55,6 +55,9 @@ export async function registerSensei(
   const name = String(formData.get("name") ?? "").trim();
   const rank = String(formData.get("rank") ?? "").trim();
   const school_id = String(formData.get("school_id") ?? "").trim();
+  const registered_by = ["self", "student", "other"].includes(String(formData.get("registered_by")))
+    ? String(formData.get("registered_by"))
+    : "other";
   if (!name) return { ok: false, error: "Sensei / coach name is required." };
   if (!school_id) return { ok: false, error: "Select the sensei's school / dojo." };
 
@@ -75,6 +78,7 @@ export async function registerSensei(
     name,
     rank: rank || null,
     school_id,
+    registered_by,
   });
   if (error) return { ok: false, error: "Could not register the sensei. Please try again." };
 

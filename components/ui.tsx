@@ -67,7 +67,7 @@ export function SiteHeader() {
         <Link href="/" className="flex items-center gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/logo.svg"
+            src="/logo.jpg"
             alt="Malaysia IKO Goju-ryu Karate-do crest"
             className="h-11 w-11 rounded-lg bg-white p-0.5"
           />

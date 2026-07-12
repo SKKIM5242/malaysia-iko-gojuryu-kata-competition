@@ -21,6 +21,7 @@ export function AdminShell({
     ["Schools", "/admin/schools"],
     ["Senseis", "/admin/senseis"],
     ["Participants", "/admin/participants"],
+    ["Community", "/admin/community"],
   ] as const;
   return (
     <div className="min-h-screen bg-neutral-100">
@@ -29,7 +30,7 @@ export function AdminShell({
           <Link href="/admin" className="flex items-center gap-2 font-bold">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/logo.svg"
+              src="/logo.jpg"
               alt="Malaysia IKO Goju-ryu Karate-do crest"
               className="h-8 w-8 rounded-md bg-white p-0.5"
             />

@@ -7,9 +7,12 @@ import {
 } from "@/lib/data";
 import { EmptyState, SetupNotice, SiteFooter, SiteHeader, formatDate, formatUSD } from "@/components/ui";
 import BulkRegisterForm from "@/components/BulkRegisterForm";
+import CsvBulkForm from "@/components/CsvBulkForm";
 import { kataBases } from "@/lib/division";
 
 export const dynamic = "force-dynamic";
+// CSV uploads with thousands of rows need more than the default 10s
+export const maxDuration = 60;
 
 export const metadata = { title: "Bulk registration (Sensei / Coach)" };
 
@@ -53,17 +56,35 @@ export default async function BulkRegisterPage() {
             <EmptyState>Registration is closed for this competition.</EmptyState>
           ) : (
             <>
-              <div className="mb-6 rounded-md border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
-                Fill one row per participant — like a spreadsheet. Select your school / dojo and
-                sensei / coach once at the top; they apply to every row. All fields marked * are
-                required, including each participant&apos;s bank details for prize payouts.
-              </div>
-              <BulkRegisterForm
-                competition={competition}
-                kataBases={kataBases(categories)}
-                schools={schools}
-                senseis={senseis}
-              />
+              <section className="mb-10 rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
+                <h2 className="text-lg font-bold">Option A — Excel / CSV upload (up to 10,000 pax)</h2>
+                <p className="mt-1 text-sm text-neutral-600">
+                  1. <a href="/bulk-registration-template.csv" download className="font-semibold text-red-700 underline underline-offset-2">
+                    Download the CSV template
+                  </a>{" "}
+                  (opens in Excel). 2. Fill one row per participant — keep the header row and use
+                  dates as YYYY-MM-DD; kata_event must match one of the kata event names. 3. Save
+                  as CSV and upload it below.
+                </p>
+                <div className="mt-4">
+                  <CsvBulkForm competition={competition} schools={schools} senseis={senseis} />
+                </div>
+              </section>
+
+              <section>
+                <h2 className="text-lg font-bold">Option B — fill the table on screen</h2>
+                <div className="mt-2 mb-4 rounded-md border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
+                  Fill one row per participant — like a spreadsheet. Select your school / dojo and
+                  sensei / coach once at the top; they apply to every row. All fields marked * are
+                  required, including each participant&apos;s bank details for prize payouts.
+                </div>
+                <BulkRegisterForm
+                  competition={competition}
+                  kataBases={kataBases(categories)}
+                  schools={schools}
+                  senseis={senseis}
+                />
+              </section>
             </>
           )}
         </div>
