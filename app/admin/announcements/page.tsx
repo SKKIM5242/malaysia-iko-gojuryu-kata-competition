@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getAllAnnouncements, getAllCompetitions } from "@/lib/admin-data";
 import { schemaReady } from "@/lib/data";
-import { saveAnnouncement, toggleAnnouncement, deleteAnnouncement } from "@/app/actions/admin";
+import { saveAnnouncement, toggleAnnouncement, deleteAnnouncement, moveAnnouncement } from "@/app/actions/admin";
 import { AdminShell, Card, adminBtn, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice, formatDate } from "@/components/ui";
 
@@ -99,6 +99,16 @@ export default async function AdminAnnouncements({
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-1.5">
+                      <form action={moveAnnouncement}>
+                        <input type="hidden" name="id" value={a.id} />
+                        <input type="hidden" name="direction" value="up" />
+                        <button aria-label="Move up" className="rounded border border-neutral-300 px-2 py-1 text-xs text-neutral-600 hover:bg-neutral-50">↑</button>
+                      </form>
+                      <form action={moveAnnouncement}>
+                        <input type="hidden" name="id" value={a.id} />
+                        <input type="hidden" name="direction" value="down" />
+                        <button aria-label="Move down" className="rounded border border-neutral-300 px-2 py-1 text-xs text-neutral-600 hover:bg-neutral-50">↓</button>
+                      </form>
                       <Link
                         href={`/admin/announcements?edit=${a.id}`}
                         className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"

@@ -83,6 +83,7 @@ export async function finalizeStripeSession(sessionId: string): Promise<Finalize
     competition_id: v.competition_id,
     participant_id: participantId,
     category_id: v.category_id,
+    division: v.division ?? null,
     payment_status: "paid",
     payment_reference: sessionId,
     notes: "Paid online via Stripe Checkout",

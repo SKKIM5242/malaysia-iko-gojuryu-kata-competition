@@ -13,7 +13,7 @@ export default function LoginPage() {
         <div className="mb-6 text-center text-white">
           <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-700 text-xl font-bold">剛</span>
           <h1 className="mt-3 text-xl font-bold">Organiser login</h1>
-          <p className="mt-1 text-sm text-neutral-400">Malaysia IKO Goju-ryu Kata Competition</p>
+          <p className="mt-1 text-sm text-neutral-400">Malaysia Open — IKO Goju-ryu Karate-do — Kata Competition — Goju-ryu Version Only</p>
         </div>
         <form action={formAction} className="space-y-4 rounded-lg bg-white p-6 shadow-lg">
           {state.error && (

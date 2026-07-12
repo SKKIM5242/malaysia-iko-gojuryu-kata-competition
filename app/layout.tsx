@@ -4,15 +4,15 @@ import "./globals.css";
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
   title: {
-    default: "Malaysia IKO Goju-ryu Kata Competition",
-    template: "%s — Malaysia IKO Goju-ryu Kata Competition",
+    default: "Malaysia Open — IKO Goju-ryu Karate-do — Kata Competition — Goju-ryu Version Only",
+    template: "%s — Malaysia Open — IKO Goju-ryu Karate-do — Kata Competition — Goju-ryu Version Only",
   },
   description:
-    "Official platform of the Malaysia IKO Goju-ryu Kata competition — event info, announcements, participant list, and online registration.",
+    "Official platform of the Malaysia Open — IKO Goju-ryu Karate-do Kata Competition by IKO GOJU-RYU KARATE-DO MALAYSIA SDN BHD — event info, announcements, participant list, and online registration.",
   openGraph: {
-    title: "Malaysia IKO Goju-ryu Kata Competition",
+    title: "Malaysia Open — IKO Goju-ryu Karate-do — Kata Competition — Goju-ryu Version Only",
     description:
-      "Event info, announcements, confirmed participants, and online registration for the Malaysia IKO Goju-ryu Kata competition.",
+      "Event info, announcements, confirmed participants, and online registration. Organiser: IKO GOJU-RYU KARATE-DO MALAYSIA SDN BHD.",
     type: "website",
   },
 };

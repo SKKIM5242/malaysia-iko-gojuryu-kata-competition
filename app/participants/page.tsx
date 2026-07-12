@@ -132,6 +132,7 @@ export default async function ParticipantsPage({
                     <th className="px-4 py-3">#</th>
                     <th className="px-4 py-3">Name</th>
                     <th className="px-4 py-3">Category</th>
+                    <th className="px-4 py-3">Division</th>
                     <th className="px-4 py-3">Belt</th>
                     <th className="px-4 py-3">School</th>
                     <th className="px-4 py-3">Sensei</th>
@@ -142,7 +143,10 @@ export default async function ParticipantsPage({
                     <tr key={r.id} className="hover:bg-neutral-50">
                       <td className="px-4 py-3 text-neutral-400">{(page - 1) * PAGE_SIZE + i + 1}</td>
                       <td className="px-4 py-3 font-medium text-neutral-900">{r.participant?.full_name ?? "—"}</td>
-                      <td className="px-4 py-3">{r.category?.name ?? "—"}</td>
+                      <td className="max-w-[220px] truncate px-4 py-3" title={r.category?.name ?? undefined}>
+                        {r.category?.name ?? "—"}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-xs">{r.division ?? "—"}</td>
                       <td className="px-4 py-3">{r.participant?.belt_rank ?? "—"}</td>
                       <td className="max-w-[220px] truncate px-4 py-3" title={r.participant?.school?.name ?? undefined}>
                         {r.participant?.school?.name ?? "—"}

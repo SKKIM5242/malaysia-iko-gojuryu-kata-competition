@@ -8,7 +8,7 @@ export interface Competition {
   venue: string | null;
   event_date: string | null;
   registration_deadline: string | null;
-  registration_fee_myr: number | null;
+  registration_fee_usd: number | null;
   status: CompetitionStatus;
   description: string | null;
   created_at: string;
@@ -75,6 +75,7 @@ export interface Registration {
   competition_id: string | null;
   participant_id: string | null;
   category_id: string | null;
+  division: string | null;
   payment_status: PaymentStatus;
   payment_reference: string | null;
   notes: string | null;
@@ -91,6 +92,7 @@ export interface Announcement {
   title: string;
   body: string | null;
   published: boolean;
+  sort_order: number;
   created_at: string;
 }
 

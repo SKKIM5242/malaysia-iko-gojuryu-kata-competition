@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { writeAudit } from "@/lib/audit";
 import { getStripe, paymentsEnabled } from "@/lib/payments";
+import { computeDivision } from "@/lib/division";
 
 export interface RegisterState {
   ok: boolean;
@@ -55,7 +56,7 @@ export async function submitRegistration(
   // Deadline check (server-side; the form also hides itself when closed)
   const { data: competition, error: compErr } = await supabase
     .from("competitions")
-    .select("id, name, status, registration_deadline, registration_fee_myr")
+    .select("id, name, status, event_date, registration_deadline, registration_fee_usd")
     .eq("id", values.competition_id)
     .maybeSingle();
   if (compErr || !competition) {
@@ -96,11 +97,19 @@ export async function submitRegistration(
     };
   }
 
+  // Division is derived, not picked: age group at event date × Kyu/Dan × gender
+  values.division = computeDivision(
+    values.date_of_birth,
+    values.belt_rank,
+    values.gender,
+    competition.event_date,
+  );
+
   // ── Pay-before-submit: when the gateway is configured and the competition
   // has a fee, no registration row is written yet. The validated payload is
   // parked as a draft and the visitor is sent to Stripe Checkout; the webhook
   // or the success page finalises it as a paid registration.
-  const fee = Number(competition.registration_fee_myr ?? 0);
+  const fee = Number(competition.registration_fee_usd ?? 0);
   if (paymentsEnabled() && fee > 0) {
     const draftId = crypto.randomUUID();
     const { error: dErr } = await supabase.from("registration_drafts").insert({
@@ -122,7 +131,7 @@ export async function submitRegistration(
         line_items: [
           {
             price_data: {
-              currency: "myr",
+              currency: "usd",
               unit_amount: Math.round(fee * 100),
               product_data: {
                 name: `Registration — ${competition.name}`,
@@ -185,6 +194,7 @@ export async function submitRegistration(
     competition_id: values.competition_id,
     participant_id: participantId,
     category_id: values.category_id,
+    division: values.division,
     payment_status: "pending",
     payment_reference: values.payment_reference || null,
   });

@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import Link from "next/link";
 import { submitRegistration, type RegisterState } from "@/app/actions/register";
+import { OrganiserContact } from "@/components/ui";
 import type { Category, Competition, School, Sensei } from "@/lib/types";
 
 const initialState: RegisterState = { ok: false };
@@ -48,6 +49,7 @@ export default function RegisterForm({
           confirm your payment, after which your name appears on the{" "}
           <Link href="/participants" className="underline">participants list</Link>.
         </p>
+        <div className="mx-auto max-w-md text-green-900"><OrganiserContact /></div>
       </div>
     );
   }
@@ -177,7 +179,7 @@ export default function RegisterForm({
         {pending
           ? payOnline ? "Redirecting to payment…" : "Submitting…"
           : payOnline
-            ? `Proceed to secure payment — RM ${Number(competition.registration_fee_myr ?? 0).toFixed(2)}`
+            ? `Proceed to secure payment — RM ${Number(competition.registration_fee_usd ?? 0).toFixed(2)}`
             : "Submit registration"}
       </button>
       {payOnline && (

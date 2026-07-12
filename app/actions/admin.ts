@@ -94,14 +94,14 @@ export async function saveCompetition(formData: FormData) {
     venue: String(formData.get("venue") ?? "").trim() || null,
     event_date: String(formData.get("event_date") ?? "") || null,
     registration_deadline: String(formData.get("registration_deadline") ?? "") || null,
-    registration_fee_myr: formData.get("registration_fee_myr")
-      ? Number(formData.get("registration_fee_myr"))
+    registration_fee_usd: formData.get("registration_fee_usd")
+      ? Number(formData.get("registration_fee_usd"))
       : null,
     status: String(formData.get("status") ?? "draft"),
     description: String(formData.get("description") ?? "").trim() || null,
   };
   if (!values.name) backTo(returnTo, { error: "Competition name is required." });
-  if (values.registration_fee_myr != null && Number.isNaN(values.registration_fee_myr)) {
+  if (values.registration_fee_usd != null && Number.isNaN(values.registration_fee_usd)) {
     backTo(returnTo, { error: "Fee must be a number." });
   }
 
@@ -231,6 +231,41 @@ export async function toggleAnnouncement(formData: FormData) {
   backTo(returnTo, { ok: publish ? "Announcement published." : "Announcement unpublished." });
 }
 
+export async function moveAnnouncement(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const direction = String(formData.get("direction") ?? "");
+  const returnTo = "/admin/announcements";
+  const { supabase, actorId } = await getActor();
+
+  const { data } = await supabase
+    .from("announcements")
+    .select("id, sort_order")
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: false });
+  const list = data ?? [];
+  const index = list.findIndex((a) => a.id === id);
+  if (index === -1) backTo(returnTo, { error: "Announcement not found." });
+  const swapWith = direction === "up" ? index - 1 : index + 1;
+  if (swapWith < 0 || swapWith >= list.length) {
+    backTo(returnTo, { ok: "Already at the edge of the list." });
+  }
+
+  // Normalise sort_order to the current display order, then swap the two
+  for (let i = 0; i < list.length; i++) {
+    const target = i === index ? swapWith : i === swapWith ? index : i;
+    if (list[i].sort_order !== target) {
+      await supabase.from("announcements").update({ sort_order: target }).eq("id", list[i].id);
+    }
+  }
+  await writeAudit(supabase, {
+    table_name: "announcements", record_id: id,
+    action: `announcement_moved_${direction}`, actor_id: actorId,
+  });
+  revalidatePath("/");
+  revalidatePath("/announcements");
+  backTo(returnTo, { ok: "Order updated." });
+}
+
 export async function deleteAnnouncement(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const returnTo = "/admin/announcements";
@@ -260,6 +295,13 @@ export async function saveSchool(formData: FormData) {
   };
   if (!values.name) backTo(returnTo, { error: "School name is required." });
   const { supabase, actorId } = await getActor();
+  if (!id) {
+    const { data: dup } = await supabase
+      .from("schools").select("id").ilike("name", values.name).limit(1);
+    if (dup && dup.length > 0) {
+      backTo(returnTo, { error: "A school with this name already exists." });
+    }
+  }
   if (id) {
     const { error } = await supabase.from("schools").update(values).eq("id", id);
     if (error) backTo(returnTo, { error: "Could not update school." });
@@ -302,6 +344,17 @@ export async function saveSensei(formData: FormData) {
   };
   if (!values.name) backTo(returnTo, { error: "Sensei name is required." });
   const { supabase, actorId } = await getActor();
+  if (!id) {
+    // Guard against duplicate submissions (e.g. double-clicks)
+    let dupQuery = supabase.from("senseis").select("id").ilike("name", values.name).limit(1);
+    dupQuery = values.school_id
+      ? dupQuery.eq("school_id", values.school_id)
+      : dupQuery.is("school_id", null);
+    const { data: dup } = await dupQuery;
+    if (dup && dup.length > 0) {
+      backTo(returnTo, { error: "A sensei with this name (and school) already exists." });
+    }
+  }
   if (id) {
     const { error } = await supabase.from("senseis").update(values).eq("id", id);
     if (error) backTo(returnTo, { error: "Could not update sensei." });

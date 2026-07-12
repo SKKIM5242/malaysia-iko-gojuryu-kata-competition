@@ -12,7 +12,7 @@ import {
   SiteFooter,
   SiteHeader,
   formatDate,
-  formatMYR,
+  formatUSD,
 } from "@/components/ui";
 import { Markdown } from "@/lib/markdown";
 
@@ -75,7 +75,7 @@ export default async function Home() {
               </div>
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">Fee per participant</p>
-                <p className="mt-1 font-semibold text-neutral-900">{formatMYR(competition.registration_fee_myr)}</p>
+                <p className="mt-1 font-semibold text-neutral-900">{formatUSD(competition.registration_fee_usd)}</p>
               </div>
             </div>
             <div className="border-t border-neutral-100 px-6 py-5 sm:px-10">

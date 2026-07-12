@@ -67,8 +67,8 @@ export function SiteHeader() {
         <Link href="/" className="flex items-center gap-3">
           <span className="flex h-9 w-9 items-center justify-center rounded-full bg-red-700 font-bold">剛</span>
           <span className="leading-tight">
-            <span className="block text-sm font-bold tracking-wide">MALAYSIA IKO GOJU-RYU</span>
-            <span className="block text-xs text-neutral-400">Kata Competition</span>
+            <span className="block text-sm font-bold tracking-wide">MALAYSIA OPEN — IKO GOJU-RYU KARATE-DO</span>
+            <span className="block text-xs text-neutral-400">Kata Competition — Goju-ryu Version Only</span>
           </span>
         </Link>
         <nav className="flex flex-wrap items-center gap-1 text-sm">
@@ -94,15 +94,32 @@ export function SiteFooter() {
   return (
     <footer className="mt-16 border-t border-neutral-200 bg-neutral-50">
       <div className="mx-auto max-w-6xl px-4 py-8 text-sm text-neutral-500">
-        <p className="font-semibold text-neutral-700">Malaysia IKO Goju-ryu Kata Competition</p>
+        <p className="font-semibold text-neutral-700">
+          Malaysia Open — IKO Goju-ryu Karate-do — Kata Competition — Goju-ryu Version Only
+        </p>
+        <p className="mt-1">Organiser: IKO GOJU-RYU KARATE-DO MALAYSIA SDN BHD</p>
         <p className="mt-1">
-          Official competition platform of the Malaysia IKO Goju-ryu community.{" "}
           <Link href="/announcements" className="underline underline-offset-2">Announcements</Link> ·{" "}
           <Link href="/participants" className="underline underline-offset-2">Participants</Link> ·{" "}
-          <Link href="/register" className="underline underline-offset-2">Register</Link>
+          <Link href="/register" className="underline underline-offset-2">Register participant</Link> ·{" "}
+          <Link href="/register/school" className="underline underline-offset-2">Register school</Link> ·{" "}
+          <Link href="/register/sensei" className="underline underline-offset-2">Register sensei</Link> ·{" "}
+          <Link href="/register/bulk" className="underline underline-offset-2">Bulk registration</Link>
         </p>
       </div>
     </footer>
+  );
+}
+
+/** Shown to registered users only (success screens, admin) — not on public pages. */
+export function OrganiserContact() {
+  return (
+    <p className="mt-3 text-sm">
+      Questions? Contact the organiser — Mobile / WhatsApp:{" "}
+      <a href="https://wa.me/60124532831" className="font-semibold underline underline-offset-2">+60 12-453 2831</a>{" "}
+      · Email:{" "}
+      <a href="mailto:kimsiewkiew@gmail.com" className="font-semibold underline underline-offset-2">kimsiewkiew@gmail.com</a>
+    </p>
   );
 }
 
@@ -119,7 +136,7 @@ export function formatDate(d: string | null | undefined): string {
   }
 }
 
-export function formatMYR(n: number | null | undefined): string {
+export function formatUSD(n: number | null | undefined): string {
   if (n == null) return "TBA";
-  return `RM ${Number(n).toFixed(2)}`;
+  return `USD ${Number(n).toFixed(2)}`;
 }

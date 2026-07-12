@@ -69,6 +69,7 @@ export default async function AdminRegistrations({
                 <th className="px-4 py-3">Participant</th>
                 <th className="px-4 py-3">IC / Passport</th>
                 <th className="px-4 py-3">Category</th>
+                <th className="px-4 py-3">Division</th>
                 <th className="px-4 py-3">School</th>
                 <th className="px-4 py-3">Payment ref</th>
                 <th className="px-4 py-3">Status</th>
@@ -81,7 +82,10 @@ export default async function AdminRegistrations({
                   <td className="px-4 py-3 font-mono text-xs">{r.id.slice(0, 8).toUpperCase()}</td>
                   <td className="px-4 py-3 font-medium">{r.participant?.full_name ?? "—"}</td>
                   <td className="px-4 py-3 font-mono text-xs">{r.participant?.ic_passport ?? "—"}</td>
-                  <td className="px-4 py-3">{r.category?.name ?? "—"}</td>
+                  <td className="max-w-[200px] truncate px-4 py-3" title={r.category?.name ?? undefined}>
+                    {r.category?.name ?? "—"}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-xs">{r.division ?? "—"}</td>
                   <td className="max-w-[180px] truncate px-4 py-3" title={r.participant?.school?.name ?? undefined}>
                     {r.participant?.school?.name ?? "—"}
                   </td>

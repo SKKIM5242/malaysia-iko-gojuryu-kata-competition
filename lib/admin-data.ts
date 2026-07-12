@@ -71,6 +71,7 @@ export async function getAllAnnouncements(): Promise<Announcement[]> {
   const { data } = await supabase
     .from("announcements")
     .select("*")
+    .order("sort_order", { ascending: true })
     .order("created_at", { ascending: false });
   return (data as Announcement[]) ?? [];
 }

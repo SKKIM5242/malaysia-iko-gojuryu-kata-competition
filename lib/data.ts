@@ -51,6 +51,7 @@ export async function getPublishedAnnouncements(limit = 10): Promise<Announcemen
     .from("announcements")
     .select("*")
     .eq("published", true)
+    .order("sort_order", { ascending: true })
     .order("created_at", { ascending: false })
     .limit(limit);
   return (data as Announcement[]) ?? [];
