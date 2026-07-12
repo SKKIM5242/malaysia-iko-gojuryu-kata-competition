@@ -79,7 +79,9 @@ export async function getAllParticipants(): Promise<Participant[]> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("participants")
-    .select("*, school:schools(id,name,state), sensei:senseis(id,name,rank)")
+    .select(
+      "*, school:schools(id,name,state), sensei:senseis(id,name,rank), bank:participant_bank_details(bank_name,bank_account_no,bank_account_name)",
+    )
     .order("created_at", { ascending: false });
   return (data as unknown as Participant[]) ?? [];
 }

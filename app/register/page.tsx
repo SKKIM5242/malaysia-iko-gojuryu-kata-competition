@@ -7,6 +7,7 @@ import {
 } from "@/lib/data";
 import { EmptyState, SetupNotice, SiteFooter, SiteHeader, formatDate, formatMYR } from "@/components/ui";
 import RegisterForm from "@/components/RegisterForm";
+import { paymentsEnabled } from "@/lib/payments";
 
 export const dynamic = "force-dynamic";
 
@@ -60,16 +61,29 @@ export default async function RegisterPage() {
           ) : (
             <>
               <div className="mb-6 rounded-md border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
-                Fields marked * are required. After submitting you will receive a reference ID —
-                transfer the fee of <strong>{formatMYR(competition.registration_fee_myr)}</strong> and send
-                your receipt to the organiser to confirm your slot. Deadline:{" "}
-                <strong>{formatDate(competition.registration_deadline)}</strong>.
+                {paymentsEnabled() && Number(competition.registration_fee_myr ?? 0) > 0 ? (
+                  <>
+                    Fields marked * are required. After filling the form you will be taken to a
+                    secure payment page for the fee of{" "}
+                    <strong>{formatMYR(competition.registration_fee_myr)}</strong> — your registration
+                    is confirmed automatically once payment succeeds. Deadline:{" "}
+                    <strong>{formatDate(competition.registration_deadline)}</strong>.
+                  </>
+                ) : (
+                  <>
+                    Fields marked * are required. After submitting you will receive a reference ID —
+                    transfer the fee of <strong>{formatMYR(competition.registration_fee_myr)}</strong> and send
+                    your receipt to the organiser to confirm your slot. Deadline:{" "}
+                    <strong>{formatDate(competition.registration_deadline)}</strong>.
+                  </>
+                )}
               </div>
               <RegisterForm
                 competition={competition}
                 categories={categories}
                 schools={schools}
                 senseis={senseis}
+                payOnline={paymentsEnabled() && Number(competition.registration_fee_myr ?? 0) > 0}
               />
             </>
           )}

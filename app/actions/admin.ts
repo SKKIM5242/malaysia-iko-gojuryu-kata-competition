@@ -349,7 +349,13 @@ export async function saveParticipant(formData: FormData) {
   if (!values.full_name || !values.ic_passport) {
     backTo(returnTo, { error: "Name and IC/passport are required." });
   }
+  const bank = {
+    bank_name: String(formData.get("bank_name") ?? "").trim(),
+    bank_account_no: String(formData.get("bank_account_no") ?? "").trim(),
+    bank_account_name: String(formData.get("bank_account_name") ?? "").trim(),
+  };
   const { supabase, actorId } = await getActor();
+  let targetId = id;
   if (id) {
     const { data: before } = await supabase
       .from("participants").select("*").eq("id", id).maybeSingle();
@@ -362,9 +368,21 @@ export async function saveParticipant(formData: FormData) {
   } else {
     const { data, error } = await supabase.from("participants").insert(values).select("id").single();
     if (error) backTo(returnTo, { error: "Could not create participant." });
+    targetId = data!.id;
     await writeAudit(supabase, {
-      table_name: "participants", record_id: data!.id, action: "participant_created",
+      table_name: "participants", record_id: targetId, action: "participant_created",
       new_value: values, actor_id: actorId,
+    });
+  }
+
+  // Upsert reward bank details when all three fields are provided
+  if (targetId && bank.bank_name && bank.bank_account_no && bank.bank_account_name) {
+    await supabase
+      .from("participant_bank_details")
+      .upsert({ participant_id: targetId, ...bank }, { onConflict: "participant_id" });
+    await writeAudit(supabase, {
+      table_name: "participant_bank_details", record_id: targetId,
+      action: "bank_details_saved", actor_id: actorId,
     });
   }
   revalidatePath("/participants");

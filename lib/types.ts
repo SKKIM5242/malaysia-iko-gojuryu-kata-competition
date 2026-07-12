@@ -44,6 +44,15 @@ export interface Category {
   created_at: string;
 }
 
+export interface BankDetails {
+  id: string;
+  participant_id: string;
+  bank_name: string;
+  bank_account_no: string;
+  bank_account_name: string;
+  created_at: string;
+}
+
 export interface Participant {
   id: string;
   user_id: string | null;
@@ -57,6 +66,7 @@ export interface Participant {
   created_at: string;
   school?: Pick<School, "id" | "name" | "state"> | null;
   sensei?: Pick<Sensei, "id" | "name" | "rank"> | null;
+  bank?: Pick<BankDetails, "bank_name" | "bank_account_no" | "bank_account_name"> | null;
 }
 
 export interface Registration {

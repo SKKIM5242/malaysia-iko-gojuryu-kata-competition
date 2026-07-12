@@ -21,11 +21,13 @@ export default function RegisterForm({
   categories,
   schools,
   senseis,
+  payOnline,
 }: {
   competition: Competition;
   categories: Category[];
   schools: School[];
   senseis: Sensei[];
+  payOnline: boolean;
 }) {
   const [state, formAction, pending] = useActionState(submitRegistration, initialState);
 
@@ -133,12 +135,38 @@ export default function RegisterForm({
           <FieldError message={err.category_id} />
         </div>
 
-        <div className="sm:col-span-2">
-          <label htmlFor="payment_reference" className={labelCls}>
-            Bank transfer reference <span className="font-normal text-neutral-400">(optional — add it if you already paid)</span>
-          </label>
-          <input id="payment_reference" name="payment_reference" className={inputCls} placeholder="e.g. MAYB-20250815-123" />
+        <div className="sm:col-span-2 mt-2 rounded-md border border-neutral-200 bg-neutral-50 p-4">
+          <p className="text-sm font-bold text-neutral-800">Bank details for prize / reward payout *</p>
+          <p className="mt-0.5 text-xs text-neutral-500">
+            Winnings are transferred to this account. Kept private — visible to the organiser only.
+          </p>
+          <div className="mt-3 grid gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="bank_name" className={labelCls}>Bank name *</label>
+              <input id="bank_name" name="bank_name" required className={inputCls} placeholder="e.g. Maybank" />
+              <FieldError message={err.bank_name} />
+            </div>
+            <div>
+              <label htmlFor="bank_account_no" className={labelCls}>Bank account no. *</label>
+              <input id="bank_account_no" name="bank_account_no" required className={inputCls} placeholder="e.g. 5121-2345-6789" />
+              <FieldError message={err.bank_account_no} />
+            </div>
+            <div className="sm:col-span-2">
+              <label htmlFor="bank_account_name" className={labelCls}>Bank account holder name *</label>
+              <input id="bank_account_name" name="bank_account_name" required className={inputCls} placeholder="As per bank records" />
+              <FieldError message={err.bank_account_name} />
+            </div>
+          </div>
         </div>
+
+        {!payOnline && (
+          <div className="sm:col-span-2">
+            <label htmlFor="payment_reference" className={labelCls}>
+              Bank transfer reference <span className="font-normal text-neutral-400">(optional — add it if you already paid)</span>
+            </label>
+            <input id="payment_reference" name="payment_reference" className={inputCls} placeholder="e.g. MAYB-20250815-123" />
+          </div>
+        )}
       </div>
 
       <button
@@ -146,8 +174,18 @@ export default function RegisterForm({
         disabled={pending}
         className="w-full rounded-md bg-red-700 px-4 py-2.5 font-semibold text-white hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
       >
-        {pending ? "Submitting…" : "Submit registration"}
+        {pending
+          ? payOnline ? "Redirecting to payment…" : "Submitting…"
+          : payOnline
+            ? `Proceed to secure payment — RM ${Number(competition.registration_fee_myr ?? 0).toFixed(2)}`
+            : "Submit registration"}
       </button>
+      {payOnline && (
+        <p className="text-xs text-neutral-400">
+          Your registration is only submitted after the payment succeeds. Payments are processed
+          securely by Stripe (card / FPX); we never see your card details.
+        </p>
+      )}
     </form>
   );
 }

@@ -39,6 +39,19 @@ SQL editor (or `supabase db push`):
   public reads limited to published/paid/confirmed rows, anonymous INSERT
   retained for the registration form, plus the `ic_already_registered`
   duplicate-check function.
+- `0003_payment_and_bank.sql` — participant reward bank details (organiser-only
+  visibility) and registration drafts for the pay-before-submit flow.
+
+## Online payment (pay before submit)
+
+When `STRIPE_SECRET_KEY` **and** `SUPABASE_SERVICE_ROLE_KEY` are set (Vercel →
+Project → Settings → Environment Variables) and the competition has a fee, the
+register form sends the visitor to Stripe Checkout (card / FPX) and only
+creates the registration — already marked **paid** — after the payment
+succeeds. Optionally set `STRIPE_WEBHOOK_SECRET` and point a Stripe webhook at
+`/api/stripe/webhook` (event: `checkout.session.completed`) so registrations
+finalise even if the payer closes the browser on the success redirect.
+Without these keys the form falls back to the manual bank-transfer flow.
 
 ## Admin access
 

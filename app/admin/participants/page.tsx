@@ -85,6 +85,25 @@ export default async function AdminParticipants({
                   </select>
                 </div>
               </div>
+              <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3">
+                <p className="text-xs font-bold uppercase tracking-wide text-neutral-500">
+                  Reward payout bank details
+                </p>
+                <div className="mt-2 grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="bank_name" className={adminLabel}>Bank name</label>
+                    <input id="bank_name" name="bank_name" defaultValue={editing?.bank?.bank_name ?? ""} className={adminInput} placeholder="e.g. Maybank" />
+                  </div>
+                  <div>
+                    <label htmlFor="bank_account_no" className={adminLabel}>Account no.</label>
+                    <input id="bank_account_no" name="bank_account_no" defaultValue={editing?.bank?.bank_account_no ?? ""} className={adminInput} />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label htmlFor="bank_account_name" className={adminLabel}>Account holder name</label>
+                    <input id="bank_account_name" name="bank_account_name" defaultValue={editing?.bank?.bank_account_name ?? ""} className={adminInput} />
+                  </div>
+                </div>
+              </div>
               <div className="flex gap-2">
                 <button type="submit" className={adminBtn}>{editing ? "Save changes" : "Add participant"}</button>
                 {editing && (
@@ -111,6 +130,7 @@ export default async function AdminParticipants({
                     <th className="px-4 py-3">DOB</th>
                     <th className="px-4 py-3">Belt</th>
                     <th className="px-4 py-3">School</th>
+                    <th className="px-4 py-3">Payout bank</th>
                     <th className="px-4 py-3">Actions</th>
                   </tr>
                 </thead>
@@ -123,6 +143,16 @@ export default async function AdminParticipants({
                       <td className="px-4 py-3">{p.belt_rank ?? "—"}</td>
                       <td className="max-w-[180px] truncate px-4 py-3" title={p.school?.name ?? undefined}>
                         {p.school?.name ?? "—"}
+                      </td>
+                      <td className="px-4 py-3 text-xs">
+                        {p.bank ? (
+                          <span title={p.bank.bank_account_name}>
+                            {p.bank.bank_name}
+                            <span className="block font-mono text-neutral-500">{p.bank.bank_account_no}</span>
+                          </span>
+                        ) : (
+                          <span className="text-neutral-400">—</span>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex gap-1.5">

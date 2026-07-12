@@ -1,7 +1,10 @@
 "use server";
 
+import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { writeAudit } from "@/lib/audit";
+import { getStripe, paymentsEnabled } from "@/lib/payments";
 
 export interface RegisterState {
   ok: boolean;
@@ -19,6 +22,9 @@ const REQUIRED: Array<[string, string]> = [
   ["school_id", "School is required"],
   ["category_id", "Category is required"],
   ["sensei_id", "Coach / sensei is required"],
+  ["bank_name", "Bank name is required"],
+  ["bank_account_no", "Bank account number is required"],
+  ["bank_account_name", "Bank account holder name is required"],
 ];
 
 export async function submitRegistration(
@@ -49,7 +55,7 @@ export async function submitRegistration(
   // Deadline check (server-side; the form also hides itself when closed)
   const { data: competition, error: compErr } = await supabase
     .from("competitions")
-    .select("id, status, registration_deadline")
+    .select("id, name, status, registration_deadline, registration_fee_myr")
     .eq("id", values.competition_id)
     .maybeSingle();
   if (compErr || !competition) {
@@ -90,6 +96,60 @@ export async function submitRegistration(
     };
   }
 
+  // ── Pay-before-submit: when the gateway is configured and the competition
+  // has a fee, no registration row is written yet. The validated payload is
+  // parked as a draft and the visitor is sent to Stripe Checkout; the webhook
+  // or the success page finalises it as a paid registration.
+  const fee = Number(competition.registration_fee_myr ?? 0);
+  if (paymentsEnabled() && fee > 0) {
+    const draftId = crypto.randomUUID();
+    const { error: dErr } = await supabase.from("registration_drafts").insert({
+      id: draftId,
+      payload: values,
+    });
+    if (dErr) {
+      return { ok: false, error: "Could not start the payment step. Please try again." };
+    }
+
+    const origin =
+      (await headers()).get("origin") ??
+      process.env.NEXT_PUBLIC_APP_URL ??
+      "http://localhost:3000";
+    let checkoutUrl: string | null = null;
+    try {
+      const session = await getStripe().checkout.sessions.create({
+        mode: "payment",
+        line_items: [
+          {
+            price_data: {
+              currency: "myr",
+              unit_amount: Math.round(fee * 100),
+              product_data: {
+                name: `Registration — ${competition.name}`,
+                description: `Participant: ${values.full_name}`,
+              },
+            },
+            quantity: 1,
+          },
+        ],
+        metadata: { draft_id: draftId },
+        success_url: `${origin}/register/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${origin}/register?cancelled=1`,
+      });
+      checkoutUrl = session.url;
+    } catch {
+      return {
+        ok: false,
+        error: "Payment gateway is unavailable right now. Please try again later.",
+      };
+    }
+    if (!checkoutUrl) {
+      return { ok: false, error: "Payment gateway did not return a checkout page. Please try again." };
+    }
+    redirect(checkoutUrl);
+  }
+
+  // ── Manual bank-transfer flow (gateway not configured or free entry) ──
   // Generate ids here — anonymous inserts can't SELECT their own rows back
   // under the locked-down RLS, so INSERT ... RETURNING would fail.
   const participantId = crypto.randomUUID();
@@ -107,6 +167,17 @@ export async function submitRegistration(
   });
   if (pErr) {
     return { ok: false, error: "Could not save participant. Please try again." };
+  }
+
+  const { error: bErr } = await supabase.from("participant_bank_details").insert({
+    participant_id: participantId,
+    bank_name: values.bank_name,
+    bank_account_no: values.bank_account_no,
+    bank_account_name: values.bank_account_name,
+  });
+  if (bErr) {
+    await supabase.from("participants").delete().eq("id", participantId);
+    return { ok: false, error: "Could not save bank details. Please try again." };
   }
 
   const { error: rErr } = await supabase.from("registrations").insert({
