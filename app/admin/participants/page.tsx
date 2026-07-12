@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getAllParticipants } from "@/lib/admin-data";
 import { getSchools, getSenseis, schemaReady } from "@/lib/data";
+import { createClient } from "@/lib/supabase/server";
 import { saveParticipant, deleteParticipant } from "@/app/actions/admin";
 import { AdminShell, Card, adminBtn, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice, formatDate } from "@/components/ui";
@@ -28,6 +29,19 @@ export default async function AdminParticipants({
     getSenseis(),
   ]);
   const editing = params.edit ? participants.find((p) => p.id === params.edit) : undefined;
+
+  // Signed links (1h) for certificate photos in the private bucket
+  const certPaths = participants.map((p) => p.certificate_path).filter(Boolean) as string[];
+  const certUrls = new Map<string, string>();
+  if (certPaths.length > 0) {
+    const supabase = await createClient();
+    const { data: signed } = await supabase.storage
+      .from("certificates")
+      .createSignedUrls(certPaths, 3600);
+    for (const s of signed ?? []) {
+      if (s.path && s.signedUrl) certUrls.set(s.path, s.signedUrl);
+    }
+  }
 
   return (
     <AdminShell
@@ -65,6 +79,27 @@ export default async function AdminParticipants({
                 <div>
                   <label htmlFor="belt_rank" className={adminLabel}>Belt rank</label>
                   <input id="belt_rank" name="belt_rank" defaultValue={editing?.belt_rank ?? ""} className={adminInput} placeholder="e.g. 3rd Kyu" />
+                </div>
+                <div>
+                  <label htmlFor="rank_confirmation" className={adminLabel}>Rank confirmation</label>
+                  <select id="rank_confirmation" name="rank_confirmation" defaultValue={editing?.rank_confirmation ?? ""} className={adminInput}>
+                    <option value="">—</option>
+                    <option value="sensei_confirmed">Sensei Confirmed</option>
+                    <option value="certificate_uploaded">Certificate Uploaded</option>
+                    <option value="pending_confirmation">Pending Confirmation</option>
+                  </select>
+                </div>
+                <div className="sm:col-span-2">
+                  <label htmlFor="home_address" className={adminLabel}>Home address</label>
+                  <input id="home_address" name="home_address" defaultValue={editing?.home_address ?? ""} className={adminInput} />
+                </div>
+                <div>
+                  <label htmlFor="city_town" className={adminLabel}>City / Town</label>
+                  <input id="city_town" name="city_town" defaultValue={editing?.city_town ?? ""} className={adminInput} />
+                </div>
+                <div>
+                  <label htmlFor="home_country" className={adminLabel}>Home country</label>
+                  <input id="home_country" name="home_country" defaultValue={editing?.home_country ?? ""} className={adminInput} />
                 </div>
                 <div>
                   <label htmlFor="school_id" className={adminLabel}>School</label>
@@ -129,6 +164,8 @@ export default async function AdminParticipants({
                     <th className="px-4 py-3">IC / Passport</th>
                     <th className="px-4 py-3">DOB</th>
                     <th className="px-4 py-3">Belt</th>
+                    <th className="px-4 py-3">Rank status</th>
+                    <th className="px-4 py-3">Country</th>
                     <th className="px-4 py-3">School</th>
                     <th className="px-4 py-3">Payout bank</th>
                     <th className="px-4 py-3">Actions</th>
@@ -141,6 +178,27 @@ export default async function AdminParticipants({
                       <td className="px-4 py-3 font-mono text-xs">{p.ic_passport}</td>
                       <td className="px-4 py-3 whitespace-nowrap">{formatDate(p.date_of_birth)}</td>
                       <td className="px-4 py-3">{p.belt_rank ?? "—"}</td>
+                      <td className="px-4 py-3 text-xs">
+                        {p.certificate_path && certUrls.get(p.certificate_path) ? (
+                          <a
+                            href={certUrls.get(p.certificate_path)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-semibold text-green-700 underline underline-offset-2"
+                          >
+                            View certificate
+                          </a>
+                        ) : p.rank_confirmation === "sensei_confirmed" ? (
+                          <span className="font-semibold text-green-700">Sensei confirmed</span>
+                        ) : p.rank_confirmation === "pending_confirmation" ? (
+                          <span className="text-amber-600">Pending</span>
+                        ) : (
+                          <span className="text-neutral-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-xs" title={[p.home_address, p.city_town].filter(Boolean).join(", ") || undefined}>
+                        {p.home_country ?? "—"}
+                      </td>
                       <td className="max-w-[180px] truncate px-4 py-3" title={p.school?.name ?? undefined}>
                         {p.school?.name ?? "—"}
                       </td>

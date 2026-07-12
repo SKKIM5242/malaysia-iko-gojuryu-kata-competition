@@ -102,6 +102,41 @@ export default function RegisterForm({
         </div>
 
         <div>
+          <label htmlFor="certificate" className={labelCls}>
+            Latest rank certificate{" "}
+            <span className="font-normal text-neutral-400">(photo or file — take a picture with your phone)</span>
+          </label>
+          <input
+            id="certificate"
+            name="certificate"
+            type="file"
+            accept="image/*,application/pdf"
+            capture="environment"
+            className="w-full rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm file:mr-3 file:rounded file:border-0 file:bg-neutral-900 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-white"
+          />
+          <p className="mt-1 text-xs text-neutral-400">Max 10 MB. You can also submit now and send it later.</p>
+          <FieldError message={err.certificate} />
+        </div>
+
+        <div className="sm:col-span-2">
+          <label htmlFor="home_address" className={labelCls}>Home address *</label>
+          <textarea id="home_address" name="home_address" required rows={2} className={inputCls} placeholder="Street address" />
+          <FieldError message={err.home_address} />
+        </div>
+
+        <div>
+          <label htmlFor="city_town" className={labelCls}>City / Town *</label>
+          <input id="city_town" name="city_town" required className={inputCls} placeholder="e.g. Kuala Lumpur" />
+          <FieldError message={err.city_town} />
+        </div>
+
+        <div>
+          <label htmlFor="home_country" className={labelCls}>Home country *</label>
+          <input id="home_country" name="home_country" required defaultValue="Malaysia" className={inputCls} />
+          <FieldError message={err.home_country} />
+        </div>
+
+        <div>
           <label htmlFor="school_id" className={labelCls}>School / Dojo *</label>
           <select id="school_id" name="school_id" required className={inputCls} defaultValue="">
             <option value="" disabled>Select school</option>

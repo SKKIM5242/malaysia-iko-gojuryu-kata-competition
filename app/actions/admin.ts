@@ -396,6 +396,10 @@ export async function saveParticipant(formData: FormData) {
     date_of_birth: String(formData.get("date_of_birth") ?? "") || null,
     gender: String(formData.get("gender") ?? "") || null,
     belt_rank: String(formData.get("belt_rank") ?? "").trim() || null,
+    rank_confirmation: String(formData.get("rank_confirmation") ?? "") || null,
+    home_address: String(formData.get("home_address") ?? "").trim() || null,
+    city_town: String(formData.get("city_town") ?? "").trim() || null,
+    home_country: String(formData.get("home_country") ?? "").trim() || null,
     school_id: String(formData.get("school_id") ?? "") || null,
     sensei_id: String(formData.get("sensei_id") ?? "") || null,
   };

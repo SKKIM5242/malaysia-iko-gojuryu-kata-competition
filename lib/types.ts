@@ -62,6 +62,11 @@ export interface Participant {
   date_of_birth: string | null;
   gender: string | null;
   belt_rank: string | null;
+  home_address: string | null;
+  home_country: string | null;
+  city_town: string | null;
+  certificate_path: string | null;
+  rank_confirmation: string | null;
   school_id: string | null;
   sensei_id: string | null;
   created_at: string;

@@ -11,6 +11,10 @@ export interface BulkRow {
   date_of_birth: string;
   gender: string;
   belt_rank: string;
+  rank_confirmation: string;
+  home_address: string;
+  city_town: string;
+  home_country: string;
   kata_base: string;
   bank_name: string;
   bank_account_no: string;
@@ -37,6 +41,10 @@ const ROW_REQUIRED: Array<[keyof BulkRow, string]> = [
   ["date_of_birth", "date of birth"],
   ["gender", "gender"],
   ["belt_rank", "belt rank"],
+  ["rank_confirmation", "rank confirmation"],
+  ["home_address", "home address"],
+  ["city_town", "city/town"],
+  ["home_country", "home country"],
   ["kata_base", "kata event"],
   ["bank_name", "bank name"],
   ["bank_account_no", "bank account no."],
@@ -138,6 +146,11 @@ export async function bulkRegister(_prev: BulkState, formData: FormData): Promis
       date_of_birth: row.date_of_birth,
       gender: row.gender,
       belt_rank: row.belt_rank.trim(),
+      rank_confirmation:
+        row.rank_confirmation === "sensei_confirmed" ? "sensei_confirmed" : "pending_confirmation",
+      home_address: row.home_address.trim(),
+      city_town: row.city_town.trim(),
+      home_country: row.home_country.trim(),
       school_id: schoolId,
       sensei_id: senseiId,
     });

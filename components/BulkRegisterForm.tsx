@@ -14,6 +14,10 @@ const emptyRow = (): BulkRow => ({
   date_of_birth: "",
   gender: "",
   belt_rank: "",
+  rank_confirmation: "",
+  home_address: "",
+  city_town: "",
+  home_country: "Malaysia",
   kata_base: "",
   bank_name: "",
   bank_account_no: "",
@@ -116,7 +120,7 @@ export default function BulkRegisterForm({
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white shadow-sm">
-        <table className="w-full min-w-[1100px] text-left">
+        <table className="w-full min-w-[1700px] text-left">
           <thead className="border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
             <tr>
               <th className="px-2 py-2 w-10">No.</th>
@@ -125,6 +129,10 @@ export default function BulkRegisterForm({
               <th className="px-2 py-2">Date of birth *</th>
               <th className="px-2 py-2">Gender *</th>
               <th className="px-2 py-2">Belt rank *</th>
+              <th className="px-2 py-2">Rank confirmation *</th>
+              <th className="px-2 py-2">Home address *</th>
+              <th className="px-2 py-2">City/Town *</th>
+              <th className="px-2 py-2">Country *</th>
               <th className="px-2 py-2">Kata event *</th>
               <th className="px-2 py-2">Bank name *</th>
               <th className="px-2 py-2">Bank account no. *</th>
@@ -147,6 +155,16 @@ export default function BulkRegisterForm({
                   </select>
                 </td>
                 <td className="px-2 py-1.5"><input aria-label={`Row ${i + 1} belt rank`} className={cell} placeholder="e.g. 3rd Kyu" value={row.belt_rank} onChange={(e) => update(i, "belt_rank", e.target.value)} /></td>
+                <td className="px-2 py-1.5">
+                  <select aria-label={`Row ${i + 1} rank confirmation`} className={cell} value={row.rank_confirmation} onChange={(e) => update(i, "rank_confirmation", e.target.value)}>
+                    <option value=""></option>
+                    <option value="sensei_confirmed">Sensei Confirmed</option>
+                    <option value="pending_confirmation">Pending Confirmation</option>
+                  </select>
+                </td>
+                <td className="px-2 py-1.5"><input aria-label={`Row ${i + 1} home address`} className={cell} value={row.home_address} onChange={(e) => update(i, "home_address", e.target.value)} /></td>
+                <td className="px-2 py-1.5"><input aria-label={`Row ${i + 1} city or town`} className={cell} value={row.city_town} onChange={(e) => update(i, "city_town", e.target.value)} /></td>
+                <td className="px-2 py-1.5"><input aria-label={`Row ${i + 1} home country`} className={cell} value={row.home_country} onChange={(e) => update(i, "home_country", e.target.value)} /></td>
                 <td className="px-2 py-1.5">
                   <select aria-label={`Row ${i + 1} kata event`} className={cell} value={row.kata_base} onChange={(e) => update(i, "kata_base", e.target.value)}>
                     <option value=""></option>
@@ -190,7 +208,10 @@ export default function BulkRegisterForm({
           {pending ? "Submitting…" : `Submit ${rows.length} participants`}
         </button>
         <span className="text-xs text-neutral-400">
-          Empty rows are skipped. Each participant gets their own reference ID.
+          Empty rows are skipped. Each participant gets their own reference ID. Rank confirmation:
+          choose <strong>Sensei Confirmed</strong> if you vouch for the stated rank, or{" "}
+          <strong>Pending Confirmation</strong> — the participant uploads or photographs their
+          certificate later.
         </span>
       </div>
     </form>

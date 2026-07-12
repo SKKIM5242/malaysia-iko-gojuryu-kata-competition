@@ -21,6 +21,9 @@ const REQUIRED: Array<[string, string]> = [
   ["date_of_birth", "Date of birth is required"],
   ["gender", "Gender is required"],
   ["belt_rank", "Belt rank is required"],
+  ["home_address", "Home address is required"],
+  ["home_country", "Home country is required"],
+  ["city_town", "City / town is required"],
   ["school_id", "School is required"],
   ["kata_base", "Kata event is required"],
   ["sensei_id", "Coach / sensei is required"],
@@ -122,6 +125,37 @@ export async function submitRegistration(
   values.category_id = resolved.category.id;
   values.division = values.gender.toLowerCase() === "female" ? "Female" : "Male";
 
+  // Latest belt/rank certificate: optional photo/scan, uploaded to private
+  // storage before the registration is written (works for both the manual
+  // flow and the pay-first flow, where only the path travels in the draft).
+  const certificate = formData.get("certificate");
+  values.certificate_path = "";
+  if (certificate instanceof File && certificate.size > 0) {
+    if (certificate.size > 10 * 1024 * 1024) {
+      return {
+        ok: false,
+        error: "Certificate file is too large (max 10 MB).",
+        fieldErrors: { certificate: "Max file size 10 MB" },
+      };
+    }
+    const ext = (certificate.name.split(".").pop() || "jpg").toLowerCase().slice(0, 5);
+    const path = `${crypto.randomUUID()}.${ext}`;
+    const { error: upErr } = await supabase.storage
+      .from("certificates")
+      .upload(path, certificate, { contentType: certificate.type || "image/jpeg" });
+    if (upErr) {
+      return {
+        ok: false,
+        error: "Could not upload the certificate. Please try again or submit without it.",
+        fieldErrors: { certificate: "Upload failed" },
+      };
+    }
+    values.certificate_path = path;
+  }
+  values.rank_confirmation = values.certificate_path
+    ? "certificate_uploaded"
+    : "pending_confirmation";
+
   // ── Pay-before-submit: when the gateway is configured and the competition
   // has a fee, no registration row is written yet. The validated payload is
   // parked as a draft and the visitor is sent to Stripe Checkout; the webhook
@@ -188,6 +222,11 @@ export async function submitRegistration(
     date_of_birth: values.date_of_birth,
     gender: values.gender,
     belt_rank: values.belt_rank,
+    home_address: values.home_address,
+    home_country: values.home_country,
+    city_town: values.city_town,
+    certificate_path: values.certificate_path || null,
+    rank_confirmation: values.rank_confirmation,
     school_id: values.school_id,
     sensei_id: values.sensei_id,
   });

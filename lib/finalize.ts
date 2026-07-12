@@ -64,6 +64,11 @@ export async function finalizeStripeSession(sessionId: string): Promise<Finalize
     date_of_birth: v.date_of_birth,
     gender: v.gender,
     belt_rank: v.belt_rank,
+    home_address: v.home_address ?? null,
+    home_country: v.home_country ?? null,
+    city_town: v.city_town ?? null,
+    certificate_path: v.certificate_path || null,
+    rank_confirmation: v.rank_confirmation ?? null,
     school_id: v.school_id,
     sensei_id: v.sensei_id,
   });
