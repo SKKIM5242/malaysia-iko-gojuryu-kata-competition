@@ -62,13 +62,18 @@ export default async function RegisterPage() {
           ) : (
             <>
               <div className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                <strong>Note:</strong> participants must select a registered School / Dojo and a
-                registered Sensei / Coach. If yours are not in the lists yet, add them first:{" "}
-                <a href="/register/school" className="font-semibold underline underline-offset-2">register School / Dojo</a>{" "}
-                ·{" "}
-                <a href="/register/sensei" className="font-semibold underline underline-offset-2">register Sensei / Coach</a>.
-                Coaches registering many students can use the{" "}
-                <a href="/register/bulk" className="font-semibold underline underline-offset-2">bulk registration table</a>.
+                <strong>Note:</strong> participants must 1) select a registered{" "}
+                <a href="/register/school" className="font-semibold underline underline-offset-2">School / Dojo</a>{" "}
+                and 2){" "}
+                <a href="/register/sensei" className="font-semibold underline underline-offset-2">register your Sensei / Coach</a>{" "}
+                before registering yourself here. The same applies to a Sensei registering on behalf
+                of their students — use the{" "}
+                <a href="/register/bulk" className="font-semibold underline underline-offset-2">bulk registration table</a>{" "}
+                for multiple students.
+                <br className="hidden sm:block" />
+                After registration, proceed to recording your kata with your phone camera for the
+                next step. You only get <strong>3 chances</strong> to delete and re-record your kata.
+                Each participant may register for a <strong>maximum of 3 kata categories</strong>.
               </div>
               <div className="mb-6 rounded-md border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
                 {paymentsEnabled() && Number(competition.registration_fee_usd ?? 0) > 0 ? (

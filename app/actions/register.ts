@@ -78,29 +78,26 @@ export async function submitRegistration(
     return { ok: false, error: "The registration deadline has passed." };
   }
 
-  // Duplicate IC + competition check. Prefer the security-definer function
-  // (works for anonymous visitors after the RLS lock-down); fall back to a
-  // direct query under the v1 open policies where the function may not exist.
-  const { data: dup, error: dupErr } = await supabase.rpc("ic_already_registered", {
+  // Same kata twice? Not allowed. Already have 3 kata entries? Not allowed —
+  // a participant may compete in at most 3 kata events per competition.
+  const { data: alreadyHasKata } = await supabase.rpc("ic_has_kata", {
+    p_ic: values.ic_passport,
+    p_competition: values.competition_id,
+    p_kata_base: values.kata_base,
+  });
+  if (alreadyHasKata === true) {
+    return {
+      ok: false,
+      error: "You are already registered for this kata.",
+      fieldErrors: { kata_base: "Already registered for this kata" },
+    };
+  }
+  const { data: kataCount } = await supabase.rpc("ic_registration_count", {
     p_ic: values.ic_passport,
     p_competition: values.competition_id,
   });
-  let isDuplicate = dup === true;
-  if (dupErr) {
-    const { data: existing } = await supabase
-      .from("participants")
-      .select("id, registrations!inner(id, competition_id)")
-      .eq("ic_passport", values.ic_passport)
-      .eq("registrations.competition_id", values.competition_id)
-      .limit(1);
-    isDuplicate = !!existing && existing.length > 0;
-  }
-  if (isDuplicate) {
-    return {
-      ok: false,
-      error: "This IC / passport is already registered for this competition.",
-      fieldErrors: { ic_passport: "Already registered for this competition" },
-    };
+  if (typeof kataCount === "number" && kataCount >= 3) {
+    return { ok: false, error: "Maximum Kata allow to compete is 3 only." };
   }
 
   // The registrant picks the kata; the belt (Color/Kyu vs Black Belt & Dan)

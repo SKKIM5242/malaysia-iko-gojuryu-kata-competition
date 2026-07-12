@@ -99,7 +99,6 @@ export async function bulkRegister(_prev: BulkState, formData: FormData): Promis
   const categories = (catRows as Category[]) ?? [];
 
   const results: BulkRowResult[] = [];
-  const seenICs = new Set<string>();
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
@@ -110,22 +109,29 @@ export async function bulkRegister(_prev: BulkState, formData: FormData): Promis
       continue;
     }
     const ic = row.ic_passport.trim();
-    if (seenICs.has(ic)) {
-      results.push({ row: i + 1, name: label, ok: false, error: "Duplicate IC within this list" });
-      continue;
-    }
-    seenICs.add(ic);
     if (Number.isNaN(Date.parse(row.date_of_birth))) {
       results.push({ row: i + 1, name: label, ok: false, error: "Invalid date of birth" });
       continue;
     }
 
-    const { data: dup } = await supabase.rpc("ic_already_registered", {
+    // A student may compete in at most 3 kata events, and never the same
+    // kata twice. Checked live against the DB, so rows for the same student
+    // earlier in this same sheet already count (they're inserted first).
+    const { data: alreadyHasKata } = await supabase.rpc("ic_has_kata", {
+      p_ic: ic,
+      p_competition: competitionId,
+      p_kata_base: row.kata_base,
+    });
+    if (alreadyHasKata === true) {
+      results.push({ row: i + 1, name: label, ok: false, error: "Already registered for this kata" });
+      continue;
+    }
+    const { data: kataCount } = await supabase.rpc("ic_registration_count", {
       p_ic: ic,
       p_competition: competitionId,
     });
-    if (dup === true) {
-      results.push({ row: i + 1, name: label, ok: false, error: "Already registered for this competition" });
+    if (typeof kataCount === "number" && kataCount >= 3) {
+      results.push({ row: i + 1, name: label, ok: false, error: "Maximum Kata allow to compete is 3 only" });
       continue;
     }
 
@@ -285,11 +291,11 @@ export async function bulkRegisterCsv(_prev: CsvBulkState, formData: FormData): 
     row: number; full_name: string; ic: string; dob: string; gender: string;
     belt: string; rankConf: string; email: string; phone: string;
     address: string; city: string; country: string;
-    categoryId: string; bank: [string, string, string];
+    categoryId: string; kataBase: string; bank: [string, string, string];
   };
   const failures: Array<{ row: number; name: string; error: string }> = [];
   const valid: Valid[] = [];
-  const seen = new Set<string>();
+  const seenKataPerIc = new Map<string, Set<string>>();
 
   dataRows.forEach((r, i) => {
     const rowNo = i + 2; // header is row 1
@@ -300,11 +306,12 @@ export async function bulkRegisterCsv(_prev: CsvBulkState, formData: FormData): 
       return;
     }
     const ic = get(r, "ic_passport");
-    if (seen.has(ic)) {
-      failures.push({ row: rowNo, name, error: "Duplicate IC within the file" });
+    const kataBase = get(r, "kata_event");
+    const existingKataSet = seenKataPerIc.get(ic) ?? new Set<string>();
+    if (existingKataSet.has(kataBase)) {
+      failures.push({ row: rowNo, name, error: "Duplicate kata for this IC within the file" });
       return;
     }
-    seen.add(ic);
     const dob = get(r, "date_of_birth");
     if (Number.isNaN(Date.parse(dob))) {
       failures.push({ row: rowNo, name, error: "Invalid date of birth (use YYYY-MM-DD)" });
@@ -315,11 +322,13 @@ export async function bulkRegisterCsv(_prev: CsvBulkState, formData: FormData): 
       failures.push({ row: rowNo, name, error: "Gender must be male or female" });
       return;
     }
-    const resolved = resolveCategory(categories, get(r, "kata_event"), dob, get(r, "belt_rank"), competition.event_date);
+    const resolved = resolveCategory(categories, kataBase, dob, get(r, "belt_rank"), competition.event_date);
     if (!resolved.category) {
-      failures.push({ row: rowNo, name, error: resolved.error ?? `Unknown kata event "${get(r, "kata_event")}"` });
+      failures.push({ row: rowNo, name, error: resolved.error ?? `Unknown kata event "${kataBase}"` });
       return;
     }
+    existingKataSet.add(kataBase);
+    seenKataPerIc.set(ic, existingKataSet);
     valid.push({
       row: rowNo,
       full_name: get(r, "full_name"),
@@ -336,26 +345,39 @@ export async function bulkRegisterCsv(_prev: CsvBulkState, formData: FormData): 
       city: get(r, "city_town"),
       country: get(r, "home_country"),
       categoryId: resolved.category.id,
+      kataBase,
       bank: [get(r, "bank_name"), get(r, "bank_account_no"), get(r, "bank_account_name")],
     });
   });
 
-  // Batch duplicate check against the database
-  const allIcs = valid.map((v) => v.ic);
-  const alreadyRegistered = new Set<string>();
-  for (let i = 0; i < allIcs.length; i += 2000) {
-    const { data: dups } = await supabase.rpc("ics_already_registered", {
-      p_ics: allIcs.slice(i, i + 2000),
+  // A student may compete in at most 3 kata events, never the same kata
+  // twice. Batched: one summary call for every IC in the file, then a single
+  // pass applying the cap in row order (earlier rows for the same IC win).
+  const uniqueIcs = [...new Set(valid.map((v) => v.ic))];
+  const existingByIc = new Map<string, { count: number; katas: Set<string> }>();
+  for (let i = 0; i < uniqueIcs.length; i += 2000) {
+    const { data: summary } = await supabase.rpc("ic_registration_summary", {
+      p_ics: uniqueIcs.slice(i, i + 2000),
       p_competition: competitionId,
     });
-    for (const d of (dups as unknown as string[]) ?? []) alreadyRegistered.add(d);
+    for (const row of (summary as unknown as Array<{ ic: string; cnt: number; kata_bases: string[] | null }>) ?? []) {
+      existingByIc.set(row.ic, { count: row.cnt, katas: new Set(row.kata_bases ?? []) });
+    }
   }
 
   const toInsert = valid.filter((v) => {
-    if (alreadyRegistered.has(v.ic)) {
-      failures.push({ row: v.row, name: v.full_name, error: "Already registered for this competition" });
+    const state = existingByIc.get(v.ic) ?? { count: 0, katas: new Set<string>() };
+    if (state.katas.has(v.kataBase)) {
+      failures.push({ row: v.row, name: v.full_name, error: "Already registered for this kata" });
       return false;
     }
+    if (state.count >= 3) {
+      failures.push({ row: v.row, name: v.full_name, error: "Maximum Kata allow to compete is 3 only" });
+      return false;
+    }
+    state.count++;
+    state.katas.add(v.kataBase);
+    existingByIc.set(v.ic, state);
     return true;
   });
 

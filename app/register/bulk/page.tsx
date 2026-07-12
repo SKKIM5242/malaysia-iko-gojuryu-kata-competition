@@ -74,9 +74,14 @@ export default async function BulkRegisterPage() {
               <section>
                 <h2 className="text-lg font-bold">Option B — fill the table on screen</h2>
                 <div className="mt-2 mb-4 rounded-md border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
-                  Fill one row per participant — like a spreadsheet. Select your school / dojo and
-                  sensei / coach once at the top; they apply to every row. All fields marked * are
-                  required, including each participant&apos;s bank details for prize payouts.
+                  Fill one row per participant — like a spreadsheet. Your{" "}
+                  <a href="/register/school" className="font-semibold underline underline-offset-2">School / Dojo</a>{" "}
+                  and{" "}
+                  <a href="/register/sensei" className="font-semibold underline underline-offset-2">Sensei / Coach</a>{" "}
+                  must already be registered — select them once at the top; they apply to every row.
+                  All fields marked * are required, including each participant&apos;s bank details
+                  for prize payouts. Each student may register for a{" "}
+                  <strong>maximum of 3 kata categories</strong> — add one row per kata.
                 </div>
                 <BulkRegisterForm
                   competition={competition}
