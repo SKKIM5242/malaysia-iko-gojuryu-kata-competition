@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getAllCompetitions } from "@/lib/admin-data";
 import { getCategories, schemaReady } from "@/lib/data";
+import { createClient } from "@/lib/supabase/server";
 import { saveCompetition, saveCategory, deleteCategory } from "@/app/actions/admin";
 import { AdminShell, Card, adminBtn, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice, formatDate, formatUSD } from "@/components/ui";
@@ -37,6 +38,16 @@ export default async function AdminCompetitions({
   const categoriesByCompetition = new Map<string, Category[]>();
   for (const c of competitions) {
     categoriesByCompetition.set(c.id, await getCategories(c.id));
+  }
+  const supabaseAdmin = await createClient();
+  const paidCountByCompetition = new Map<string, number>();
+  for (const c of competitions) {
+    const { count } = await supabaseAdmin
+      .from("registrations")
+      .select("id", { count: "exact", head: true })
+      .eq("competition_id", c.id)
+      .eq("payment_status", "paid");
+    paidCountByCompetition.set(c.id, count ?? 0);
   }
   const allCategories = [...categoriesByCompetition.values()].flat();
   const editingCategory = params.editcat
@@ -80,6 +91,13 @@ export default async function AdminCompetitions({
                 <div>
                   <label htmlFor="registration_fee_usd" className={adminLabel}>Fee (USD)</label>
                   <input id="registration_fee_usd" name="registration_fee_usd" type="number" step="0.01" min="0" defaultValue={editing?.registration_fee_usd ?? ""} className={adminInput} />
+                </div>
+                <div>
+                  <label htmlFor="max_participants" className={adminLabel}>
+                    Max participants <span className="font-normal text-neutral-400">(blank = no cap)</span>
+                  </label>
+                  <input id="max_participants" name="max_participants" type="number" step="1" min="1" defaultValue={editing?.max_participants ?? ""} className={adminInput} placeholder="e.g. 100" />
+                  <p className="mt-1 text-xs text-neutral-400">Closes at this many paid participants or the deadline, whichever comes first.</p>
                 </div>
                 <div>
                   <label htmlFor="status" className={adminLabel}>Status</label>
@@ -183,6 +201,8 @@ export default async function AdminCompetitions({
                           {c.status}
                         </span>
                         {" · deadline "}{formatDate(c.registration_deadline)}
+                        {c.max_participants != null &&
+                          ` · ${paidCountByCompetition.get(c.id) ?? 0}/${c.max_participants} paid`}
                       </p>
                     </div>
                     <Link

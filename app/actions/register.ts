@@ -62,7 +62,7 @@ export async function submitRegistration(
   // Deadline check (server-side; the form also hides itself when closed)
   const { data: competition, error: compErr } = await supabase
     .from("competitions")
-    .select("id, name, status, event_date, registration_deadline, registration_fee_usd")
+    .select("id, name, status, event_date, registration_deadline, registration_fee_usd, max_participants")
     .eq("id", values.competition_id)
     .maybeSingle();
   if (compErr || !competition) {
@@ -76,6 +76,15 @@ export async function submitRegistration(
     new Date(competition.registration_deadline + "T23:59:59") < new Date()
   ) {
     return { ok: false, error: "The registration deadline has passed." };
+  }
+  // Closes at the participant cap or the date deadline, whichever comes first.
+  if (competition.max_participants != null) {
+    const { data: paidCount } = await supabase.rpc("competition_paid_count", {
+      p_competition: values.competition_id,
+    });
+    if (typeof paidCount === "number" && paidCount >= competition.max_participants) {
+      return { ok: false, error: `Registration is closed — this tier reached its cap of ${competition.max_participants} paid participants.` };
+    }
   }
 
   // Same kata twice? Not allowed. Already have 3 kata entries? Not allowed —

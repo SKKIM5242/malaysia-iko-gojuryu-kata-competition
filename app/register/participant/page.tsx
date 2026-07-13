@@ -1,8 +1,11 @@
+import Link from "next/link";
 import {
-  getActiveCompetition,
+  getCompetitionById,
+  getOpenCompetitions,
   getCategories,
   getSchools,
   getSenseis,
+  isCompetitionOpen,
   schemaReady,
 } from "@/lib/data";
 import { EmptyState, SetupNotice, SiteFooter, SiteHeader, formatDate, formatUSD } from "@/components/ui";
@@ -14,7 +17,12 @@ export const dynamic = "force-dynamic";
 
 export const metadata = { title: "Register" };
 
-export default async function RegisterPage() {
+export default async function RegisterPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ competition?: string }>;
+}) {
+  const { competition: competitionId } = await searchParams;
   const ready = await schemaReady();
   if (!ready) {
     return (
@@ -26,11 +34,51 @@ export default async function RegisterPage() {
     );
   }
 
-  const competition = await getActiveCompetition();
+  const openCompetitions = await getOpenCompetitions();
+
+  // No tier picked in the URL, and more than one tier exists — ask first.
+  if (!competitionId && openCompetitions.length > 1) {
+    return (
+      <>
+        <SiteHeader />
+        <main className="mx-auto max-w-2xl px-4 py-10">
+          <h1 className="text-2xl font-bold tracking-tight">Choose your registration tier</h1>
+          <p className="mt-1 mb-6 text-sm text-neutral-500">
+            This event has more than one registration tier — pick one to continue.
+          </p>
+          <div className="space-y-3">
+            {openCompetitions.map((c) => (
+              <Link
+                key={c.id}
+                href={`/register/participant?competition=${c.id}`}
+                className="block rounded-lg border border-neutral-200 bg-white p-4 shadow-sm hover:border-red-300"
+              >
+                <p className="font-bold text-neutral-900">{c.name}</p>
+                <p className="text-sm text-neutral-500">
+                  {formatUSD(c.registration_fee_usd)} · deadline {formatDate(c.registration_deadline)}
+                  {c.max_participants != null ? ` · ${c.paidCount}/${c.max_participants} slots filled` : ""}
+                </p>
+              </Link>
+            ))}
+          </div>
+        </main>
+        <SiteFooter />
+      </>
+    );
+  }
+
+  const competition = competitionId
+    ? await getCompetitionById(competitionId)
+    : openCompetitions[0] ?? null;
+  const paidCount =
+    openCompetitions.find((c) => c.id === competition?.id)?.paidCount ?? 0;
+  const open = competition ? isCompetitionOpen(competition, paidCount) : false;
+  const full =
+    !!competition && competition.max_participants != null && paidCount >= competition.max_participants;
   const deadlinePassed =
-    competition?.registration_deadline != null &&
+    !!competition &&
+    competition.registration_deadline != null &&
     new Date(competition.registration_deadline + "T23:59:59") < new Date();
-  const open = competition?.status === "open" && !deadlinePassed;
 
   const [categories, schools, senseis] = competition
     ? await Promise.all([getCategories(competition.id), getSchools(), getSenseis()])
@@ -44,7 +92,13 @@ export default async function RegisterPage() {
         {competition && (
           <p className="mt-1 text-sm text-neutral-500">
             {competition.name} · {formatDate(competition.event_date)} · Fee {formatUSD(competition.registration_fee_usd)}
+            {competition.max_participants != null && ` · ${paidCount}/${competition.max_participants} slots filled`}
           </p>
+        )}
+        {openCompetitions.length > 1 && (
+          <Link href="/register/participant" className="mt-1 inline-block text-xs text-red-700 underline underline-offset-2">
+            ← Choose a different tier
+          </Link>
         )}
 
         <div className="mt-8">
@@ -52,11 +106,15 @@ export default async function RegisterPage() {
             <EmptyState>There is no competition to register for right now.</EmptyState>
           ) : !open ? (
             <div className="rounded-lg border border-neutral-300 bg-neutral-100 p-8 text-center">
-              <p className="text-lg font-bold text-neutral-700">Registration closed</p>
+              <p className="text-lg font-bold text-neutral-700">
+                {full ? "Registration closed — this tier is full" : "Registration closed"}
+              </p>
               <p className="mt-1 text-sm text-neutral-500">
-                {deadlinePassed
-                  ? `The registration deadline (${formatDate(competition.registration_deadline)}) has passed.`
-                  : "This competition is not currently accepting registrations."}
+                {full
+                  ? `This tier reached its cap of ${competition.max_participants} paid participants.`
+                  : deadlinePassed
+                    ? `The registration deadline (${formatDate(competition.registration_deadline)}) has passed.`
+                    : "This competition is not currently accepting registrations."}
               </p>
             </div>
           ) : (
@@ -83,6 +141,10 @@ export default async function RegisterPage() {
                   kata categories in their registration list — <strong>each registration covers only 1
                   kata category</strong>. You may log in again another time to record your kata, and
                   you may log in to this app an <strong>unlimited</strong> number of times.
+                </p>
+                <p>
+                  This tier closes at <strong>{competition.max_participants ?? "—"} paid participants</strong>{" "}
+                  or <strong>{formatDate(competition.registration_deadline)}</strong>, whichever comes first.
                 </p>
               </div>
               <div className="mb-6 rounded-md border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600">

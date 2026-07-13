@@ -120,12 +120,18 @@ export async function saveCompetition(formData: FormData) {
     registration_fee_usd: formData.get("registration_fee_usd")
       ? Number(formData.get("registration_fee_usd"))
       : null,
+    max_participants: formData.get("max_participants")
+      ? Number(formData.get("max_participants"))
+      : null,
     status: String(formData.get("status") ?? "draft"),
     description: String(formData.get("description") ?? "").trim() || null,
   };
   if (!values.name) backTo(returnTo, { error: "Competition name is required." });
   if (values.registration_fee_usd != null && Number.isNaN(values.registration_fee_usd)) {
     backTo(returnTo, { error: "Fee must be a number." });
+  }
+  if (values.max_participants != null && Number.isNaN(values.max_participants)) {
+    backTo(returnTo, { error: "Max participants must be a number." });
   }
 
   const { supabase, actorId } = await getActor();

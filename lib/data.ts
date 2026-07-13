@@ -14,25 +14,45 @@ import type {
  * results already unwrapped — callers render empty/error states off null.
  */
 
-export async function getActiveCompetition(): Promise<Competition | null> {
+/**
+ * All competitions currently open for registration, cheapest first — there
+ * can be several at once (e.g. fee tiers of the same championship). Each
+ * card gets its own paid-participant count so the UI can show "closed" the
+ * moment a tier hits its cap, ahead of its date deadline if that comes first.
+ */
+export async function getOpenCompetitions(): Promise<Array<Competition & { paidCount: number }>> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("competitions")
     .select("*")
     .eq("status", "open")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (data) return data as Competition;
-  // Fall back to the most recent competition of any status so the site
-  // still shows something between events.
-  const { data: latest } = await supabase
-    .from("competitions")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  return (latest as Competition) ?? null;
+    .order("registration_fee_usd", { ascending: true, nullsFirst: true });
+  const competitions = (data as Competition[]) ?? [];
+  return Promise.all(
+    competitions.map(async (c) => {
+      const { data: count } = await supabase.rpc("competition_paid_count", { p_competition: c.id });
+      return { ...c, paidCount: typeof count === "number" ? count : 0 };
+    }),
+  );
+}
+
+export function isCompetitionOpen(
+  competition: Pick<Competition, "status" | "registration_deadline" | "max_participants">,
+  paidCount: number,
+): boolean {
+  if (competition.status !== "open") return false;
+  const deadlinePassed =
+    competition.registration_deadline != null &&
+    new Date(competition.registration_deadline + "T23:59:59") < new Date();
+  if (deadlinePassed) return false;
+  if (competition.max_participants != null && paidCount >= competition.max_participants) return false;
+  return true;
+}
+
+export async function getCompetitionById(id: string): Promise<Competition | null> {
+  const supabase = await createClient();
+  const { data } = await supabase.from("competitions").select("*").eq("id", id).maybeSingle();
+  return (data as Competition) ?? null;
 }
 
 export async function getCategories(competitionId: string): Promise<Category[]> {
@@ -82,19 +102,20 @@ export interface ConfirmedRegistration extends Registration {
 }
 
 export async function getConfirmedRegistrations(
-  competitionId: string,
+  competitionIds: string | string[],
   filters: ParticipantFilters = {},
 ): Promise<{ rows: ConfirmedRegistration[]; total: number }> {
   const supabase = await createClient();
   const pageSize = filters.pageSize ?? 25;
   const page = Math.max(1, filters.page ?? 1);
+  const ids = Array.isArray(competitionIds) ? competitionIds : [competitionIds];
   let query = supabase
     .from("registrations")
     .select(
       "*, participant:participants(*, school:schools(id,name,state), sensei:senseis(id,name,rank)), category:categories(id,name)",
       { count: "exact" },
     )
-    .eq("competition_id", competitionId)
+    .in("competition_id", ids)
     .eq("payment_status", "paid")
     .order("created_at", { ascending: false })
     .range((page - 1) * pageSize, page * pageSize - 1);

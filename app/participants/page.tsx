@@ -1,12 +1,12 @@
 import Link from "next/link";
 import {
-  getActiveCompetition,
+  getOpenCompetitions,
   getCategories,
   getConfirmedRegistrations,
   getSchools,
   schemaReady,
 } from "@/lib/data";
-import { EmptyState, SetupNotice, SiteFooter, SiteHeader } from "@/components/ui";
+import { EmptyState, SetupNotice, SiteFooter, SiteHeader, formatUSD } from "@/components/ui";
 import { kataBases } from "@/lib/division";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +16,7 @@ const PAGE_SIZE = 25;
 export default async function ParticipantsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ kata?: string; school?: string; page?: string }>;
+  searchParams: Promise<{ kata?: string; school?: string; tier?: string; page?: string }>;
 }) {
   const params = await searchParams;
   const ready = await schemaReady();
@@ -30,8 +30,8 @@ export default async function ParticipantsPage({
     );
   }
 
-  const competition = await getActiveCompetition();
-  if (!competition) {
+  const openCompetitions = await getOpenCompetitions();
+  if (openCompetitions.length === 0) {
     return (
       <>
         <SiteHeader />
@@ -44,11 +44,15 @@ export default async function ParticipantsPage({
     );
   }
 
+  const selectedTier = params.tier && openCompetitions.some((c) => c.id === params.tier) ? params.tier : undefined;
+  const competitionIds = selectedTier ? [selectedTier] : openCompetitions.map((c) => c.id);
+  // Kata list is identical across tiers of the same championship — use the first tier's.
+  const categories = await getCategories((selectedTier ?? openCompetitions[0].id));
+
   const page = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
-  const [categories, schools, { rows, total }] = await Promise.all([
-    getCategories(competition.id),
+  const [schools, { rows, total }] = await Promise.all([
     getSchools(),
-    getConfirmedRegistrations(competition.id, {
+    getConfirmedRegistrations(competitionIds, {
       kataBase: params.kata || undefined,
       schoolId: params.school || undefined,
       page,
@@ -60,9 +64,10 @@ export default async function ParticipantsPage({
 
   const filterHref = (overrides: Record<string, string | undefined>) => {
     const q = new URLSearchParams();
-    const merged = { kata: params.kata, school: params.school, ...overrides };
+    const merged = { kata: params.kata, school: params.school, tier: params.tier, ...overrides };
     if (merged.kata) q.set("kata", merged.kata);
     if (merged.school) q.set("school", merged.school);
+    if (merged.tier) q.set("tier", merged.tier);
     if (overrides.page) q.set("page", overrides.page);
     const s = q.toString();
     return `/participants${s ? `?${s}` : ""}`;
@@ -74,10 +79,30 @@ export default async function ParticipantsPage({
       <main className="mx-auto max-w-6xl px-4 py-10">
         <h1 className="text-2xl font-bold tracking-tight">Confirmed participants</h1>
         <p className="mt-1 text-sm text-neutral-500">
-          {competition.name} — participants whose payment has been confirmed by the organiser.
+          {openCompetitions.length > 1 && !selectedTier
+            ? "All registration tiers — participants whose payment has been confirmed by the organiser."
+            : `${(openCompetitions.find((c) => c.id === selectedTier) ?? openCompetitions[0]).name} — participants whose payment has been confirmed by the organiser.`}
         </p>
 
         <form method="GET" action="/participants" className="mt-6 flex flex-wrap items-end gap-3">
+          {openCompetitions.length > 1 && (
+            <div>
+              <label htmlFor="tier" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-neutral-500">
+                Registration tier
+              </label>
+              <select
+                id="tier"
+                name="tier"
+                defaultValue={params.tier ?? ""}
+                className="rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm"
+              >
+                <option value="">All tiers</option>
+                {openCompetitions.map((c) => (
+                  <option key={c.id} value={c.id}>{formatUSD(c.registration_fee_usd)} tier</option>
+                ))}
+              </select>
+            </div>
+          )}
           <div>
             <label htmlFor="kata" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-neutral-500">
               Kata event
@@ -116,7 +141,7 @@ export default async function ParticipantsPage({
           >
             Filter
           </button>
-          {(params.kata || params.school) && (
+          {(params.kata || params.school || params.tier) && (
             <Link href="/participants" className="py-2 text-sm text-red-700 underline underline-offset-2">
               Clear filters
             </Link>

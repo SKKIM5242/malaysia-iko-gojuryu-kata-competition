@@ -9,6 +9,7 @@ export interface Competition {
   event_date: string | null;
   registration_deadline: string | null;
   registration_fee_usd: number | null;
+  max_participants: number | null;
   status: CompetitionStatus;
   description: string | null;
   created_at: string;

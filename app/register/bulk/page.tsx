@@ -1,8 +1,11 @@
+import Link from "next/link";
 import {
-  getActiveCompetition,
+  getCompetitionById,
+  getOpenCompetitions,
   getCategories,
   getSchools,
   getSenseis,
+  isCompetitionOpen,
   schemaReady,
 } from "@/lib/data";
 import { EmptyState, SetupNotice, SiteFooter, SiteHeader, formatDate, formatUSD } from "@/components/ui";
@@ -16,7 +19,12 @@ export const maxDuration = 60;
 
 export const metadata = { title: "Bulk registration (Sensei / Coach)" };
 
-export default async function BulkRegisterPage() {
+export default async function BulkRegisterPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ competition?: string }>;
+}) {
+  const { competition: competitionId } = await searchParams;
   const ready = await schemaReady();
   if (!ready) {
     return (
@@ -28,11 +36,43 @@ export default async function BulkRegisterPage() {
     );
   }
 
-  const competition = await getActiveCompetition();
-  const deadlinePassed =
-    competition?.registration_deadline != null &&
-    new Date(competition.registration_deadline + "T23:59:59") < new Date();
-  const open = competition?.status === "open" && !deadlinePassed;
+  const openCompetitions = await getOpenCompetitions();
+
+  if (!competitionId && openCompetitions.length > 1) {
+    return (
+      <>
+        <SiteHeader />
+        <main className="mx-auto max-w-2xl px-4 py-10">
+          <h1 className="text-2xl font-bold tracking-tight">Choose a registration tier</h1>
+          <p className="mt-1 mb-6 text-sm text-neutral-500">
+            This event has more than one registration tier — pick one to bulk-register your students.
+          </p>
+          <div className="space-y-3">
+            {openCompetitions.map((c) => (
+              <Link
+                key={c.id}
+                href={`/register/bulk?competition=${c.id}`}
+                className="block rounded-lg border border-neutral-200 bg-white p-4 shadow-sm hover:border-red-300"
+              >
+                <p className="font-bold text-neutral-900">{c.name}</p>
+                <p className="text-sm text-neutral-500">
+                  {formatUSD(c.registration_fee_usd)} · deadline {formatDate(c.registration_deadline)}
+                  {c.max_participants != null ? ` · ${c.paidCount}/${c.max_participants} slots filled` : ""}
+                </p>
+              </Link>
+            ))}
+          </div>
+        </main>
+        <SiteFooter />
+      </>
+    );
+  }
+
+  const competition = competitionId
+    ? await getCompetitionById(competitionId)
+    : openCompetitions[0] ?? null;
+  const paidCount = openCompetitions.find((c) => c.id === competition?.id)?.paidCount ?? 0;
+  const open = competition ? isCompetitionOpen(competition, paidCount) : false;
 
   const [categories, schools, senseis] = competition
     ? await Promise.all([getCategories(competition.id), getSchools(), getSenseis()])
@@ -47,7 +87,13 @@ export default async function BulkRegisterPage() {
           <p className="mt-1 text-sm text-neutral-500">
             {competition.name} · {formatDate(competition.event_date)} · Fee{" "}
             {formatUSD(competition.registration_fee_usd)} per participant
+            {competition.max_participants != null && ` · ${paidCount}/${competition.max_participants} slots filled`}
           </p>
+        )}
+        {openCompetitions.length > 1 && (
+          <Link href="/register/bulk" className="mt-1 inline-block text-xs text-red-700 underline underline-offset-2">
+            ← Choose a different tier
+          </Link>
         )}
         <div className="mt-8">
           {!competition ? (
