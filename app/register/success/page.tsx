@@ -2,7 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { paymentsEnabled } from "@/lib/payments";
 import { finalizeStripeSession } from "@/lib/finalize";
-import { OrganiserContact, SiteFooter, SiteHeader } from "@/components/ui";
+import { SiteFooter, SiteHeader, TelegramJoinButton } from "@/components/ui";
+import { getTelegramLink } from "@/lib/telegram";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +38,9 @@ export default async function RegisterSuccessPage({
               <Link href="/participants" className="underline">participants list</Link>. A Stripe receipt
               has been sent to the email you entered at checkout.
             </p>
-            <div className="mx-auto max-w-md text-green-900"><OrganiserContact /></div>
+            <div className="mx-auto max-w-md text-green-900">
+              <TelegramJoinButton href={getTelegramLink("participant")} />
+            </div>
             <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
               <Link
                 href="/account"

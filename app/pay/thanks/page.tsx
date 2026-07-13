@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { paymentsEnabled } from "@/lib/payments";
 import { finalizeInvoiceSession } from "@/lib/finalize";
-import { OrganiserContact, SiteFooter, SiteHeader } from "@/components/ui";
+import { SiteFooter, SiteHeader, TelegramJoinButton } from "@/components/ui";
+import { getTelegramLink } from "@/lib/telegram";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +31,9 @@ export default async function PayThanksPage({
               Invoice <span className="rounded bg-white px-2 py-0.5 font-mono font-bold">{result.referenceId}</span>{" "}
               is now marked paid. A Stripe receipt has been emailed to you.
             </p>
-            <div className="mx-auto max-w-md text-green-900"><OrganiserContact /></div>
+            <div className="mx-auto max-w-md text-green-900">
+              <TelegramJoinButton href={getTelegramLink("general")} />
+            </div>
           </div>
         ) : result?.status === "unpaid" ? (
           <div className="rounded-lg border border-amber-300 bg-amber-50 p-8 text-center">

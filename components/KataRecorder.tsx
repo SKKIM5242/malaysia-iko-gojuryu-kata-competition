@@ -291,6 +291,15 @@ export default function KataRecorder({
         this in-app camera recorder.
       </div>
 
+      <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+        <strong>Camera placement:</strong> prop your phone up (against a wall, on a chair, or a
+        tripod) about <strong>12 feet (≈3.6 m)</strong> away from your starting point, at roughly
+        chest height, in the same direction you will be performing your kata. Leave enough space
+        in frame for the full routine — you should be able to see your whole body move throughout.
+        Tap <strong>Start</strong>, walk into position, perform your kata, then walk back and tap{" "}
+        <strong>Stop</strong> when you are finished.
+      </div>
+
       <div className="relative mx-auto max-w-md overflow-hidden rounded-lg border border-neutral-300 bg-black">
         <video ref={videoRef} playsInline muted className="hidden" />
         <canvas ref={canvasRef} className={phase === "idle" ? "hidden" : "block w-full"} />
@@ -314,18 +323,27 @@ export default function KataRecorder({
 
       <div className="flex flex-wrap justify-center gap-3">
         {phase === "idle" && (
-          <button onClick={startCamera} className="rounded-md bg-red-700 px-6 py-2.5 font-semibold text-white hover:bg-red-600">
+          <button
+            onClick={startCamera}
+            className="w-full max-w-md rounded-lg bg-red-700 px-6 py-4 text-lg font-bold text-white hover:bg-red-600 sm:w-auto"
+          >
             Enable camera
           </button>
         )}
         {phase === "live" && (
-          <button onClick={startRecording} className="rounded-md bg-red-700 px-6 py-2.5 font-semibold text-white hover:bg-red-600">
-            ● Start recording
+          <button
+            onClick={startRecording}
+            className="w-full max-w-md rounded-lg bg-red-700 px-6 py-4 text-lg font-bold text-white hover:bg-red-600 sm:w-auto"
+          >
+            ● Start
           </button>
         )}
         {phase === "recording" && (
-          <button onClick={stopRecording} className="rounded-md bg-neutral-900 px-6 py-2.5 font-semibold text-white hover:bg-neutral-700">
-            ■ Stop recording
+          <button
+            onClick={stopRecording}
+            className="w-full max-w-md rounded-lg bg-neutral-900 px-6 py-4 text-lg font-bold text-white hover:bg-neutral-700 sm:w-auto"
+          >
+            ■ Stop
           </button>
         )}
         {phase === "review" && (
