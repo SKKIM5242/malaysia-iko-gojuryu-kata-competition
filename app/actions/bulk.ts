@@ -152,6 +152,15 @@ export async function bulkRegister(_prev: BulkState, formData: FormData): Promis
       results.push({ row: i + 1, name: label, ok: false, error: resolved.error ?? "No matching category" });
       continue;
     }
+    if (resolved.category.max_participants != null) {
+      const { data: categoryPaid } = await supabase.rpc("category_paid_count", {
+        p_category: resolved.category.id,
+      });
+      if (typeof categoryPaid === "number" && categoryPaid >= resolved.category.max_participants) {
+        results.push({ row: i + 1, name: label, ok: false, error: "This sub-category is full" });
+        continue;
+      }
+    }
 
     const participantId = crypto.randomUUID();
     const registrationId = crypto.randomUUID();
@@ -303,7 +312,7 @@ export async function bulkRegisterCsv(_prev: CsvBulkState, formData: FormData): 
     row: number; full_name: string; ic: string; dob: string; gender: string;
     belt: string; rankConf: string; email: string; phone: string;
     address: string; city: string; country: string;
-    categoryId: string; kataBase: string; bank: [string, string, string];
+    categoryId: string; categoryMax: number | null; kataBase: string; bank: [string, string, string];
   };
   const failures: Array<{ row: number; name: string; error: string }> = [];
   const valid: Valid[] = [];
@@ -357,6 +366,7 @@ export async function bulkRegisterCsv(_prev: CsvBulkState, formData: FormData): 
       city: get(r, "city_town"),
       country: get(r, "home_country"),
       categoryId: resolved.category.id,
+      categoryMax: resolved.category.max_participants,
       kataBase,
       bank: [get(r, "bank_name"), get(r, "bank_account_no"), get(r, "bank_account_name")],
     });
@@ -377,6 +387,20 @@ export async function bulkRegisterCsv(_prev: CsvBulkState, formData: FormData): 
     }
   }
 
+  // Sub-categories can have their own (tighter) cap than the competition —
+  // batch-fetch current paid counts, then track remaining room in-memory as
+  // rows are accepted (DB writes happen later, in chunks).
+  const cappedCategoryIds = [...new Set(valid.filter((v) => v.categoryMax != null).map((v) => v.categoryId))];
+  const categoryTaken = new Map<string, number>();
+  for (let i = 0; i < cappedCategoryIds.length; i += 2000) {
+    const { data: counts } = await supabase.rpc("category_paid_counts", {
+      p_category_ids: cappedCategoryIds.slice(i, i + 2000),
+    });
+    for (const row of (counts as Array<{ category_id: string; cnt: number }>) ?? []) {
+      categoryTaken.set(row.category_id, row.cnt);
+    }
+  }
+
   const toInsert = valid.filter((v) => {
     const state = existingByIc.get(v.ic) ?? { count: 0, katas: new Set<string>() };
     if (state.katas.has(v.kataBase)) {
@@ -386,6 +410,14 @@ export async function bulkRegisterCsv(_prev: CsvBulkState, formData: FormData): 
     if (state.count >= 3) {
       failures.push({ row: v.row, name: v.full_name, error: "Maximum Kata allow to compete is 3 only" });
       return false;
+    }
+    if (v.categoryMax != null) {
+      const taken = categoryTaken.get(v.categoryId) ?? 0;
+      if (taken >= v.categoryMax) {
+        failures.push({ row: v.row, name: v.full_name, error: "This sub-category is full" });
+        return false;
+      }
+      categoryTaken.set(v.categoryId, taken + 1);
     }
     state.count++;
     state.katas.add(v.kataBase);

@@ -133,6 +133,21 @@ export async function submitRegistration(
   values.category_id = resolved.category.id;
   values.division = values.gender.toLowerCase() === "female" ? "Female" : "Male";
 
+  // This exact sub-category (kata + belt + age) may have its own cap, tighter
+  // than the competition-wide one.
+  if (resolved.category.max_participants != null) {
+    const { data: categoryPaid } = await supabase.rpc("category_paid_count", {
+      p_category: resolved.category.id,
+    });
+    if (typeof categoryPaid === "number" && categoryPaid >= resolved.category.max_participants) {
+      return {
+        ok: false,
+        error: "This sub-category is full. Please choose a different kata or check back later.",
+        fieldErrors: { kata_base: "Sub-category full" },
+      };
+    }
+  }
+
   // Latest belt/rank certificate: optional photo/scan, uploaded to private
   // storage before the registration is written (works for both the manual
   // flow and the pay-first flow, where only the path travels in the draft).

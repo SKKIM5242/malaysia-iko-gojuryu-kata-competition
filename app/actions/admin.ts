@@ -169,9 +169,13 @@ export async function saveCategory(formData: FormData) {
     age_max: formData.get("age_max") ? Number(formData.get("age_max")) : null,
     belt_group: String(formData.get("belt_group") ?? "") || null,
     gender: String(formData.get("gender") ?? "") || null,
+    max_participants: formData.get("max_participants") ? Number(formData.get("max_participants")) : null,
   };
   if (!values.name || !values.competition_id) {
     backTo(returnTo, { error: "Category name and competition are required." });
+  }
+  if (values.max_participants != null && Number.isNaN(values.max_participants)) {
+    backTo(returnTo, { error: "Max participants must be a number." });
   }
   const { supabase, actorId } = await getActor();
   if (id) {
@@ -471,6 +475,9 @@ export async function saveReferee(formData: FormData) {
     date_of_birth: String(formData.get("date_of_birth") ?? "") || null,
     gender: String(formData.get("gender") ?? "") || null,
     karate_rank: String(formData.get("karate_rank") ?? "").trim() || null,
+    judging_experience_count: formData.get("judging_experience_count")
+      ? Number(formData.get("judging_experience_count"))
+      : null,
     school: String(formData.get("school") ?? "").trim() || null,
     email: String(formData.get("email") ?? "").trim() || null,
     phone: String(formData.get("phone") ?? "").trim() || null,

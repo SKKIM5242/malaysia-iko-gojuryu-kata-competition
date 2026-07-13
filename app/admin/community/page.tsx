@@ -9,11 +9,13 @@ export const dynamic = "force-dynamic";
 
 interface Referee {
   id: string; full_name: string; ic_passport: string; date_of_birth: string | null;
-  gender: string | null; karate_rank: string | null; school: string | null;
+  gender: string | null; karate_rank: string | null; judging_experience_count: number | null;
+  school: string | null;
   email: string | null; phone: string | null; home_address: string | null;
   city_town: string | null; home_country: string | null;
   bank_name: string | null; bank_account_no: string | null; bank_account_name: string | null;
-  certificate_path: string | null; invitation_code: string | null;
+  certificate_path: string | null; international_certificate_paths: string[] | null;
+  invitation_code: string | null;
   payment_status: string; status: string; created_at: string;
 }
 interface Audience {
@@ -79,7 +81,10 @@ export default async function AdminCommunity({
   const refereeList = (referees as Referee[]) ?? [];
   const editing = params.editref ? refereeList.find((r) => r.id === params.editref) : undefined;
 
-  const certPaths = refereeList.map((r) => r.certificate_path).filter(Boolean) as string[];
+  const certPaths = [
+    ...refereeList.map((r) => r.certificate_path),
+    ...refereeList.flatMap((r) => r.international_certificate_paths ?? []),
+  ].filter(Boolean) as string[];
   const certUrls = new Map<string, string>();
   if (certPaths.length > 0) {
     const { data: signed } = await supabase.storage.from("certificates").createSignedUrls(certPaths, 3600);
@@ -118,6 +123,12 @@ export default async function AdminCommunity({
                 <div>
                   <label htmlFor="karate_rank" className={adminLabel}>Karate rank</label>
                   <input id="karate_rank" name="karate_rank" defaultValue={editing?.karate_rank ?? ""} className={adminInput} placeholder="e.g. Godan" />
+                </div>
+                <div>
+                  <label htmlFor="judging_experience_count" className={adminLabel}>
+                    No. of times judging Kata competition
+                  </label>
+                  <input id="judging_experience_count" name="judging_experience_count" type="number" min="0" step="1" defaultValue={editing?.judging_experience_count ?? ""} className={adminInput} />
                 </div>
                 <div className="sm:col-span-2">
                   <CertificateField
@@ -202,6 +213,9 @@ export default async function AdminCommunity({
                       <p className="text-xs text-neutral-500">
                         {[r.home_address, r.city_town, r.home_country].filter(Boolean).join(", ") || "—"}
                       </p>
+                      <p className="text-xs text-neutral-500">
+                        Judged {r.judging_experience_count ?? 0} time{r.judging_experience_count === 1 ? "" : "s"} before
+                      </p>
                       <p className="mt-0.5 text-xs">
                         {r.bank_name}
                         {r.bank_account_no ? <span className="font-mono"> · {r.bank_account_no}</span> : ""}
@@ -209,8 +223,18 @@ export default async function AdminCommunity({
                       <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
                         {r.certificate_path && certUrls.get(r.certificate_path) ? (
                           <a href={certUrls.get(r.certificate_path)} target="_blank" rel="noopener noreferrer"
-                            className="font-semibold text-green-700 underline underline-offset-2">Certificate</a>
-                        ) : null}
+                            className="font-semibold text-green-700 underline underline-offset-2">Rank certificate</a>
+                        ) : (
+                          <span className="text-red-500">No rank certificate</span>
+                        )}
+                        {(r.international_certificate_paths ?? []).map((path, i) => (
+                          certUrls.get(path) ? (
+                            <a key={path} href={certUrls.get(path)} target="_blank" rel="noopener noreferrer"
+                              className="font-semibold text-blue-700 underline underline-offset-2">
+                              Intl. cert {i + 1}
+                            </a>
+                          ) : null
+                        ))}
                         {r.invitation_code && (
                           <span className="font-mono text-purple-700">code: {r.invitation_code}</span>
                         )}

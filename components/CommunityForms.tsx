@@ -94,15 +94,32 @@ export function RefereeForm({ telegramLink }: { telegramLink: string | null }) {
           <Err m={e.karate_rank} />
         </div>
         <div>
+          <label htmlFor="judging_experience_count" className={labelCls}>
+            No. of times taking part in judging Kata competition *
+          </label>
+          <input id="judging_experience_count" name="judging_experience_count" type="number" min="0" step="1" required className={inputCls} placeholder="e.g. 5 (0 if none)" />
+          <Err m={e.judging_experience_count} />
+        </div>
+        <div>
           <label htmlFor="school" className={labelCls}>School / organisation</label>
           <input id="school" name="school" className={inputCls} />
         </div>
         <div>
           <label htmlFor="certificate" className={labelCls}>
-            Rank certificate <span className="font-normal text-neutral-400">(photo or file)</span>
+            Latest rank certificate * <span className="font-normal text-neutral-400">(photo or file)</span>
           </label>
-          <input id="certificate" name="certificate" type="file" accept="image/*,application/pdf" capture="environment"
+          <input id="certificate" name="certificate" type="file" accept="image/*,application/pdf" capture="environment" required
             className="w-full rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm file:mr-3 file:rounded file:border-0 file:bg-neutral-900 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-white" />
+          <Err m={e.certificate} />
+        </div>
+        <div className="sm:col-span-2">
+          <label htmlFor="international_certificates" className={labelCls}>
+            International certified Referee / Judge certificates{" "}
+            <span className="font-normal text-neutral-400">(optional — unlimited uploads)</span>
+          </label>
+          <input id="international_certificates" name="international_certificates" type="file" accept="image/*,application/pdf" multiple
+            className="w-full rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm file:mr-3 file:rounded file:border-0 file:bg-neutral-900 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-white" />
+          <p className="mt-1 text-xs text-neutral-400">Select multiple files at once, or add this field again later — not required.</p>
         </div>
         <div>
           <label htmlFor="email" className={labelCls}>Email *</label>

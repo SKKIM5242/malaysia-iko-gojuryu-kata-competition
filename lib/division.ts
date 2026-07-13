@@ -46,6 +46,17 @@ export function kataBases(categories: Category[]): string[] {
   return bases;
 }
 
+/** Groups categories by kata event, preserving each kata's first-seen order. */
+export function groupByKata(categories: Category[]): Array<[string, Category[]]> {
+  const groups = new Map<string, Category[]>();
+  for (const c of categories) {
+    const base = kataBaseOf(c.name);
+    if (!groups.has(base)) groups.set(base, []);
+    groups.get(base)!.push(c);
+  }
+  return [...groups.entries()];
+}
+
 /**
  * Resolve the exact sub-category for a registrant. Returns the category or
  * an error message when the age falls outside every bracket.

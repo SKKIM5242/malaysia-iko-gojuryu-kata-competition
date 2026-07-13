@@ -5,19 +5,10 @@ import { createClient } from "@/lib/supabase/server";
 import { saveCompetition, saveCategory, deleteCategory } from "@/app/actions/admin";
 import { AdminShell, Card, adminBtn, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice, formatDate, formatUSD } from "@/components/ui";
+import { groupByKata } from "@/lib/division";
 import type { Category } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
-
-function groupByKata(categories: Category[]): Array<[string, Category[]]> {
-  const groups = new Map<string, Category[]>();
-  for (const c of categories) {
-    const base = c.name.split(" — ")[0];
-    if (!groups.has(base)) groups.set(base, []);
-    groups.get(base)!.push(c);
-  }
-  return [...groups.entries()];
-}
 
 export default async function AdminCompetitions({
   searchParams,
@@ -50,6 +41,15 @@ export default async function AdminCompetitions({
     paidCountByCompetition.set(c.id, count ?? 0);
   }
   const allCategories = [...categoriesByCompetition.values()].flat();
+  const categoryPaidCount = new Map<string, number>();
+  if (allCategories.length > 0) {
+    const { data: counts } = await supabaseAdmin.rpc("category_paid_counts", {
+      p_category_ids: allCategories.map((c) => c.id),
+    });
+    for (const row of (counts as Array<{ category_id: string; cnt: number }>) ?? []) {
+      categoryPaidCount.set(row.category_id, row.cnt);
+    }
+  }
   const editingCategory = params.editcat
     ? allCategories.find((c) => c.id === params.editcat)
     : undefined;
@@ -165,6 +165,21 @@ export default async function AdminCompetitions({
                         <option value="female">Female</option>
                       </select>
                     </div>
+                    <div className="sm:col-span-2">
+                      <label htmlFor="cat_max_participants" className={adminLabel}>
+                        Max participants <span className="font-normal text-neutral-400">(blank = no cap)</span>
+                      </label>
+                      <input
+                        id="cat_max_participants"
+                        name="max_participants"
+                        type="number"
+                        step="1"
+                        min="1"
+                        defaultValue={editingCategory?.max_participants ?? ""}
+                        className={adminInput}
+                        placeholder="e.g. 20"
+                      />
+                    </div>
                   </div>
                   <div className="flex gap-2">
                     <button type="submit" className={adminBtn}>
@@ -224,27 +239,42 @@ export default async function AdminCompetitions({
                               {base} <span className="font-normal text-neutral-400">({cats.length} sub-categories)</span>
                             </summary>
                             <ul className="space-y-1 px-2 pb-2 pl-5">
-                              {cats.map((cat) => (
-                                <li key={cat.id} className="flex items-center justify-between gap-2 text-sm">
-                                  <span className="text-neutral-600">
-                                    {cat.name.split(" — ").slice(1).join(" — ") || cat.name}
-                                  </span>
-                                  <span className="flex shrink-0 gap-1">
-                                    <Link
-                                      href={`/admin/competitions?editcat=${cat.id}`}
-                                      className="rounded border border-neutral-300 px-2 py-0.5 text-xs text-neutral-600 hover:bg-neutral-50"
-                                    >
-                                      Edit
-                                    </Link>
-                                    <form action={deleteCategory}>
-                                      <input type="hidden" name="id" value={cat.id} />
-                                      <button className="rounded border border-red-200 px-2 py-0.5 text-xs text-red-600 hover:bg-red-50">
-                                        Delete
-                                      </button>
-                                    </form>
-                                  </span>
-                                </li>
-                              ))}
+                              {cats.map((cat) => {
+                                const taken = categoryPaidCount.get(cat.id) ?? 0;
+                                const left = cat.max_participants != null ? Math.max(0, cat.max_participants - taken) : null;
+                                return (
+                                  <li key={cat.id} className="flex items-center justify-between gap-2 text-sm">
+                                    <span className="text-neutral-600">
+                                      {cat.name.split(" — ").slice(1).join(" — ") || cat.name}
+                                    </span>
+                                    <span className="flex shrink-0 items-center gap-3">
+                                      <span
+                                        className={`text-xs whitespace-nowrap ${
+                                          left === 0 ? "font-semibold text-red-600" : "text-neutral-400"
+                                        }`}
+                                      >
+                                        {cat.max_participants != null
+                                          ? `${taken}/${cat.max_participants} taken (${left} left)`
+                                          : `${taken} taken (no cap)`}
+                                      </span>
+                                      <span className="flex gap-1">
+                                        <Link
+                                          href={`/admin/competitions?editcat=${cat.id}`}
+                                          className="rounded border border-neutral-300 px-2 py-0.5 text-xs text-neutral-600 hover:bg-neutral-50"
+                                        >
+                                          Edit
+                                        </Link>
+                                        <form action={deleteCategory}>
+                                          <input type="hidden" name="id" value={cat.id} />
+                                          <button className="rounded border border-red-200 px-2 py-0.5 text-xs text-red-600 hover:bg-red-50">
+                                            Delete
+                                          </button>
+                                        </form>
+                                      </span>
+                                    </span>
+                                  </li>
+                                );
+                              })}
                             </ul>
                           </details>
                         ))}

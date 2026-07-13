@@ -55,6 +55,7 @@ export interface Category {
   belt_group: string | null;
   gender: string | null;
   sort_order: number;
+  max_participants: number | null;
   created_at: string;
 }
 

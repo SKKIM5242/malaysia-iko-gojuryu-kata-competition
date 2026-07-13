@@ -31,6 +31,7 @@ export async function registerReferee(
     ["date_of_birth", "Date of birth"],
     ["gender", "Gender"],
     ["karate_rank", "Karate rank"],
+    ["judging_experience_count", "Number of times judging"],
     ["email", "Email"],
     ["phone", "Mobile / WhatsApp"],
     ["home_address", "Home address"],
@@ -43,24 +44,54 @@ export async function registerReferee(
   if (Object.keys(fieldErrors).length > 0) {
     return { ok: false, error: "Please fix the highlighted fields.", fieldErrors };
   }
+  const judgingCount = Number(values.judging_experience_count);
+  if (!Number.isInteger(judgingCount) || judgingCount < 0) {
+    return {
+      ok: false,
+      error: "Please fix the highlighted fields.",
+      fieldErrors: { judging_experience_count: "Enter a whole number (0 if none)" },
+    };
+  }
   const school = String(formData.get("school") ?? "").trim();
   const invitation_code = String(formData.get("invitation_code") ?? "").trim();
 
   const supabase = await createClient();
 
-  // Certificate (optional)
-  let certificate_path: string | null = null;
+  // Latest rank certificate — required.
   const certificate = formData.get("certificate");
-  if (certificate instanceof File && certificate.size > 0) {
-    if (certificate.size > 10 * 1024 * 1024) {
-      return { ok: false, error: "Certificate file is too large (max 10 MB)." };
+  if (!(certificate instanceof File) || certificate.size === 0) {
+    return {
+      ok: false,
+      error: "Please fix the highlighted fields.",
+      fieldErrors: { certificate: "Latest rank certificate is required" },
+    };
+  }
+  if (certificate.size > 10 * 1024 * 1024) {
+    return { ok: false, error: "Certificate file is too large (max 10 MB)." };
+  }
+  const ext = (certificate.name.split(".").pop() || "jpg").toLowerCase().slice(0, 5);
+  const certificate_path = `referee-${crypto.randomUUID()}.${ext}`;
+  const { error: upErr } = await supabase.storage
+    .from("certificates")
+    .upload(certificate_path, certificate, { contentType: certificate.type || "image/jpeg" });
+  if (upErr) return { ok: false, error: "Could not upload the certificate. Please try again." };
+
+  // International certification records — optional, unlimited files.
+  const internationalFiles = formData
+    .getAll("international_certificates")
+    .filter((f): f is File => f instanceof File && f.size > 0);
+  const international_certificate_paths: string[] = [];
+  for (const file of internationalFiles) {
+    if (file.size > 10 * 1024 * 1024) {
+      return { ok: false, error: `"${file.name}" is too large (max 10 MB per file).` };
     }
-    const ext = (certificate.name.split(".").pop() || "jpg").toLowerCase().slice(0, 5);
-    certificate_path = `referee-${crypto.randomUUID()}.${ext}`;
-    const { error: upErr } = await supabase.storage
+    const fExt = (file.name.split(".").pop() || "jpg").toLowerCase().slice(0, 5);
+    const path = `referee-intl-${crypto.randomUUID()}.${fExt}`;
+    const { error: intlErr } = await supabase.storage
       .from("certificates")
-      .upload(certificate_path, certificate, { contentType: certificate.type || "image/jpeg" });
-    if (upErr) return { ok: false, error: "Could not upload the certificate. Please try again." };
+      .upload(path, file, { contentType: file.type || "image/jpeg" });
+    if (intlErr) return { ok: false, error: `Could not upload "${file.name}". Please try again.` };
+    international_certificate_paths.push(path);
   }
 
   const id = crypto.randomUUID();
@@ -71,6 +102,7 @@ export async function registerReferee(
     date_of_birth: values.date_of_birth,
     gender: values.gender,
     karate_rank: values.karate_rank,
+    judging_experience_count: judgingCount,
     school: school || null,
     email: values.email,
     phone: values.phone,
@@ -81,6 +113,7 @@ export async function registerReferee(
     bank_account_no: values.bank_account_no,
     bank_account_name: values.bank_account_name,
     certificate_path,
+    international_certificate_paths,
     invitation_code: invitation_code || null,
     payment_status: "pending",
   });
