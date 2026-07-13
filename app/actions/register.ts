@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { writeAudit } from "@/lib/audit";
 import { getStripe, paymentsEnabled } from "@/lib/payments";
 import { resolveCategory } from "@/lib/division";
+import { notifyRegistrationConfirmation } from "@/lib/notify";
 import type { Category } from "@/lib/types";
 
 export interface RegisterState {
@@ -288,8 +289,14 @@ export async function submitRegistration(
     },
   });
 
-  return {
-    ok: true,
-    referenceId: registrationId.slice(0, 8).toUpperCase(),
-  };
+  const referenceId = registrationId.slice(0, 8).toUpperCase();
+  await notifyRegistrationConfirmation({
+    participantEmail: values.email || null,
+    participantName: values.full_name,
+    competitionName: competition.name,
+    referenceId,
+    kataName: values.kata_base || null,
+  });
+
+  return { ok: true, referenceId };
 }

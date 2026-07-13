@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStripe } from "@/lib/payments";
 import { writeAudit } from "@/lib/audit";
+import { notifyRegistrationConfirmation } from "@/lib/notify";
 
 export type FinalizeResult =
   | { status: "paid"; referenceId: string }
@@ -152,5 +153,19 @@ export async function finalizeStripeSession(sessionId: string): Promise<Finalize
 
   await admin.from("registration_drafts").delete().eq("id", draftId);
 
-  return { status: "paid", referenceId: registrationId.slice(0, 8).toUpperCase() };
+  const referenceId = registrationId.slice(0, 8).toUpperCase();
+  const { data: competitionRow } = await admin
+    .from("competitions")
+    .select("name")
+    .eq("id", v.competition_id)
+    .maybeSingle();
+  await notifyRegistrationConfirmation({
+    participantEmail: v.email ?? null,
+    participantName: v.full_name,
+    competitionName: competitionRow?.name ?? "the competition",
+    referenceId,
+    kataName: v.kata_base ?? null,
+  });
+
+  return { status: "paid", referenceId };
 }

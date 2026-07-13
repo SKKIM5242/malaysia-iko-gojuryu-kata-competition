@@ -24,6 +24,9 @@ export default function AuthForms() {
     const password = String(form.get("password") ?? "");
     const supabase = createClient();
     try {
+      if (form.get("not_a_robot") !== "on") {
+        throw new Error("Please confirm you are not a robot or AI.");
+      }
       if (mode === "signup") {
         if (form.get("terms_accepted") !== "on") {
           throw new Error("Please accept the Terms & Conditions to create an account.");
@@ -153,6 +156,10 @@ export default function AuthForms() {
             </span>
           </label>
         )}
+        <label htmlFor="not_a_robot" className="flex items-center gap-2 text-xs text-neutral-600">
+          <input id="not_a_robot" name="not_a_robot" type="checkbox" required />
+          <span>I am not a robot or AI. *</span>
+        </label>
         <button
           type="submit"
           disabled={pending}
