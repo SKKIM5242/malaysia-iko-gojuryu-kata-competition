@@ -17,6 +17,7 @@ import {
 } from "@/components/ui";
 import { Markdown } from "@/lib/markdown";
 import { kataBases } from "@/lib/division";
+import type { Category } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +39,12 @@ export default async function Home() {
     getOpenCompetitions(),
     getPublishedAnnouncements(5),
   ]);
-  const categories = competitions[0] ? await getCategories(competitions[0].id) : [];
+  const categoriesByCompetition = new Map<string, Category[]>();
+  for (const c of competitions) {
+    categoriesByCompetition.set(c.id, await getCategories(c.id));
+  }
+  const tierCap = (cats: Category[]): number | null =>
+    cats.find((c) => c.gender === "male" && c.max_participants != null)?.max_participants ?? null;
 
   return (
     <>
@@ -53,13 +59,7 @@ export default async function Home() {
             </SectionTitle>
             <div className={`grid gap-6 ${competitions.length > 1 ? "md:grid-cols-3" : ""}`}>
               {competitions.map((competition) => {
-                const open = isCompetitionOpen(competition, competition.paidCount);
-                const full =
-                  competition.max_participants != null && competition.paidCount >= competition.max_participants;
-                const slotsLeft =
-                  competition.max_participants != null
-                    ? Math.max(0, competition.max_participants - competition.paidCount)
-                    : null;
+                const open = isCompetitionOpen(competition);
                 return (
                   <div
                     key={competition.id}
@@ -67,7 +67,7 @@ export default async function Home() {
                   >
                     <div className="bg-neutral-950 px-6 py-6 text-white">
                       <p className="text-xs font-semibold uppercase tracking-widest text-red-500">
-                        {open ? "Registration open" : full ? "Full — closed" : "Closed"}
+                        {open ? "Registration open" : "Closed"}
                       </p>
                       <h2 className="mt-2 text-xl font-bold tracking-tight">{competition.name}</h2>
                       <p className="mt-2 text-2xl font-bold text-red-400">
@@ -83,19 +83,6 @@ export default async function Home() {
                         <span className="text-neutral-400">Deadline</span>
                         <span className="font-semibold text-neutral-900">{formatDate(competition.registration_deadline)}</span>
                       </div>
-                      {competition.max_participants != null && (
-                        <div className="flex justify-between">
-                          <span className="text-neutral-400">Slots</span>
-                          <span className="font-semibold text-neutral-900">
-                            {competition.paidCount} / {competition.max_participants}{" "}
-                            {slotsLeft != null && slotsLeft > 0 && !full ? `(${slotsLeft} left)` : ""}
-                          </span>
-                        </div>
-                      )}
-                      <p className="text-xs text-neutral-400">
-                        Closes at {competition.max_participants ?? "—"} paid participants or{" "}
-                        {formatDate(competition.registration_deadline)}, whichever comes first.
-                      </p>
                     </div>
                     <div className="border-t border-neutral-100 px-6 py-4">
                       {open ? (
@@ -107,7 +94,7 @@ export default async function Home() {
                         </Link>
                       ) : (
                         <span className="block rounded-md bg-neutral-200 px-4 py-2.5 text-center font-semibold text-neutral-500">
-                          {full ? "Full" : "Registration closed"}
+                          Registration closed
                         </span>
                       )}
                     </div>
@@ -127,26 +114,46 @@ export default async function Home() {
         )}
 
         {competitions.length > 0 && (
-          <section className="mt-12">
+          <section className="mt-12 space-y-10">
             <SectionTitle>Kata events</SectionTitle>
-            {categories.length === 0 ? (
-              <EmptyState>Categories have not been published yet.</EmptyState>
-            ) : (
-              <>
-                <p className="mb-4 text-sm text-neutral-500">
-                  Every kata event is divided into <strong>Color/Kyu Belt</strong> and{" "}
-                  <strong>Black Belt &amp; Dan Holders</strong> sub-categories, each with age groups{" "}
-                  <strong>4–14</strong>, <strong>15–40</strong>, <strong>41–65</strong> and{" "}
-                  <strong>66–99</strong>. Your sub-category is assigned automatically when you register.
-                  The same kata list applies to every registration tier above.
-                </p>
-                <ol className="grid list-inside list-decimal gap-x-8 gap-y-2 rounded-lg border border-neutral-200 bg-white p-6 shadow-sm sm:grid-cols-2">
-                  {kataBases(categories).map((k) => (
-                    <li key={k} className="text-sm font-medium text-neutral-800">{k}</li>
-                  ))}
-                </ol>
-              </>
-            )}
+            {competitions.map((competition) => {
+              const cats = categoriesByCompetition.get(competition.id) ?? [];
+              const cap = tierCap(cats);
+              return (
+                <div key={competition.id}>
+                  {competitions.length > 1 && (
+                    <h3 className="mb-2 text-base font-bold text-neutral-900">{competition.name}</h3>
+                  )}
+                  {cats.length === 0 ? (
+                    <EmptyState>Categories have not been published yet.</EmptyState>
+                  ) : (
+                    <>
+                      <p className="mb-4 text-sm text-neutral-500">
+                        Every kata event is divided into <strong>Male</strong>, <strong>Female</strong> or{" "}
+                        <strong>Mix (Male &amp; Female)</strong> sub-categories, then{" "}
+                        <strong>Color/Kyu Belt</strong> and <strong>Black Belt &amp; Dan Holders</strong>{" "}
+                        sub-sub-categories, each with age groups <strong>4–14</strong>, <strong>15–40</strong>,{" "}
+                        <strong>41–65</strong> and <strong>66–99</strong>. Your sub-category is assigned
+                        automatically when you register. The same kata list applies to every registration tier.
+                        {" "}Male and Female sub-categories are listed for the initial registration stage
+                        {cap != null && (
+                          <>
+                            {" "}— once the registration deadline is reached, any Male or Female sub-category
+                            with fewer than <strong>{cap}</strong> participants is merged into a{" "}
+                            <strong>Mix (Male &amp; Female)</strong> category.
+                          </>
+                        )}
+                      </p>
+                      <ol className="grid list-inside list-decimal gap-x-8 gap-y-2 rounded-lg border border-neutral-200 bg-white p-6 shadow-sm sm:grid-cols-2">
+                        {kataBases(cats).map((k) => (
+                          <li key={k} className="text-sm font-medium text-neutral-800">{k}</li>
+                        ))}
+                      </ol>
+                    </>
+                  )}
+                </div>
+              );
+            })}
           </section>
         )}
 

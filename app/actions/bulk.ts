@@ -78,7 +78,7 @@ export async function bulkRegister(_prev: BulkState, formData: FormData): Promis
   const supabase = await createClient();
   const { data: competition } = await supabase
     .from("competitions")
-    .select("id, status, event_date, registration_deadline, max_participants")
+    .select("id, status, event_date, registration_deadline")
     .eq("id", competitionId)
     .maybeSingle();
   if (!competition || competition.status !== "open") {
@@ -89,12 +89,6 @@ export async function bulkRegister(_prev: BulkState, formData: FormData): Promis
     new Date(competition.registration_deadline + "T23:59:59") < new Date()
   ) {
     return { done: false, error: "The registration deadline has passed." };
-  }
-  if (competition.max_participants != null) {
-    const { data: paidCount } = await supabase.rpc("competition_paid_count", { p_competition: competitionId });
-    if (typeof paidCount === "number" && paidCount >= competition.max_participants) {
-      return { done: false, error: `Registration is closed — this tier reached its cap of ${competition.max_participants} paid participants.` };
-    }
   }
 
   const { data: catRows } = await supabase
@@ -146,6 +140,7 @@ export async function bulkRegister(_prev: BulkState, formData: FormData): Promis
       row.kata_base,
       row.date_of_birth,
       row.belt_rank,
+      row.gender,
       competition.event_date,
     );
     if (!resolved.category) {
@@ -278,7 +273,7 @@ export async function bulkRegisterCsv(_prev: CsvBulkState, formData: FormData): 
   const supabase = await createClient();
   const { data: competition } = await supabase
     .from("competitions")
-    .select("id, status, event_date, registration_deadline, max_participants")
+    .select("id, status, event_date, registration_deadline")
     .eq("id", competitionId)
     .maybeSingle();
   if (!competition || competition.status !== "open") {
@@ -289,12 +284,6 @@ export async function bulkRegisterCsv(_prev: CsvBulkState, formData: FormData): 
     new Date(competition.registration_deadline + "T23:59:59") < new Date()
   ) {
     return { done: false, error: "The registration deadline has passed." };
-  }
-  if (competition.max_participants != null) {
-    const { data: paidCount } = await supabase.rpc("competition_paid_count", { p_competition: competitionId });
-    if (typeof paidCount === "number" && paidCount >= competition.max_participants) {
-      return { done: false, error: `Registration is closed — this tier reached its cap of ${competition.max_participants} paid participants.` };
-    }
   }
 
   const { data: catRows } = await supabase
@@ -343,7 +332,7 @@ export async function bulkRegisterCsv(_prev: CsvBulkState, formData: FormData): 
       failures.push({ row: rowNo, name, error: "Gender must be male or female" });
       return;
     }
-    const resolved = resolveCategory(categories, kataBase, dob, get(r, "belt_rank"), competition.event_date);
+    const resolved = resolveCategory(categories, kataBase, dob, get(r, "belt_rank"), gender, competition.event_date);
     if (!resolved.category) {
       failures.push({ row: rowNo, name, error: resolved.error ?? `Unknown kata event "${kataBase}"` });
       return;

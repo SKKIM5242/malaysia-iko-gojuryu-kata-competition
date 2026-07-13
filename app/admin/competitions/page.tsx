@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getAllCompetitions } from "@/lib/admin-data";
 import { getCategories, schemaReady } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
-import { saveCompetition, saveCategory, deleteCategory } from "@/app/actions/admin";
+import { saveCompetition, saveCategory, deleteCategory, mergeCategoryToMix } from "@/app/actions/admin";
 import { AdminShell, Card, adminBtn, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice, formatDate, formatUSD } from "@/components/ui";
 import { groupByKata } from "@/lib/division";
@@ -31,15 +31,6 @@ export default async function AdminCompetitions({
     categoriesByCompetition.set(c.id, await getCategories(c.id));
   }
   const supabaseAdmin = await createClient();
-  const paidCountByCompetition = new Map<string, number>();
-  for (const c of competitions) {
-    const { count } = await supabaseAdmin
-      .from("registrations")
-      .select("id", { count: "exact", head: true })
-      .eq("competition_id", c.id)
-      .eq("payment_status", "paid");
-    paidCountByCompetition.set(c.id, count ?? 0);
-  }
   const allCategories = [...categoriesByCompetition.values()].flat();
   const categoryPaidCount = new Map<string, number>();
   if (allCategories.length > 0) {
@@ -91,13 +82,6 @@ export default async function AdminCompetitions({
                 <div>
                   <label htmlFor="registration_fee_usd" className={adminLabel}>Fee (USD)</label>
                   <input id="registration_fee_usd" name="registration_fee_usd" type="number" step="0.01" min="0" defaultValue={editing?.registration_fee_usd ?? ""} className={adminInput} />
-                </div>
-                <div>
-                  <label htmlFor="max_participants" className={adminLabel}>
-                    Max participants <span className="font-normal text-neutral-400">(blank = no cap)</span>
-                  </label>
-                  <input id="max_participants" name="max_participants" type="number" step="1" min="1" defaultValue={editing?.max_participants ?? ""} className={adminInput} placeholder="e.g. 100" />
-                  <p className="mt-1 text-xs text-neutral-400">Closes at this many paid participants or the deadline, whichever comes first.</p>
                 </div>
                 <div>
                   <label htmlFor="status" className={adminLabel}>Status</label>
@@ -159,10 +143,10 @@ export default async function AdminCompetitions({
                     </div>
                     <div>
                       <label htmlFor="cat_gender" className={adminLabel}>Gender</label>
-                      <select id="cat_gender" name="gender" defaultValue={editingCategory?.gender ?? "open"} className={adminInput}>
-                        <option value="open">Open (divisions auto-split M/F)</option>
+                      <select id="cat_gender" name="gender" defaultValue={editingCategory?.gender ?? "male"} className={adminInput}>
                         <option value="male">Male</option>
                         <option value="female">Female</option>
+                        <option value="mix">Mix (Male & Female)</option>
                       </select>
                     </div>
                     <div className="sm:col-span-2">
@@ -216,8 +200,6 @@ export default async function AdminCompetitions({
                           {c.status}
                         </span>
                         {" · deadline "}{formatDate(c.registration_deadline)}
-                        {c.max_participants != null &&
-                          ` · ${paidCountByCompetition.get(c.id) ?? 0}/${c.max_participants} paid`}
                       </p>
                     </div>
                     <Link
@@ -258,6 +240,17 @@ export default async function AdminCompetitions({
                                           : `${taken} taken (no cap)`}
                                       </span>
                                       <span className="flex gap-1">
+                                        {(cat.gender === "male" || cat.gender === "female") && (
+                                          <form action={mergeCategoryToMix}>
+                                            <input type="hidden" name="category_id" value={cat.id} />
+                                            <button
+                                              className="rounded border border-amber-300 px-2 py-0.5 text-xs text-amber-700 hover:bg-amber-50"
+                                              title="Move this category's (and its Male/Female sibling's) registrations into a shared Mix (Male & Female) category"
+                                            >
+                                              Merge → Mix
+                                            </button>
+                                          </form>
+                                        )}
                                         <Link
                                           href={`/admin/competitions?editcat=${cat.id}`}
                                           className="rounded border border-neutral-300 px-2 py-0.5 text-xs text-neutral-600 hover:bg-neutral-50"

@@ -57,23 +57,33 @@ export function groupByKata(categories: Category[]): Array<[string, Category[]]>
   return [...groups.entries()];
 }
 
+export function genderCode(gender: string): "male" | "female" {
+  return gender.toLowerCase() === "female" ? "female" : "male";
+}
+
 /**
  * Resolve the exact sub-category for a registrant. Returns the category or
- * an error message when the age falls outside every bracket.
+ * an error message when the age falls outside every bracket. Registrants
+ * always resolve into a Male or Female sub-category; Mix (Male & Female)
+ * categories are created and populated manually by an admin when a Male or
+ * Female category doesn't reach its cap by the registration deadline.
  */
 export function resolveCategory(
   categories: Category[],
   kataBase: string,
   dateOfBirth: string,
   beltRank: string,
+  gender: string,
   eventDate: string | null | undefined,
 ): { category?: Category; error?: string } {
   const age = ageAt(dateOfBirth, eventDate);
   const grp = beltGroup(beltRank);
+  const genderVal = genderCode(gender);
   const match = categories.find(
     (c) =>
       kataBaseOf(c.name) === kataBase &&
       c.belt_group === grp &&
+      c.gender === genderVal &&
       c.age_min != null &&
       c.age_max != null &&
       age >= c.age_min &&

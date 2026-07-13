@@ -16,36 +16,27 @@ import type {
 
 /**
  * All competitions currently open for registration, cheapest first — there
- * can be several at once (e.g. fee tiers of the same championship). Each
- * card gets its own paid-participant count so the UI can show "closed" the
- * moment a tier hits its cap, ahead of its date deadline if that comes first.
+ * can be several at once (e.g. fee tiers of the same championship). Caps are
+ * tracked per kata sub-category, not per competition.
  */
-export async function getOpenCompetitions(): Promise<Array<Competition & { paidCount: number }>> {
+export async function getOpenCompetitions(): Promise<Competition[]> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("competitions")
     .select("*")
     .eq("status", "open")
     .order("registration_fee_usd", { ascending: true, nullsFirst: true });
-  const competitions = (data as Competition[]) ?? [];
-  return Promise.all(
-    competitions.map(async (c) => {
-      const { data: count } = await supabase.rpc("competition_paid_count", { p_competition: c.id });
-      return { ...c, paidCount: typeof count === "number" ? count : 0 };
-    }),
-  );
+  return (data as Competition[]) ?? [];
 }
 
 export function isCompetitionOpen(
-  competition: Pick<Competition, "status" | "registration_deadline" | "max_participants">,
-  paidCount: number,
+  competition: Pick<Competition, "status" | "registration_deadline">,
 ): boolean {
   if (competition.status !== "open") return false;
   const deadlinePassed =
     competition.registration_deadline != null &&
     new Date(competition.registration_deadline + "T23:59:59") < new Date();
   if (deadlinePassed) return false;
-  if (competition.max_participants != null && paidCount >= competition.max_participants) return false;
   return true;
 }
 

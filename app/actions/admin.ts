@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { writeAudit } from "@/lib/audit";
+import { kataBaseOf } from "@/lib/division";
 import type { PaymentStatus } from "@/lib/types";
 
 /**
@@ -120,18 +121,12 @@ export async function saveCompetition(formData: FormData) {
     registration_fee_usd: formData.get("registration_fee_usd")
       ? Number(formData.get("registration_fee_usd"))
       : null,
-    max_participants: formData.get("max_participants")
-      ? Number(formData.get("max_participants"))
-      : null,
     status: String(formData.get("status") ?? "draft"),
     description: String(formData.get("description") ?? "").trim() || null,
   };
   if (!values.name) backTo(returnTo, { error: "Competition name is required." });
   if (values.registration_fee_usd != null && Number.isNaN(values.registration_fee_usd)) {
     backTo(returnTo, { error: "Fee must be a number." });
-  }
-  if (values.max_participants != null && Number.isNaN(values.max_participants)) {
-    backTo(returnTo, { error: "Max participants must be a number." });
   }
 
   const { supabase, actorId } = await getActor();
@@ -208,6 +203,89 @@ export async function deleteCategory(formData: FormData) {
   });
   revalidatePath("/");
   backTo(returnTo, { ok: "Category deleted." });
+}
+
+/**
+ * Merges a Male or Female sub-category into a Mix (Male & Female) category
+ * for the same kata + belt group + age bracket — creating the Mix category
+ * on first use. Every registration currently in the Male and/or Female
+ * sub-category for that slot is moved onto the Mix category; the Male/Female
+ * rows are left in place (now empty) for the record.
+ */
+export async function mergeCategoryToMix(formData: FormData) {
+  const categoryId = String(formData.get("category_id") ?? "");
+  const returnTo = "/admin/competitions";
+  const { supabase, actorId } = await getActor();
+
+  const { data: source } = await supabase
+    .from("categories")
+    .select("*")
+    .eq("id", categoryId)
+    .maybeSingle();
+  if (!source) backTo(returnTo, { error: "Category not found." });
+  if (source!.gender === "mix") backTo(returnTo, { ok: "Already a Mix category." });
+
+  const kataBase = kataBaseOf(source!.name);
+  const beltLabel = source!.belt_group === "dan" ? "Black Belt & Dan Holders" : "Color/Kyu Belt";
+  const mixName = `${kataBase} — ${beltLabel} — Age ${source!.age_min}–${source!.age_max} — Mix (Male & Female)`;
+
+  const { data: siblingsRaw } = await supabase
+    .from("categories")
+    .select("id, name, gender")
+    .eq("competition_id", source!.competition_id)
+    .eq("belt_group", source!.belt_group)
+    .eq("age_min", source!.age_min)
+    .eq("age_max", source!.age_max)
+    .in("gender", ["male", "female"]);
+  const mergeIds = (siblingsRaw ?? [])
+    .filter((s) => kataBaseOf(s.name) === kataBase)
+    .map((s) => s.id);
+  if (!mergeIds.includes(categoryId)) mergeIds.push(categoryId);
+
+  let mixCategoryId: string;
+  const { data: existingMix } = await supabase
+    .from("categories")
+    .select("id")
+    .eq("competition_id", source!.competition_id)
+    .eq("name", mixName)
+    .maybeSingle();
+  if (existingMix) {
+    mixCategoryId = existingMix.id;
+  } else {
+    const { data: created, error: createErr } = await supabase
+      .from("categories")
+      .insert({
+        competition_id: source!.competition_id,
+        name: mixName,
+        age_min: source!.age_min,
+        age_max: source!.age_max,
+        belt_group: source!.belt_group,
+        gender: "mix",
+        sort_order: (source!.sort_order ?? 0) + 1,
+        max_participants: null,
+      })
+      .select("id")
+      .single();
+    if (createErr || !created) backTo(returnTo, { error: "Could not create the Mix category." });
+    mixCategoryId = created!.id;
+    await writeAudit(supabase, {
+      table_name: "categories", record_id: mixCategoryId, action: "category_created",
+      new_value: { name: mixName, gender: "mix" }, actor_id: actorId,
+    });
+  }
+
+  const { error: moveErr } = await supabase
+    .from("registrations")
+    .update({ category_id: mixCategoryId })
+    .in("category_id", mergeIds);
+  if (moveErr) backTo(returnTo, { error: "Could not move registrations into the Mix category." });
+
+  await writeAudit(supabase, {
+    table_name: "registrations", record_id: null, action: "registrations_merged_to_mix",
+    new_value: { from_category_ids: mergeIds, to_category_id: mixCategoryId }, actor_id: actorId,
+  });
+  revalidatePath("/");
+  backTo(returnTo, { ok: `Merged into “${mixName}”.` });
 }
 
 // ── Announcements ────────────────────────────────────────────────────────────

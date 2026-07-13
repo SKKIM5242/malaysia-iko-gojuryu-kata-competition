@@ -57,7 +57,6 @@ export default async function BulkRegisterPage({
                 <p className="font-bold text-neutral-900">{c.name}</p>
                 <p className="text-sm text-neutral-500">
                   {formatUSD(c.registration_fee_usd)} · deadline {formatDate(c.registration_deadline)}
-                  {c.max_participants != null ? ` · ${c.paidCount}/${c.max_participants} slots filled` : ""}
                 </p>
               </Link>
             ))}
@@ -71,8 +70,7 @@ export default async function BulkRegisterPage({
   const competition = competitionId
     ? await getCompetitionById(competitionId)
     : openCompetitions[0] ?? null;
-  const paidCount = openCompetitions.find((c) => c.id === competition?.id)?.paidCount ?? 0;
-  const open = competition ? isCompetitionOpen(competition, paidCount) : false;
+  const open = competition ? isCompetitionOpen(competition) : false;
 
   const [categories, schools, senseis] = competition
     ? await Promise.all([getCategories(competition.id), getSchools(), getSenseis()])
@@ -87,7 +85,6 @@ export default async function BulkRegisterPage({
           <p className="mt-1 text-sm text-neutral-500">
             {competition.name} · {formatDate(competition.event_date)} · Fee{" "}
             {formatUSD(competition.registration_fee_usd)} per participant
-            {competition.max_participants != null && ` · ${paidCount}/${competition.max_participants} slots filled`}
           </p>
         )}
         {openCompetitions.length > 1 && (

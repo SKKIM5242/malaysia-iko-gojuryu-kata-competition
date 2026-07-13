@@ -69,7 +69,6 @@ export default async function RegisterPage({
                     <p className="font-bold text-neutral-900">{c.name}</p>
                     <p className="text-sm text-neutral-500">
                       {formatUSD(c.registration_fee_usd)} · deadline {formatDate(c.registration_deadline)}
-                      {c.max_participants != null ? ` · ${c.paidCount}/${c.max_participants} slots filled` : ""}
                     </p>
                   </div>
                   <Link
@@ -120,11 +119,7 @@ export default async function RegisterPage({
   const competition = competitionId
     ? await getCompetitionById(competitionId)
     : openCompetitions[0] ?? null;
-  const paidCount =
-    openCompetitions.find((c) => c.id === competition?.id)?.paidCount ?? 0;
-  const open = competition ? isCompetitionOpen(competition, paidCount) : false;
-  const full =
-    !!competition && competition.max_participants != null && paidCount >= competition.max_participants;
+  const open = competition ? isCompetitionOpen(competition) : false;
   const deadlinePassed =
     !!competition &&
     competition.registration_deadline != null &&
@@ -142,7 +137,6 @@ export default async function RegisterPage({
         {competition && (
           <p className="mt-1 text-sm text-neutral-500">
             {competition.name} · {formatDate(competition.event_date)} · Fee {formatUSD(competition.registration_fee_usd)}
-            {competition.max_participants != null && ` · ${paidCount}/${competition.max_participants} slots filled`}
           </p>
         )}
         {openCompetitions.length > 1 && (
@@ -156,15 +150,11 @@ export default async function RegisterPage({
             <EmptyState>There is no competition to register for right now.</EmptyState>
           ) : !open ? (
             <div className="rounded-lg border border-neutral-300 bg-neutral-100 p-8 text-center">
-              <p className="text-lg font-bold text-neutral-700">
-                {full ? "Registration closed — this tier is full" : "Registration closed"}
-              </p>
+              <p className="text-lg font-bold text-neutral-700">Registration closed</p>
               <p className="mt-1 text-sm text-neutral-500">
-                {full
-                  ? `This tier reached its cap of ${competition.max_participants} paid participants.`
-                  : deadlinePassed
-                    ? `The registration deadline (${formatDate(competition.registration_deadline)}) has passed.`
-                    : "This competition is not currently accepting registrations."}
+                {deadlinePassed
+                  ? `The registration deadline (${formatDate(competition.registration_deadline)}) has passed.`
+                  : "This competition is not currently accepting registrations."}
               </p>
             </div>
           ) : (
@@ -193,8 +183,8 @@ export default async function RegisterPage({
                   you may log in to this app an <strong>unlimited</strong> number of times.
                 </p>
                 <p>
-                  This tier closes at <strong>{competition.max_participants ?? "—"} paid participants</strong>{" "}
-                  or <strong>{formatDate(competition.registration_deadline)}</strong>, whichever comes first.
+                  Registration for this tier closes on{" "}
+                  <strong>{formatDate(competition.registration_deadline)}</strong>.
                 </p>
               </div>
               <div className="mb-6 rounded-md border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
