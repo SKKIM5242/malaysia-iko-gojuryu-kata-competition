@@ -32,7 +32,7 @@ export default async function PayThanksPage({
               is now marked paid. A Stripe receipt has been emailed to you.
             </p>
             <div className="mx-auto max-w-md text-green-900">
-              <TelegramJoinButton href={getTelegramLink("participant")} />
+              <TelegramJoinButton href={getTelegramLink("class")} />
             </div>
           </div>
         ) : result?.status === "unpaid" ? (

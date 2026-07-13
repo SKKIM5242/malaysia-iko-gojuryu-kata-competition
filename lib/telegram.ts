@@ -1,4 +1,4 @@
-export type TelegramCategory = "participant" | "school" | "referee" | "audience" | "staff";
+export type TelegramCategory = "participant" | "school" | "referee" | "audience" | "staff" | "class";
 
 const LABELS: Record<TelegramCategory, string> = {
   participant: "Participants",
@@ -6,6 +6,7 @@ const LABELS: Record<TelegramCategory, string> = {
   referee: "Referees / Judges",
   audience: "Audience / Spectators",
   staff: "Admin / Organizer / Customer Support",
+  class: "Dojo Class Students",
 };
 
 /**

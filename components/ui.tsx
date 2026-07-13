@@ -72,8 +72,8 @@ export function SiteHeader() {
             className="h-11 w-11 rounded-lg bg-white p-0.5"
           />
           <span className="leading-tight">
-            <span className="block text-sm font-bold tracking-wide">MALAYSIA OPEN — IKO GOJU-RYU KARATE-DO</span>
-            <span className="block text-sm font-bold tracking-wide">Kata Competition — Goju-ryu Version Only</span>
+            <span className="block text-sm font-bold tracking-wide">MALAYSIA OPEN KARATE-DO KATA COMPETITION</span>
+            <span className="block text-sm font-bold tracking-wide">Goju-ryu or IKO Goju-ryu Version Only</span>
           </span>
         </Link>
         <nav className="flex flex-wrap items-center gap-1 text-sm">
@@ -100,7 +100,9 @@ export function SiteFooter() {
     <footer className="mt-16 border-t border-neutral-200 bg-neutral-50">
       <div className="mx-auto max-w-6xl px-4 py-8 text-sm text-neutral-500">
         <p className="font-semibold text-neutral-700">
-          Malaysia Open — IKO Goju-ryu Karate-do — Kata Competition — Goju-ryu Version Only
+          Malaysia Open Karate-do Kata Competition - Goju-ryu or IKO Goju-ryu Version Only.
+          Specially for all Goju-ryu Karateka to compete globally without leaving their beloved
+          Country.
         </p>
         <p className="mt-1">
           Organiser:{" "}

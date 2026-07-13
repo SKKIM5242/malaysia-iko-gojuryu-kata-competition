@@ -18,7 +18,11 @@ export default function LoginPage() {
             className="mx-auto h-20 w-20 rounded-xl bg-white p-1"
           />
           <h1 className="mt-3 text-xl font-bold">Organiser login</h1>
-          <p className="mt-1 text-sm text-neutral-400">Malaysia Open — IKO Goju-ryu Karate-do — Kata Competition — Goju-ryu Version Only</p>
+          <p className="mt-1 text-sm text-neutral-400">
+            Malaysia Open Karate-do Kata Competition - Goju-ryu or IKO Goju-ryu Version Only.
+            Specially for all Goju-ryu Karateka to compete globally without leaving their beloved
+            Country.
+          </p>
         </div>
         <form action={formAction} className="space-y-4 rounded-lg bg-white p-6 shadow-lg">
           {state.error && (

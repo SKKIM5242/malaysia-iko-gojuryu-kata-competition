@@ -61,19 +61,29 @@ export default async function RegisterPage() {
             </div>
           ) : (
             <>
-              <div className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                <strong>Note:</strong> participants must 1) select a registered{" "}
-                <a href="/register/school" className="font-semibold underline underline-offset-2">School / Dojo</a>{" "}
-                and 2){" "}
-                <a href="/register/sensei" className="font-semibold underline underline-offset-2">register your Sensei / Coach</a>{" "}
-                before registering yourself here. The same applies to a Sensei registering on behalf
-                of their students — use the{" "}
-                <a href="/register/bulk" className="font-semibold underline underline-offset-2">bulk registration table</a>{" "}
-                for multiple students.
-                <br className="hidden sm:block" />
-                After registration, proceed to recording your kata with your phone camera for the
-                next step. You only get <strong>3 chances</strong> to delete and re-record your kata.
-                Each participant may register for a <strong>maximum of 3 kata categories</strong>.
+              <div className="mb-3 space-y-2 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                <p>
+                  <strong>Note:</strong> participants must 1) register their own{" "}
+                  <a href="/register/school" className="font-semibold underline underline-offset-2">School / Dojo</a>{" "}
+                  and 2){" "}
+                  <a href="/register/sensei" className="font-semibold underline underline-offset-2">register your Sensei / Coach</a>{" "}
+                  before registering themself here. The same applies to a Sensei registering on
+                  behalf of their students — or use the{" "}
+                  <a href="/register/bulk" className="font-semibold underline underline-offset-2">bulk registration table</a>{" "}
+                  for multiple students.
+                </p>
+                <p>
+                  <strong>Once payment is made, no refund will be given</strong> if a participant does
+                  not attend or later decides not to participate.
+                </p>
+                <p>
+                  After registration, please proceed to recording your kata with your phone camera for
+                  the next step. You only get <strong>3 chances</strong> to delete and re-record your
+                  kata. Each participant may register up to <strong>3 times</strong> for any qualifying
+                  kata categories in their registration list — <strong>each registration covers only 1
+                  kata category</strong>. You may log in again another time to record your kata, and
+                  you may log in to this app an <strong>unlimited</strong> number of times.
+                </p>
               </div>
               <div className="mb-6 rounded-md border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
                 {paymentsEnabled() && Number(competition.registration_fee_usd ?? 0) > 0 ? (
