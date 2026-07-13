@@ -1,31 +1,32 @@
-export type TelegramCategory = "participant" | "school" | "sensei" | "referee" | "audience" | "staff" | "general";
+export type TelegramCategory = "participant" | "school" | "referee" | "audience" | "staff";
+
+const LABELS: Record<TelegramCategory, string> = {
+  participant: "Participants",
+  school: "School / Dojo & Sensei / Coach",
+  referee: "Referees / Judges",
+  audience: "Audience / Spectators",
+  staff: "Admin / Organizer / Customer Support",
+};
 
 /**
- * Telegram community links per registration category. Set TELEGRAM_GROUP_URL
- * (the group invite link) plus optional TELEGRAM_TOPIC_* vars (the numeric
- * message-thread id of each Topic) once the group exists — see
- * docs/TELEGRAM_SETUP.md. Until configured this returns null and callers
- * fall back to the phone/email contact instead of a broken link.
- *
- * Telegram doesn't support hiding topics from members — anyone who joins the
- * group can browse every topic. Referee/Judge and Admin/Organizer/Staff
- * therefore just get the base group link ("full access to all sections");
- * other categories get a direct link to their own topic when configured.
+ * Each registration category has its own dedicated Telegram group (private
+ * invite links) — genuine per-category access, since Telegram fully
+ * separates membership between groups (unlike Topics within one group,
+ * which everyone in the group can browse regardless of role).
  */
 export function getTelegramLink(category: TelegramCategory): string | null {
-  const base = process.env.TELEGRAM_GROUP_URL?.trim() || null;
-  if (!base) return null;
+  const envName = `TELEGRAM_GROUP_${category.toUpperCase()}`;
+  return process.env[envName]?.trim() || null;
+}
 
-  const topicId =
-    {
-      participant: process.env.TELEGRAM_TOPIC_PARTICIPANT,
-      school: process.env.TELEGRAM_TOPIC_SCHOOL,
-      sensei: process.env.TELEGRAM_TOPIC_SENSEI,
-      audience: process.env.TELEGRAM_TOPIC_AUDIENCE,
-      referee: undefined, // full group access
-      staff: undefined, // full group access
-      general: undefined,
-    }[category]?.trim();
+export function getTelegramLabel(category: TelegramCategory): string {
+  return LABELS[category];
+}
 
-  return topicId ? `${base.replace(/\/$/, "")}/${topicId}` : base;
+/** Approved Referee/Judge and Admin/Organizer/Staff get every group — they
+ * moderate or judge across the whole competition, not just one category. */
+export function getAllTelegramLinks(): Array<{ category: TelegramCategory; label: string; url: string }> {
+  return (Object.keys(LABELS) as TelegramCategory[])
+    .map((category) => ({ category, label: LABELS[category], url: getTelegramLink(category) }))
+    .filter((x): x is { category: TelegramCategory; label: string; url: string } => !!x.url);
 }

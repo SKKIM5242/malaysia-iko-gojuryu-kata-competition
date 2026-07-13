@@ -2,11 +2,12 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/app/actions/auth";
 import { schemaReady } from "@/lib/data";
-import { SetupNotice, SiteFooter, SiteHeader } from "@/components/ui";
+import { SetupNotice, SiteFooter, SiteHeader, TelegramFullAccessLinks } from "@/components/ui";
 import AuthForms from "@/components/AuthForms";
 import ClaimForm from "@/components/ClaimForm";
 import KataRecorder from "@/components/KataRecorder";
 import RefereeScoring, { type ScoringItem } from "@/components/RefereeScoring";
+import { getAllTelegramLinks } from "@/lib/telegram";
 
 export const dynamic = "force-dynamic";
 
@@ -107,6 +108,12 @@ export default async function AccountPage() {
                 You have unlimited sign-in access — no payment required. Manage the competition in{" "}
                 <Link href="/admin" className="underline font-semibold">the admin panel</Link>.
               </p>
+              <div className="mt-4">
+                <p className="mb-2 text-sm font-semibold text-green-900">
+                  Full access — every Telegram group:
+                </p>
+                <TelegramFullAccessLinks links={getAllTelegramLinks()} />
+              </div>
             </div>
           ) : (
             <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-6">
@@ -192,6 +199,12 @@ export default async function AccountPage() {
         <SiteHeader />
         <main className="mx-auto max-w-3xl px-4 py-10">
           <h1 className="text-2xl font-bold">Referee / Judge scoring</h1>
+          <div className="mt-6 rounded-lg border border-neutral-200 bg-neutral-50 p-4">
+            <p className="mb-2 text-sm font-semibold text-neutral-700">
+              Full access — every Telegram group:
+            </p>
+            <TelegramFullAccessLinks links={getAllTelegramLinks()} />
+          </div>
           <div className="mt-6">
             <RefereeScoring refereeName={profile.full_name ?? "Judge"} refereeCountry={profile.country} items={items} />
           </div>

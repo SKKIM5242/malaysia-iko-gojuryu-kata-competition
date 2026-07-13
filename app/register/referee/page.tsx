@@ -1,5 +1,6 @@
 import { SiteFooter, SiteHeader } from "@/components/ui";
 import { RefereeForm } from "@/components/CommunityForms";
+import { getTelegramLink } from "@/lib/telegram";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,7 @@ export default function RegisterRefereePage() {
           </p>
         </div>
         <div className="mt-8">
-          <RefereeForm />
+          <RefereeForm telegramLink={getTelegramLink("referee")} />
         </div>
       </main>
       <SiteFooter />

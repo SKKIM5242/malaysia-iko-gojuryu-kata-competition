@@ -1,5 +1,6 @@
 import { SiteFooter, SiteHeader } from "@/components/ui";
 import { SchoolForm } from "@/components/DirectoryForms";
+import { getTelegramLink } from "@/lib/telegram";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,7 @@ export default function RegisterSchoolPage() {
           Register your school or dojo so your sensei and participants can select it during registration.
         </p>
         <div className="mt-8">
-          <SchoolForm />
+          <SchoolForm telegramLink={getTelegramLink("school")} />
         </div>
       </main>
       <SiteFooter />

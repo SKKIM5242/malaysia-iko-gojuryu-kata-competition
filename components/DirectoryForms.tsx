@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import Link from "next/link";
 import { registerSchool, registerSensei, type DirectoryState } from "@/app/actions/directory";
+import { TelegramJoinButton } from "@/components/ui";
 import type { School } from "@/lib/types";
 
 const initial: DirectoryState = { ok: false };
@@ -16,7 +17,17 @@ const MALAYSIAN_STATES = [
   "Putrajaya", "Sabah", "Sarawak", "Selangor", "Terengganu",
 ];
 
-function Success({ what, name, next }: { what: string; name: string; next: React.ReactNode }) {
+function Success({
+  what,
+  name,
+  next,
+  telegramLink,
+}: {
+  what: string;
+  name: string;
+  next: React.ReactNode;
+  telegramLink: string | null;
+}) {
   return (
     <div className="rounded-lg border border-green-300 bg-green-50 p-8 text-center">
       <p className="text-3xl">✅</p>
@@ -25,17 +36,21 @@ function Success({ what, name, next }: { what: string; name: string; next: React
         <strong>{name}</strong> is now in the directory and can be selected on registration forms.
       </p>
       <div className="mt-4 text-sm text-green-800">{next}</div>
+      <div className="mx-auto mt-4 max-w-md text-green-900">
+        <TelegramJoinButton href={telegramLink} />
+      </div>
     </div>
   );
 }
 
-export function SchoolForm() {
+export function SchoolForm({ telegramLink }: { telegramLink: string | null }) {
   const [state, formAction, pending] = useActionState(registerSchool, initial);
   if (state.ok && state.name) {
     return (
       <Success
         what="School / Dojo"
         name={state.name}
+        telegramLink={telegramLink}
         next={
           <>
             Next: <Link href="/register/sensei" className="underline">register your Sensei / Coach</Link>,
@@ -90,13 +105,22 @@ export function SchoolForm() {
   );
 }
 
-export function SenseiForm({ schools, defaultBy }: { schools: School[]; defaultBy?: string }) {
+export function SenseiForm({
+  schools,
+  defaultBy,
+  telegramLink,
+}: {
+  schools: School[];
+  defaultBy?: string;
+  telegramLink: string | null;
+}) {
   const [state, formAction, pending] = useActionState(registerSensei, initial);
   if (state.ok && state.name) {
     return (
       <Success
         what="Sensei / Coach"
         name={state.name}
+        telegramLink={telegramLink}
         next={
           <>
             Next: <Link href="/register" className="underline">register participants</Link> or{" "}

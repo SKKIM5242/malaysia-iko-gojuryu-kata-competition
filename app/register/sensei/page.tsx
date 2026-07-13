@@ -1,6 +1,7 @@
 import { getSchools, schemaReady } from "@/lib/data";
 import { SetupNotice, SiteFooter, SiteHeader } from "@/components/ui";
 import { SenseiForm } from "@/components/DirectoryForms";
+import { getTelegramLink } from "@/lib/telegram";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +27,13 @@ export default async function RegisterSenseiPage({
             ? "Register your sensei / coach so you can select them when registering as a participant."
             : "Register the sensei / coach so participants can select them during registration."}
         </p>
-        <div className="mt-8">{ready ? <SenseiForm schools={schools} defaultBy={by} /> : <SetupNotice />}</div>
+        <div className="mt-8">
+          {ready ? (
+            <SenseiForm schools={schools} defaultBy={by} telegramLink={getTelegramLink("school")} />
+          ) : (
+            <SetupNotice />
+          )}
+        </div>
       </main>
       <SiteFooter />
     </>

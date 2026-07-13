@@ -7,7 +7,7 @@ import {
   applyStaff,
   type CommunityState,
 } from "@/app/actions/community";
-import { OrganiserContact } from "@/components/ui";
+import { TelegramJoinButton } from "@/components/ui";
 
 const initial: CommunityState = { ok: false };
 const inputCls =
@@ -18,7 +18,17 @@ function Err({ m }: { m?: string }) {
   return m ? <p className="mt-1 text-xs text-red-600">{m}</p> : null;
 }
 
-function Success({ what, refId, note }: { what: string; refId: string; note: string }) {
+function Success({
+  what,
+  refId,
+  note,
+  telegramLink,
+}: {
+  what: string;
+  refId: string;
+  note: string;
+  telegramLink: string | null;
+}) {
   return (
     <div className="rounded-lg border border-green-300 bg-green-50 p-8 text-center">
       <p className="text-3xl">✅</p>
@@ -28,18 +38,21 @@ function Success({ what, refId, note }: { what: string; refId: string; note: str
         <span className="rounded bg-white px-2 py-0.5 font-mono font-bold tracking-wider">{refId}</span>
       </p>
       <p className="mx-auto mt-3 max-w-md text-sm text-green-800">{note}</p>
-      <div className="mx-auto max-w-md text-green-900"><OrganiserContact /></div>
+      <div className="mx-auto max-w-md text-green-900">
+        <TelegramJoinButton href={telegramLink} />
+      </div>
     </div>
   );
 }
 
-export function RefereeForm() {
+export function RefereeForm({ telegramLink }: { telegramLink: string | null }) {
   const [state, formAction, pending] = useActionState(registerReferee, initial);
   if (state.ok && state.referenceId) {
     return (
       <Success
         what="Referee / judge registration"
         refId={state.referenceId}
+        telegramLink={telegramLink}
         note="The organiser will review your registration and contact you about the USD 100 deposit (or confirm your invitation code). Remember: the USD 100 is a deposit for participants — for non-participants it will be forfeited."
       />
     );
@@ -155,13 +168,14 @@ export function RefereeForm() {
   );
 }
 
-export function AudienceForm() {
+export function AudienceForm({ telegramLink }: { telegramLink: string | null }) {
   const [state, formAction, pending] = useActionState(registerAudience, initial);
   if (state.ok && state.referenceId) {
     return (
       <Success
         what="Audience registration"
         refId={state.referenceId}
+        telegramLink={telegramLink}
         note="The organiser will confirm your USD 10 sign-in (or your invitation code) and share viewing access details."
       />
     );
@@ -207,13 +221,14 @@ export function AudienceForm() {
   );
 }
 
-export function StaffForm() {
+export function StaffForm({ telegramLink }: { telegramLink: string | null }) {
   const [state, formAction, pending] = useActionState(applyStaff, initial);
   if (state.ok && state.referenceId) {
     return (
       <Success
         what="Application"
         refId={state.referenceId}
+        telegramLink={telegramLink}
         note="The organiser will review your application and contact you."
       />
     );

@@ -1,5 +1,6 @@
 import { SiteFooter, SiteHeader } from "@/components/ui";
 import { StaffForm } from "@/components/CommunityForms";
+import { getTelegramLink } from "@/lib/telegram";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,7 @@ export default function RegisterStaffPage() {
           the organiser before any access is granted.
         </p>
         <div className="mt-8">
-          <StaffForm />
+          <StaffForm telegramLink={getTelegramLink("staff")} />
         </div>
       </main>
       <SiteFooter />

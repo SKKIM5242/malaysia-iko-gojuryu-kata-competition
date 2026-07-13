@@ -1,5 +1,6 @@
 import { SiteFooter, SiteHeader } from "@/components/ui";
 import { AudienceForm } from "@/components/CommunityForms";
+import { getTelegramLink } from "@/lib/telegram";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,7 @@ export default function RegisterAudiencePage() {
           (by invitation only). The organiser confirms your payment and shares viewing access.
         </div>
         <div className="mt-8">
-          <AudienceForm />
+          <AudienceForm telegramLink={getTelegramLink("audience")} />
         </div>
       </main>
       <SiteFooter />
