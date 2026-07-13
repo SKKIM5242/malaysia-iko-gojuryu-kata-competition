@@ -1,10 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { schemaReady } from "@/lib/data";
-import {
-  setProfileApproval, createInvitationCode, toggleInvitationCode,
-  assignRefereeToVideo, unassignRefereeFromVideo,
-} from "@/app/actions/admin";
+import { setProfileApproval, createInvitationCode, toggleInvitationCode } from "@/app/actions/admin";
 import { AdminShell, Card, adminBtn, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice } from "@/components/ui";
 
@@ -13,7 +10,6 @@ export const dynamic = "force-dynamic";
 const TABS = [
   ["approvals", "Approvals"],
   ["codes", "Invitation codes"],
-  ["assign", "Assign referees"],
 ] as const;
 
 interface ProfileRow {
@@ -64,7 +60,6 @@ export default async function AdminAccounts({
 
       {tab === "approvals" && <ApprovalsTab supabase={supabase} />}
       {tab === "codes" && <CodesTab supabase={supabase} />}
-      {tab === "assign" && <AssignTab supabase={supabase} />}
     </AdminShell>
   );
 }
@@ -85,7 +80,14 @@ async function ApprovalsTab({ supabase }: { supabase: Awaited<ReturnType<typeof 
 
   return (
     <div>
-      <h2 className="mb-3 text-lg font-bold">Referee &amp; staff accounts</h2>
+      <h2 className="mb-1 text-lg font-bold">Referee &amp; staff accounts</h2>
+      <p className="mb-3 text-sm text-neutral-500">
+        Assigning referees to recordings and viewing scores now lives on the{" "}
+        <Link href="/admin/judging" className="font-semibold text-red-700 underline underline-offset-2">
+          Judging
+        </Link>{" "}
+        page.
+      </p>
       {profiles.length === 0 ? (
         <EmptyState>No referee or staff accounts have signed up yet.</EmptyState>
       ) : (
@@ -217,87 +219,3 @@ async function CodesTab({ supabase }: { supabase: Awaited<ReturnType<typeof crea
   );
 }
 
-async function AssignTab({ supabase }: { supabase: Awaited<ReturnType<typeof createClient>> }) {
-  const [{ data: videos }, { data: referees }] = await Promise.all([
-    supabase
-      .from("kata_videos")
-      .select("id, created_at, participant:participants(full_name), registration:registrations(category:categories(name))")
-      .order("created_at", { ascending: false }),
-    supabase.from("profiles").select("user_id, full_name, country").eq("role", "referee").eq("approved", true),
-  ]);
-  const videoList =
-    (videos as unknown as Array<{
-      id: string;
-      created_at: string;
-      participant: { full_name: string } | null;
-      registration: { category: { name: string } | null } | null;
-    }>) ?? [];
-  const refereeList = referees ?? [];
-
-  const { data: allAssignments } = await supabase.from("referee_assignments").select("video_id, referee_user_id");
-  const assignedByVideo = new Map<string, string[]>();
-  for (const a of allAssignments ?? []) {
-    const list = assignedByVideo.get(a.video_id) ?? [];
-    list.push(a.referee_user_id);
-    assignedByVideo.set(a.video_id, list);
-  }
-  const refereeName = new Map(refereeList.map((r) => [r.user_id, r.full_name ?? r.user_id.slice(0, 8)]));
-
-  return (
-    <div>
-      <h2 className="mb-3 text-lg font-bold">Submitted recordings ({videoList.length})</h2>
-      <p className="mb-4 text-sm text-neutral-500">
-        Assign 3–7 referees per recording. A referee can only score videos assigned to them.
-      </p>
-      {videoList.length === 0 ? (
-        <EmptyState>No kata recordings submitted yet.</EmptyState>
-      ) : refereeList.length === 0 ? (
-        <EmptyState>No approved referees yet — approve some in the Approvals tab first.</EmptyState>
-      ) : (
-        <div className="space-y-4">
-          {videoList.map((v) => {
-            const assigned = assignedByVideo.get(v.id) ?? [];
-            const available = refereeList.filter((r) => !assigned.includes(r.user_id));
-            return (
-              <Card key={v.id}>
-                <p className="font-bold text-neutral-900">{v.participant?.full_name ?? "Unknown participant"}</p>
-                <p className="text-sm text-neutral-500">{v.registration?.category?.name ?? "—"}</p>
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {assigned.length === 0 ? (
-                    <span className="text-xs text-neutral-400">No referees assigned yet</span>
-                  ) : (
-                    assigned.map((uid) => (
-                      <form key={uid} action={unassignRefereeFromVideo}>
-                        <input type="hidden" name="video_id" value={v.id} />
-                        <input type="hidden" name="referee_user_id" value={uid} />
-                        <button className="flex items-center gap-1 rounded-full border border-neutral-300 bg-neutral-50 px-2.5 py-1 text-xs font-semibold text-neutral-700 hover:bg-red-50">
-                          {refereeName.get(uid) ?? uid.slice(0, 8)} ✕
-                        </button>
-                      </form>
-                    ))
-                  )}
-                </div>
-                {available.length > 0 && (
-                  <form action={assignRefereeToVideo} className="mt-3 flex flex-wrap items-center gap-2">
-                    <input type="hidden" name="video_id" value={v.id} />
-                    <select name="referee_user_id" required defaultValue="" className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm">
-                      <option value="" disabled>Add referee…</option>
-                      {available.map((r) => (
-                        <option key={r.user_id} value={r.user_id}>
-                          {r.full_name ?? r.user_id.slice(0, 8)}{r.country ? ` (${r.country})` : ""}
-                        </option>
-                      ))}
-                    </select>
-                    <button className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-neutral-700">
-                      Assign
-                    </button>
-                  </form>
-                )}
-              </Card>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}

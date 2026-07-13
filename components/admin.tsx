@@ -22,6 +22,7 @@ export function AdminShell({
     ["Senseis", "/admin/senseis"],
     ["Participants", "/admin/participants"],
     ["Community", "/admin/community"],
+    ["Judging", "/admin/judging"],
     ["Classes", "/admin/classes"],
     ["Accounts", "/admin/accounts"],
   ] as const;

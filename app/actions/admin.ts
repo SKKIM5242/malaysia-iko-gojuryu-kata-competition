@@ -752,7 +752,7 @@ export async function toggleInvitationCode(formData: FormData) {
 export async function assignRefereeToVideo(formData: FormData) {
   const videoId = String(formData.get("video_id") ?? "");
   const refereeUserId = String(formData.get("referee_user_id") ?? "");
-  const returnTo = "/admin/accounts";
+  const returnTo = String(formData.get("return_to") ?? "/admin/judging");
   if (!videoId || !refereeUserId) backTo(returnTo, { error: "Select a video and a referee." });
   const { supabase, actorId } = await getActor();
   const { error } = await supabase.rpc("assign_referee", { p_video: videoId, p_referee: refereeUserId });
@@ -767,7 +767,7 @@ export async function assignRefereeToVideo(formData: FormData) {
 export async function unassignRefereeFromVideo(formData: FormData) {
   const videoId = String(formData.get("video_id") ?? "");
   const refereeUserId = String(formData.get("referee_user_id") ?? "");
-  const returnTo = "/admin/accounts";
+  const returnTo = String(formData.get("return_to") ?? "/admin/judging");
   const { supabase, actorId } = await getActor();
   const { error } = await supabase.rpc("unassign_referee", { p_video: videoId, p_referee: refereeUserId });
   if (error) backTo(returnTo, { error: "Could not remove referee." });
