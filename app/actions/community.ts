@@ -94,6 +94,15 @@ export async function registerReferee(
     international_certificate_paths.push(path);
   }
 
+  let paymentStatus: "pending" | "waived" = "pending";
+  if (invitation_code) {
+    const { data: redeemed } = await supabase.rpc("redeem_invitation_code", {
+      p_code: invitation_code,
+      p_role: "referee",
+    });
+    if (redeemed === true) paymentStatus = "waived";
+  }
+
   const id = crypto.randomUUID();
   const { error } = await supabase.from("referees").insert({
     id,
@@ -115,7 +124,7 @@ export async function registerReferee(
     certificate_path,
     international_certificate_paths,
     invitation_code: invitation_code || null,
-    payment_status: "pending",
+    payment_status: paymentStatus,
   });
   if (error) return { ok: false, error: "Could not save your registration. Please try again." };
 
@@ -145,6 +154,16 @@ export async function registerAudience(
   const invitation_code = String(formData.get("invitation_code") ?? "").trim();
 
   const supabase = await createClient();
+
+  let paymentStatus: "pending" | "waived" = "pending";
+  if (invitation_code) {
+    const { data: redeemed } = await supabase.rpc("redeem_invitation_code", {
+      p_code: invitation_code,
+      p_role: "audience",
+    });
+    if (redeemed === true) paymentStatus = "waived";
+  }
+
   const id = crypto.randomUUID();
   const { error } = await supabase.from("audiences").insert({
     id,
@@ -153,7 +172,7 @@ export async function registerAudience(
     phone: phone || null,
     home_country: values.home_country,
     invitation_code: invitation_code || null,
-    payment_status: "pending",
+    payment_status: paymentStatus,
   });
   if (error) return { ok: false, error: "Could not save your registration. Please try again." };
 

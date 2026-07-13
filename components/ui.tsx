@@ -79,6 +79,7 @@ export function SiteHeader() {
         <nav className="flex flex-wrap items-center gap-1 text-sm">
           <Link href="/" className="rounded px-3 py-1.5 hover:bg-neutral-800">Home</Link>
           <Link href="/participants" className="rounded px-3 py-1.5 hover:bg-neutral-800">Participants</Link>
+          <Link href="/winners" className="rounded px-3 py-1.5 hover:bg-neutral-800">Winners</Link>
           <Link href="/announcements" className="rounded px-3 py-1.5 hover:bg-neutral-800">Announcements</Link>
           <Link
             href="/register"
