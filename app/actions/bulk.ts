@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { writeAudit } from "@/lib/audit";
 import { resolveCategory } from "@/lib/division";
 import { parseCsv } from "@/lib/csv";
+import { sendConfirmationEmail } from "@/lib/notify";
 import type { Category } from "@/lib/types";
 
 export interface BulkRow {
@@ -78,7 +79,7 @@ export async function bulkRegister(_prev: BulkState, formData: FormData): Promis
   const supabase = await createClient();
   const { data: competition } = await supabase
     .from("competitions")
-    .select("id, status, event_date, registration_deadline")
+    .select("id, name, status, event_date, registration_deadline")
     .eq("id", competitionId)
     .maybeSingle();
   if (!competition || competition.status !== "open") {
@@ -99,6 +100,7 @@ export async function bulkRegister(_prev: BulkState, formData: FormData): Promis
   const categories = (catRows as Category[]) ?? [];
 
   const results: BulkRowResult[] = [];
+  const emailJobs: Array<() => Promise<void>> = [];
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
@@ -206,8 +208,24 @@ export async function bulkRegister(_prev: BulkState, formData: FormData): Promis
       action: "bulk_registration_submitted",
       new_value: { participant_id: participantId, category_id: resolved.category.id, sensei_id: senseiId },
     });
-    results.push({ row: i + 1, name: label, ok: true, referenceId: registrationId.slice(0, 8).toUpperCase() });
+    const referenceId = registrationId.slice(0, 8).toUpperCase();
+    results.push({ row: i + 1, name: label, ok: true, referenceId });
+    emailJobs.push(() =>
+      sendConfirmationEmail({
+        toEmail: row.email.trim(),
+        recipientName: row.full_name.trim(),
+        subject: `Registration confirmed — ${competition.name}`,
+        referenceId,
+        telegramCategory: "participant",
+        bodyLines: [
+          `This confirms your registration for ${competition.name} (${row.kata_base}), submitted via bulk registration.`,
+          "Payment status: pending — the organiser confirms each participant once the fee is received.",
+        ],
+      }),
+    );
   }
+
+  await Promise.allSettled(emailJobs.map((job) => job()));
 
   return { done: true, results };
 }
@@ -273,7 +291,7 @@ export async function bulkRegisterCsv(_prev: CsvBulkState, formData: FormData): 
   const supabase = await createClient();
   const { data: competition } = await supabase
     .from("competitions")
-    .select("id, status, event_date, registration_deadline")
+    .select("id, name, status, event_date, registration_deadline")
     .eq("id", competitionId)
     .maybeSingle();
   if (!competition || competition.status !== "open") {
@@ -470,6 +488,22 @@ export async function bulkRegisterCsv(_prev: CsvBulkState, formData: FormData): 
       continue;
     }
     registered += chunk.length;
+
+    await Promise.allSettled(
+      withIds.map((v) =>
+        sendConfirmationEmail({
+          toEmail: v.email,
+          recipientName: v.full_name,
+          subject: `Registration confirmed — ${competition.name}`,
+          referenceId: v.registrationId.slice(0, 8).toUpperCase(),
+          telegramCategory: "participant",
+          bodyLines: [
+            `This confirms your registration for ${competition.name} (${v.kataBase}), submitted via CSV bulk upload.`,
+            "Payment status: pending — the organiser confirms each participant once the fee is received.",
+          ],
+        }),
+      ),
+    );
   }
 
   await writeAudit(supabase, {

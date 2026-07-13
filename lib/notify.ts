@@ -1,8 +1,10 @@
 /**
- * Best-effort assignment notifications. Each channel no-ops gracefully until
- * its credentials exist (same pattern as lib/telegram.ts's group links) —
- * safe to call unconditionally from the assignment code paths.
+ * Best-effort notifications. Each channel no-ops gracefully until its
+ * credentials exist (same pattern as lib/telegram.ts's group links) — safe
+ * to call unconditionally from the assignment / registration code paths.
  */
+
+import { getTelegramLink, type TelegramCategory } from "@/lib/telegram";
 
 interface AssignmentNotice {
   refereeEmail: string | null;
@@ -71,31 +73,38 @@ export async function notifyRefereeAssignment(notice: AssignmentNotice): Promise
   await Promise.allSettled([sendAssignmentEmail(notice), sendAssignmentTelegram(notice)]);
 }
 
-interface RegistrationNotice {
-  participantEmail: string | null;
-  participantName: string;
-  competitionName: string;
-  referenceId: string;
-  kataName: string | null;
+interface ConfirmationEmailInput {
+  toEmail: string | null;
+  recipientName: string;
+  subject: string;
+  /** Flow-specific detail lines — mirrors what the on-screen confirmation
+   * ("pop up") already shows the registrant, so the email is a faithful
+   * record of it, not a generic receipt. */
+  bodyLines: string[];
+  referenceId?: string | null;
+  telegramCategory?: TelegramCategory | null;
 }
 
-/** Record-purpose confirmation sent right after a registration is created
- * (manual bank-transfer flow or a successful Stripe payment) — reminds the
- * participant to join the Telegram group for updates. */
-export async function notifyRegistrationConfirmation(notice: RegistrationNotice): Promise<void> {
-  if (!notice.participantEmail) return;
-  const telegramUrl = process.env.TELEGRAM_GROUP_PARTICIPANT?.trim() || null;
-  await sendEmail(
-    notice.participantEmail,
-    `Registration confirmed — ${notice.competitionName}`,
-    `Hi ${notice.participantName},\n\n` +
-      `This confirms your registration for ${notice.competitionName}` +
-      `${notice.kataName ? ` (${notice.kataName})` : ""}.\n` +
-      `Reference ID: ${notice.referenceId}\n\n` +
-      `Keep this email for your records.\n\n` +
-      (telegramUrl
-        ? `Don't forget to join the Participants Telegram group for updates: ${telegramUrl}\n\n`
-        : "") +
-      `— Malaysia Open IKO Goju-ryu Kata Championship`,
+/**
+ * Record-purpose confirmation sent right after any registration (participant,
+ * referee, audience, staff, school, sensei) is created. Every email includes
+ * the Kata Arena log-in link, the app link, and — when applicable — the
+ * relevant category's Telegram group link, in addition to whatever detail
+ * lines the caller supplies to mirror that flow's on-screen confirmation.
+ */
+export async function sendConfirmationEmail(input: ConfirmationEmailInput): Promise<void> {
+  if (!input.toEmail) return;
+  const telegramUrl = input.telegramCategory ? getTelegramLink(input.telegramCategory) : null;
+  const lines: string[] = [`Hi ${input.recipientName},`, "", ...input.bodyLines];
+  if (input.referenceId) lines.push("", `Reference ID: ${input.referenceId}`);
+  lines.push(
+    "",
+    "Keep this email for your records.",
+    "",
+    `Kata Arena log in: ${appUrl()}/account`,
+    `App: ${appUrl()}`,
   );
+  if (telegramUrl) lines.push(`Telegram group: ${telegramUrl}`);
+  lines.push("", "— Malaysia Open IKO Goju-ryu Kata Championship");
+  await sendEmail(input.toEmail, input.subject, lines.join("\n"));
 }

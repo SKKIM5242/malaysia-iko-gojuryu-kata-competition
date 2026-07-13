@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { writeAudit } from "@/lib/audit";
+import { sendConfirmationEmail } from "@/lib/notify";
 
 export interface CommunityState {
   ok: boolean;
@@ -134,7 +135,21 @@ export async function registerReferee(
     action: "referee_registered",
     new_value: { full_name: values.full_name, invitation_code: invitation_code || null },
   });
-  return { ok: true, referenceId: id.slice(0, 8).toUpperCase() };
+  const referenceId = id.slice(0, 8).toUpperCase();
+  await sendConfirmationEmail({
+    toEmail: values.email,
+    recipientName: values.full_name,
+    subject: "Referee / Judge registration received",
+    referenceId,
+    telegramCategory: "referee",
+    bodyLines: [
+      "This confirms your Referee / Judge registration.",
+      paymentStatus === "waived"
+        ? "Your invitation code waived the USD 100 deposit — you're all set."
+        : "The organiser will review your registration and contact you about the USD 100 deposit (or confirm your invitation code). Remember: the USD 100 is a deposit for participants — for non-participants it will be forfeited.",
+    ],
+  });
+  return { ok: true, referenceId };
 }
 
 /** Audience / spectator sign-in — USD 10 or USD 0 with invitation code. */
@@ -182,7 +197,21 @@ export async function registerAudience(
     action: "audience_registered",
     new_value: { full_name: values.full_name },
   });
-  return { ok: true, referenceId: id.slice(0, 8).toUpperCase() };
+  const referenceId = id.slice(0, 8).toUpperCase();
+  await sendConfirmationEmail({
+    toEmail: values.email,
+    recipientName: values.full_name,
+    subject: "Audience / Spectator registration received",
+    referenceId,
+    telegramCategory: "audience",
+    bodyLines: [
+      "This confirms your Audience / Spectator registration.",
+      paymentStatus === "waived"
+        ? "Your invitation code waived the USD 10 fee — you're all set."
+        : "The organiser will confirm your USD 10 sign-in (or your invitation code) and share viewing access details.",
+    ],
+  });
+  return { ok: true, referenceId };
 }
 
 /** Admin / organizer / customer-support application (reviewed by the owner). */
@@ -219,5 +248,17 @@ export async function applyStaff(
     action: "staff_application_submitted",
     new_value: { full_name: values.full_name, role_requested: values.role_requested },
   });
-  return { ok: true, referenceId: id.slice(0, 8).toUpperCase() };
+  const referenceId = id.slice(0, 8).toUpperCase();
+  await sendConfirmationEmail({
+    toEmail: values.email,
+    recipientName: values.full_name,
+    subject: "Admin / Organizer / Customer Support application received",
+    referenceId,
+    telegramCategory: "staff",
+    bodyLines: [
+      `This confirms your application to join as Admin / Organizer / Customer Support (requested role: ${values.role_requested}).`,
+      "The organiser will review your application and contact you.",
+    ],
+  });
+  return { ok: true, referenceId };
 }

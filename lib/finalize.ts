@@ -1,7 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStripe } from "@/lib/payments";
 import { writeAudit } from "@/lib/audit";
-import { notifyRegistrationConfirmation } from "@/lib/notify";
+import { sendConfirmationEmail } from "@/lib/notify";
 
 export type FinalizeResult =
   | { status: "paid"; referenceId: string }
@@ -159,12 +159,18 @@ export async function finalizeStripeSession(sessionId: string): Promise<Finalize
     .select("name")
     .eq("id", v.competition_id)
     .maybeSingle();
-  await notifyRegistrationConfirmation({
-    participantEmail: v.email ?? null,
-    participantName: v.full_name,
-    competitionName: competitionRow?.name ?? "the competition",
+  const competitionName = competitionRow?.name ?? "the competition";
+  await sendConfirmationEmail({
+    toEmail: v.email ?? null,
+    recipientName: v.full_name,
+    subject: `Payment successful — registration confirmed — ${competitionName}`,
     referenceId,
-    kataName: v.kata_base ?? null,
+    telegramCategory: "participant",
+    bodyLines: [
+      `This confirms your paid registration for ${competitionName}${v.kata_base ? ` (${v.kata_base})` : ""}.`,
+      "Payment received — your slot is confirmed and your name will appear on the participants list. A Stripe receipt was also sent to the email you entered at checkout.",
+      "Keep your reference ID and the IC/passport you registered with — you'll need both to link your account when you're ready to record your kata.",
+    ],
   });
 
   return { status: "paid", referenceId };

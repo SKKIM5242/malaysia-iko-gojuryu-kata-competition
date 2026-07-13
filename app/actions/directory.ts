@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { writeAudit } from "@/lib/audit";
+import { sendConfirmationEmail } from "@/lib/notify";
 
 export interface DirectoryState {
   ok: boolean;
@@ -49,6 +50,16 @@ export async function registerSchool(
     record_id: id,
     action: "school_self_registered",
     new_value: { name, state, affiliation_code },
+  });
+  await sendConfirmationEmail({
+    toEmail: email,
+    recipientName: name,
+    subject: `School / Dojo registered — ${name}`,
+    telegramCategory: "school",
+    bodyLines: [
+      `"${name}" is now in the directory and can be selected on registration forms.`,
+      "Next: register your Sensei / Coach, then register participants.",
+    ],
   });
   return { ok: true, name };
 }
@@ -99,6 +110,16 @@ export async function registerSensei(
     record_id: id,
     action: "sensei_self_registered",
     new_value: { name, rank, school_id },
+  });
+  await sendConfirmationEmail({
+    toEmail: email,
+    recipientName: name,
+    subject: `Sensei / Coach registered — ${name}`,
+    telegramCategory: "school",
+    bodyLines: [
+      `"${name}" is now in the directory.`,
+      "Next: register participants or bulk-register your students.",
+    ],
   });
   return { ok: true, name };
 }

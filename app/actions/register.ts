@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { writeAudit } from "@/lib/audit";
 import { getStripe, paymentsEnabled } from "@/lib/payments";
 import { resolveCategory } from "@/lib/division";
-import { notifyRegistrationConfirmation } from "@/lib/notify";
+import { sendConfirmationEmail } from "@/lib/notify";
 import type { Category } from "@/lib/types";
 
 export interface RegisterState {
@@ -290,12 +290,17 @@ export async function submitRegistration(
   });
 
   const referenceId = registrationId.slice(0, 8).toUpperCase();
-  await notifyRegistrationConfirmation({
-    participantEmail: values.email || null,
-    participantName: values.full_name,
-    competitionName: competition.name,
+  await sendConfirmationEmail({
+    toEmail: values.email || null,
+    recipientName: values.full_name,
+    subject: `Registration confirmed — ${competition.name}`,
     referenceId,
-    kataName: values.kata_base || null,
+    telegramCategory: "participant",
+    bodyLines: [
+      `This confirms your registration for ${competition.name}${values.kata_base ? ` (${values.kata_base})` : ""}.`,
+      "Payment status: pending — transfer the registration fee and send your receipt to the organiser (see the announcement for bank details). The organiser will confirm your payment, after which your name appears on the participants list.",
+      "Organiser contact: WhatsApp +60 12-453 2831 / kimsiewkiew@gmail.com",
+    ],
   });
 
   return { ok: true, referenceId };
