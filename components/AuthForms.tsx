@@ -13,6 +13,7 @@ export default function AuthForms() {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [role, setRole] = useState("participant");
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -32,6 +33,7 @@ export default function AuthForms() {
               full_name: String(form.get("full_name") ?? "").trim(),
               country: String(form.get("country") ?? "").trim(),
               role: String(form.get("role") ?? "participant"),
+              invite_code: String(form.get("invite_code") ?? "").trim(),
             },
           },
         });
@@ -77,16 +79,33 @@ export default function AuthForms() {
           <>
             <div>
               <label htmlFor="auth_role" className={labelCls}>I am registering as *</label>
-              <select id="auth_role" name="role" required defaultValue="participant" className={inputCls}>
+              <select
+                id="auth_role"
+                name="role"
+                required
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                className={inputCls}
+              >
                 <option value="participant">Participant (record my kata)</option>
                 <option value="referee">Referee / Judge</option>
                 <option value="staff">Admin / Organizer / Customer Support</option>
               </select>
               <p className="mt-1 text-xs text-neutral-400">
                 Referee/Judge and Admin/Organizer/Customer Support accounts need the organiser&apos;s
-                approval before they activate. Approved staff sign in without any payment, without limit.
+                approval before they activate — unless you have an invitation code below. Once
+                approved, sign-in is unlimited and free.
               </p>
             </div>
+            {(role === "referee" || role === "staff") && (
+              <div>
+                <label htmlFor="auth_invite" className={labelCls}>Invitation code (optional)</label>
+                <input id="auth_invite" name="invite_code" className={inputCls} placeholder="e.g. IKO-JUDGE-2026" />
+                <p className="mt-1 text-xs text-neutral-400">
+                  A valid code activates your account immediately — no payment, no waiting for approval.
+                </p>
+              </div>
+            )}
             <div>
               <label htmlFor="auth_name" className={labelCls}>Full name *</label>
               <input id="auth_name" name="full_name" required className={inputCls} />

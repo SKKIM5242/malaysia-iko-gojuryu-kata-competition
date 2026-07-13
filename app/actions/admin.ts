@@ -604,3 +604,85 @@ export async function deleteParticipant(formData: FormData) {
   revalidatePath("/participants");
   backTo(returnTo, { ok: "Participant deleted." });
 }
+
+// ── Accounts (profiles, invitation codes, referee assignment) ──────────────
+
+export async function setProfileApproval(formData: FormData) {
+  const userId = String(formData.get("user_id") ?? "");
+  const approve = formData.get("approve") === "true";
+  const returnTo = "/admin/accounts";
+  const { supabase, actorId } = await getActor();
+  const { error } = await supabase.rpc("approve_profile", { p_user: userId, p_approve: approve });
+  if (error) backTo(returnTo, { error: "Could not update approval." });
+  await writeAudit(supabase, {
+    table_name: "profiles", record_id: userId,
+    action: approve ? "account_approved" : "account_unapproved", actor_id: actorId,
+  });
+  backTo(returnTo, { ok: approve ? "Account approved." : "Approval revoked." });
+}
+
+export async function createInvitationCode(formData: FormData) {
+  const code = String(formData.get("code") ?? "").trim().toUpperCase();
+  const role = String(formData.get("role") ?? "");
+  const note = String(formData.get("note") ?? "").trim() || null;
+  const maxUsesRaw = String(formData.get("max_uses") ?? "").trim();
+  const returnTo = "/admin/accounts";
+  if (!code || !["referee", "staff", "any"].includes(role)) {
+    backTo(returnTo, { error: "Code and a valid role are required." });
+  }
+  const { supabase, actorId } = await getActor();
+  const { data, error } = await supabase
+    .from("invitation_codes")
+    .insert({ code, role, note, max_uses: maxUsesRaw ? Number(maxUsesRaw) : null })
+    .select("id")
+    .single();
+  if (error) backTo(returnTo, { error: "Could not create code — it may already exist." });
+  await writeAudit(supabase, {
+    table_name: "invitation_codes", record_id: data!.id, action: "invitation_code_created",
+    new_value: { code, role }, actor_id: actorId,
+  });
+  backTo(returnTo, { ok: "Invitation code created." });
+}
+
+export async function toggleInvitationCode(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const active = formData.get("active") === "true";
+  const returnTo = "/admin/accounts";
+  const { supabase, actorId } = await getActor();
+  const { error } = await supabase.from("invitation_codes").update({ active }).eq("id", id);
+  if (error) backTo(returnTo, { error: "Could not update code." });
+  await writeAudit(supabase, {
+    table_name: "invitation_codes", record_id: id,
+    action: active ? "invitation_code_activated" : "invitation_code_deactivated", actor_id: actorId,
+  });
+  backTo(returnTo, { ok: "Invitation code updated." });
+}
+
+export async function assignRefereeToVideo(formData: FormData) {
+  const videoId = String(formData.get("video_id") ?? "");
+  const refereeUserId = String(formData.get("referee_user_id") ?? "");
+  const returnTo = "/admin/accounts";
+  if (!videoId || !refereeUserId) backTo(returnTo, { error: "Select a video and a referee." });
+  const { supabase, actorId } = await getActor();
+  const { error } = await supabase.rpc("assign_referee", { p_video: videoId, p_referee: refereeUserId });
+  if (error) backTo(returnTo, { error: "Could not assign referee." });
+  await writeAudit(supabase, {
+    table_name: "referee_assignments", record_id: videoId,
+    action: "referee_assigned", new_value: { referee_user_id: refereeUserId }, actor_id: actorId,
+  });
+  backTo(returnTo, { ok: "Referee assigned." });
+}
+
+export async function unassignRefereeFromVideo(formData: FormData) {
+  const videoId = String(formData.get("video_id") ?? "");
+  const refereeUserId = String(formData.get("referee_user_id") ?? "");
+  const returnTo = "/admin/accounts";
+  const { supabase, actorId } = await getActor();
+  const { error } = await supabase.rpc("unassign_referee", { p_video: videoId, p_referee: refereeUserId });
+  if (error) backTo(returnTo, { error: "Could not remove referee." });
+  await writeAudit(supabase, {
+    table_name: "referee_assignments", record_id: videoId,
+    action: "referee_unassigned", new_value: { referee_user_id: refereeUserId }, actor_id: actorId,
+  });
+  backTo(returnTo, { ok: "Referee removed." });
+}

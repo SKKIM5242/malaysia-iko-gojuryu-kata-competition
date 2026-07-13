@@ -23,6 +23,7 @@ export function AdminShell({
     ["Participants", "/admin/participants"],
     ["Community", "/admin/community"],
     ["Classes", "/admin/classes"],
+    ["Accounts", "/admin/accounts"],
   ] as const;
   return (
     <div className="min-h-screen bg-neutral-100">

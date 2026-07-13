@@ -39,12 +39,27 @@ export async function updateSession(request: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser();
 
-    // Admin routes require the owner's session (Sprint 4 lock-down)
-    if (!user && request.nextUrl.pathname.startsWith("/admin")) {
-      const loginUrl = request.nextUrl.clone();
-      loginUrl.pathname = "/login";
-      loginUrl.search = "";
-      return NextResponse.redirect(loginUrl);
+    // Admin routes require an approved admin/staff session — a signed-in
+    // participant or referee must NOT reach /admin just by being logged in.
+    if (request.nextUrl.pathname.startsWith("/admin")) {
+      if (!user) {
+        const loginUrl = request.nextUrl.clone();
+        loginUrl.pathname = "/login";
+        loginUrl.search = "";
+        return NextResponse.redirect(loginUrl);
+      }
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role, approved")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      const isAdmin = profile && ["admin", "staff"].includes(profile.role) && profile.approved;
+      if (!isAdmin) {
+        const homeUrl = request.nextUrl.clone();
+        homeUrl.pathname = "/account";
+        homeUrl.search = "";
+        return NextResponse.redirect(homeUrl);
+      }
     }
     return response;
   } catch {

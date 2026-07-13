@@ -38,6 +38,24 @@ export default async function RegisterSuccessPage({
               has been sent to the email you entered at checkout.
             </p>
             <div className="mx-auto max-w-md text-green-900"><OrganiserContact /></div>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+              <Link
+                href="/account"
+                className="rounded-md bg-red-700 px-6 py-2.5 font-semibold text-white hover:bg-red-600"
+              >
+                Start Recording
+              </Link>
+              <Link
+                href="/"
+                className="rounded-md border border-green-300 bg-white px-6 py-2.5 font-semibold text-green-800 hover:bg-green-50"
+              >
+                Sign in later for Recording
+              </Link>
+            </div>
+            <p className="mx-auto mt-2 max-w-md text-xs text-green-700">
+              Keep your reference ID <strong>{result.referenceId}</strong> and the IC/passport you
+              registered with — you&apos;ll need both to link your account when you&apos;re ready to record.
+            </p>
           </div>
         ) : result.status === "unpaid" ? (
           <div className="rounded-lg border border-amber-300 bg-amber-50 p-8 text-center">
