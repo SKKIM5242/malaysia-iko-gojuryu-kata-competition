@@ -31,3 +31,12 @@ export function getAllTelegramLinks(): Array<{ category: TelegramCategory; label
     .map((category) => ({ category, label: LABELS[category], url: getTelegramLink(category) }))
     .filter((x): x is { category: TelegramCategory; label: string; url: string } => !!x.url);
 }
+
+/** Deep link that starts a chat with the assignment-notification bot and
+ * links it to this user's account (see app/api/telegram-webhook/route.ts).
+ * Returns null until the organiser sets TELEGRAM_BOT_USERNAME. */
+export function getTelegramBotConnectUrl(userId: string): string | null {
+  const username = process.env.TELEGRAM_BOT_USERNAME?.trim();
+  if (!username) return null;
+  return `https://t.me/${username}?start=${userId}`;
+}

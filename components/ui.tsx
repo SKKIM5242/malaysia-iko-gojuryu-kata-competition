@@ -86,6 +86,13 @@ export function SiteHeader() {
           >
             Register
           </Link>
+          <Link
+            href="/account"
+            className="ml-1 rounded border border-white/30 px-4 py-1.5 font-semibold hover:bg-neutral-800"
+            title="Sign in to Kata Arena — watch/record your kata, judge as a referee, or manage your account"
+          >
+            Kata Arena Log In
+          </Link>
           <Link href="/admin" className="rounded px-3 py-1.5 text-neutral-400 hover:bg-neutral-800">
             Admin
           </Link>

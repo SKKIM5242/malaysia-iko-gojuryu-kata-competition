@@ -11,6 +11,7 @@ export interface Competition {
   registration_fee_usd: number | null;
   status: CompetitionStatus;
   description: string | null;
+  judges_required: number;
   created_at: string;
 }
 

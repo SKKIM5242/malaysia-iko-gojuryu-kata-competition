@@ -6,6 +6,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { writeAudit } from "@/lib/audit";
 import { kataBaseOf } from "@/lib/division";
+import { notifyRefereeAssignment } from "@/lib/notify";
 import type { PaymentStatus } from "@/lib/types";
 
 /**
@@ -749,6 +750,42 @@ export async function toggleInvitationCode(formData: FormData) {
   backTo(returnTo, { ok: "Invitation code updated." });
 }
 
+/** Fetches what the notification needs and fires it off (best-effort — never
+ * throws, so a notification hiccup can't undo a successful assignment). */
+async function notifyVideoAssignment(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  videoId: string,
+  refereeUserId: string,
+) {
+  try {
+    const [{ data: referee }, { data: video }] = await Promise.all([
+      supabase
+        .from("profiles")
+        .select("full_name, email, telegram_chat_id")
+        .eq("user_id", refereeUserId)
+        .maybeSingle(),
+      supabase
+        .from("kata_videos")
+        .select("participant:participants(full_name), registration:registrations(category:categories(name))")
+        .eq("id", videoId)
+        .maybeSingle(),
+    ]);
+    const v = video as unknown as {
+      participant: { full_name: string } | null;
+      registration: { category: { name: string } | null } | null;
+    } | null;
+    await notifyRefereeAssignment({
+      refereeEmail: referee?.email ?? null,
+      refereeName: referee?.full_name ?? null,
+      refereeTelegramChatId: referee?.telegram_chat_id ?? null,
+      participantName: v?.participant?.full_name ?? "a participant",
+      categoryName: v?.registration?.category?.name ?? null,
+    });
+  } catch {
+    // Best-effort — assignment already succeeded regardless.
+  }
+}
+
 export async function assignRefereeToVideo(formData: FormData) {
   const videoId = String(formData.get("video_id") ?? "");
   const refereeUserId = String(formData.get("referee_user_id") ?? "");
@@ -761,6 +798,7 @@ export async function assignRefereeToVideo(formData: FormData) {
     table_name: "referee_assignments", record_id: videoId,
     action: "referee_assigned", new_value: { referee_user_id: refereeUserId }, actor_id: actorId,
   });
+  await notifyVideoAssignment(supabase, videoId, refereeUserId);
   backTo(returnTo, { ok: "Referee assigned." });
 }
 
@@ -776,4 +814,115 @@ export async function unassignRefereeFromVideo(formData: FormData) {
     action: "referee_unassigned", new_value: { referee_user_id: refereeUserId }, actor_id: actorId,
   });
   backTo(returnTo, { ok: "Referee removed." });
+}
+
+export async function setJudgesRequired(formData: FormData) {
+  const competitionId = String(formData.get("competition_id") ?? "");
+  const judgesRequired = Number(formData.get("judges_required") ?? "");
+  const returnTo = "/admin/judging";
+  if (!competitionId || !Number.isInteger(judgesRequired) || judgesRequired < 1) {
+    backTo(returnTo, { error: "Enter a whole number of judges (1 or more)." });
+  }
+  const { supabase, actorId } = await getActor();
+  const { error } = await supabase
+    .from("competitions")
+    .update({ judges_required: judgesRequired })
+    .eq("id", competitionId);
+  if (error) backTo(returnTo, { error: "Could not update judges required." });
+  await writeAudit(supabase, {
+    table_name: "competitions", record_id: competitionId,
+    action: "judges_required_changed", new_value: { judges_required: judgesRequired }, actor_id: actorId,
+  });
+  revalidatePath("/admin/judging");
+  backTo(returnTo, { ok: "Judges required updated." });
+}
+
+/**
+ * Tops up every under-assigned recording in a competition to its
+ * judges_required target, picking the least-loaded eligible referee each
+ * time (random tie-break) so workload stays roughly even across the panel.
+ * Existing assignments are left alone — this only fills gaps.
+ */
+export async function autoAssignReferees(formData: FormData) {
+  const competitionId = String(formData.get("competition_id") ?? "");
+  const returnTo = "/admin/judging";
+  if (!competitionId) backTo(returnTo, { error: "Select a competition." });
+  const { supabase, actorId } = await getActor();
+
+  const { data: competition } = await supabase
+    .from("competitions")
+    .select("id, judges_required")
+    .eq("id", competitionId)
+    .maybeSingle();
+  if (!competition) backTo(returnTo, { error: "Competition not found." });
+  const needed = competition!.judges_required ?? 3;
+
+  const { data: regs } = await supabase.from("registrations").select("id").eq("competition_id", competitionId);
+  const regIds = (regs ?? []).map((r) => r.id as string);
+  const { data: videos } =
+    regIds.length > 0
+      ? await supabase.from("kata_videos").select("id").in("registration_id", regIds)
+      : { data: [] as Array<{ id: string }> };
+  const videoIds = (videos ?? []).map((v) => v.id as string);
+  if (videoIds.length === 0) backTo(returnTo, { ok: "No recordings submitted yet for this competition." });
+
+  const { data: referees } = await supabase
+    .from("profiles")
+    .select("user_id")
+    .eq("role", "referee")
+    .eq("approved", true);
+  const refereeIds = (referees ?? []).map((r) => r.user_id as string);
+  if (refereeIds.length === 0) backTo(returnTo, { error: "No approved referees available yet." });
+
+  const { data: existing } = await supabase
+    .from("referee_assignments")
+    .select("video_id, referee_user_id")
+    .in("video_id", videoIds);
+  const assignedByVideo = new Map<string, Set<string>>();
+  const loadByReferee = new Map<string, number>(refereeIds.map((id) => [id, 0]));
+  for (const a of existing ?? []) {
+    const set = assignedByVideo.get(a.video_id) ?? new Set<string>();
+    set.add(a.referee_user_id);
+    assignedByVideo.set(a.video_id, set);
+    loadByReferee.set(a.referee_user_id, (loadByReferee.get(a.referee_user_id) ?? 0) + 1);
+  }
+
+  // Randomise video order so a shortage of referees doesn't systematically
+  // starve whichever videos happen to sort last.
+  const shuffledVideos = [...videoIds].sort(() => Math.random() - 0.5);
+  const newAssignments: Array<{ videoId: string; refereeUserId: string }> = [];
+
+  for (const videoId of shuffledVideos) {
+    const already = assignedByVideo.get(videoId) ?? new Set<string>();
+    let slotsLeft = needed - already.size;
+    while (slotsLeft > 0) {
+      const eligible = refereeIds.filter((id) => !already.has(id));
+      if (eligible.length === 0) break;
+      const minLoad = Math.min(...eligible.map((id) => loadByReferee.get(id) ?? 0));
+      const candidates = eligible.filter((id) => (loadByReferee.get(id) ?? 0) === minLoad);
+      const pick = candidates[Math.floor(Math.random() * candidates.length)];
+      const { error } = await supabase.rpc("assign_referee", { p_video: videoId, p_referee: pick });
+      if (!error) {
+        already.add(pick);
+        loadByReferee.set(pick, (loadByReferee.get(pick) ?? 0) + 1);
+        newAssignments.push({ videoId, refereeUserId: pick });
+      }
+      slotsLeft--;
+    }
+    assignedByVideo.set(videoId, already);
+  }
+
+  await Promise.all(newAssignments.map((a) => notifyVideoAssignment(supabase, a.videoId, a.refereeUserId)));
+
+  await writeAudit(supabase, {
+    table_name: "referee_assignments", record_id: null, action: "referees_auto_assigned",
+    new_value: { competition_id: competitionId, judges_required: needed, new_assignments: newAssignments.length },
+    actor_id: actorId,
+  });
+  revalidatePath("/admin/judging");
+  backTo(returnTo, {
+    ok: newAssignments.length > 0
+      ? `Auto-assigned ${newAssignments.length} referee slot${newAssignments.length === 1 ? "" : "s"}.`
+      : "Every recording already has its full panel of judges.",
+  });
 }

@@ -25,6 +25,9 @@ export default function AuthForms() {
     const supabase = createClient();
     try {
       if (mode === "signup") {
+        if (form.get("terms_accepted") !== "on") {
+          throw new Error("Please accept the Terms & Conditions to create an account.");
+        }
         const { error: err } = await supabase.auth.signUp({
           email,
           password,
@@ -34,6 +37,7 @@ export default function AuthForms() {
               country: String(form.get("country") ?? "").trim(),
               role: String(form.get("role") ?? "participant"),
               invite_code: String(form.get("invite_code") ?? "").trim(),
+              terms_accepted: true,
             },
           },
         });
@@ -132,6 +136,23 @@ export default function AuthForms() {
             className={inputCls}
           />
         </div>
+        {mode === "signup" && (
+          <label htmlFor="terms_accepted" className="flex items-start gap-2 text-xs text-neutral-600">
+            <input id="terms_accepted" name="terms_accepted" type="checkbox" required className="mt-0.5" />
+            <span>
+              I agree to the Kata Arena{" "}
+              <a
+                href="/terms"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold text-red-700 underline underline-offset-2"
+              >
+                Terms &amp; Conditions
+              </a>
+              . *
+            </span>
+          </label>
+        )}
         <button
           type="submit"
           disabled={pending}
