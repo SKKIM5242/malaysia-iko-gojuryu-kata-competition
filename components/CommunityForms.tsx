@@ -263,6 +263,50 @@ export function StaffForm({ telegramLink }: { telegramLink: string | null }) {
           <Err m={e.full_name} />
         </div>
         <div>
+          <label htmlFor="ic_passport" className={labelCls}>IC / Passport *</label>
+          <input id="ic_passport" name="ic_passport" required className={inputCls} />
+          <Err m={e.ic_passport} />
+        </div>
+        <div>
+          <label htmlFor="date_of_birth" className={labelCls}>Date of birth *</label>
+          <input id="date_of_birth" name="date_of_birth" type="date" required className={inputCls} />
+          <Err m={e.date_of_birth} />
+        </div>
+        <div>
+          <label htmlFor="gender" className={labelCls}>Gender *</label>
+          <select id="gender" name="gender" required defaultValue="" className={inputCls}>
+            <option value="" disabled>Select gender</option>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+          </select>
+          <Err m={e.gender} />
+        </div>
+        <div>
+          <label htmlFor="karate_rank" className={labelCls}>
+            Latest Rank <span className="font-normal text-neutral-400">(optional)</span>
+          </label>
+          <input id="karate_rank" name="karate_rank" className={inputCls} placeholder="e.g. Godan" />
+        </div>
+        <div>
+          <label htmlFor="school" className={labelCls}>School / organisation</label>
+          <input id="school" name="school" className={inputCls} />
+        </div>
+        <div>
+          <label htmlFor="certificate" className={labelCls}>
+            Latest rank certificate <span className="font-normal text-neutral-400">(optional — photo or file)</span>
+          </label>
+          <input id="certificate" name="certificate" type="file" accept="image/*,application/pdf" capture="environment"
+            className="w-full rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm file:mr-3 file:rounded file:border-0 file:bg-neutral-900 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-white" />
+        </div>
+        <div>
+          <label htmlFor="international_certificates" className={labelCls}>
+            International certificates{" "}
+            <span className="font-normal text-neutral-400">(optional — unlimited uploads)</span>
+          </label>
+          <input id="international_certificates" name="international_certificates" type="file" accept="image/*,application/pdf" multiple
+            className="w-full rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm file:mr-3 file:rounded file:border-0 file:bg-neutral-900 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-white" />
+        </div>
+        <div>
           <label htmlFor="email" className={labelCls}>Email *</label>
           <input id="email" name="email" type="email" required className={inputCls} />
           <Err m={e.email} />
@@ -272,6 +316,43 @@ export function StaffForm({ telegramLink }: { telegramLink: string | null }) {
           <input id="phone" name="phone" required className={inputCls} placeholder="+60…" />
           <Err m={e.phone} />
         </div>
+        <div className="sm:col-span-2">
+          <label htmlFor="home_address" className={labelCls}>Home address *</label>
+          <textarea id="home_address" name="home_address" required rows={2} className={inputCls} />
+          <Err m={e.home_address} />
+        </div>
+        <div>
+          <label htmlFor="city_town" className={labelCls}>City / Town *</label>
+          <input id="city_town" name="city_town" required className={inputCls} />
+          <Err m={e.city_town} />
+        </div>
+        <div>
+          <label htmlFor="home_country" className={labelCls}>Home country *</label>
+          <input id="home_country" name="home_country" required defaultValue="Malaysia" className={inputCls} />
+          <Err m={e.home_country} />
+        </div>
+
+        <div className="sm:col-span-2 rounded-md border border-neutral-200 bg-neutral-50 p-4">
+          <p className="text-sm font-bold text-neutral-800">Bank details *</p>
+          <div className="mt-3 grid gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="bank_name" className={labelCls}>Bank name *</label>
+              <input id="bank_name" name="bank_name" required className={inputCls} />
+              <Err m={e.bank_name} />
+            </div>
+            <div>
+              <label htmlFor="bank_account_no" className={labelCls}>Bank account no. *</label>
+              <input id="bank_account_no" name="bank_account_no" required className={inputCls} />
+              <Err m={e.bank_account_no} />
+            </div>
+            <div className="sm:col-span-2">
+              <label htmlFor="bank_account_name" className={labelCls}>Account holder name *</label>
+              <input id="bank_account_name" name="bank_account_name" required className={inputCls} />
+              <Err m={e.bank_account_name} />
+            </div>
+          </div>
+        </div>
+
         <div className="sm:col-span-2">
           <label htmlFor="role_requested" className={labelCls}>Role *</label>
           <select id="role_requested" name="role_requested" required defaultValue="" className={inputCls}>
@@ -285,6 +366,10 @@ export function StaffForm({ telegramLink }: { telegramLink: string | null }) {
         <div className="sm:col-span-2">
           <label htmlFor="message" className={labelCls}>Message / experience</label>
           <textarea id="message" name="message" rows={3} className={inputCls} />
+        </div>
+        <div className="sm:col-span-2">
+          <label htmlFor="invitation_code" className={labelCls}>Invitation code (optional)</label>
+          <input id="invitation_code" name="invitation_code" className={inputCls} />
         </div>
       </div>
       <button type="submit" disabled={pending}

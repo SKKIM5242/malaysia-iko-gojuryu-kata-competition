@@ -17,6 +17,11 @@ const MALAYSIAN_STATES = [
   "Putrajaya", "Sabah", "Sarawak", "Selangor", "Terengganu",
 ];
 
+function FieldError({ message }: { message?: string }) {
+  if (!message) return null;
+  return <p className="mt-1 text-xs text-red-600">{message}</p>;
+}
+
 function Success({
   what,
   name,
@@ -115,6 +120,7 @@ export function SenseiForm({
   telegramLink: string | null;
 }) {
   const [state, formAction, pending] = useActionState(registerSensei, initial);
+  const err = state.fieldErrors ?? {};
   if (state.ok && state.name) {
     return (
       <Success
@@ -158,8 +164,9 @@ export function SenseiForm({
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label htmlFor="rank" className={labelCls}>Rank</label>
-          <input id="rank" name="rank" className={inputCls} placeholder="e.g. Godan" />
+          <label htmlFor="rank" className={labelCls}>Latest Rank *</label>
+          <input id="rank" name="rank" required className={inputCls} placeholder="e.g. Godan" />
+          <FieldError message={err.rank} />
         </div>
         <div>
           <label htmlFor="school_id" className={labelCls}>School / Dojo *</label>
@@ -177,6 +184,23 @@ export function SenseiForm({
         <div>
           <label htmlFor="sensei_phone" className={labelCls}>Mobile phone *</label>
           <input id="sensei_phone" name="phone" type="tel" required className={inputCls} placeholder="+60…" />
+        </div>
+        <div className="sm:col-span-2">
+          <label htmlFor="certificate" className={labelCls}>
+            Latest rank certificate *{" "}
+            <span className="font-normal text-neutral-400">(photo or file — take a picture with your phone)</span>
+          </label>
+          <input
+            id="certificate"
+            name="certificate"
+            type="file"
+            required
+            accept="image/*,application/pdf"
+            capture="environment"
+            className="w-full rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm file:mr-3 file:rounded file:border-0 file:bg-neutral-900 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-white"
+          />
+          <p className="mt-1 text-xs text-neutral-400">Max 10 MB.</p>
+          <FieldError message={err.certificate} />
         </div>
       </div>
       <p className="text-xs text-neutral-500">

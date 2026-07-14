@@ -8,6 +8,7 @@ export interface DirectoryState {
   ok: boolean;
   error?: string;
   name?: string;
+  fieldErrors?: Record<string, string>;
 }
 
 /** Public School / Dojo self-registration (anonymous insert allowed by RLS). */
@@ -78,9 +79,32 @@ export async function registerSensei(
   const email = String(formData.get("email") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
   if (!name) return { ok: false, error: "Sensei / coach name is required." };
+  if (!rank) {
+    return {
+      ok: false,
+      error: "Please fix the highlighted fields.",
+      fieldErrors: { rank: "Latest rank is required" },
+    };
+  }
   if (!school_id) return { ok: false, error: "Select the sensei's school / dojo." };
   if (!email) return { ok: false, error: "Email address is required." };
   if (!phone) return { ok: false, error: "Mobile phone is required." };
+
+  const certificate = formData.get("certificate");
+  if (!(certificate instanceof File) || certificate.size === 0) {
+    return {
+      ok: false,
+      error: "Please fix the highlighted fields.",
+      fieldErrors: { certificate: "Latest rank certificate is required" },
+    };
+  }
+  if (certificate.size > 10 * 1024 * 1024) {
+    return {
+      ok: false,
+      error: "Certificate file is too large (max 10 MB).",
+      fieldErrors: { certificate: "Max file size 10 MB" },
+    };
+  }
 
   const supabase = await createClient();
   const { data: existing } = await supabase
@@ -93,15 +117,23 @@ export async function registerSensei(
     return { ok: false, error: "This sensei is already registered for that school." };
   }
 
+  const ext = (certificate.name.split(".").pop() || "jpg").toLowerCase().slice(0, 5);
+  const certificate_path = `sensei-${crypto.randomUUID()}.${ext}`;
+  const { error: upErr } = await supabase.storage
+    .from("certificates")
+    .upload(certificate_path, certificate, { contentType: certificate.type || "image/jpeg" });
+  if (upErr) return { ok: false, error: "Could not upload the certificate. Please try again." };
+
   const id = crypto.randomUUID();
   const { error } = await supabase.from("senseis").insert({
     id,
     name,
-    rank: rank || null,
+    rank,
     school_id,
     registered_by,
     email,
     phone,
+    certificate_path,
   });
   if (error) return { ok: false, error: "Could not register the sensei. Please try again." };
 
