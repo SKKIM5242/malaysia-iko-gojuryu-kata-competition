@@ -69,29 +69,59 @@ export default async function AdminSchools({
                     ))}
                   </select>
                 </div>
-                <div>
-                  <label htmlFor="affiliation_code" className={adminLabel}>IKO affiliation code</label>
-                  <input id="affiliation_code" name="affiliation_code" defaultValue={editing?.affiliation_code ?? ""} className={adminInput} placeholder="e.g. IKO-MY-KL-001" />
+              </div>
+
+              <div className="rounded-md border border-neutral-200 bg-neutral-50 p-4">
+                <p className="text-sm font-semibold text-neutral-700">Person in-charge / Chief Instructor</p>
+                <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="contact_title" className={adminLabel}>Title *</label>
+                    <select id="contact_title" name="contact_title" required defaultValue={editing?.contact_title ?? ""} className={adminInput}>
+                      <option value="" disabled>Select</option>
+                      <option value="Mr.">Mr.</option>
+                      <option value="Ms.">Ms.</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="contact_name" className={adminLabel}>Name *</label>
+                    <input id="contact_name" name="contact_name" required defaultValue={editing?.contact_name ?? ""} className={adminInput} />
+                  </div>
+                  <div>
+                    <label htmlFor="contact_karate_title" className={adminLabel}>Karate title *</label>
+                    <select id="contact_karate_title" name="contact_karate_title" required defaultValue={editing?.contact_karate_title ?? ""} className={adminInput}>
+                      <option value="" disabled>Select</option>
+                      <option value="Hanshi">Hanshi</option>
+                      <option value="Shihan">Shihan</option>
+                      <option value="Sensei">Sensei</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="contact_rank" className={adminLabel}>Rank in karate-do *</label>
+                    <input id="contact_rank" name="contact_rank" required defaultValue={editing?.contact_rank ?? ""} className={adminInput} placeholder="e.g. Godan" />
+                  </div>
                 </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="sm:col-span-2">
-                  <label htmlFor="home_address" className={adminLabel}>Home address</label>
-                  <input id="home_address" name="home_address" defaultValue={editing?.home_address ?? ""} className={adminInput} />
+                  <label htmlFor="home_address" className={adminLabel}>Home address *</label>
+                  <input id="home_address" name="home_address" required defaultValue={editing?.home_address ?? ""} className={adminInput} />
                 </div>
                 <div>
-                  <label htmlFor="city_town" className={adminLabel}>City / Town</label>
-                  <input id="city_town" name="city_town" defaultValue={editing?.city_town ?? ""} className={adminInput} />
+                  <label htmlFor="city_town" className={adminLabel}>City / Town *</label>
+                  <input id="city_town" name="city_town" required defaultValue={editing?.city_town ?? ""} className={adminInput} />
                 </div>
                 <div>
-                  <label htmlFor="home_country" className={adminLabel}>Home country</label>
-                  <input id="home_country" name="home_country" defaultValue={editing?.home_country ?? (editing ? "" : "Malaysia")} className={adminInput} />
+                  <label htmlFor="home_country" className={adminLabel}>Home country *</label>
+                  <input id="home_country" name="home_country" required defaultValue={editing?.home_country ?? (editing ? "" : "Malaysia")} className={adminInput} />
                 </div>
                 <div>
-                  <label htmlFor="email" className={adminLabel}>Email address</label>
-                  <input id="email" name="email" type="email" defaultValue={editing?.email ?? ""} className={adminInput} />
+                  <label htmlFor="email" className={adminLabel}>Email address *</label>
+                  <input id="email" name="email" type="email" required defaultValue={editing?.email ?? ""} className={adminInput} />
                 </div>
                 <div>
-                  <label htmlFor="phone" className={adminLabel}>Mobile phone</label>
-                  <input id="phone" name="phone" type="tel" defaultValue={editing?.phone ?? ""} className={adminInput} placeholder="+60…" />
+                  <label htmlFor="phone" className={adminLabel}>Mobile phone *</label>
+                  <input id="phone" name="phone" type="tel" required defaultValue={editing?.phone ?? ""} className={adminInput} placeholder="+60…" />
                 </div>
               </div>
               <div className="flex gap-2">
@@ -117,7 +147,7 @@ export default async function AdminSchools({
                   <tr>
                     <th className="px-4 py-3">Name</th>
                     <th className="px-4 py-3">State</th>
-                    <th className="px-4 py-3">Code</th>
+                    <th className="px-4 py-3">Person in-charge</th>
                     <th className="px-4 py-3">Location</th>
                     <th className="px-4 py-3">Contact</th>
                     <th className="px-4 py-3">Actions</th>
@@ -128,7 +158,20 @@ export default async function AdminSchools({
                     <tr key={s.id} className="hover:bg-neutral-50">
                       <td className="max-w-[240px] truncate px-4 py-3 font-medium" title={s.name}>{s.name}</td>
                       <td className="px-4 py-3">{s.state ?? "—"}</td>
-                      <td className="px-4 py-3 font-mono text-xs">{s.affiliation_code ?? "—"}</td>
+                      <td className="px-4 py-3 text-xs">
+                        {s.contact_name ? (
+                          <>
+                            {[s.contact_title, s.contact_name].filter(Boolean).join(" ")}
+                            {s.contact_karate_title && (
+                              <span className="block text-neutral-500">
+                                {s.contact_karate_title}{s.contact_rank ? ` — ${s.contact_rank}` : ""}
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-xs" title={[s.home_address, s.city_town].filter(Boolean).join(", ") || undefined}>
                         {s.home_country ?? "—"}
                       </td>

@@ -458,7 +458,10 @@ export async function saveSchool(formData: FormData) {
   const values = {
     name: String(formData.get("name") ?? "").trim(),
     state: String(formData.get("state") ?? "").trim() || null,
-    affiliation_code: String(formData.get("affiliation_code") ?? "").trim() || null,
+    contact_title: String(formData.get("contact_title") ?? "").trim() || null,
+    contact_name: String(formData.get("contact_name") ?? "").trim() || null,
+    contact_karate_title: String(formData.get("contact_karate_title") ?? "").trim() || null,
+    contact_rank: String(formData.get("contact_rank") ?? "").trim() || null,
     home_address: String(formData.get("home_address") ?? "").trim() || null,
     city_town: String(formData.get("city_town") ?? "").trim() || null,
     home_country: String(formData.get("home_country") ?? "").trim() || null,
@@ -466,6 +469,16 @@ export async function saveSchool(formData: FormData) {
     phone: String(formData.get("phone") ?? "").trim() || null,
   };
   if (!values.name) backTo(returnTo, { error: "School name is required." });
+  if (!values.contact_title || !values.contact_name || !values.contact_karate_title || !values.contact_rank) {
+    backTo(returnTo, { error: "Person in-charge's title, name, karate title, and rank are required." });
+  }
+  if (!values.home_address || !values.city_town || !values.home_country) {
+    backTo(returnTo, { error: "Home address, city/town, and home country are required." });
+  }
+  if (!values.email || !values.phone) {
+    backTo(returnTo, { error: "Email address and mobile phone are required." });
+  }
+  const record = { ...values, gender: values.contact_title === "Mr." ? "male" : "female" };
   const { supabase, actorId } = await getActor();
   if (!id) {
     const { data: dup } = await supabase
@@ -475,14 +488,14 @@ export async function saveSchool(formData: FormData) {
     }
   }
   if (id) {
-    const { error } = await supabase.from("schools").update(values).eq("id", id);
+    const { error } = await supabase.from("schools").update(record).eq("id", id);
     if (error) backTo(returnTo, { error: "Could not update school." });
     await writeAudit(supabase, {
       table_name: "schools", record_id: id, action: "school_updated",
       new_value: values, actor_id: actorId,
     });
   } else {
-    const { data, error } = await supabase.from("schools").insert(values).select("id").single();
+    const { data, error } = await supabase.from("schools").insert(record).select("id").single();
     if (error) backTo(returnTo, { error: "Could not create school." });
     await writeAudit(supabase, {
       table_name: "schools", record_id: data!.id, action: "school_created",
@@ -512,6 +525,7 @@ export async function saveSensei(formData: FormData) {
   const values = {
     name: String(formData.get("name") ?? "").trim(),
     rank: String(formData.get("rank") ?? "").trim() || null,
+    gender: String(formData.get("gender") ?? "").trim() || null,
     school_id: String(formData.get("school_id") ?? "") || null,
     home_address: String(formData.get("home_address") ?? "").trim() || null,
     city_town: String(formData.get("city_town") ?? "").trim() || null,
@@ -520,6 +534,15 @@ export async function saveSensei(formData: FormData) {
     phone: String(formData.get("phone") ?? "").trim() || null,
   };
   if (!values.name) backTo(returnTo, { error: "Sensei name is required." });
+  if (!values.gender || !["male", "female"].includes(values.gender)) {
+    backTo(returnTo, { error: "Sex is required." });
+  }
+  if (!values.home_address || !values.city_town || !values.home_country) {
+    backTo(returnTo, { error: "Home address, city/town, and home country are required." });
+  }
+  if (!values.email || !values.phone) {
+    backTo(returnTo, { error: "Email address and mobile phone are required." });
+  }
   const { supabase, actorId } = await getActor();
 
   const certificatePath = await uploadCertificateIfPresent(supabase, formData, "sensei", returnTo);

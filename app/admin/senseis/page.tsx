@@ -71,6 +71,14 @@ export default async function AdminSenseis({
                   <input id="rank" name="rank" defaultValue={editing?.rank ?? ""} className={adminInput} placeholder="e.g. Godan" />
                 </div>
                 <div>
+                  <label htmlFor="gender" className={adminLabel}>Sex *</label>
+                  <select id="gender" name="gender" required defaultValue={editing?.gender ?? ""} className={adminInput}>
+                    <option value="" disabled>Select gender</option>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                  </select>
+                </div>
+                <div>
                   <CertificateField
                     currentUrl={editing?.certificate_path ? certUrls.get(editing.certificate_path) : undefined}
                   />
@@ -85,24 +93,24 @@ export default async function AdminSenseis({
                   </select>
                 </div>
                 <div className="sm:col-span-2">
-                  <label htmlFor="home_address" className={adminLabel}>Home address</label>
-                  <input id="home_address" name="home_address" defaultValue={editing?.home_address ?? ""} className={adminInput} />
+                  <label htmlFor="home_address" className={adminLabel}>Home address *</label>
+                  <input id="home_address" name="home_address" required defaultValue={editing?.home_address ?? ""} className={adminInput} />
                 </div>
                 <div>
-                  <label htmlFor="city_town" className={adminLabel}>City / Town</label>
-                  <input id="city_town" name="city_town" defaultValue={editing?.city_town ?? ""} className={adminInput} />
+                  <label htmlFor="city_town" className={adminLabel}>City / Town *</label>
+                  <input id="city_town" name="city_town" required defaultValue={editing?.city_town ?? ""} className={adminInput} />
                 </div>
                 <div>
-                  <label htmlFor="home_country" className={adminLabel}>Home country</label>
-                  <input id="home_country" name="home_country" defaultValue={editing?.home_country ?? (editing ? "" : "Malaysia")} className={adminInput} />
+                  <label htmlFor="home_country" className={adminLabel}>Home country *</label>
+                  <input id="home_country" name="home_country" required defaultValue={editing?.home_country ?? (editing ? "" : "Malaysia")} className={adminInput} />
                 </div>
                 <div>
-                  <label htmlFor="email" className={adminLabel}>Email address</label>
-                  <input id="email" name="email" type="email" defaultValue={editing?.email ?? ""} className={adminInput} />
+                  <label htmlFor="email" className={adminLabel}>Email address *</label>
+                  <input id="email" name="email" type="email" required defaultValue={editing?.email ?? ""} className={adminInput} />
                 </div>
                 <div>
-                  <label htmlFor="phone" className={adminLabel}>Mobile phone</label>
-                  <input id="phone" name="phone" type="tel" defaultValue={editing?.phone ?? ""} className={adminInput} placeholder="+60…" />
+                  <label htmlFor="phone" className={adminLabel}>Mobile phone *</label>
+                  <input id="phone" name="phone" type="tel" required defaultValue={editing?.phone ?? ""} className={adminInput} placeholder="+60…" />
                 </div>
               </div>
               <div className="flex gap-2">

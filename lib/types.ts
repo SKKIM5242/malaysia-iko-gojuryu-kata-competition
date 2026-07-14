@@ -20,7 +20,12 @@ export interface School {
   user_id: string | null;
   name: string;
   state: string | null;
-  affiliation_code: string | null;
+  /** Person in-charge / chief instructor of the school. */
+  contact_title: string | null;
+  contact_name: string | null;
+  contact_karate_title: string | null;
+  contact_rank: string | null;
+  gender: string | null;
   home_address: string | null;
   home_country: string | null;
   city_town: string | null;
@@ -34,6 +39,7 @@ export interface Sensei {
   user_id: string | null;
   name: string;
   rank: string | null;
+  gender: string | null;
   school_id: string | null;
   home_address: string | null;
   home_country: string | null;
