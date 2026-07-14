@@ -3,6 +3,7 @@ import { getCategories, schemaReady } from "@/lib/data";
 import { EmptyState, SectionTitle, SetupNotice, SiteFooter, SiteHeader, formatDate } from "@/components/ui";
 import { groupByKata } from "@/lib/division";
 import { finalScore } from "@/lib/scoring";
+import { winnersRevealDate } from "@/lib/winners";
 import type { Competition } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -10,27 +11,11 @@ export const metadata = { title: "Winners" };
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 
-/** Malaysia working day = Mon–Fri. This does not account for Malaysian
- * public holidays (they vary by state and by the Islamic calendar) — only
- * weekends are rolled past. Dates are handled entirely in UTC (never the
- * server's local timezone) so "2026-08-30" always means the same calendar
- * day regardless of where this runs. */
-function nextMalaysiaWorkingDay(date: Date): Date {
-  const d = new Date(date);
-  while (d.getUTCDay() === 0 || d.getUTCDay() === 6) d.setUTCDate(d.getUTCDate() + 1);
-  return d;
-}
-
-function winnersRevealDate(registrationDeadline: string): Date {
-  const [y, m, d] = registrationDeadline.split("-").map(Number);
-  const plus30 = new Date(Date.UTC(y, m - 1, d + 30));
-  return nextMalaysiaWorkingDay(plus30);
-}
-
 interface WinnerEntry {
   rank: number;
   participantName: string;
   finalScore: number;
+  playbackUrl: string | null;
 }
 
 async function computeWinners(
@@ -54,9 +39,11 @@ async function computeWinners(
 
   const { data: videos } = await supabase
     .from("kata_videos")
-    .select("id, registration_id")
+    .select("id, registration_id, storage_path")
     .in("registration_id", regIds);
-  const videoByReg = new Map((videos ?? []).map((v) => [v.registration_id as string, v.id as string]));
+  const videoByReg = new Map(
+    (videos ?? []).map((v) => [v.registration_id as string, { id: v.id as string, storagePath: v.storage_path as string }]),
+  );
   const videoIds = (videos ?? []).map((v) => v.id as string);
   if (videoIds.length === 0) return new Map();
 
@@ -68,25 +55,42 @@ async function computeWinners(
     scoresByVideo.set(s.video_id as string, list);
   }
 
-  const byCategory = new Map<string, Array<{ name: string; score: number }>>();
+  const byCategory = new Map<string, Array<{ name: string; score: number; videoId: string; storagePath: string }>>();
   for (const r of regList) {
-    const videoId = videoByReg.get(r.id);
-    if (!videoId) continue;
-    const fs = finalScore(scoresByVideo.get(videoId) ?? []);
+    const video = videoByReg.get(r.id);
+    if (!video) continue;
+    const fs = finalScore(scoresByVideo.get(video.id) ?? []);
     if (fs == null) continue;
     const list = byCategory.get(r.category_id) ?? [];
-    list.push({ name: r.participant?.full_name ?? "Unknown participant", score: fs });
+    list.push({ name: r.participant?.full_name ?? "Unknown participant", score: fs, videoId: video.id, storagePath: video.storagePath });
     byCategory.set(r.category_id, list);
   }
 
-  const result = new Map<string, WinnerEntry[]>();
+  // Only the top 3 per category get their recording copied to this page —
+  // sign just those, not every scored video.
+  const top3ByCategory = new Map<string, Array<{ name: string; score: number; videoId: string; storagePath: string }>>();
   for (const [catId, entries] of byCategory) {
+    top3ByCategory.set(catId, entries.sort((a, b) => b.score - a.score).slice(0, 3));
+  }
+  const winningPaths = [...top3ByCategory.values()].flat().map((e) => e.storagePath);
+  const playbackUrls = new Map<string, string>();
+  if (winningPaths.length > 0) {
+    const { data: signed } = await supabase.storage.from("kata-videos").createSignedUrls(winningPaths, 3600);
+    for (const s of signed ?? []) {
+      if (s.path && s.signedUrl) playbackUrls.set(s.path, s.signedUrl);
+    }
+  }
+
+  const result = new Map<string, WinnerEntry[]>();
+  for (const [catId, entries] of top3ByCategory) {
     result.set(
       catId,
-      entries
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 3)
-        .map((e, i) => ({ rank: i + 1, participantName: e.name, finalScore: e.score })),
+      entries.map((e, i) => ({
+        rank: i + 1,
+        participantName: e.name,
+        finalScore: e.score,
+        playbackUrl: playbackUrls.get(e.storagePath) ?? null,
+      })),
     );
   }
   return result;
@@ -153,11 +157,23 @@ async function CompetitionWinners({
                       </p>
                       <ul className="space-y-1">
                         {winners.map((w) => (
-                          <li key={w.rank} className="flex items-center justify-between text-sm">
+                          <li key={w.rank} className="flex items-center justify-between gap-2 text-sm">
                             <span>
                               {MEDALS[w.rank - 1]} {w.participantName}
                             </span>
-                            <span className="font-semibold text-neutral-700">{w.finalScore.toFixed(1)}</span>
+                            <span className="flex items-center gap-2">
+                              <span className="font-semibold text-neutral-700">{w.finalScore.toFixed(1)}</span>
+                              {w.playbackUrl && (
+                                <a
+                                  href={w.playbackUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="rounded border border-neutral-300 px-2 py-0.5 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
+                                >
+                                  Watch recording
+                                </a>
+                              )}
+                            </span>
                           </li>
                         ))}
                       </ul>

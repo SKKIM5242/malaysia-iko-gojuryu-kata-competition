@@ -8,7 +8,6 @@ import ClaimForm from "@/components/ClaimForm";
 import KataRecorder from "@/components/KataRecorder";
 import RefereeScoring, { type ScoringItem } from "@/components/RefereeScoring";
 import { getAllTelegramLinks, getTelegramBotConnectUrl } from "@/lib/telegram";
-import { finalScore } from "@/lib/scoring";
 
 export const dynamic = "force-dynamic";
 
@@ -24,62 +23,6 @@ interface ProfileRow {
   registration_id: string | null;
   record_attempts: number;
   telegram_chat_id: string | null;
-}
-
-interface ArenaEntry {
-  videoId: string;
-  participantName: string;
-  categoryName: string | null;
-  playbackUrl: string | null;
-  finalScore: number | null;
-}
-
-/** All recordings + final (trimmed-mean) scores for a competition — shown to
- * participants only after that competition's registration deadline passes. */
-async function loadKataArena(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  competitionId: string,
-): Promise<ArenaEntry[]> {
-  const { data: regs } = await supabase.from("registrations").select("id").eq("competition_id", competitionId);
-  const regIds = (regs ?? []).map((r) => r.id as string);
-  if (regIds.length === 0) return [];
-
-  const { data: videos } = await supabase
-    .from("kata_videos")
-    .select(
-      "id, storage_path, participant:participants(full_name), registration:registrations(category:categories(name))",
-    )
-    .in("registration_id", regIds);
-  const videoList =
-    (videos as unknown as Array<{
-      id: string;
-      storage_path: string;
-      participant: { full_name: string } | null;
-      registration: { category: { name: string } | null } | null;
-    }>) ?? [];
-  if (videoList.length === 0) return [];
-
-  const videoIds = videoList.map((v) => v.id);
-  const { data: scores } = await supabase.from("video_scores").select("video_id, score").in("video_id", videoIds);
-  const scoresByVideo = new Map<string, number[]>();
-  for (const s of scores ?? []) {
-    const list = scoresByVideo.get(s.video_id as string) ?? [];
-    list.push(Number(s.score));
-    scoresByVideo.set(s.video_id as string, list);
-  }
-
-  return Promise.all(
-    videoList.map(async (v) => {
-      const { data: signed } = await supabase.storage.from("kata-videos").createSignedUrl(v.storage_path, 3600);
-      return {
-        videoId: v.id,
-        participantName: v.participant?.full_name ?? "Unknown participant",
-        categoryName: v.registration?.category?.name ?? null,
-        playbackUrl: signed?.signedUrl ?? null,
-        finalScore: finalScore(scoresByVideo.get(v.id) ?? []),
-      };
-    }),
-  );
 }
 
 function watermarkText(eventDate: string | null | undefined): string {
@@ -334,9 +277,6 @@ export default async function AccountPage({
     } | null
   )?.competition ?? null;
   const eventDate = competition?.event_date ?? null;
-  const deadlinePassed =
-    !!competition?.registration_deadline &&
-    new Date(competition.registration_deadline + "T23:59:59") < new Date();
 
   let ownVideoUrl: string | null = null;
   if (existingVideo) {
@@ -346,16 +286,11 @@ export default async function AccountPage({
     ownVideoUrl = signed?.signedUrl ?? null;
   }
 
-  let arena: ArenaEntry[] = [];
-  if (existingVideo && deadlinePassed && competition) {
-    arena = await loadKataArena(supabase, competition.id);
-  }
-
   return (
     <>
       <SiteHeader />
       <main className="mx-auto max-w-3xl px-4 py-10">
-        <h1 className="text-2xl font-bold">{deadlinePassed && existingVideo ? "Kata Arena" : "Record your kata"}</h1>
+        <h1 className="text-2xl font-bold">{existingVideo ? "Your kata recording" : "Record your kata"}</h1>
         <p className="mt-1 mb-6 text-sm text-neutral-500">
           Signed in as {profile.full_name ?? user.email}.
         </p>
@@ -368,62 +303,36 @@ export default async function AccountPage({
               ) : (
                 <p className="mt-2 text-sm text-green-800">Thank you — it is ready for judging.</p>
               )}
-              {!deadlinePassed && (
-                <p className="mt-2 text-xs text-green-800">
-                  Other participants&apos; recordings and scores unlock here once the registration
-                  deadline passes{" "}
-                  {competition?.registration_deadline && (
-                    <>(on {competition.registration_deadline})</>
-                  )}
-                  .
-                </p>
-              )}
             </div>
-            {deadlinePassed && (
-              <div>
-                <h2 className="mb-1 text-lg font-bold">All recordings &amp; final scores</h2>
-                <p className="mb-4 text-sm text-neutral-500">
-                  The registration deadline has passed — every participant&apos;s recording and final
-                  score for this competition is now visible below.
-                </p>
-                {arena.length === 0 ? (
-                  <p className="text-sm text-neutral-400">No recordings submitted yet.</p>
-                ) : (
-                  <div className="space-y-3">
-                    {arena.map((a) => (
-                      <div key={a.videoId} className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div>
-                            <p className="font-bold text-neutral-900">{a.participantName}</p>
-                            <p className="text-sm text-neutral-500">{a.categoryName ?? "—"}</p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {a.finalScore != null && (
-                              <span className="rounded-full bg-neutral-900 px-2.5 py-1 text-xs font-semibold text-white">
-                                Final {a.finalScore.toFixed(1)}
-                              </span>
-                            )}
-                            {a.playbackUrl && (
-                              <a
-                                href={a.playbackUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="rounded border border-neutral-300 px-3 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
-                              >
-                                Watch
-                              </a>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+            <div>
+              <p className="mb-2 text-sm text-neutral-500">
+                Watch every participant&apos;s recording for this competition in Kata Arena. Final
+                judge scores unlock there once winners are announced.
+              </p>
+              <Link
+                href="/kata-arena"
+                className="inline-block rounded-md bg-red-700 px-5 py-2.5 font-semibold text-white hover:bg-red-600"
+              >
+                Go to Kata Arena
+              </Link>
+            </div>
           </div>
         ) : (
-          <KataRecorder initialAttempts={profile.record_attempts} watermark={watermarkText(eventDate)} />
+          <div className="space-y-8">
+            <KataRecorder initialAttempts={profile.record_attempts} watermark={watermarkText(eventDate)} />
+            <div>
+              <p className="mb-2 text-sm text-neutral-500">
+                Already registered but not ready to record yet? You can still watch every submitted
+                recording in Kata Arena.
+              </p>
+              <Link
+                href="/kata-arena"
+                className="inline-block rounded-md border border-neutral-300 bg-white px-5 py-2.5 font-semibold text-neutral-700 hover:bg-neutral-50"
+              >
+                Go to Kata Arena
+              </Link>
+            </div>
+          </div>
         )}
         <div className="mt-6">{SignOutButton}</div>
       </main>
