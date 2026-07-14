@@ -165,13 +165,18 @@ export default async function KataArenaPage() {
         <SiteHeader />
         <main className="mx-auto max-w-3xl px-4 py-10">
           <h1 className="text-2xl font-bold tracking-tight">Kata Arena</h1>
-          <p className="mt-1 mb-8 text-sm text-neutral-500">
+          <p className="mt-1 mb-2 text-sm text-neutral-500">
             Every submitted recording, with each referee&apos;s individual score. Final (average)
             scores and standings stay hidden until winners are announced — see the{" "}
             <Link href="/winners" className="underline">
               Winners page
             </Link>
             .
+          </p>
+          <p className="mb-8 text-sm">
+            <Link href="/kata-categories" className="font-semibold text-red-700 underline underline-offset-2">
+              Browse recordings by kata category →
+            </Link>
           </p>
           {competitions.length === 0 ? (
             <p className="text-sm text-neutral-400">No competitions yet.</p>

@@ -103,3 +103,61 @@ export async function loadKataArena(
     }),
   );
 }
+
+export interface CategoryRecording {
+  participantName: string;
+  playbackUrl: string | null;
+}
+
+/** Every paid registration's submitted recording for a competition, keyed
+ * by category_id — used by the Kata Categories page to slot each
+ * participant's video under its kata sub-category (Male/Female/Mix ×
+ * Belt group × Age bracket). Registrants without a submitted video yet
+ * are omitted — this page is a recordings browser, not a roster. */
+export async function loadRecordingsByCategory(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  competitionId: string,
+): Promise<Map<string, CategoryRecording[]>> {
+  const result = new Map<string, CategoryRecording[]>();
+
+  const { data: regs } = await supabase
+    .from("registrations")
+    .select("id, category_id, participant:participants(full_name)")
+    .eq("competition_id", competitionId)
+    .eq("payment_status", "paid")
+    .not("category_id", "is", null);
+  const regList =
+    (regs as unknown as Array<{
+      id: string;
+      category_id: string;
+      participant: { full_name: string } | null;
+    }>) ?? [];
+  if (regList.length === 0) return result;
+  const regIds = regList.map((r) => r.id);
+
+  const { data: videos } = await supabase
+    .from("kata_videos")
+    .select("registration_id, storage_path")
+    .in("registration_id", regIds);
+  const pathByReg = new Map((videos ?? []).map((v) => [v.registration_id as string, v.storage_path as string]));
+  const paths = [...pathByReg.values()];
+  if (paths.length === 0) return result;
+
+  const playbackUrls = new Map<string, string>();
+  const { data: signed } = await supabase.storage.from("kata-videos").createSignedUrls(paths, 3600);
+  for (const s of signed ?? []) {
+    if (s.path && s.signedUrl) playbackUrls.set(s.path, s.signedUrl);
+  }
+
+  for (const r of regList) {
+    const path = pathByReg.get(r.id);
+    if (!path) continue;
+    const list = result.get(r.category_id) ?? [];
+    list.push({
+      participantName: r.participant?.full_name ?? "Unknown participant",
+      playbackUrl: playbackUrls.get(path) ?? null,
+    });
+    result.set(r.category_id, list);
+  }
+  return result;
+}
