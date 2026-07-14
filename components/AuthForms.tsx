@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
 const inputCls =
@@ -138,6 +139,14 @@ export default function AuthForms() {
             autoComplete={mode === "signup" ? "new-password" : "current-password"}
             className={inputCls}
           />
+          {mode === "signin" && (
+            <Link
+              href="/account/forgot-password"
+              className="mt-1 inline-block text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700"
+            >
+              Forgot password?
+            </Link>
+          )}
         </div>
         {mode === "signup" && (
           <label htmlFor="terms_accepted" className="flex items-start gap-2 text-xs text-neutral-600">

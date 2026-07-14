@@ -51,6 +51,12 @@ export default function LoginPage() {
               autoComplete="current-password"
               className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-red-600 focus:outline-none focus:ring-1 focus:ring-red-600"
             />
+            <Link
+              href="/account/forgot-password"
+              className="mt-1 inline-block text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700"
+            >
+              Forgot password?
+            </Link>
           </div>
           <button
             type="submit"
