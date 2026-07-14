@@ -89,7 +89,12 @@ function watermarkText(eventDate: string | null | undefined): string {
   return `Malaysia Open - IKO Goju-ryu Karate-do - Kata Competition ${label}`;
 }
 
-export default async function AccountPage() {
+export default async function AccountPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ mode?: string }>;
+}) {
+  const { mode } = await searchParams;
   const ready = await schemaReady();
   if (!ready) {
     return (
@@ -116,7 +121,7 @@ export default async function AccountPage() {
             Sign in or create an account to record your kata, judge as a referee, or use your
             organiser/staff access.
           </p>
-          <AuthForms />
+          <AuthForms defaultMode={mode === "signup" ? "signup" : "signin"} />
         </main>
         <SiteFooter />
       </>

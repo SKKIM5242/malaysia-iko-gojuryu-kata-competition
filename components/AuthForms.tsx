@@ -9,9 +9,9 @@ const inputCls =
   "w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm focus:border-red-600 focus:outline-none focus:ring-1 focus:ring-red-600";
 const labelCls = "mb-1 block text-sm font-medium text-neutral-700";
 
-export default function AuthForms() {
+export default function AuthForms({ defaultMode = "signin" }: { defaultMode?: "signin" | "signup" }) {
   const router = useRouter();
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [mode, setMode] = useState<"signin" | "signup">(defaultMode);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [role, setRole] = useState("participant");
