@@ -1,18 +1,81 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { schemaReady } from "@/lib/data";
-import { loadKataArena } from "@/lib/arena";
+import { getAllCompetitions } from "@/lib/admin-data";
+import { loadKataArena, type ArenaEntry } from "@/lib/arena";
 import { winnersRevealed } from "@/lib/winners";
 import { SetupNotice, SiteFooter, SiteHeader } from "@/components/ui";
+import AuthForms from "@/components/AuthForms";
 import ClaimForm from "@/components/ClaimForm";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Kata Arena" };
 
+const PRIVILEGED_ROLES = ["admin", "organizer", "staff", "customer_support", "referee", "audience"];
+
 interface ProfileRow {
-  role: "participant" | "referee" | "staff" | "admin";
+  role: "participant" | "referee" | "staff" | "admin" | "organizer" | "customer_support" | "audience";
   full_name: string | null;
+  approved: boolean;
+  participant_id: string | null;
   registration_id: string | null;
+}
+
+function RecordingCard({
+  entry,
+  showJudgeScores,
+  showFinalScore,
+}: {
+  entry: ArenaEntry;
+  showJudgeScores: boolean;
+  showFinalScore: boolean;
+}) {
+  return (
+    <div className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <p className="font-bold text-neutral-900">{entry.participantName}</p>
+          <p className="text-sm text-neutral-500">{entry.categoryName ?? "—"}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {showFinalScore && entry.finalScore != null && (
+            <span className="rounded-full bg-neutral-900 px-2.5 py-1 text-xs font-semibold text-white">
+              Final {entry.finalScore.toFixed(1)}
+            </span>
+          )}
+          {entry.playbackUrl && (
+            <a
+              href={entry.playbackUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded border border-neutral-300 px-3 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
+            >
+              Watch
+            </a>
+          )}
+        </div>
+      </div>
+      {showJudgeScores && (
+        <div className="mt-3 flex flex-wrap items-center gap-1.5">
+          {entry.judgeScores.length === 0 ? (
+            <span className="text-xs text-neutral-400">No referees assigned yet</span>
+          ) : (
+            entry.judgeScores.map((js, i) => (
+              <span
+                key={`${entry.videoId}-${i}`}
+                className="flex items-center gap-1.5 rounded-full border border-neutral-300 bg-neutral-50 px-2.5 py-1 text-xs font-semibold text-neutral-700"
+              >
+                {js.judgeName}
+                <span className={js.score != null ? "text-green-700" : "text-amber-600"}>
+                  {js.score != null ? js.score.toFixed(1) : "pending"}
+                </span>
+              </span>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default async function KataArenaPage() {
@@ -39,16 +102,15 @@ export default async function KataArenaPage() {
       <>
         <SiteHeader />
         <main className="mx-auto max-w-2xl px-4 py-10">
-          <h1 className="text-2xl font-bold tracking-tight">Kata Arena</h1>
-          <p className="mt-2 text-sm text-neutral-500">
-            Sign in as a registered participant to watch every submitted kata recording.
+          <h1 className="mb-2 text-2xl font-bold tracking-tight">Kata Arena</h1>
+          <p className="mb-8 text-sm text-neutral-500">
+            Sign in to watch kata recordings. Participants can watch their own recording any time;
+            other participants&apos; recordings and every judge&apos;s score become visible to
+            Referees, Admin/Organizer, Customer Support and Audience accounts as they&apos;re
+            submitted. Final scores and standings stay hidden for everyone until winners are
+            announced.
           </p>
-          <Link
-            href="/account"
-            className="mt-4 inline-block rounded-md bg-red-700 px-5 py-2.5 font-semibold text-white hover:bg-red-600"
-          >
-            Kata Arena Log In
-          </Link>
+          <AuthForms />
         </main>
         <SiteFooter />
       </>
@@ -57,21 +119,34 @@ export default async function KataArenaPage() {
 
   const { data: profileData } = await supabase
     .from("profiles")
-    .select("role, full_name, registration_id")
+    .select("role, full_name, approved, participant_id, registration_id")
     .eq("user_id", user.id)
     .maybeSingle();
   const profile = profileData as ProfileRow | null;
 
-  if (!profile || profile.role !== "participant") {
+  if (!profile) {
+    return (
+      <>
+        <SiteHeader />
+        <main className="mx-auto max-w-2xl px-4 py-10">
+          <h1 className="text-2xl font-bold tracking-tight">Kata Arena</h1>
+          <p className="mt-2 text-sm text-neutral-500">Setting up your account… please refresh in a moment.</p>
+        </main>
+        <SiteFooter />
+      </>
+    );
+  }
+
+  if (!profile.approved) {
     return (
       <>
         <SiteHeader />
         <main className="mx-auto max-w-2xl px-4 py-10">
           <h1 className="text-2xl font-bold tracking-tight">Kata Arena</h1>
           <p className="mt-2 text-sm text-neutral-500">
-            Kata Arena is for registered participants only.{" "}
+            Your account is awaiting the organiser&apos;s approval.{" "}
             <Link href="/account" className="underline">
-              Go to your account
+              Check your account status
             </Link>
             .
           </p>
@@ -81,6 +156,54 @@ export default async function KataArenaPage() {
     );
   }
 
+  // ── Referee / Admin / Organizer / Customer Support / Audience: every
+  // competition's recordings + individual judge scores, never the total. ──
+  if (PRIVILEGED_ROLES.includes(profile.role)) {
+    const competitions = await getAllCompetitions();
+    return (
+      <>
+        <SiteHeader />
+        <main className="mx-auto max-w-3xl px-4 py-10">
+          <h1 className="text-2xl font-bold tracking-tight">Kata Arena</h1>
+          <p className="mt-1 mb-8 text-sm text-neutral-500">
+            Every submitted recording, with each referee&apos;s individual score. Final (average)
+            scores and standings stay hidden until winners are announced — see the{" "}
+            <Link href="/winners" className="underline">
+              Winners page
+            </Link>
+            .
+          </p>
+          {competitions.length === 0 ? (
+            <p className="text-sm text-neutral-400">No competitions yet.</p>
+          ) : (
+            await Promise.all(
+              competitions.map(async (c) => {
+                const arena = await loadKataArena(supabase, c.id);
+                const revealed = winnersRevealed(c.registration_deadline);
+                return (
+                  <div key={c.id} className="mb-10">
+                    <h2 className="mb-3 text-lg font-bold">{c.name}</h2>
+                    {arena.length === 0 ? (
+                      <p className="text-sm text-neutral-400">No recordings submitted yet.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {arena.map((a) => (
+                          <RecordingCard key={a.videoId} entry={a} showJudgeScores showFinalScore={revealed} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              }),
+            )
+          )}
+        </main>
+        <SiteFooter />
+      </>
+    );
+  }
+
+  // ── Participant ───────────────────────────────────────────────────────────
   if (!profile.registration_id) {
     return (
       <>
@@ -121,8 +244,13 @@ export default async function KataArenaPage() {
     );
   }
 
-  const arena = await loadKataArena(supabase, competition.id);
+  const fullArena = await loadKataArena(supabase, competition.id);
   const revealed = winnersRevealed(competition.registration_deadline);
+  // Own recording is always visible; other participants' recordings only
+  // unlock once winners are announced.
+  const visibleArena = revealed
+    ? fullArena
+    : fullArena.filter((a) => a.participantId === profile.participant_id);
 
   return (
     <>
@@ -130,49 +258,17 @@ export default async function KataArenaPage() {
       <main className="mx-auto max-w-3xl px-4 py-10">
         <h1 className="text-2xl font-bold tracking-tight">Kata Arena</h1>
         <p className="mt-1 mb-6 text-sm text-neutral-500">
-          {competition.name} — every participant&apos;s submitted recording is watchable below.{" "}
-          {revealed ? (
-            "Final judge scores are revealed now that winners have been announced."
-          ) : (
-            <>
-              Final judge scores stay hidden until winners are announced — see the{" "}
-              <Link href="/winners" className="underline">
-                Winners page
-              </Link>{" "}
-              for the reveal date.
-            </>
-          )}
+          {competition.name}. You can always watch your own recording here.{" "}
+          {revealed
+            ? "Winners have been announced, so every participant's recording and final score is now visible below."
+            : "Other participants' recordings and every final score stay hidden until winners are announced."}
         </p>
-        {arena.length === 0 ? (
+        {visibleArena.length === 0 ? (
           <p className="text-sm text-neutral-400">No recordings submitted yet.</p>
         ) : (
           <div className="space-y-3">
-            {arena.map((a) => (
-              <div key={a.videoId} className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <p className="font-bold text-neutral-900">{a.participantName}</p>
-                    <p className="text-sm text-neutral-500">{a.categoryName ?? "—"}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {revealed && a.finalScore != null && (
-                      <span className="rounded-full bg-neutral-900 px-2.5 py-1 text-xs font-semibold text-white">
-                        Final {a.finalScore.toFixed(1)}
-                      </span>
-                    )}
-                    {a.playbackUrl && (
-                      <a
-                        href={a.playbackUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="rounded border border-neutral-300 px-3 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
-                      >
-                        Watch
-                      </a>
-                    )}
-                  </div>
-                </div>
-              </div>
+            {visibleArena.map((a) => (
+              <RecordingCard key={a.videoId} entry={a} showJudgeScores={false} showFinalScore={revealed} />
             ))}
           </div>
         )}

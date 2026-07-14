@@ -15,7 +15,7 @@ export const metadata = { title: "My account" };
 
 interface ProfileRow {
   user_id: string;
-  role: "participant" | "referee" | "staff" | "admin";
+  role: "participant" | "referee" | "staff" | "admin" | "organizer" | "customer_support" | "audience";
   full_name: string | null;
   country: string | null;
   approved: boolean;
@@ -100,8 +100,8 @@ export default async function AccountPage({
     );
   }
 
-  // ── Staff / Admin ────────────────────────────────────────────────────────
-  if (profile.role === "staff" || profile.role === "admin") {
+  // ── Staff / Admin / Organizer / Customer Support ────────────────────────
+  if (["staff", "admin", "organizer", "customer_support"].includes(profile.role)) {
     return (
       <>
         <SiteHeader />
@@ -235,6 +235,37 @@ export default async function AccountPage({
           <div className="mt-6">
             <RefereeScoring refereeName={profile.full_name ?? "Judge"} refereeCountry={profile.country} items={items} />
           </div>
+          <div className="mt-4">{SignOutButton}</div>
+        </main>
+        <SiteFooter />
+      </>
+    );
+  }
+
+  // ── Audience / Spectator ─────────────────────────────────────────────────
+  if (profile.role === "audience") {
+    return (
+      <>
+        <SiteHeader />
+        <main className="mx-auto max-w-2xl px-4 py-10">
+          <h1 className="text-2xl font-bold">Audience / Spectator</h1>
+          {profile.approved ? (
+            <div className="mt-4 rounded-lg border border-green-300 bg-green-50 p-6">
+              <p className="font-semibold text-green-900">Your account is approved.</p>
+              <p className="mt-1 text-sm text-green-800">
+                Watch every submitted kata recording in{" "}
+                <Link href="/kata-arena" className="underline font-semibold">Kata Arena</Link>.
+              </p>
+            </div>
+          ) : (
+            <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-6">
+              <p className="font-semibold text-amber-900">Waiting for approval.</p>
+              <p className="mt-1 text-sm text-amber-800">
+                Your Audience / Spectator account activates once the organiser confirms your USD 10
+                sign-in (or your invitation code — enter it at sign-up next time).
+              </p>
+            </div>
+          )}
           <div className="mt-4">{SignOutButton}</div>
         </main>
         <SiteFooter />
