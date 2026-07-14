@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getSchools, getSenseis, schemaReady } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
-import { saveSensei, deleteSensei } from "@/app/actions/admin";
+import { saveSensei, deleteSensei, createInvitationCode } from "@/app/actions/admin";
 import { AdminShell, Card, CertificateField, adminBtn, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice } from "@/components/ui";
 
@@ -38,6 +38,23 @@ export default async function AdminSenseis({
 
   return (
     <AdminShell title="Senseis" active="/admin/senseis" flash={{ ok: params.ok, error: params.error }}>
+      <div className="mb-8">
+        <h2 className="mb-3 text-lg font-bold">Sensei / Coach invitation code</h2>
+        <Card>
+          <form action={createInvitationCode} className="flex flex-wrap items-end gap-3">
+            <input type="hidden" name="role" value="school" />
+            <input type="hidden" name="return_to" value="/admin/senseis" />
+            <div>
+              <label htmlFor="sensei_code_note" className={adminLabel}>Note (optional)</label>
+              <input id="sensei_code_note" name="note" className={adminInput} placeholder="e.g. Visiting instructors" />
+            </div>
+            <button type="submit" className={adminBtn}>Generate unlimited-use code</button>
+          </form>
+          <p className="mt-2 text-xs text-neutral-400">
+            Shared with Schools / Dojos too. Manage or deactivate codes in Admin → Accounts → Invitation codes.
+          </p>
+        </Card>
+      </div>
       <div className="grid gap-8 lg:grid-cols-2">
         <div>
           <h2 className="mb-3 text-lg font-bold">{editing ? "Edit sensei" : "Add sensei"}</h2>

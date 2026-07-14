@@ -31,6 +31,15 @@ export default async function AdminCompetitions({
     categoriesByCompetition.set(c.id, await getCategories(c.id));
   }
   const supabaseAdmin = await createClient();
+  const {
+    data: { user },
+  } = await supabaseAdmin.auth.getUser();
+  const { data: myProfile } = user
+    ? await supabaseAdmin.from("profiles").select("role").eq("user_id", user.id).maybeSingle()
+    : { data: null };
+  // Customer Support can view competitions/categories and merge Male/Female
+  // into Mix, but cannot create/edit/delete competitions or categories.
+  const isCustomerSupport = myProfile?.role === "customer_support";
   const allCategories = [...categoriesByCompetition.values()].flat();
   const categoryPaidCount = new Map<string, number>();
   if (allCategories.length > 0) {
@@ -56,7 +65,8 @@ export default async function AdminCompetitions({
       active="/admin/competitions"
       flash={{ ok: params.ok, error: params.error }}
     >
-      <div className="grid gap-8 lg:grid-cols-2">
+      <div className={isCustomerSupport ? "" : "grid gap-8 lg:grid-cols-2"}>
+        {!isCustomerSupport && (
         <div>
           <h2 className="mb-3 text-lg font-bold">{editing ? "Edit competition" : "Create competition"}</h2>
           <Card>
@@ -180,6 +190,7 @@ export default async function AdminCompetitions({
             </div>
           )}
         </div>
+        )}
 
         <div>
           <h2 className="mb-3 text-lg font-bold">All competitions</h2>
@@ -202,12 +213,14 @@ export default async function AdminCompetitions({
                         {" · deadline "}{formatDate(c.registration_deadline)}
                       </p>
                     </div>
-                    <Link
-                      href={`/admin/competitions?edit=${c.id}`}
-                      className="rounded border border-neutral-300 px-3 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
-                    >
-                      Edit
-                    </Link>
+                    {!isCustomerSupport && (
+                      <Link
+                        href={`/admin/competitions?edit=${c.id}`}
+                        className="rounded border border-neutral-300 px-3 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
+                      >
+                        Edit
+                      </Link>
+                    )}
                   </div>
                   <div className="mt-3 border-t border-neutral-100 pt-3">
                     <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-neutral-400">Categories</p>
@@ -251,18 +264,22 @@ export default async function AdminCompetitions({
                                             </button>
                                           </form>
                                         )}
-                                        <Link
-                                          href={`/admin/competitions?editcat=${cat.id}`}
-                                          className="rounded border border-neutral-300 px-2 py-0.5 text-xs text-neutral-600 hover:bg-neutral-50"
-                                        >
-                                          Edit
-                                        </Link>
-                                        <form action={deleteCategory}>
-                                          <input type="hidden" name="id" value={cat.id} />
-                                          <button className="rounded border border-red-200 px-2 py-0.5 text-xs text-red-600 hover:bg-red-50">
-                                            Delete
-                                          </button>
-                                        </form>
+                                        {!isCustomerSupport && (
+                                          <>
+                                            <Link
+                                              href={`/admin/competitions?editcat=${cat.id}`}
+                                              className="rounded border border-neutral-300 px-2 py-0.5 text-xs text-neutral-600 hover:bg-neutral-50"
+                                            >
+                                              Edit
+                                            </Link>
+                                            <form action={deleteCategory}>
+                                              <input type="hidden" name="id" value={cat.id} />
+                                              <button className="rounded border border-red-200 px-2 py-0.5 text-xs text-red-600 hover:bg-red-50">
+                                                Delete
+                                              </button>
+                                            </form>
+                                          </>
+                                        )}
                                       </span>
                                     </span>
                                   </li>

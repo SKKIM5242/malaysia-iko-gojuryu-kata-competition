@@ -30,11 +30,11 @@ export default async function AdminParticipants({
   ]);
   const editing = params.edit ? participants.find((p) => p.id === params.edit) : undefined;
 
+  const supabase = await createClient();
   // Signed links (1h) for certificate photos in the private bucket
   const certPaths = participants.map((p) => p.certificate_path).filter(Boolean) as string[];
   const certUrls = new Map<string, string>();
   if (certPaths.length > 0) {
-    const supabase = await createClient();
     const { data: signed } = await supabase.storage
       .from("certificates")
       .createSignedUrls(certPaths, 3600);
@@ -42,6 +42,13 @@ export default async function AdminParticipants({
       if (s.path && s.signedUrl) certUrls.set(s.path, s.signedUrl);
     }
   }
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { data: myProfile } = user
+    ? await supabase.from("profiles").select("role").eq("user_id", user.id).maybeSingle()
+    : { data: null };
+  const isCustomerSupport = myProfile?.role === "customer_support";
 
   return (
     <AdminShell
@@ -233,12 +240,14 @@ export default async function AdminParticipants({
                           >
                             Edit
                           </Link>
-                          <form action={deleteParticipant}>
-                            <input type="hidden" name="id" value={p.id} />
-                            <button className="rounded border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50">
-                              Delete
-                            </button>
-                          </form>
+                          {!isCustomerSupport && (
+                            <form action={deleteParticipant}>
+                              <input type="hidden" name="id" value={p.id} />
+                              <button className="rounded border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50">
+                                Delete
+                              </button>
+                            </form>
+                          )}
                         </div>
                       </td>
                     </tr>

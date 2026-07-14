@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { getAllRegistrations } from "@/lib/admin-data";
 import { schemaReady } from "@/lib/data";
-import { updatePaymentStatus, deleteRegistration } from "@/app/actions/admin";
-import { AdminShell, adminBtnSecondary } from "@/components/admin";
+import { createClient } from "@/lib/supabase/server";
+import { updatePaymentStatus, deleteRegistration, createInvitationCode } from "@/app/actions/admin";
+import { AdminShell, Card, adminBtn, adminBtnSecondary, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice, StatusBadge } from "@/components/ui";
 import type { PaymentStatus } from "@/lib/types";
 
@@ -32,12 +33,44 @@ export default async function AdminRegistrations({
   const rows = await getAllRegistrations(filter);
   const returnTo = `/admin/registrations${filter ? `?status=${filter}` : ""}`;
 
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { data: myProfile } = user
+    ? await supabase.from("profiles").select("role").eq("user_id", user.id).maybeSingle()
+    : { data: null };
+  const isCustomerSupport = myProfile?.role === "customer_support";
+
   return (
     <AdminShell
       title="Registrations"
       active="/admin/registrations"
       flash={{ ok: params.ok, error: params.error }}
     >
+      {isCustomerSupport && (
+        <div className="mb-6">
+          <h2 className="mb-3 text-lg font-bold">Generate invitation code</h2>
+          <Card>
+            <form action={createInvitationCode} className="flex flex-wrap items-end gap-3">
+              <div>
+                <label htmlFor="cs_code_role" className={adminLabel}>For</label>
+                <select id="cs_code_role" name="role" defaultValue="audience" className={adminInput}>
+                  <option value="audience">Audience / Spectator</option>
+                  <option value="referee">Referee / Judge</option>
+                  <option value="school">School / Dojo &amp; Sensei</option>
+                </select>
+              </div>
+              <div>
+                <label htmlFor="cs_max_uses" className={adminLabel}>Max uses (blank = unlimited)</label>
+                <input id="cs_max_uses" name="max_uses" type="number" min="1" className={`${adminInput} w-40`} />
+              </div>
+              <input type="hidden" name="return_to" value={returnTo} />
+              <button type="submit" className={adminBtn}>Generate code</button>
+            </form>
+          </Card>
+        </div>
+      )}
       <div className="mb-4 flex flex-wrap gap-2 text-sm">
         {STATUSES.map((s) => {
           const href = s === "all" ? "/admin/registrations" : `/admin/registrations?status=${s}`;
@@ -123,13 +156,15 @@ export default async function AdminRegistrations({
                           </button>
                         </form>
                       )}
-                      <form action={deleteRegistration}>
-                        <input type="hidden" name="id" value={r.id} />
-                        <input type="hidden" name="return_to" value={returnTo} />
-                        <button className="rounded border border-red-200 bg-white px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50">
-                          Delete
-                        </button>
-                      </form>
+                      {!isCustomerSupport && (
+                        <form action={deleteRegistration}>
+                          <input type="hidden" name="id" value={r.id} />
+                          <input type="hidden" name="return_to" value={returnTo} />
+                          <button className="rounded border border-red-200 bg-white px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50">
+                            Delete
+                          </button>
+                        </form>
+                      )}
                     </div>
                   </td>
                 </tr>

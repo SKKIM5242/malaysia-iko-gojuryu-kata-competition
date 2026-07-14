@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { schemaReady } from "@/lib/data";
-import { updateCommunityStatus, saveReferee, deleteReferee } from "@/app/actions/admin";
+import { updateCommunityStatus, saveReferee, deleteReferee, createInvitationCode } from "@/app/actions/admin";
 import { AdminShell, Card, CertificateField, adminBtn, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice } from "@/components/ui";
 
@@ -18,15 +18,6 @@ interface Referee {
   invitation_code: string | null;
   payment_status: string; status: string; created_at: string;
 }
-interface Audience {
-  id: string; full_name: string; email: string | null; phone: string | null;
-  home_country: string | null; invitation_code: string | null;
-  payment_status: string; created_at: string;
-}
-interface StaffApp {
-  id: string; full_name: string; email: string | null; phone: string | null;
-  role_requested: string; message: string | null; status: string; created_at: string;
-}
 
 function StatusButtons({
   table, id, field, current, options,
@@ -41,6 +32,7 @@ function StatusButtons({
           <input type="hidden" name="id" value={id} />
           <input type="hidden" name="field" value={field} />
           <input type="hidden" name="value" value={o} />
+          <input type="hidden" name="return_to" value="/admin/referees" />
           <button
             disabled={o === current}
             className={`rounded border px-2 py-0.5 text-xs font-semibold capitalize ${
@@ -57,7 +49,7 @@ function StatusButtons({
   );
 }
 
-export default async function AdminCommunity({
+export default async function AdminReferees({
   searchParams,
 }: {
   searchParams: Promise<{ editref?: string; ok?: string; error?: string }>;
@@ -66,18 +58,14 @@ export default async function AdminCommunity({
   const ready = await schemaReady();
   if (!ready) {
     return (
-      <AdminShell title="Community" active="/admin/community">
+      <AdminShell title="Referees / Judges" active="/admin/referees">
         <SetupNotice />
       </AdminShell>
     );
   }
 
   const supabase = await createClient();
-  const [{ data: referees }, { data: audiences }, { data: staff }] = await Promise.all([
-    supabase.from("referees").select("*").order("created_at", { ascending: false }),
-    supabase.from("audiences").select("*").order("created_at", { ascending: false }),
-    supabase.from("staff_applications").select("*").order("created_at", { ascending: false }),
-  ]);
+  const { data: referees } = await supabase.from("referees").select("*").order("created_at", { ascending: false });
   const refereeList = (referees as Referee[]) ?? [];
   const editing = params.editref ? refereeList.find((r) => r.id === params.editref) : undefined;
 
@@ -92,7 +80,26 @@ export default async function AdminCommunity({
   }
 
   return (
-    <AdminShell title="Community" active="/admin/community" flash={{ ok: params.ok, error: params.error }}>
+    <AdminShell title="Referees / Judges" active="/admin/referees" flash={{ ok: params.ok, error: params.error }}>
+      <div className="mb-8">
+        <h2 className="mb-3 text-lg font-bold">Referee / Judge invitation code</h2>
+        <Card>
+          <form action={createInvitationCode} className="flex flex-wrap items-end gap-3">
+            <input type="hidden" name="role" value="referee" />
+            <input type="hidden" name="return_to" value="/admin/referees" />
+            <div>
+              <label htmlFor="ref_code_note" className={adminLabel}>Note (optional)</label>
+              <input id="ref_code_note" name="note" className={adminInput} placeholder="e.g. July intake" />
+            </div>
+            <button type="submit" className={adminBtn}>Generate unlimited-use code</button>
+          </form>
+          <p className="mt-2 text-xs text-neutral-400">
+            Waives the USD 100 deposit for anyone who signs up as Referee / Judge with the code — unlimited uses.
+            Manage or deactivate codes in Admin → Accounts → Invitation codes.
+          </p>
+        </Card>
+      </div>
+
       <div className="grid gap-8 lg:grid-cols-2">
         <div>
           <h2 className="mb-3 text-lg font-bold">{editing ? "Edit referee / judge" : "Add referee / judge"}</h2>
@@ -186,7 +193,7 @@ export default async function AdminCommunity({
               <div className="flex gap-2">
                 <button type="submit" className={adminBtn}>{editing ? "Save changes" : "Add referee / judge"}</button>
                 {editing && (
-                  <Link href="/admin/community" className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-semibold text-neutral-600 hover:bg-neutral-50">
+                  <Link href="/admin/referees" className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-semibold text-neutral-600 hover:bg-neutral-50">
                     Cancel
                   </Link>
                 )}
@@ -242,7 +249,7 @@ export default async function AdminCommunity({
                     </div>
                     <div className="flex shrink-0 gap-1.5">
                       <Link
-                        href={`/admin/community?editref=${r.id}`}
+                        href={`/admin/referees?editref=${r.id}`}
                         className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
                       >
                         Edit
@@ -273,76 +280,6 @@ export default async function AdminCommunity({
           )}
         </div>
       </div>
-
-      <h2 className="mt-10 mb-3 text-lg font-bold">Audience / Spectators — USD 10 sign-in</h2>
-      {!audiences || audiences.length === 0 ? (
-        <EmptyState>No audience registrations yet.</EmptyState>
-      ) : (
-        <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white shadow-sm">
-          <table className="w-full min-w-[720px] text-left text-sm">
-            <thead className="border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
-              <tr>
-                <th className="px-3 py-2.5">Name</th>
-                <th className="px-3 py-2.5">Contact</th>
-                <th className="px-3 py-2.5">Country</th>
-                <th className="px-3 py-2.5">Code</th>
-                <th className="px-3 py-2.5">Payment</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-100">
-              {(audiences as Audience[]).map((a) => (
-                <tr key={a.id} className="hover:bg-neutral-50">
-                  <td className="px-3 py-2.5 font-medium">{a.full_name}</td>
-                  <td className="px-3 py-2.5 text-xs">{a.email}{a.phone ? ` · ${a.phone}` : ""}</td>
-                  <td className="px-3 py-2.5">{a.home_country ?? "—"}</td>
-                  <td className="px-3 py-2.5 font-mono text-xs">{a.invitation_code ?? "—"}</td>
-                  <td className="px-3 py-2.5">
-                    <StatusButtons table="audiences" id={a.id} field="payment_status" current={a.payment_status}
-                      options={["pending", "paid", "waived"]} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      <h2 className="mt-10 mb-3 text-lg font-bold">Admin / Organizer / Customer Support applications</h2>
-      {!staff || staff.length === 0 ? (
-        <EmptyState>No applications yet.</EmptyState>
-      ) : (
-        <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white shadow-sm">
-          <table className="w-full min-w-[720px] text-left text-sm">
-            <thead className="border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
-              <tr>
-                <th className="px-3 py-2.5">Name</th>
-                <th className="px-3 py-2.5">Contact</th>
-                <th className="px-3 py-2.5">Role</th>
-                <th className="px-3 py-2.5">Message</th>
-                <th className="px-3 py-2.5">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-100">
-              {(staff as StaffApp[]).map((s) => (
-                <tr key={s.id} className="align-top hover:bg-neutral-50">
-                  <td className="px-3 py-2.5 font-medium">{s.full_name}</td>
-                  <td className="px-3 py-2.5 text-xs">{s.email}<br />{s.phone}</td>
-                  <td className="px-3 py-2.5 capitalize">{s.role_requested.replace("_", " ")}</td>
-                  <td className="max-w-[240px] px-3 py-2.5 text-xs text-neutral-500">{s.message ?? "—"}</td>
-                  <td className="px-3 py-2.5">
-                    <StatusButtons table="staff_applications" id={s.id} field="status" current={s.status}
-                      options={["pending", "approved", "rejected"]} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-      <p className="mt-4 text-xs text-neutral-400">
-        Approving a staff application does not grant admin access by itself — create their login in
-        the Supabase dashboard (Authentication → Users) once approved.
-      </p>
     </AdminShell>
   );
 }

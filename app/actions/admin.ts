@@ -4,9 +4,10 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { writeAudit } from "@/lib/audit";
 import { kataBaseOf } from "@/lib/division";
-import { notifyRefereeAssignment } from "@/lib/notify";
+import { notifyRefereeAssignment, sendConfirmationEmail } from "@/lib/notify";
 import type { PaymentStatus } from "@/lib/types";
 
 /**
@@ -20,6 +21,35 @@ async function getActor() {
     data: { user },
   } = await supabase.auth.getUser();
   return { supabase, actorId: user?.id ?? null };
+}
+
+/** The caller's own role, read server-side from their session — never
+ * trust a role value supplied by the client for permission checks. */
+async function getActorRole(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  actorId: string | null,
+): Promise<string | null> {
+  if (!actorId) return null;
+  const { data } = await supabase
+    .from("profiles")
+    .select("role, approved")
+    .eq("user_id", actorId)
+    .maybeSingle();
+  return data?.approved ? data.role : null;
+}
+
+/** Customer Support has edit access to registrations/participants and can
+ * merge categories, but never delete anything or manage competitions —
+ * called at the top of every action that should reject them. */
+async function blockCustomerSupport(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  actorId: string | null,
+  returnTo: string,
+) {
+  const role = await getActorRole(supabase, actorId);
+  if (role === "customer_support") {
+    backTo(returnTo, { error: "Customer Support accounts cannot perform this action." });
+  }
 }
 
 function backTo(path: string, params: Record<string, string>) {
@@ -91,6 +121,7 @@ export async function deleteRegistration(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const returnTo = String(formData.get("return_to") ?? "/admin/registrations");
   const { supabase, actorId } = await getActor();
+  await blockCustomerSupport(supabase, actorId, returnTo);
   const { data: before } = await supabase
     .from("registrations")
     .select("*")
@@ -131,6 +162,7 @@ export async function saveCompetition(formData: FormData) {
   }
 
   const { supabase, actorId } = await getActor();
+  await blockCustomerSupport(supabase, actorId, returnTo);
   if (id) {
     const { data: before } = await supabase
       .from("competitions").select("*").eq("id", id).maybeSingle();
@@ -174,6 +206,7 @@ export async function saveCategory(formData: FormData) {
     backTo(returnTo, { error: "Max participants must be a number." });
   }
   const { supabase, actorId } = await getActor();
+  await blockCustomerSupport(supabase, actorId, returnTo);
   if (id) {
     const { error } = await supabase.from("categories").update(values).eq("id", id);
     if (error) backTo(returnTo, { error: "Could not update category." });
@@ -197,6 +230,7 @@ export async function deleteCategory(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const returnTo = "/admin/competitions";
   const { supabase, actorId } = await getActor();
+  await blockCustomerSupport(supabase, actorId, returnTo);
   const { error } = await supabase.from("categories").delete().eq("id", id);
   if (error) backTo(returnTo, { error: "Cannot delete — registrations reference this category." });
   await writeAudit(supabase, {
@@ -523,7 +557,7 @@ export async function updateCommunityStatus(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const field = String(formData.get("field") ?? "");
   const value = String(formData.get("value") ?? "");
-  const returnTo = "/admin/community";
+  const returnTo = String(formData.get("return_to") ?? "/admin/referees");
   const allowed: Record<string, Record<string, string[]>> = {
     referees: {
       payment_status: ["pending", "paid", "waived", "refunded", "forfeited"],
@@ -547,7 +581,7 @@ export async function updateCommunityStatus(formData: FormData) {
 
 export async function saveReferee(formData: FormData) {
   const id = String(formData.get("id") ?? "");
-  const returnTo = "/admin/community";
+  const returnTo = "/admin/referees";
   const values = {
     full_name: String(formData.get("full_name") ?? "").trim(),
     ic_passport: String(formData.get("ic_passport") ?? "").trim(),
@@ -602,7 +636,7 @@ export async function saveReferee(formData: FormData) {
 
 export async function deleteReferee(formData: FormData) {
   const id = String(formData.get("id") ?? "");
-  const returnTo = "/admin/community";
+  const returnTo = "/admin/referees";
   const { supabase, actorId } = await getActor();
   const { error } = await supabase.from("referees").delete().eq("id", id);
   if (error) backTo(returnTo, { error: "Could not delete referee." });
@@ -688,6 +722,7 @@ export async function deleteParticipant(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const returnTo = "/admin/participants";
   const { supabase, actorId } = await getActor();
+  await blockCustomerSupport(supabase, actorId, returnTo);
   const { error } = await supabase.from("participants").delete().eq("id", id);
   if (error) backTo(returnTo, { error: "Cannot delete — registrations reference this participant. Delete those first." });
   await writeAudit(supabase, {
@@ -714,14 +749,16 @@ export async function setProfileApproval(formData: FormData) {
 }
 
 export async function createInvitationCode(formData: FormData) {
-  const code = String(formData.get("code") ?? "").trim().toUpperCase();
   const role = String(formData.get("role") ?? "");
+  const providedCode = String(formData.get("code") ?? "").trim().toUpperCase();
   const note = String(formData.get("note") ?? "").trim() || null;
   const maxUsesRaw = String(formData.get("max_uses") ?? "").trim();
-  const returnTo = "/admin/accounts";
-  if (!code || !["referee", "staff", "any"].includes(role)) {
-    backTo(returnTo, { error: "Code and a valid role are required." });
+  const returnTo = String(formData.get("return_to") ?? "/admin/accounts");
+  if (!["referee", "staff", "audience", "school", "any"].includes(role)) {
+    backTo(returnTo, { error: "A valid role is required." });
   }
+  // "Generate" buttons don't ask for a custom code — mint a short random one.
+  const code = providedCode || `${role.toUpperCase()}-${crypto.randomUUID().slice(0, 6).toUpperCase()}`;
   const { supabase, actorId } = await getActor();
   const { data, error } = await supabase
     .from("invitation_codes")
@@ -733,7 +770,7 @@ export async function createInvitationCode(formData: FormData) {
     table_name: "invitation_codes", record_id: data!.id, action: "invitation_code_created",
     new_value: { code, role }, actor_id: actorId,
   });
-  backTo(returnTo, { ok: "Invitation code created." });
+  backTo(returnTo, { ok: `Invitation code created: ${code}` });
 }
 
 export async function toggleInvitationCode(formData: FormData) {
@@ -925,4 +962,77 @@ export async function autoAssignReferees(formData: FormData) {
       ? `Auto-assigned ${newAssignments.length} referee slot${newAssignments.length === 1 ? "" : "s"}.`
       : "Every recording already has its full panel of judges.",
   });
+}
+
+// ── Organizer / Customer Support account creation ───────────────────────────
+
+const ROLE_LABEL: Record<string, string> = {
+  organizer: "Admin / Organizer",
+  customer_support: "Customer Support",
+};
+
+/**
+ * Directly creates a real login (auth user + approved profile) for an
+ * Organizer or Customer Support account — no self-signup or invitation code
+ * involved. Gated server-side on the CALLER's own role (never on anything
+ * the client submits): only Super Admin may create Organizer accounts;
+ * Super Admin or an existing Organizer may create Customer Support accounts.
+ */
+export async function createStaffAccount(formData: FormData) {
+  const role = String(formData.get("role") ?? "");
+  const returnTo = role === "organizer" ? "/admin/organizers" : "/admin/support";
+  if (!["organizer", "customer_support"].includes(role)) {
+    backTo(returnTo, { error: "Invalid role." });
+  }
+  const full_name = String(formData.get("full_name") ?? "").trim();
+  const email = String(formData.get("email") ?? "").trim();
+  if (!full_name || !email) {
+    backTo(returnTo, { error: "Full name and email are required." });
+  }
+
+  const { supabase, actorId } = await getActor();
+  const actorRole = await getActorRole(supabase, actorId);
+  if (role === "organizer" && actorRole !== "admin") {
+    backTo(returnTo, { error: "Only the Super Admin can create Admin / Organizer accounts." });
+  }
+  if (role === "customer_support" && !["admin", "organizer", "staff"].includes(actorRole ?? "")) {
+    backTo(returnTo, { error: "Only Super Admin or Admin / Organizer can create Customer Support accounts." });
+  }
+
+  const tempPassword = crypto.randomUUID().replace(/-/g, "").slice(0, 14);
+  const admin = createAdminClient();
+  const { data: created, error } = await admin.auth.admin.createUser({
+    email,
+    password: tempPassword,
+    email_confirm: true,
+    user_metadata: { full_name, role },
+  });
+  if (error || !created.user) {
+    backTo(returnTo, { error: "Could not create the account — the email may already be registered." });
+  }
+  // handle_new_user already inserted a profiles row with approved=false;
+  // flip it here via the service-role client (never via client metadata).
+  await admin.from("profiles").update({ approved: true }).eq("user_id", created!.user!.id);
+
+  await writeAudit(supabase, {
+    table_name: "profiles",
+    record_id: created!.user!.id,
+    action: "staff_account_created",
+    new_value: { role, full_name, email },
+    actor_id: actorId,
+  });
+
+  await sendConfirmationEmail({
+    toEmail: email,
+    recipientName: full_name,
+    subject: `Your ${ROLE_LABEL[role]} account is ready`,
+    bodyLines: [
+      `An account has been created for you as ${ROLE_LABEL[role]}.`,
+      `Temporary password: ${tempPassword}`,
+      "Sign in and keep this password safe — there is currently no self-service password reset, contact the organiser if you need it changed.",
+    ],
+  });
+
+  revalidatePath(returnTo);
+  backTo(returnTo, { ok: `${ROLE_LABEL[role]} account created for ${full_name} — login details emailed.` });
 }

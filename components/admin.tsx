@@ -1,8 +1,32 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { signOut } from "@/app/actions/auth";
+import { createClient } from "@/lib/supabase/server";
 
-export function AdminShell({
+const FULL_NAV: Array<[string, string]> = [
+  ["Dashboard", "/admin"],
+  ["Registrations", "/admin/registrations"],
+  ["Competitions", "/admin/competitions"],
+  ["Announcements", "/admin/announcements"],
+  ["Schools", "/admin/schools"],
+  ["Senseis", "/admin/senseis"],
+  ["Participants", "/admin/participants"],
+  ["Referees", "/admin/referees"],
+  ["Audience", "/admin/audience"],
+  ["Organizers", "/admin/organizers"],
+  ["Support", "/admin/support"],
+  ["Judging", "/admin/judging"],
+  ["Classes", "/admin/classes"],
+  ["Accounts", "/admin/accounts"],
+];
+
+const CUSTOMER_SUPPORT_NAV: Array<[string, string]> = [
+  ["Registrations", "/admin/registrations"],
+  ["Participants", "/admin/participants"],
+  ["Competitions", "/admin/competitions"],
+];
+
+export async function AdminShell({
   title,
   active,
   children,
@@ -13,19 +37,21 @@ export function AdminShell({
   children: ReactNode;
   flash?: { ok?: string; error?: string };
 }) {
-  const nav = [
-    ["Dashboard", "/admin"],
-    ["Registrations", "/admin/registrations"],
-    ["Competitions", "/admin/competitions"],
-    ["Announcements", "/admin/announcements"],
-    ["Schools", "/admin/schools"],
-    ["Senseis", "/admin/senseis"],
-    ["Participants", "/admin/participants"],
-    ["Community", "/admin/community"],
-    ["Judging", "/admin/judging"],
-    ["Classes", "/admin/classes"],
-    ["Accounts", "/admin/accounts"],
-  ] as const;
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { data: profile } = user
+    ? await supabase.from("profiles").select("role").eq("user_id", user.id).maybeSingle()
+    : { data: null };
+  const role = profile?.role ?? null;
+
+  const nav =
+    role === "customer_support"
+      ? CUSTOMER_SUPPORT_NAV
+      : role === "organizer" || role === "staff"
+        ? FULL_NAV.filter(([, href]) => href !== "/admin/accounts" && href !== "/admin/judging")
+        : FULL_NAV;
   return (
     <div className="min-h-screen bg-neutral-100">
       <header className="border-b border-neutral-800 bg-neutral-950 text-white">

@@ -96,15 +96,15 @@ export default function AuthForms() {
               >
                 <option value="participant">Participant (record my kata)</option>
                 <option value="referee">Referee / Judge</option>
-                <option value="staff">Admin / Organizer / Customer Support</option>
               </select>
               <p className="mt-1 text-xs text-neutral-400">
-                Referee/Judge and Admin/Organizer/Customer Support accounts need the organiser&apos;s
-                approval before they activate — unless you have an invitation code below. Once
-                approved, sign-in is unlimited and free.
+                Referee/Judge accounts need the organiser&apos;s approval before they activate —
+                unless you have an invitation code below. Once approved, sign-in is unlimited and
+                free. Admin / Organizer and Customer Support accounts are created directly by the
+                organiser — there is no self-signup for those.
               </p>
             </div>
-            {(role === "referee" || role === "staff") && (
+            {role === "referee" && (
               <div>
                 <label htmlFor="auth_invite" className={labelCls}>Invitation code (optional)</label>
                 <input id="auth_invite" name="invite_code" className={inputCls} placeholder="e.g. IKO-JUDGE-2026" />

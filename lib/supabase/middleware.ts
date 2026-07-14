@@ -39,8 +39,14 @@ export async function updateSession(request: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser();
 
-    // Admin routes require an approved admin/staff session — a signed-in
+    // Admin routes require an approved admin-tier session — a signed-in
     // participant or referee must NOT reach /admin just by being logged in.
+    // Three tiers share /admin with different route allow-lists:
+    //   admin (Super Admin)      -> everything
+    //   organizer / staff        -> everything except /admin/accounts and
+    //                               /admin/judging
+    //   customer_support         -> only /admin/registrations,
+    //                               /admin/participants, /admin/competitions
     if (request.nextUrl.pathname.startsWith("/admin")) {
       if (!user) {
         const loginUrl = request.nextUrl.clone();
@@ -53,12 +59,31 @@ export async function updateSession(request: NextRequest) {
         .select("role, approved")
         .eq("user_id", user.id)
         .maybeSingle();
-      const isAdmin = profile && ["admin", "staff"].includes(profile.role) && profile.approved;
-      if (!isAdmin) {
+      const role = profile?.approved ? profile.role : null;
+      const path = request.nextUrl.pathname;
+      const toAccount = () => {
         const homeUrl = request.nextUrl.clone();
         homeUrl.pathname = "/account";
         homeUrl.search = "";
         return NextResponse.redirect(homeUrl);
+      };
+
+      if (role === "admin") {
+        // full access
+      } else if (role === "organizer" || role === "staff") {
+        if (path.startsWith("/admin/accounts") || path.startsWith("/admin/judging")) {
+          return toAccount();
+        }
+      } else if (role === "customer_support") {
+        const allowed = ["/admin/registrations", "/admin/participants", "/admin/competitions"];
+        if (!allowed.some((p) => path === p || path.startsWith(`${p}/`))) {
+          const redirectUrl = request.nextUrl.clone();
+          redirectUrl.pathname = "/admin/registrations";
+          redirectUrl.search = "";
+          return NextResponse.redirect(redirectUrl);
+        }
+      } else {
+        return toAccount();
       }
     }
     return response;

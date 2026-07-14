@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getSchools, schemaReady } from "@/lib/data";
-import { saveSchool, deleteSchool } from "@/app/actions/admin";
+import { saveSchool, deleteSchool, createInvitationCode } from "@/app/actions/admin";
 import { AdminShell, Card, adminBtn, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice } from "@/components/ui";
 
@@ -32,6 +32,23 @@ export default async function AdminSchools({
 
   return (
     <AdminShell title="Schools" active="/admin/schools" flash={{ ok: params.ok, error: params.error }}>
+      <div className="mb-8">
+        <h2 className="mb-3 text-lg font-bold">School / Dojo invitation code</h2>
+        <Card>
+          <form action={createInvitationCode} className="flex flex-wrap items-end gap-3">
+            <input type="hidden" name="role" value="school" />
+            <input type="hidden" name="return_to" value="/admin/schools" />
+            <div>
+              <label htmlFor="school_code_note" className={adminLabel}>Note (optional)</label>
+              <input id="school_code_note" name="note" className={adminInput} placeholder="e.g. Regional dojos" />
+            </div>
+            <button type="submit" className={adminBtn}>Generate unlimited-use code</button>
+          </form>
+          <p className="mt-2 text-xs text-neutral-400">
+            Shared with Senseis / Coaches too. Manage or deactivate codes in Admin → Accounts → Invitation codes.
+          </p>
+        </Card>
+      </div>
       <div className="grid gap-8 lg:grid-cols-2">
         <div>
           <h2 className="mb-3 text-lg font-bold">{editing ? "Edit school" : "Add school"}</h2>
