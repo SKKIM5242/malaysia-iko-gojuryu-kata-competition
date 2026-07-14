@@ -24,8 +24,12 @@ export default async function AdminDashboard() {
     ["Rejected", counts.registrations.rejected, "/admin/registrations?status=rejected"],
     ["Total registrations", counts.registrations.total, "/admin/registrations"],
     ["Participants", counts.participants, "/admin/participants"],
+    ["Referees / Judges", counts.referees, "/admin/referees"],
+    ["Audience / Spectators", counts.audiences, "/admin/audience"],
     ["Schools", counts.schools, "/admin/schools"],
     ["Senseis", counts.senseis, "/admin/senseis"],
+    ["Admin / Organizer applications", counts.staffApplications.organizer, "/admin/organizers"],
+    ["Customer Support applications", counts.staffApplications.customerSupport, "/admin/support"],
     ["Announcements", counts.announcements, "/admin/announcements"],
   ];
 

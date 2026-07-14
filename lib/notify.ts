@@ -108,3 +108,45 @@ export async function sendConfirmationEmail(input: ConfirmationEmailInput): Prom
   lines.push("", "— Malaysia Open IKO Goju-ryu Kata Championship");
   await sendEmail(input.toEmail, input.subject, lines.join("\n"));
 }
+
+const ANNOUNCEMENT_TELEGRAM_CATEGORIES: TelegramCategory[] = [
+  "participant", "school", "referee", "audience", "staff",
+];
+
+/** Posts to one group's "Announcements" topic. No-ops until that group's
+ * numeric chat id (TELEGRAM_CHAT_ID_<CATEGORY>) is configured — the invite
+ * links already set up (TELEGRAM_GROUP_<CATEGORY>) aren't enough for the Bot
+ * API, which needs the chat id. TELEGRAM_TOPIC_ANNOUNCEMENT_<CATEGORY> (the
+ * topic's message_thread_id) is optional — omitted, the message just posts
+ * to the group's General topic instead of a dedicated one. */
+async function postAnnouncementToGroup(
+  category: TelegramCategory,
+  title: string,
+  body: string | null,
+): Promise<void> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env[`TELEGRAM_CHAT_ID_${category.toUpperCase()}`];
+  if (!token || !chatId) return;
+  const threadId = process.env[`TELEGRAM_TOPIC_ANNOUNCEMENT_${category.toUpperCase()}`];
+  try {
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        ...(threadId ? { message_thread_id: Number(threadId) } : {}),
+        text: `📢 ${title}${body ? `\n\n${body}` : ""}`,
+      }),
+    });
+  } catch {
+    // Best-effort — publishing on the public site already succeeded either way.
+  }
+}
+
+/** Fires when an announcement is published (tick "visible on public site")
+ * — posts the same announcement into every group's Announcements topic. */
+export async function notifyAnnouncementPublished(title: string, body: string | null): Promise<void> {
+  await Promise.allSettled(
+    ANNOUNCEMENT_TELEGRAM_CATEGORIES.map((cat) => postAnnouncementToGroup(cat, title, body)),
+  );
+}

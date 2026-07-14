@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { writeAudit } from "@/lib/audit";
 import { kataBaseOf } from "@/lib/division";
-import { notifyRefereeAssignment, sendConfirmationEmail } from "@/lib/notify";
+import { notifyRefereeAssignment, sendConfirmationEmail, notifyAnnouncementPublished } from "@/lib/notify";
 import type { PaymentStatus } from "@/lib/types";
 
 /**
@@ -39,8 +39,9 @@ async function getActorRole(
 }
 
 /** Customer Support has edit access to registrations/participants and can
- * merge categories, but never delete anything or manage competitions —
- * called at the top of every action that should reject them. */
+ * merge/edit/delete categories, but never delete registrations/participants
+ * and never manages competitions — called at the top of every action that
+ * should reject them specifically. */
 async function blockCustomerSupport(
   supabase: Awaited<ReturnType<typeof createClient>>,
   actorId: string | null,
@@ -49,6 +50,19 @@ async function blockCustomerSupport(
   const role = await getActorRole(supabase, actorId);
   if (role === "customer_support") {
     backTo(returnTo, { error: "Customer Support accounts cannot perform this action." });
+  }
+}
+
+/** Only Admin/Organizer (and legacy "staff") may create or edit competitions
+ * — Referee and Customer Support get category-level access but not this. */
+async function requireCompetitionManager(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  actorId: string | null,
+  returnTo: string,
+) {
+  const role = await getActorRole(supabase, actorId);
+  if (!["admin", "organizer", "staff"].includes(role ?? "")) {
+    backTo(returnTo, { error: "Only Admin / Organizer can manage competitions." });
   }
 }
 
@@ -162,7 +176,7 @@ export async function saveCompetition(formData: FormData) {
   }
 
   const { supabase, actorId } = await getActor();
-  await blockCustomerSupport(supabase, actorId, returnTo);
+  await requireCompetitionManager(supabase, actorId, returnTo);
   if (id) {
     const { data: before } = await supabase
       .from("competitions").select("*").eq("id", id).maybeSingle();
@@ -206,7 +220,6 @@ export async function saveCategory(formData: FormData) {
     backTo(returnTo, { error: "Max participants must be a number." });
   }
   const { supabase, actorId } = await getActor();
-  await blockCustomerSupport(supabase, actorId, returnTo);
   if (id) {
     const { error } = await supabase.from("categories").update(values).eq("id", id);
     if (error) backTo(returnTo, { error: "Could not update category." });
@@ -230,7 +243,6 @@ export async function deleteCategory(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const returnTo = "/admin/competitions";
   const { supabase, actorId } = await getActor();
-  await blockCustomerSupport(supabase, actorId, returnTo);
   const { error } = await supabase.from("categories").delete().eq("id", id);
   if (error) backTo(returnTo, { error: "Cannot delete — registrations reference this category." });
   await writeAudit(supabase, {
@@ -336,6 +348,7 @@ export async function saveAnnouncement(formData: FormData) {
   };
   if (!values.title) backTo(returnTo, { error: "Title is required." });
   const { supabase, actorId } = await getActor();
+  let justPublished = false;
   if (id) {
     const { data: before } = await supabase
       .from("announcements").select("*").eq("id", id).maybeSingle();
@@ -345,6 +358,7 @@ export async function saveAnnouncement(formData: FormData) {
       table_name: "announcements", record_id: id, action: "announcement_updated",
       old_value: before, new_value: values, actor_id: actorId,
     });
+    justPublished = values.published && before?.published !== true;
   } else {
     const { data, error } = await supabase
       .from("announcements").insert(values).select("id").single();
@@ -353,7 +367,9 @@ export async function saveAnnouncement(formData: FormData) {
       table_name: "announcements", record_id: data!.id, action: "announcement_created",
       new_value: values, actor_id: actorId,
     });
+    justPublished = values.published;
   }
+  if (justPublished) await notifyAnnouncementPublished(values.title, values.body);
   revalidatePath("/");
   revalidatePath("/announcements");
   backTo(returnTo, { ok: "Announcement saved." });
@@ -364,6 +380,8 @@ export async function toggleAnnouncement(formData: FormData) {
   const publish = formData.get("publish") === "true";
   const returnTo = "/admin/announcements";
   const { supabase, actorId } = await getActor();
+  const { data: before } = await supabase
+    .from("announcements").select("title, body, published").eq("id", id).maybeSingle();
   const { error } = await supabase
     .from("announcements").update({ published: publish }).eq("id", id);
   if (error) backTo(returnTo, { error: "Could not change publish state." });
@@ -372,6 +390,9 @@ export async function toggleAnnouncement(formData: FormData) {
     action: publish ? "announcement_published" : "announcement_unpublished",
     new_value: { published: publish }, actor_id: actorId,
   });
+  if (publish && before && before.published !== true) {
+    await notifyAnnouncementPublished(before.title, before.body);
+  }
   revalidatePath("/");
   revalidatePath("/announcements");
   backTo(returnTo, { ok: publish ? "Announcement published." : "Announcement unpublished." });

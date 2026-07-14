@@ -12,7 +12,7 @@ import { createClient } from "@/lib/supabase/server";
 import { EmptyState, SetupNotice, SiteFooter, SiteHeader, formatDate, formatUSD } from "@/components/ui";
 import RegisterForm from "@/components/RegisterForm";
 import { paymentsEnabled } from "@/lib/payments";
-import { kataBases, groupByKata } from "@/lib/division";
+import { groupByKata } from "@/lib/division";
 
 export const dynamic = "force-dynamic";
 
@@ -129,6 +129,17 @@ export default async function RegisterPage({
     ? await Promise.all([getCategories(competition.id), getSchools(), getSenseis()])
     : [[], [], []];
 
+  const categoryTaken: Record<string, number> = {};
+  if (categories.length > 0) {
+    const supabase = await createClient();
+    const { data: counts } = await supabase.rpc("category_paid_counts", {
+      p_category_ids: categories.map((c) => c.id),
+    });
+    for (const row of (counts as Array<{ category_id: string; cnt: number }>) ?? []) {
+      categoryTaken[row.category_id] = row.cnt;
+    }
+  }
+
   return (
     <>
       <SiteHeader />
@@ -207,7 +218,8 @@ export default async function RegisterPage({
               </div>
               <RegisterForm
                 competition={competition}
-                kataBases={kataBases(categories)}
+                categories={categories}
+                categoryTaken={categoryTaken}
                 schools={schools}
                 senseis={senseis}
                 payOnline={paymentsEnabled() && Number(competition.registration_fee_usd ?? 0) > 0}

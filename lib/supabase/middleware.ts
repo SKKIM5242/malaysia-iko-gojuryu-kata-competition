@@ -40,13 +40,16 @@ export async function updateSession(request: NextRequest) {
     } = await supabase.auth.getUser();
 
     // Admin routes require an approved admin-tier session — a signed-in
-    // participant or referee must NOT reach /admin just by being logged in.
-    // Three tiers share /admin with different route allow-lists:
+    // participant must NOT reach /admin just by being logged in. Tiers share
+    // /admin with different route allow-lists:
     //   admin (Super Admin)      -> everything
     //   organizer / staff        -> everything except /admin/accounts and
     //                               /admin/judging
     //   customer_support         -> only /admin/registrations,
     //                               /admin/participants, /admin/competitions
+    //   referee                  -> only /admin/competitions (category-level
+    //                               actions there — the page itself hides
+    //                               competition-level create/edit for them)
     if (request.nextUrl.pathname.startsWith("/admin")) {
       if (!user) {
         const loginUrl = request.nextUrl.clone();
@@ -79,6 +82,13 @@ export async function updateSession(request: NextRequest) {
         if (!allowed.some((p) => path === p || path.startsWith(`${p}/`))) {
           const redirectUrl = request.nextUrl.clone();
           redirectUrl.pathname = "/admin/registrations";
+          redirectUrl.search = "";
+          return NextResponse.redirect(redirectUrl);
+        }
+      } else if (role === "referee") {
+        if (!(path === "/admin/competitions" || path.startsWith("/admin/competitions/"))) {
+          const redirectUrl = request.nextUrl.clone();
+          redirectUrl.pathname = "/admin/competitions";
           redirectUrl.search = "";
           return NextResponse.redirect(redirectUrl);
         }

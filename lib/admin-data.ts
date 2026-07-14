@@ -14,6 +14,9 @@ export interface AdminCounts {
   schools: number;
   senseis: number;
   announcements: number;
+  referees: number;
+  audiences: number;
+  staffApplications: { organizer: number; customerSupport: number };
 }
 
 export async function getAdminCounts(): Promise<AdminCounts> {
@@ -24,23 +27,36 @@ export async function getAdminCounts(): Promise<AdminCounts> {
     const { count: c } = await q;
     return c ?? 0;
   };
-  const [total, pending, paid, rejected, participants, schools, senseis, announcements] =
-    await Promise.all([
-      count("registrations"),
-      count("registrations", ["payment_status", "pending"]),
-      count("registrations", ["payment_status", "paid"]),
-      count("registrations", ["payment_status", "rejected"]),
-      count("participants"),
-      count("schools"),
-      count("senseis"),
-      count("announcements"),
-    ]);
+  const [
+    total, pending, paid, rejected, participants, schools, senseis, announcements,
+    referees, audiences, staffOrganizer, staffSupport,
+  ] = await Promise.all([
+    count("registrations"),
+    count("registrations", ["payment_status", "pending"]),
+    count("registrations", ["payment_status", "paid"]),
+    count("registrations", ["payment_status", "rejected"]),
+    count("participants"),
+    count("schools"),
+    count("senseis"),
+    count("announcements"),
+    count("referees"),
+    count("audiences"),
+    supabase
+      .from("staff_applications")
+      .select("id", { count: "exact", head: true })
+      .in("role_requested", ["admin", "organizer"])
+      .then((r) => r.count ?? 0),
+    count("staff_applications", ["role_requested", "customer_support"]),
+  ]);
   return {
     registrations: { total, pending, paid, rejected },
     participants,
     schools,
     senseis,
     announcements,
+    referees,
+    audiences,
+    staffApplications: { organizer: staffOrganizer, customerSupport: staffSupport },
   };
 }
 

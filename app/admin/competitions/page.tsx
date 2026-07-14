@@ -37,9 +37,10 @@ export default async function AdminCompetitions({
   const { data: myProfile } = user
     ? await supabaseAdmin.from("profiles").select("role").eq("user_id", user.id).maybeSingle()
     : { data: null };
-  // Customer Support can view competitions/categories and merge Male/Female
-  // into Mix, but cannot create/edit/delete competitions or categories.
-  const isCustomerSupport = myProfile?.role === "customer_support";
+  // Admin/Organizer/Referee/Customer Support can all merge-to-Mix and
+  // edit/delete categories here; only Admin/Organizer (and legacy "staff")
+  // may create or edit the competition itself.
+  const canManageCompetition = ["admin", "organizer", "staff"].includes(myProfile?.role ?? "");
   const allCategories = [...categoriesByCompetition.values()].flat();
   const categoryPaidCount = new Map<string, number>();
   if (allCategories.length > 0) {
@@ -65,63 +66,66 @@ export default async function AdminCompetitions({
       active="/admin/competitions"
       flash={{ ok: params.ok, error: params.error }}
     >
-      <div className={isCustomerSupport ? "" : "grid gap-8 lg:grid-cols-2"}>
-        {!isCustomerSupport && (
+      <div className="grid gap-8 lg:grid-cols-2">
         <div>
-          <h2 className="mb-3 text-lg font-bold">{editing ? "Edit competition" : "Create competition"}</h2>
-          <Card>
-            <form action={saveCompetition} className="space-y-4">
-              {editing && <input type="hidden" name="id" value={editing.id} />}
-              <div>
-                <label htmlFor="name" className={adminLabel}>Name *</label>
-                <input id="name" name="name" required defaultValue={editing?.name ?? ""} className={adminInput} />
-              </div>
-              <div>
-                <label htmlFor="venue" className={adminLabel}>Venue</label>
-                <input id="venue" name="venue" defaultValue={editing?.venue ?? ""} className={adminInput} />
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label htmlFor="event_date" className={adminLabel}>Event date</label>
-                  <input id="event_date" name="event_date" type="date" defaultValue={editing?.event_date ?? ""} className={adminInput} />
-                </div>
-                <div>
-                  <label htmlFor="registration_deadline" className={adminLabel}>Registration deadline</label>
-                  <input id="registration_deadline" name="registration_deadline" type="date" defaultValue={editing?.registration_deadline ?? ""} className={adminInput} />
-                </div>
-                <div>
-                  <label htmlFor="registration_fee_usd" className={adminLabel}>Fee (USD)</label>
-                  <input id="registration_fee_usd" name="registration_fee_usd" type="number" step="0.01" min="0" defaultValue={editing?.registration_fee_usd ?? ""} className={adminInput} />
-                </div>
-                <div>
-                  <label htmlFor="status" className={adminLabel}>Status</label>
-                  <select id="status" name="status" defaultValue={editing?.status ?? "draft"} className={adminInput}>
-                    <option value="draft">Draft</option>
-                    <option value="open">Open (registration live)</option>
-                    <option value="closed">Closed</option>
-                    <option value="completed">Completed</option>
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label htmlFor="description" className={adminLabel}>Description</label>
-                <textarea id="description" name="description" rows={3} defaultValue={editing?.description ?? ""} className={adminInput} />
-              </div>
-              <div className="flex gap-2">
-                <button type="submit" className={adminBtn}>
-                  {editing ? "Save changes" : "Create competition"}
-                </button>
-                {editing && (
-                  <Link href="/admin/competitions" className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-semibold text-neutral-600 hover:bg-neutral-50">
-                    Cancel
-                  </Link>
-                )}
-              </div>
-            </form>
-          </Card>
+          {canManageCompetition && (
+            <>
+              <h2 className="mb-3 text-lg font-bold">{editing ? "Edit competition" : "Create competition"}</h2>
+              <Card>
+                <form action={saveCompetition} className="space-y-4">
+                  {editing && <input type="hidden" name="id" value={editing.id} />}
+                  <div>
+                    <label htmlFor="name" className={adminLabel}>Name *</label>
+                    <input id="name" name="name" required defaultValue={editing?.name ?? ""} className={adminInput} />
+                  </div>
+                  <div>
+                    <label htmlFor="venue" className={adminLabel}>Venue</label>
+                    <input id="venue" name="venue" defaultValue={editing?.venue ?? ""} className={adminInput} />
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label htmlFor="event_date" className={adminLabel}>Event date</label>
+                      <input id="event_date" name="event_date" type="date" defaultValue={editing?.event_date ?? ""} className={adminInput} />
+                    </div>
+                    <div>
+                      <label htmlFor="registration_deadline" className={adminLabel}>Registration deadline</label>
+                      <input id="registration_deadline" name="registration_deadline" type="date" defaultValue={editing?.registration_deadline ?? ""} className={adminInput} />
+                    </div>
+                    <div>
+                      <label htmlFor="registration_fee_usd" className={adminLabel}>Fee (USD)</label>
+                      <input id="registration_fee_usd" name="registration_fee_usd" type="number" step="0.01" min="0" defaultValue={editing?.registration_fee_usd ?? ""} className={adminInput} />
+                    </div>
+                    <div>
+                      <label htmlFor="status" className={adminLabel}>Status</label>
+                      <select id="status" name="status" defaultValue={editing?.status ?? "draft"} className={adminInput}>
+                        <option value="draft">Draft</option>
+                        <option value="open">Open (registration live)</option>
+                        <option value="closed">Closed</option>
+                        <option value="completed">Completed</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label htmlFor="description" className={adminLabel}>Description</label>
+                    <textarea id="description" name="description" rows={3} defaultValue={editing?.description ?? ""} className={adminInput} />
+                  </div>
+                  <div className="flex gap-2">
+                    <button type="submit" className={adminBtn}>
+                      {editing ? "Save changes" : "Create competition"}
+                    </button>
+                    {editing && (
+                      <Link href="/admin/competitions" className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-semibold text-neutral-600 hover:bg-neutral-50">
+                        Cancel
+                      </Link>
+                    )}
+                  </div>
+                </form>
+              </Card>
+            </>
+          )}
 
           {editing && (
-            <div className="mt-6">
+            <div className={canManageCompetition ? "mt-6" : ""}>
               <h2 className="mb-3 text-lg font-bold">
                 {editingCategory ? `Edit category “${editingCategory.name}”` : `Add category to “${editing.name}”`}
               </h2>
@@ -190,7 +194,6 @@ export default async function AdminCompetitions({
             </div>
           )}
         </div>
-        )}
 
         <div>
           <h2 className="mb-3 text-lg font-bold">All competitions</h2>
@@ -213,7 +216,7 @@ export default async function AdminCompetitions({
                         {" · deadline "}{formatDate(c.registration_deadline)}
                       </p>
                     </div>
-                    {!isCustomerSupport && (
+                    {canManageCompetition && (
                       <Link
                         href={`/admin/competitions?edit=${c.id}`}
                         className="rounded border border-neutral-300 px-3 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
@@ -264,22 +267,18 @@ export default async function AdminCompetitions({
                                             </button>
                                           </form>
                                         )}
-                                        {!isCustomerSupport && (
-                                          <>
-                                            <Link
-                                              href={`/admin/competitions?editcat=${cat.id}`}
-                                              className="rounded border border-neutral-300 px-2 py-0.5 text-xs text-neutral-600 hover:bg-neutral-50"
-                                            >
-                                              Edit
-                                            </Link>
-                                            <form action={deleteCategory}>
-                                              <input type="hidden" name="id" value={cat.id} />
-                                              <button className="rounded border border-red-200 px-2 py-0.5 text-xs text-red-600 hover:bg-red-50">
-                                                Delete
-                                              </button>
-                                            </form>
-                                          </>
-                                        )}
+                                        <Link
+                                          href={`/admin/competitions?editcat=${cat.id}`}
+                                          className="rounded border border-neutral-300 px-2 py-0.5 text-xs text-neutral-600 hover:bg-neutral-50"
+                                        >
+                                          Edit
+                                        </Link>
+                                        <form action={deleteCategory}>
+                                          <input type="hidden" name="id" value={cat.id} />
+                                          <button className="rounded border border-red-200 px-2 py-0.5 text-xs text-red-600 hover:bg-red-50">
+                                            Delete
+                                          </button>
+                                        </form>
                                       </span>
                                     </span>
                                   </li>

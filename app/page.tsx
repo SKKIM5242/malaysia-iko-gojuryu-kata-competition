@@ -16,7 +16,8 @@ import {
   formatUSD,
 } from "@/components/ui";
 import { Markdown } from "@/lib/markdown";
-import { kataBases } from "@/lib/division";
+import { groupByKata } from "@/lib/division";
+import { createClient } from "@/lib/supabase/server";
 import type { Category } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -45,6 +46,16 @@ export default async function Home() {
   }
   const tierCap = (cats: Category[]): number | null =>
     cats.find((c) => c.gender === "male" && c.max_participants != null)?.max_participants ?? null;
+
+  const allCategoryIds = [...categoriesByCompetition.values()].flat().map((c) => c.id);
+  const categoryTaken = new Map<string, number>();
+  if (allCategoryIds.length > 0) {
+    const supabase = await createClient();
+    const { data: counts } = await supabase.rpc("category_paid_counts", { p_category_ids: allCategoryIds });
+    for (const row of (counts as Array<{ category_id: string; cnt: number }>) ?? []) {
+      categoryTaken.set(row.category_id, row.cnt);
+    }
+  }
 
   return (
     <>
@@ -144,11 +155,33 @@ export default async function Home() {
                           </>
                         )}
                       </p>
-                      <ol className="grid list-inside list-decimal gap-x-8 gap-y-2 rounded-lg border border-neutral-200 bg-white p-6 shadow-sm sm:grid-cols-2">
-                        {kataBases(cats).map((k) => (
-                          <li key={k} className="text-sm font-medium text-neutral-800">{k}</li>
+                      <div className="space-y-2">
+                        {groupByKata(cats).map(([base, subCats]) => (
+                          <details key={base} className="rounded-lg border border-neutral-200 bg-white shadow-sm">
+                            <summary className="cursor-pointer px-4 py-2.5 text-sm font-semibold text-neutral-800 hover:bg-neutral-50">
+                              {base} <span className="font-normal text-neutral-400">({subCats.length} sub-categories)</span>
+                            </summary>
+                            <ul className="space-y-1 px-4 pb-3">
+                              {subCats.map((cat) => {
+                                const taken = categoryTaken.get(cat.id) ?? 0;
+                                const left = cat.max_participants != null ? Math.max(0, cat.max_participants - taken) : null;
+                                return (
+                                  <li key={cat.id} className="flex items-center justify-between gap-2 text-sm">
+                                    <span className="text-neutral-600">
+                                      {cat.name.split(" — ").slice(1).join(" — ") || cat.name}
+                                    </span>
+                                    <span className={`shrink-0 text-xs whitespace-nowrap ${left === 0 ? "font-semibold text-red-600" : "text-neutral-400"}`}>
+                                      {cat.max_participants != null
+                                        ? `${taken}/${cat.max_participants} taken (${left} left)`
+                                        : `${taken} taken (no cap)`}
+                                    </span>
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          </details>
                         ))}
-                      </ol>
+                      </div>
                     </>
                   )}
                 </div>

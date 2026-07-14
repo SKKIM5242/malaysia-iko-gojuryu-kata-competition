@@ -1,10 +1,11 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { submitRegistration, type RegisterState } from "@/app/actions/register";
 import { OrganiserContact } from "@/components/ui";
-import type { Competition, School, Sensei } from "@/lib/types";
+import { ageAt, beltGroup, genderCode, kataBaseOf, kataBases as allKataBasesOf } from "@/lib/division";
+import type { Category, Competition, School, Sensei } from "@/lib/types";
 
 const initialState: RegisterState = { ok: false };
 
@@ -19,18 +20,53 @@ function FieldError({ message }: { message?: string }) {
 
 export default function RegisterForm({
   competition,
-  kataBases,
+  categories,
+  categoryTaken,
   schools,
   senseis,
   payOnline,
 }: {
   competition: Competition;
-  kataBases: string[];
+  categories: Category[];
+  categoryTaken: Record<string, number>;
   schools: School[];
   senseis: Sensei[];
   payOnline: boolean;
 }) {
   const [state, formAction, pending] = useActionState(submitRegistration, initialState);
+
+  const [dateOfBirth, setDateOfBirth] = useState("");
+  const [gender, setGender] = useState("");
+  const [beltRank, setBeltRank] = useState("");
+  const [kataBase, setKataBase] = useState("");
+
+  // Only shows kata events with a matching, non-full sub-category for the
+  // belt rank / date of birth / gender entered so far — resolveCategory()
+  // (server-side) uses the exact same matching rules.
+  const eligibleKataBases = useMemo(() => {
+    if (!beltRank.trim() || !dateOfBirth || !gender || Number.isNaN(Date.parse(dateOfBirth))) return [];
+    const age = ageAt(dateOfBirth, competition.event_date);
+    const grp = beltGroup(beltRank);
+    const genderVal = genderCode(gender);
+    const matching = categories.filter(
+      (c) =>
+        c.belt_group === grp &&
+        c.gender === genderVal &&
+        c.age_min != null &&
+        c.age_max != null &&
+        age >= c.age_min &&
+        age <= c.age_max &&
+        (c.max_participants == null || (categoryTaken[c.id] ?? 0) < c.max_participants),
+    );
+    const bases = new Set(matching.map((c) => kataBaseOf(c.name)));
+    return allKataBasesOf(categories).filter((k) => bases.has(k));
+  }, [beltRank, dateOfBirth, gender, categories, categoryTaken, competition.event_date]);
+
+  const detailsComplete = beltRank.trim() !== "" && dateOfBirth !== "" && gender !== "";
+
+  useEffect(() => {
+    if (kataBase && !eligibleKataBases.includes(kataBase)) setKataBase("");
+  }, [eligibleKataBases, kataBase]);
 
   if (state.ok && state.referenceId) {
     return (
@@ -81,13 +117,28 @@ export default function RegisterForm({
 
         <div>
           <label htmlFor="date_of_birth" className={labelCls}>Date of birth *</label>
-          <input id="date_of_birth" name="date_of_birth" type="date" required className={inputCls} />
+          <input
+            id="date_of_birth"
+            name="date_of_birth"
+            type="date"
+            required
+            value={dateOfBirth}
+            onChange={(e) => setDateOfBirth(e.target.value)}
+            className={inputCls}
+          />
           <FieldError message={err.date_of_birth} />
         </div>
 
         <div>
           <label htmlFor="gender" className={labelCls}>Gender *</label>
-          <select id="gender" name="gender" required className={inputCls} defaultValue="">
+          <select
+            id="gender"
+            name="gender"
+            required
+            className={inputCls}
+            value={gender}
+            onChange={(e) => setGender(e.target.value)}
+          >
             <option value="" disabled>Select gender</option>
             <option value="male">Male</option>
             <option value="female">Female</option>
@@ -97,7 +148,15 @@ export default function RegisterForm({
 
         <div>
           <label htmlFor="belt_rank" className={labelCls}>Belt rank *</label>
-          <input id="belt_rank" name="belt_rank" required className={inputCls} placeholder="e.g. 3rd Kyu, 1st Dan" />
+          <input
+            id="belt_rank"
+            name="belt_rank"
+            required
+            value={beltRank}
+            onChange={(e) => setBeltRank(e.target.value)}
+            className={inputCls}
+            placeholder="e.g. 3rd Kyu, 1st Dan"
+          />
           <FieldError message={err.belt_rank} />
         </div>
 
@@ -173,16 +232,38 @@ export default function RegisterForm({
 
         <div className="sm:col-span-2">
           <label htmlFor="kata_base" className={labelCls}>Kata event *</label>
-          <select id="kata_base" name="kata_base" required className={inputCls} defaultValue="">
-            <option value="" disabled>Select kata</option>
-            {kataBases.map((k) => (
+          <select
+            id="kata_base"
+            name="kata_base"
+            required
+            className={inputCls}
+            value={kataBase}
+            onChange={(e) => setKataBase(e.target.value)}
+            disabled={!detailsComplete}
+          >
+            <option value="" disabled>
+              {!detailsComplete
+                ? "Fill in belt rank, date of birth and gender first"
+                : eligibleKataBases.length === 0
+                  ? "No kata currently available for your belt / age / gender"
+                  : "Select kata"}
+            </option>
+            {eligibleKataBases.map((k) => (
               <option key={k} value={k}>{k}</option>
             ))}
           </select>
           <p className="mt-1 text-xs text-neutral-400">
-            Your belt sub-category (Color/Kyu Belt or Black Belt &amp; Dan Holders) and age group
-            (4–14, 15–40, 41–65, 66–99) are assigned automatically from your belt rank and date of birth.
+            Only shows kata events with an open sub-category matching your belt rank
+            (Color/Kyu Belt or Black Belt &amp; Dan Holders), age group (4–14, 15–40, 41–65, 66–99)
+            and gender — and that still has room.
           </p>
+          {detailsComplete && eligibleKataBases.length === 0 && (
+            <p className="mt-1 text-xs text-amber-600">
+              No open kata matches your belt rank, age and gender right now — every matching
+              sub-category may be full, or none exists for this combination yet. Contact the
+              organiser if this seems wrong.
+            </p>
+          )}
           <FieldError message={err.kata_base} />
         </div>
 

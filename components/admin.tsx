@@ -26,6 +26,8 @@ const CUSTOMER_SUPPORT_NAV: Array<[string, string]> = [
   ["Competitions", "/admin/competitions"],
 ];
 
+const REFEREE_NAV: Array<[string, string]> = [["Competitions", "/admin/competitions"]];
+
 export async function AdminShell({
   title,
   active,
@@ -49,9 +51,11 @@ export async function AdminShell({
   const nav =
     role === "customer_support"
       ? CUSTOMER_SUPPORT_NAV
-      : role === "organizer" || role === "staff"
-        ? FULL_NAV.filter(([, href]) => href !== "/admin/accounts" && href !== "/admin/judging")
-        : FULL_NAV;
+      : role === "referee"
+        ? REFEREE_NAV
+        : role === "organizer" || role === "staff"
+          ? FULL_NAV.filter(([, href]) => href !== "/admin/accounts" && href !== "/admin/judging")
+          : FULL_NAV;
   return (
     <div className="min-h-screen bg-neutral-100">
       <header className="border-b border-neutral-800 bg-neutral-950 text-white">
