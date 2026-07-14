@@ -141,36 +141,40 @@ export async function submitRegistration(
     }
   }
 
-  // Latest belt/rank certificate: optional photo/scan, uploaded to private
-  // storage before the registration is written (works for both the manual
-  // flow and the pay-first flow, where only the path travels in the draft).
+  // Latest belt/rank certificate: required for single-participant
+  // registration — uploaded to private storage before the registration is
+  // written (works for both the manual flow and the pay-first flow, where
+  // only the path travels in the draft). "Pending confirmation" is only
+  // ever set by a Sensei on the bulk registration path, never here.
   const certificate = formData.get("certificate");
-  values.certificate_path = "";
-  if (certificate instanceof File && certificate.size > 0) {
-    if (certificate.size > 10 * 1024 * 1024) {
-      return {
-        ok: false,
-        error: "Certificate file is too large (max 10 MB).",
-        fieldErrors: { certificate: "Max file size 10 MB" },
-      };
-    }
-    const ext = (certificate.name.split(".").pop() || "jpg").toLowerCase().slice(0, 5);
-    const path = `${crypto.randomUUID()}.${ext}`;
-    const { error: upErr } = await supabase.storage
-      .from("certificates")
-      .upload(path, certificate, { contentType: certificate.type || "image/jpeg" });
-    if (upErr) {
-      return {
-        ok: false,
-        error: "Could not upload the certificate. Please try again or submit without it.",
-        fieldErrors: { certificate: "Upload failed" },
-      };
-    }
-    values.certificate_path = path;
+  if (!(certificate instanceof File) || certificate.size === 0) {
+    return {
+      ok: false,
+      error: "Please fix the highlighted fields.",
+      fieldErrors: { certificate: "Latest rank certificate is required" },
+    };
   }
-  values.rank_confirmation = values.certificate_path
-    ? "certificate_uploaded"
-    : "pending_confirmation";
+  if (certificate.size > 10 * 1024 * 1024) {
+    return {
+      ok: false,
+      error: "Certificate file is too large (max 10 MB).",
+      fieldErrors: { certificate: "Max file size 10 MB" },
+    };
+  }
+  const ext = (certificate.name.split(".").pop() || "jpg").toLowerCase().slice(0, 5);
+  const path = `${crypto.randomUUID()}.${ext}`;
+  const { error: upErr } = await supabase.storage
+    .from("certificates")
+    .upload(path, certificate, { contentType: certificate.type || "image/jpeg" });
+  if (upErr) {
+    return {
+      ok: false,
+      error: "Could not upload the certificate. Please try again.",
+      fieldErrors: { certificate: "Upload failed" },
+    };
+  }
+  values.certificate_path = path;
+  values.rank_confirmation = "certificate_uploaded";
 
   // ── Pay-before-submit: when the gateway is configured and the competition
   // has a fee, no registration row is written yet. The validated payload is

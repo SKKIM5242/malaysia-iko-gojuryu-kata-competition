@@ -115,18 +115,19 @@ export default function RegisterForm({
 
         <div>
           <label htmlFor="certificate" className={labelCls}>
-            Latest rank certificate{" "}
+            Latest rank certificate *{" "}
             <span className="font-normal text-neutral-400">(photo or file — take a picture with your phone)</span>
           </label>
           <input
             id="certificate"
             name="certificate"
             type="file"
+            required
             accept="image/*,application/pdf"
             capture="environment"
             className="w-full rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm file:mr-3 file:rounded file:border-0 file:bg-neutral-900 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-white"
           />
-          <p className="mt-1 text-xs text-neutral-400">Max 10 MB. You can also submit now and send it later.</p>
+          <p className="mt-1 text-xs text-neutral-400">Max 10 MB.</p>
           <FieldError message={err.certificate} />
         </div>
 
