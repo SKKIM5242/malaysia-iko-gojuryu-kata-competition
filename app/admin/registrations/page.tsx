@@ -41,6 +41,9 @@ export default async function AdminRegistrations({
     ? await supabase.from("profiles").select("role").eq("user_id", user.id).maybeSingle()
     : { data: null };
   const isCustomerSupport = myProfile?.role === "customer_support";
+  const isReferee = myProfile?.role === "referee";
+  const canChangePayment = !isReferee;
+  const canDelete = !isCustomerSupport && !isReferee;
 
   return (
     <AdminShell
@@ -125,47 +128,51 @@ export default async function AdminRegistrations({
                   <td className="px-4 py-3 font-mono text-xs">{r.payment_reference ?? "—"}</td>
                   <td className="px-4 py-3"><StatusBadge status={r.payment_status} /></td>
                   <td className="px-4 py-3">
-                    <div className="flex flex-wrap gap-1.5">
-                      {r.payment_status !== "paid" && (
-                        <form action={updatePaymentStatus}>
-                          <input type="hidden" name="id" value={r.id} />
-                          <input type="hidden" name="status" value="paid" />
-                          <input type="hidden" name="return_to" value={returnTo} />
-                          <button className="rounded bg-green-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-green-500">
-                            Mark Paid
-                          </button>
-                        </form>
-                      )}
-                      {r.payment_status !== "rejected" && (
-                        <form action={updatePaymentStatus}>
-                          <input type="hidden" name="id" value={r.id} />
-                          <input type="hidden" name="status" value="rejected" />
-                          <input type="hidden" name="return_to" value={returnTo} />
-                          <button className="rounded bg-red-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-500">
-                            Reject
-                          </button>
-                        </form>
-                      )}
-                      {r.payment_status !== "pending" && (
-                        <form action={updatePaymentStatus}>
-                          <input type="hidden" name="id" value={r.id} />
-                          <input type="hidden" name="status" value="pending" />
-                          <input type="hidden" name="return_to" value={returnTo} />
-                          <button className="rounded border border-neutral-300 bg-white px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50">
-                            Set Pending
-                          </button>
-                        </form>
-                      )}
-                      {!isCustomerSupport && (
-                        <form action={deleteRegistration}>
-                          <input type="hidden" name="id" value={r.id} />
-                          <input type="hidden" name="return_to" value={returnTo} />
-                          <button className="rounded border border-red-200 bg-white px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50">
-                            Delete
-                          </button>
-                        </form>
-                      )}
-                    </div>
+                    {canChangePayment ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {r.payment_status !== "paid" && (
+                          <form action={updatePaymentStatus}>
+                            <input type="hidden" name="id" value={r.id} />
+                            <input type="hidden" name="status" value="paid" />
+                            <input type="hidden" name="return_to" value={returnTo} />
+                            <button className="rounded bg-green-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-green-500">
+                              Mark Paid
+                            </button>
+                          </form>
+                        )}
+                        {r.payment_status !== "rejected" && (
+                          <form action={updatePaymentStatus}>
+                            <input type="hidden" name="id" value={r.id} />
+                            <input type="hidden" name="status" value="rejected" />
+                            <input type="hidden" name="return_to" value={returnTo} />
+                            <button className="rounded bg-red-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-500">
+                              Reject
+                            </button>
+                          </form>
+                        )}
+                        {r.payment_status !== "pending" && (
+                          <form action={updatePaymentStatus}>
+                            <input type="hidden" name="id" value={r.id} />
+                            <input type="hidden" name="status" value="pending" />
+                            <input type="hidden" name="return_to" value={returnTo} />
+                            <button className="rounded border border-neutral-300 bg-white px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50">
+                              Set Pending
+                            </button>
+                          </form>
+                        )}
+                        {canDelete && (
+                          <form action={deleteRegistration}>
+                            <input type="hidden" name="id" value={r.id} />
+                            <input type="hidden" name="return_to" value={returnTo} />
+                            <button className="rounded border border-red-200 bg-white px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50">
+                              Delete
+                            </button>
+                          </form>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-neutral-400">View only</span>
+                    )}
                   </td>
                 </tr>
               ))}

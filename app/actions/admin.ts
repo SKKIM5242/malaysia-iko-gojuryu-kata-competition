@@ -66,6 +66,34 @@ async function requireCompetitionManager(
   }
 }
 
+/** Referee accounts can view registrations/participants but never change
+ * payment status or delete anything — called at the top of the actions that
+ * should reject them specifically. */
+async function blockReferee(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  actorId: string | null,
+  returnTo: string,
+) {
+  const role = await getActorRole(supabase, actorId);
+  if (role === "referee") {
+    backTo(returnTo, { error: "Referee / Judge accounts cannot perform this action." });
+  }
+}
+
+/** Judging Arena mutations (assign/unassign referees, set judges-required,
+ * auto-assign) are Super Admin only — Organizer, Customer Support, and
+ * Referee can view the arena but not configure it. */
+async function requireAdmin(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  actorId: string | null,
+  returnTo: string,
+) {
+  const role = await getActorRole(supabase, actorId);
+  if (role !== "admin") {
+    backTo(returnTo, { error: "Only the Super Admin can configure judging." });
+  }
+}
+
 function backTo(path: string, params: Record<string, string>) {
   const q = new URLSearchParams(params).toString();
   redirect(`${path}${q ? `?${q}` : ""}`);
@@ -103,6 +131,7 @@ export async function updatePaymentStatus(formData: FormData) {
     backTo(returnTo, { error: "Invalid payment status update." });
   }
   const { supabase, actorId } = await getActor();
+  await blockReferee(supabase, actorId, returnTo);
 
   const { data: before } = await supabase
     .from("registrations")
@@ -136,6 +165,7 @@ export async function deleteRegistration(formData: FormData) {
   const returnTo = String(formData.get("return_to") ?? "/admin/registrations");
   const { supabase, actorId } = await getActor();
   await blockCustomerSupport(supabase, actorId, returnTo);
+  await blockReferee(supabase, actorId, returnTo);
   const { data: before } = await supabase
     .from("registrations")
     .select("*")
@@ -767,6 +797,7 @@ export async function deleteParticipant(formData: FormData) {
   const returnTo = "/admin/participants";
   const { supabase, actorId } = await getActor();
   await blockCustomerSupport(supabase, actorId, returnTo);
+  await blockReferee(supabase, actorId, returnTo);
   const { error } = await supabase.from("participants").delete().eq("id", id);
   if (error) backTo(returnTo, { error: "Cannot delete — registrations reference this participant. Delete those first." });
   await writeAudit(supabase, {
@@ -873,6 +904,7 @@ export async function assignRefereeToVideo(formData: FormData) {
   const returnTo = String(formData.get("return_to") ?? "/admin/judging");
   if (!videoId || !refereeUserId) backTo(returnTo, { error: "Select a video and a referee." });
   const { supabase, actorId } = await getActor();
+  await requireAdmin(supabase, actorId, returnTo);
   const { error } = await supabase.rpc("assign_referee", { p_video: videoId, p_referee: refereeUserId });
   if (error) backTo(returnTo, { error: "Could not assign referee." });
   await writeAudit(supabase, {
@@ -888,6 +920,7 @@ export async function unassignRefereeFromVideo(formData: FormData) {
   const refereeUserId = String(formData.get("referee_user_id") ?? "");
   const returnTo = String(formData.get("return_to") ?? "/admin/judging");
   const { supabase, actorId } = await getActor();
+  await requireAdmin(supabase, actorId, returnTo);
   const { error } = await supabase.rpc("unassign_referee", { p_video: videoId, p_referee: refereeUserId });
   if (error) backTo(returnTo, { error: "Could not remove referee." });
   await writeAudit(supabase, {
@@ -905,6 +938,7 @@ export async function setJudgesRequired(formData: FormData) {
     backTo(returnTo, { error: "Enter a whole number of judges (1 or more)." });
   }
   const { supabase, actorId } = await getActor();
+  await requireAdmin(supabase, actorId, returnTo);
   const { error } = await supabase
     .from("competitions")
     .update({ judges_required: judgesRequired })
@@ -929,6 +963,7 @@ export async function autoAssignReferees(formData: FormData) {
   const returnTo = "/admin/judging";
   if (!competitionId) backTo(returnTo, { error: "Select a competition." });
   const { supabase, actorId } = await getActor();
+  await requireAdmin(supabase, actorId, returnTo);
 
   const { data: competition } = await supabase
     .from("competitions")

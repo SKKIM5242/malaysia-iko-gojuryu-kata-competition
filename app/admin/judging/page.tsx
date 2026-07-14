@@ -35,6 +35,14 @@ export default async function AdminJudging({
   }
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { data: myProfile } = user
+    ? await supabase.from("profiles").select("role").eq("user_id", user.id).maybeSingle()
+    : { data: null };
+  const isAdmin = myProfile?.role === "admin";
+
   const [competitions, { data: videos }, { data: referees }, { data: assignments }, { data: scores }] =
     await Promise.all([
       getAllCompetitions(),
@@ -125,12 +133,14 @@ export default async function AdminJudging({
                   <span className={score != null ? "text-green-700" : "text-amber-600"}>
                     {score != null ? score.toFixed(1) : "pending"}
                   </span>
-                  <form action={unassignRefereeFromVideo}>
-                    <input type="hidden" name="video_id" value={v.id} />
-                    <input type="hidden" name="referee_user_id" value={uid} />
-                    <input type="hidden" name="return_to" value="/admin/judging" />
-                    <button className="text-neutral-400 hover:text-red-600" title="Unassign">✕</button>
-                  </form>
+                  {isAdmin && (
+                    <form action={unassignRefereeFromVideo}>
+                      <input type="hidden" name="video_id" value={v.id} />
+                      <input type="hidden" name="referee_user_id" value={uid} />
+                      <input type="hidden" name="return_to" value="/admin/judging" />
+                      <button className="text-neutral-400 hover:text-red-600" title="Unassign">✕</button>
+                    </form>
+                  )}
                 </span>
               );
             })
@@ -143,7 +153,7 @@ export default async function AdminJudging({
           )}
         </div>
 
-        {available.length > 0 && (
+        {isAdmin && available.length > 0 && (
           <form action={assignRefereeToVideo} className="mt-3 flex flex-wrap items-center gap-2">
             <input type="hidden" name="video_id" value={v.id} />
             <input type="hidden" name="return_to" value="/admin/judging" />
@@ -227,30 +237,36 @@ export default async function AdminJudging({
                   {compVideos.length} recording{compVideos.length === 1 ? "" : "s"} submitted
                 </p>
               </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <form action={setJudgesRequired} className="flex items-center gap-1.5">
-                  <input type="hidden" name="competition_id" value={c.id} />
-                  <label htmlFor={`judges_${c.id}`} className="text-xs font-semibold text-neutral-500">
-                    Judges per recording
-                  </label>
-                  <input
-                    id={`judges_${c.id}`}
-                    name="judges_required"
-                    type="number"
-                    min={1}
-                    max={15}
-                    defaultValue={c.judges_required}
-                    className={`${adminInput} w-16 py-1 text-center`}
-                  />
-                  <button className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50">
-                    Save
-                  </button>
-                </form>
-                <form action={autoAssignReferees}>
-                  <input type="hidden" name="competition_id" value={c.id} />
-                  <button className={adminBtn}>Auto-assign referees</button>
-                </form>
-              </div>
+              {isAdmin ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <form action={setJudgesRequired} className="flex items-center gap-1.5">
+                    <input type="hidden" name="competition_id" value={c.id} />
+                    <label htmlFor={`judges_${c.id}`} className="text-xs font-semibold text-neutral-500">
+                      Judges per recording
+                    </label>
+                    <input
+                      id={`judges_${c.id}`}
+                      name="judges_required"
+                      type="number"
+                      min={1}
+                      max={15}
+                      defaultValue={c.judges_required}
+                      className={`${adminInput} w-16 py-1 text-center`}
+                    />
+                    <button className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50">
+                      Save
+                    </button>
+                  </form>
+                  <form action={autoAssignReferees}>
+                    <input type="hidden" name="competition_id" value={c.id} />
+                    <button className={adminBtn}>Auto-assign referees</button>
+                  </form>
+                </div>
+              ) : (
+                <span className="text-xs text-neutral-400">
+                  {c.judges_required} judge{c.judges_required === 1 ? "" : "s"} per recording · view only
+                </span>
+              )}
             </div>
             {compVideos.length === 0 ? (
               <EmptyState>No kata recordings submitted yet for this competition.</EmptyState>

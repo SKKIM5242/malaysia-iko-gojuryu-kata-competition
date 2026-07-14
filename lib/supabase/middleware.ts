@@ -43,13 +43,20 @@ export async function updateSession(request: NextRequest) {
     // participant must NOT reach /admin just by being logged in. Tiers share
     // /admin with different route allow-lists:
     //   admin (Super Admin)      -> everything
-    //   organizer / staff        -> everything except /admin/accounts and
-    //                               /admin/judging
-    //   customer_support         -> only /admin/registrations,
-    //                               /admin/participants, /admin/competitions
-    //   referee                  -> only /admin/competitions (category-level
-    //                               actions there — the page itself hides
-    //                               competition-level create/edit for them)
+    //   organizer / staff        -> everything except /admin/accounts;
+    //                               /admin/judging is reachable but the page
+    //                               itself only shows them a read-only view
+    //                               (no assign-referee / scoring-config UI)
+    //   customer_support         -> dashboard, registrations, participants,
+    //                               competitions, announcements, senseis,
+    //                               referees, audience, and judging
+    //                               (judging + registrations approve/reject
+    //                               are further narrowed at the page/action
+    //                               level — see app/actions/admin.ts)
+    //   referee                  -> dashboard, competitions (category-level
+    //                               actions there), registrations (view
+    //                               only), participants, announcements, and
+    //                               judging (view only)
     if (request.nextUrl.pathname.startsWith("/admin")) {
       if (!user) {
         const loginUrl = request.nextUrl.clone();
@@ -74,19 +81,28 @@ export async function updateSession(request: NextRequest) {
       if (role === "admin") {
         // full access
       } else if (role === "organizer" || role === "staff") {
-        if (path.startsWith("/admin/accounts") || path.startsWith("/admin/judging")) {
+        if (path.startsWith("/admin/accounts")) {
           return toAccount();
         }
       } else if (role === "customer_support") {
-        const allowed = ["/admin/registrations", "/admin/participants", "/admin/competitions"];
-        if (!allowed.some((p) => path === p || path.startsWith(`${p}/`))) {
+        const allowedPrefixes = [
+          "/admin/registrations", "/admin/participants", "/admin/competitions",
+          "/admin/announcements", "/admin/senseis", "/admin/referees", "/admin/audience", "/admin/judging",
+        ];
+        const ok = path === "/admin" || allowedPrefixes.some((p) => path === p || path.startsWith(`${p}/`));
+        if (!ok) {
           const redirectUrl = request.nextUrl.clone();
           redirectUrl.pathname = "/admin/registrations";
           redirectUrl.search = "";
           return NextResponse.redirect(redirectUrl);
         }
       } else if (role === "referee") {
-        if (!(path === "/admin/competitions" || path.startsWith("/admin/competitions/"))) {
+        const allowedPrefixes = [
+          "/admin/competitions", "/admin/registrations", "/admin/participants",
+          "/admin/announcements", "/admin/judging",
+        ];
+        const ok = path === "/admin" || allowedPrefixes.some((p) => path === p || path.startsWith(`${p}/`));
+        if (!ok) {
           const redirectUrl = request.nextUrl.clone();
           redirectUrl.pathname = "/admin/competitions";
           redirectUrl.search = "";

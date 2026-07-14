@@ -49,6 +49,8 @@ export default async function AdminParticipants({
     ? await supabase.from("profiles").select("role").eq("user_id", user.id).maybeSingle()
     : { data: null };
   const isCustomerSupport = myProfile?.role === "customer_support";
+  const isReferee = myProfile?.role === "referee";
+  const canDelete = !isCustomerSupport && !isReferee;
 
   return (
     <AdminShell
@@ -240,7 +242,7 @@ export default async function AdminParticipants({
                           >
                             Edit
                           </Link>
-                          {!isCustomerSupport && (
+                          {canDelete && (
                             <form action={deleteParticipant}>
                               <input type="hidden" name="id" value={p.id} />
                               <button className="rounded border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50">

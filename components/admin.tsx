@@ -21,12 +21,25 @@ const FULL_NAV: Array<[string, string]> = [
 ];
 
 const CUSTOMER_SUPPORT_NAV: Array<[string, string]> = [
+  ["Dashboard", "/admin"],
   ["Registrations", "/admin/registrations"],
-  ["Participants", "/admin/participants"],
   ["Competitions", "/admin/competitions"],
+  ["Announcements", "/admin/announcements"],
+  ["Senseis", "/admin/senseis"],
+  ["Participants", "/admin/participants"],
+  ["Referees", "/admin/referees"],
+  ["Audience", "/admin/audience"],
+  ["Judging", "/admin/judging"],
 ];
 
-const REFEREE_NAV: Array<[string, string]> = [["Competitions", "/admin/competitions"]];
+const REFEREE_NAV: Array<[string, string]> = [
+  ["Dashboard", "/admin"],
+  ["Registrations", "/admin/registrations"],
+  ["Competitions", "/admin/competitions"],
+  ["Announcements", "/admin/announcements"],
+  ["Participants", "/admin/participants"],
+  ["Judging", "/admin/judging"],
+];
 
 export async function AdminShell({
   title,
@@ -54,7 +67,7 @@ export async function AdminShell({
       : role === "referee"
         ? REFEREE_NAV
         : role === "organizer" || role === "staff"
-          ? FULL_NAV.filter(([, href]) => href !== "/admin/accounts" && href !== "/admin/judging")
+          ? FULL_NAV.filter(([, href]) => href !== "/admin/accounts")
           : FULL_NAV;
   return (
     <div className="min-h-screen bg-neutral-100">
