@@ -9,6 +9,7 @@ import { writeAudit } from "@/lib/audit";
 import { kataBaseOf } from "@/lib/division";
 import { notifyRefereeAssignment, sendConfirmationEmail, notifyAnnouncementPublished } from "@/lib/notify";
 import type { PaymentStatus } from "@/lib/types";
+import { parseCsvWithHeader, type CsvUploadResult } from "@/lib/csv-bulk";
 
 /**
  * Admin server actions. Sprint 3 runs these under the v1 open RLS policies;
@@ -1151,4 +1152,396 @@ export async function createStaffAccount(formData: FormData) {
 
   revalidatePath(returnTo);
   backTo(returnTo, { ok: `${ROLE_LABEL[role]} account created for ${full_name} — login details emailed.` });
+}
+
+// ── CSV bulk upload — Schools / Senseis / Referees / Audience / Staff ───────
+// Each mirrors the validation of its single-record "Add" action above, but
+// processes many rows from one CSV file, row by row, collecting per-row
+// failures instead of aborting the whole file on the first bad row.
+
+const SCHOOL_CSV_COLUMNS = [
+  "name", "state", "contact_title", "contact_name", "contact_karate_title", "contact_rank",
+  "home_address", "city_town", "home_country", "email", "phone",
+  "bank_name", "bank_account_no", "bank_account_name",
+] as const;
+
+export async function bulkUploadSchools(_prev: CsvUploadResult, formData: FormData): Promise<CsvUploadResult> {
+  const file = formData.get("csv_file");
+  if (!(file instanceof File) || file.size === 0) return { done: false, error: "Choose a CSV file to upload." };
+  if (file.size > 5 * 1024 * 1024) return { done: false, error: "CSV file too large (max 5 MB)." };
+
+  const parsed = parseCsvWithHeader(await file.text(), SCHOOL_CSV_COLUMNS);
+  if ("error" in parsed) return { done: false, error: parsed.error };
+  const { dataRows, get } = parsed;
+  if (dataRows.length === 0) return { done: false, error: "The CSV has no data rows." };
+  if (dataRows.length > 2000) return { done: false, error: "Maximum 2000 rows per upload." };
+
+  const { supabase, actorId } = await getActor();
+  const failures: Array<{ row: number; name: string; error: string }> = [];
+  let succeeded = 0;
+
+  for (let i = 0; i < dataRows.length; i++) {
+    const r = dataRows[i];
+    const rowNo = i + 2;
+    const name = get(r, "name") || `Row ${rowNo}`;
+    const record = {
+      name: get(r, "name"),
+      state: get(r, "state") || null,
+      contact_title: get(r, "contact_title") || null,
+      contact_name: get(r, "contact_name") || null,
+      contact_karate_title: get(r, "contact_karate_title") || null,
+      contact_rank: get(r, "contact_rank") || null,
+      home_address: get(r, "home_address") || null,
+      city_town: get(r, "city_town") || null,
+      home_country: get(r, "home_country") || null,
+      email: get(r, "email") || null,
+      phone: get(r, "phone") || null,
+      bank_name: get(r, "bank_name") || null,
+      bank_account_no: get(r, "bank_account_no") || null,
+      bank_account_name: get(r, "bank_account_name") || null,
+    };
+    if (!record.name) { failures.push({ row: rowNo, name, error: "School name is required" }); continue; }
+    if (!record.contact_title || !record.contact_name || !record.contact_karate_title || !record.contact_rank) {
+      failures.push({ row: rowNo, name, error: "Person in-charge's title, name, karate title, and rank are required" });
+      continue;
+    }
+    if (!record.home_address || !record.city_town || !record.home_country) {
+      failures.push({ row: rowNo, name, error: "Home address, city/town, and home country are required" });
+      continue;
+    }
+    if (!record.email || !record.phone) {
+      failures.push({ row: rowNo, name, error: "Email address and mobile phone are required" });
+      continue;
+    }
+    if (!record.bank_name || !record.bank_account_no || !record.bank_account_name) {
+      failures.push({ row: rowNo, name, error: "Bank name, account number, and account holder name are required" });
+      continue;
+    }
+    const { data: dup } = await supabase.from("schools").select("id").ilike("name", record.name).limit(1);
+    if (dup && dup.length > 0) { failures.push({ row: rowNo, name, error: "A school with this name already exists" }); continue; }
+
+    const { data, error } = await supabase
+      .from("schools")
+      .insert({ ...record, gender: record.contact_title === "Mr." ? "male" : "female" })
+      .select("id").single();
+    if (error) { failures.push({ row: rowNo, name, error: "Could not save" }); continue; }
+    await writeAudit(supabase, {
+      table_name: "schools", record_id: data!.id, action: "school_created", new_value: record, actor_id: actorId,
+    });
+    succeeded++;
+  }
+
+  await writeAudit(supabase, {
+    table_name: "schools", record_id: null, action: "bulk_csv_schools",
+    new_value: { rows: dataRows.length, succeeded, failed: failures.length }, actor_id: actorId,
+  });
+  revalidatePath("/admin/schools");
+  return { done: true, succeeded, failed: failures.length, failures: failures.slice(0, 50) };
+}
+
+const SENSEI_CSV_COLUMNS = [
+  "name", "ic_passport", "date_of_birth", "rank", "gender", "school_name",
+  "home_address", "city_town", "home_country", "email", "phone",
+  "bank_name", "bank_account_no", "bank_account_name",
+] as const;
+
+export async function bulkUploadSenseis(_prev: CsvUploadResult, formData: FormData): Promise<CsvUploadResult> {
+  const file = formData.get("csv_file");
+  if (!(file instanceof File) || file.size === 0) return { done: false, error: "Choose a CSV file to upload." };
+  if (file.size > 5 * 1024 * 1024) return { done: false, error: "CSV file too large (max 5 MB)." };
+
+  const parsed = parseCsvWithHeader(await file.text(), SENSEI_CSV_COLUMNS);
+  if ("error" in parsed) return { done: false, error: parsed.error };
+  const { dataRows, get } = parsed;
+  if (dataRows.length === 0) return { done: false, error: "The CSV has no data rows." };
+  if (dataRows.length > 2000) return { done: false, error: "Maximum 2000 rows per upload." };
+
+  const { supabase, actorId } = await getActor();
+  const { data: schools } = await supabase.from("schools").select("id, name");
+  const schoolIdByName = new Map((schools ?? []).map((s) => [s.name.trim().toLowerCase(), s.id]));
+
+  const failures: Array<{ row: number; name: string; error: string }> = [];
+  let succeeded = 0;
+
+  for (let i = 0; i < dataRows.length; i++) {
+    const r = dataRows[i];
+    const rowNo = i + 2;
+    const name = get(r, "name") || `Row ${rowNo}`;
+    const schoolName = get(r, "school_name");
+    let schoolId: string | null = null;
+    if (schoolName) {
+      schoolId = schoolIdByName.get(schoolName.trim().toLowerCase()) ?? null;
+      if (!schoolId) { failures.push({ row: rowNo, name, error: `School "${schoolName}" not found` }); continue; }
+    }
+    const gender = get(r, "gender").toLowerCase();
+    const record = {
+      name: get(r, "name"),
+      ic_passport: get(r, "ic_passport") || null,
+      date_of_birth: get(r, "date_of_birth") || null,
+      rank: get(r, "rank") || null,
+      gender: gender || null,
+      school_id: schoolId,
+      home_address: get(r, "home_address") || null,
+      city_town: get(r, "city_town") || null,
+      home_country: get(r, "home_country") || null,
+      email: get(r, "email") || null,
+      phone: get(r, "phone") || null,
+      bank_name: get(r, "bank_name") || null,
+      bank_account_no: get(r, "bank_account_no") || null,
+      bank_account_name: get(r, "bank_account_name") || null,
+    };
+    if (!record.name) { failures.push({ row: rowNo, name, error: "Sensei name is required" }); continue; }
+    if (!record.ic_passport) { failures.push({ row: rowNo, name, error: "IC / Passport is required" }); continue; }
+    if (!record.rank) { failures.push({ row: rowNo, name, error: "Rank is required" }); continue; }
+    if (!gender || !["male", "female"].includes(gender)) { failures.push({ row: rowNo, name, error: "Gender must be male or female" }); continue; }
+    if (!record.home_address || !record.city_town || !record.home_country) {
+      failures.push({ row: rowNo, name, error: "Home address, city/town, and home country are required" });
+      continue;
+    }
+    if (!record.email || !record.phone) {
+      failures.push({ row: rowNo, name, error: "Email address and mobile phone are required" });
+      continue;
+    }
+
+    let dupQuery = supabase.from("senseis").select("id").ilike("name", record.name).limit(1);
+    dupQuery = schoolId ? dupQuery.eq("school_id", schoolId) : dupQuery.is("school_id", null);
+    const { data: dup } = await dupQuery;
+    if (dup && dup.length > 0) { failures.push({ row: rowNo, name, error: "A sensei with this name (and school) already exists" }); continue; }
+
+    const { data, error } = await supabase.from("senseis").insert(record).select("id").single();
+    if (error) { failures.push({ row: rowNo, name, error: "Could not save" }); continue; }
+    await writeAudit(supabase, {
+      table_name: "senseis", record_id: data!.id, action: "sensei_created", new_value: record, actor_id: actorId,
+    });
+    succeeded++;
+  }
+
+  await writeAudit(supabase, {
+    table_name: "senseis", record_id: null, action: "bulk_csv_senseis",
+    new_value: { rows: dataRows.length, succeeded, failed: failures.length }, actor_id: actorId,
+  });
+  revalidatePath("/admin/senseis");
+  return { done: true, succeeded, failed: failures.length, failures: failures.slice(0, 50) };
+}
+
+const REFEREE_CSV_COLUMNS = [
+  "full_name", "ic_passport", "date_of_birth", "gender", "karate_rank", "judging_experience_count",
+  "school", "email", "phone", "home_address", "city_town", "home_country",
+  "bank_name", "bank_account_no", "bank_account_name",
+] as const;
+
+export async function bulkUploadReferees(_prev: CsvUploadResult, formData: FormData): Promise<CsvUploadResult> {
+  const file = formData.get("csv_file");
+  if (!(file instanceof File) || file.size === 0) return { done: false, error: "Choose a CSV file to upload." };
+  if (file.size > 5 * 1024 * 1024) return { done: false, error: "CSV file too large (max 5 MB)." };
+
+  const parsed = parseCsvWithHeader(await file.text(), REFEREE_CSV_COLUMNS);
+  if ("error" in parsed) return { done: false, error: parsed.error };
+  const { dataRows, get } = parsed;
+  if (dataRows.length === 0) return { done: false, error: "The CSV has no data rows." };
+  if (dataRows.length > 2000) return { done: false, error: "Maximum 2000 rows per upload." };
+
+  const { supabase, actorId } = await getActor();
+  const failures: Array<{ row: number; name: string; error: string }> = [];
+  let succeeded = 0;
+
+  for (let i = 0; i < dataRows.length; i++) {
+    const r = dataRows[i];
+    const rowNo = i + 2;
+    const full_name = get(r, "full_name") || `Row ${rowNo}`;
+    const experienceRaw = get(r, "judging_experience_count");
+    const record = {
+      full_name: get(r, "full_name"),
+      ic_passport: get(r, "ic_passport"),
+      date_of_birth: get(r, "date_of_birth") || null,
+      gender: get(r, "gender") || null,
+      karate_rank: get(r, "karate_rank") || null,
+      judging_experience_count: experienceRaw ? Number(experienceRaw) : null,
+      school: get(r, "school") || null,
+      email: get(r, "email") || null,
+      phone: get(r, "phone") || null,
+      home_address: get(r, "home_address") || null,
+      city_town: get(r, "city_town") || null,
+      home_country: get(r, "home_country") || null,
+      bank_name: get(r, "bank_name") || null,
+      bank_account_no: get(r, "bank_account_no") || null,
+      bank_account_name: get(r, "bank_account_name") || null,
+    };
+    if (!record.full_name || !record.ic_passport) {
+      failures.push({ row: rowNo, name: full_name, error: "Name and IC/passport are required" });
+      continue;
+    }
+    const { data, error } = await supabase.from("referees").insert(record).select("id").single();
+    if (error) { failures.push({ row: rowNo, name: full_name, error: "Could not save" }); continue; }
+    await writeAudit(supabase, {
+      table_name: "referees", record_id: data!.id, action: "referee_created_by_admin",
+      new_value: record, actor_id: actorId,
+    });
+    succeeded++;
+  }
+
+  await writeAudit(supabase, {
+    table_name: "referees", record_id: null, action: "bulk_csv_referees",
+    new_value: { rows: dataRows.length, succeeded, failed: failures.length }, actor_id: actorId,
+  });
+  revalidatePath("/admin/referees");
+  return { done: true, succeeded, failed: failures.length, failures: failures.slice(0, 50) };
+}
+
+const AUDIENCE_CSV_COLUMNS = ["full_name", "email", "phone", "home_country", "invitation_code", "payment_status"] as const;
+
+export async function bulkUploadAudience(_prev: CsvUploadResult, formData: FormData): Promise<CsvUploadResult> {
+  const file = formData.get("csv_file");
+  if (!(file instanceof File) || file.size === 0) return { done: false, error: "Choose a CSV file to upload." };
+  if (file.size > 5 * 1024 * 1024) return { done: false, error: "CSV file too large (max 5 MB)." };
+
+  const parsed = parseCsvWithHeader(await file.text(), AUDIENCE_CSV_COLUMNS);
+  if ("error" in parsed) return { done: false, error: parsed.error };
+  const { dataRows, get } = parsed;
+  if (dataRows.length === 0) return { done: false, error: "The CSV has no data rows." };
+  if (dataRows.length > 5000) return { done: false, error: "Maximum 5000 rows per upload." };
+
+  const { supabase, actorId } = await getActor();
+  const failures: Array<{ row: number; name: string; error: string }> = [];
+  let succeeded = 0;
+
+  for (let i = 0; i < dataRows.length; i++) {
+    const r = dataRows[i];
+    const rowNo = i + 2;
+    const full_name = get(r, "full_name") || `Row ${rowNo}`;
+    const statusRaw = get(r, "payment_status").toLowerCase() || "pending";
+    if (!["pending", "paid", "waived"].includes(statusRaw)) {
+      failures.push({ row: rowNo, name: full_name, error: "payment_status must be pending, paid, or waived" });
+      continue;
+    }
+    const record = {
+      full_name: get(r, "full_name"),
+      email: get(r, "email"),
+      phone: get(r, "phone") || null,
+      home_country: get(r, "home_country"),
+      invitation_code: get(r, "invitation_code") || null,
+      payment_status: statusRaw,
+    };
+    if (!record.full_name || !record.email || !record.home_country) {
+      failures.push({ row: rowNo, name: full_name, error: "Full name, email, and home country are required" });
+      continue;
+    }
+    const { data, error } = await supabase.from("audiences").insert(record).select("id").single();
+    if (error) { failures.push({ row: rowNo, name: full_name, error: "Could not save" }); continue; }
+    await writeAudit(supabase, {
+      table_name: "audiences", record_id: data!.id, action: "audience_created_by_admin",
+      new_value: record, actor_id: actorId,
+    });
+    succeeded++;
+  }
+
+  await writeAudit(supabase, {
+    table_name: "audiences", record_id: null, action: "bulk_csv_audience",
+    new_value: { rows: dataRows.length, succeeded, failed: failures.length }, actor_id: actorId,
+  });
+  revalidatePath("/admin/audience");
+  return { done: true, succeeded, failed: failures.length, failures: failures.slice(0, 50) };
+}
+
+const STAFF_CSV_COLUMNS = [
+  "full_name", "email", "ic_passport", "date_of_birth", "gender", "belt_rank",
+  "home_address", "city_town", "country", "phone",
+  "bank_name", "bank_account_no", "bank_account_name",
+] as const;
+
+/** Shared by bulkUploadOrganizers / bulkUploadSupport below — creates a real
+ * login + emails a temporary password per row, same as createStaffAccount
+ * above but looped over CSV rows. Capped far lower than the data-only bulk
+ * uploads (200 rows) since every row is a real account + an email sent. */
+async function bulkCreateStaffAccounts(formData: FormData, role: "organizer" | "customer_support"): Promise<CsvUploadResult> {
+  const returnTo = role === "organizer" ? "/admin/organizers" : "/admin/support";
+  const file = formData.get("csv_file");
+  if (!(file instanceof File) || file.size === 0) return { done: false, error: "Choose a CSV file to upload." };
+  if (file.size > 5 * 1024 * 1024) return { done: false, error: "CSV file too large (max 5 MB)." };
+
+  const parsed = parseCsvWithHeader(await file.text(), STAFF_CSV_COLUMNS);
+  if ("error" in parsed) return { done: false, error: parsed.error };
+  const { dataRows, get } = parsed;
+  if (dataRows.length === 0) return { done: false, error: "The CSV has no data rows." };
+  if (dataRows.length > 200) return { done: false, error: "Maximum 200 rows per upload — this creates a real login per row." };
+
+  const { supabase, actorId } = await getActor();
+  const actorRole = await getActorRole(supabase, actorId);
+  if (role === "organizer" && actorRole !== "admin") {
+    return { done: false, error: "Only the Super Admin can bulk-create Admin / Organizer accounts." };
+  }
+  if (role === "customer_support" && !["admin", "organizer", "staff"].includes(actorRole ?? "")) {
+    return { done: false, error: "Only Super Admin or Admin / Organizer can bulk-create Customer Support accounts." };
+  }
+
+  const admin = createAdminClient();
+  const failures: Array<{ row: number; name: string; error: string }> = [];
+  let succeeded = 0;
+
+  for (let i = 0; i < dataRows.length; i++) {
+    const r = dataRows[i];
+    const rowNo = i + 2;
+    const full_name = get(r, "full_name") || `Row ${rowNo}`;
+    const email = get(r, "email");
+    const ic_passport = get(r, "ic_passport");
+    if (!full_name || !email || !ic_passport) {
+      failures.push({ row: rowNo, name: full_name, error: "Full name, email, and IC/Passport are required" });
+      continue;
+    }
+    const extra = {
+      ic_passport,
+      date_of_birth: get(r, "date_of_birth") || null,
+      gender: get(r, "gender") || null,
+      belt_rank: get(r, "belt_rank") || null,
+      home_address: get(r, "home_address") || null,
+      city_town: get(r, "city_town") || null,
+      country: get(r, "country") || null,
+      phone: get(r, "phone") || null,
+      bank_name: get(r, "bank_name") || null,
+      bank_account_no: get(r, "bank_account_no") || null,
+      bank_account_name: get(r, "bank_account_name") || null,
+    };
+    const tempPassword = crypto.randomUUID().replace(/-/g, "").slice(0, 14);
+    const { data: created, error } = await admin.auth.admin.createUser({
+      email,
+      password: tempPassword,
+      email_confirm: true,
+      user_metadata: { full_name, role },
+    });
+    if (error || !created.user) {
+      failures.push({ row: rowNo, name: full_name, error: "Could not create account — email may already be registered" });
+      continue;
+    }
+    await admin.from("profiles").update({ approved: true, ...extra }).eq("user_id", created.user.id);
+    await writeAudit(supabase, {
+      table_name: "profiles", record_id: created.user.id, action: "staff_account_created",
+      new_value: { role, full_name, email, ...extra }, actor_id: actorId,
+    });
+    await sendConfirmationEmail({
+      toEmail: email,
+      recipientName: full_name,
+      subject: `Your ${ROLE_LABEL[role]} account is ready`,
+      bodyLines: [
+        `An account has been created for you as ${ROLE_LABEL[role]}.`,
+        `Temporary password: ${tempPassword}`,
+        "Sign in and keep this password safe — there is currently no self-service password reset, contact the organiser if you need it changed.",
+      ],
+    });
+    succeeded++;
+  }
+
+  await writeAudit(supabase, {
+    table_name: "profiles", record_id: null, action: "bulk_csv_staff_accounts",
+    new_value: { role, rows: dataRows.length, succeeded, failed: failures.length }, actor_id: actorId,
+  });
+  revalidatePath(returnTo);
+  return { done: true, succeeded, failed: failures.length, failures: failures.slice(0, 50) };
+}
+
+export async function bulkUploadOrganizers(_prev: CsvUploadResult, formData: FormData): Promise<CsvUploadResult> {
+  return bulkCreateStaffAccounts(formData, "organizer");
+}
+
+export async function bulkUploadSupport(_prev: CsvUploadResult, formData: FormData): Promise<CsvUploadResult> {
+  return bulkCreateStaffAccounts(formData, "customer_support");
 }

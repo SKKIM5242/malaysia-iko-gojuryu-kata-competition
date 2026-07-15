@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { getSchools, schemaReady } from "@/lib/data";
-import { saveSchool, deleteSchool, createInvitationCode } from "@/app/actions/admin";
+import { saveSchool, deleteSchool, createInvitationCode, bulkUploadSchools } from "@/app/actions/admin";
 import { AdminShell, Card, adminBtn, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
+import CsvUploadForm from "@/components/CsvUploadForm";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +50,13 @@ export default async function AdminSchools({
             Shared with Senseis / Coaches too. Manage or deactivate codes in Admin → Accounts → Invitation codes.
           </p>
         </Card>
+      </div>
+      <div className="mb-8">
+        <CsvUploadForm
+          action={bulkUploadSchools}
+          templateHref="/schools-template.csv"
+          entityLabel="school"
+        />
       </div>
       <div className="grid gap-8 lg:grid-cols-2">
         <div>

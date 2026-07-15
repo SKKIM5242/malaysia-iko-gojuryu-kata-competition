@@ -1,9 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { schemaReady } from "@/lib/data";
-import { updateCommunityStatus, createStaffAccount } from "@/app/actions/admin";
+import { updateCommunityStatus, createStaffAccount, bulkUploadOrganizers } from "@/app/actions/admin";
 import { AdminShell, Card, CertificateField, adminBtn, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
+import CsvUploadForm from "@/components/CsvUploadForm";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +48,14 @@ export default async function AdminOrganizers({
     <AdminShell title="Admin / Organizer" active="/admin/organizers" flash={{ ok: params.ok, error: params.error }}>
       {isSuperAdmin ? (
         <div className="mb-8">
+          <div className="mb-6">
+            <CsvUploadForm
+              action={bulkUploadOrganizers}
+              templateHref="/organizers-template.csv"
+              entityLabel="account"
+              note="Each row creates a real login instantly and emails a temporary password — max 200 rows per upload."
+            />
+          </div>
           <h2 className="mb-3 text-lg font-bold">Create an Admin / Organizer account</h2>
           <Card>
             <form action={createStaffAccount} className="space-y-4">

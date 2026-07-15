@@ -1,9 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { schemaReady } from "@/lib/data";
-import { updateCommunityStatus, createInvitationCode } from "@/app/actions/admin";
+import { updateCommunityStatus, createInvitationCode, bulkUploadAudience } from "@/app/actions/admin";
 import { AdminShell, Card, adminBtn, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
+import CsvUploadForm from "@/components/CsvUploadForm";
 
 export const dynamic = "force-dynamic";
 
@@ -84,6 +85,14 @@ export default async function AdminAudience({
             Manage or deactivate codes in Admin → Accounts → Invitation codes.
           </p>
         </Card>
+      </div>
+
+      <div className="mb-8">
+        <CsvUploadForm
+          action={bulkUploadAudience}
+          templateHref="/audience-template.csv"
+          entityLabel="audience member"
+        />
       </div>
 
       <h2 className="mb-3 text-lg font-bold">Audience / Spectators — USD 10 sign-in</h2>

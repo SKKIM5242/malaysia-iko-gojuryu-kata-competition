@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { schemaReady } from "@/lib/data";
-import { updateCommunityStatus, saveReferee, deleteReferee, createInvitationCode } from "@/app/actions/admin";
+import { updateCommunityStatus, saveReferee, deleteReferee, createInvitationCode, bulkUploadReferees } from "@/app/actions/admin";
 import { AdminShell, Card, CertificateField, adminBtn, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice, formatDate } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
+import CsvUploadForm from "@/components/CsvUploadForm";
 
 export const dynamic = "force-dynamic";
 
@@ -99,6 +100,15 @@ export default async function AdminReferees({
             Manage or deactivate codes in Admin → Accounts → Invitation codes.
           </p>
         </Card>
+      </div>
+
+      <div className="mb-8">
+        <CsvUploadForm
+          action={bulkUploadReferees}
+          templateHref="/referees-template.csv"
+          entityLabel="referee"
+          note="Certificates can't be uploaded via CSV — add one later via Edit."
+        />
       </div>
 
       <div className="grid gap-8 lg:grid-cols-2">
