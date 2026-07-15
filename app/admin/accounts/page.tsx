@@ -4,6 +4,7 @@ import { schemaReady } from "@/lib/data";
 import { setProfileApproval, createInvitationCode, toggleInvitationCode } from "@/app/actions/admin";
 import { AdminShell, Card, adminBtn, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice } from "@/components/ui";
+import DownloadCsvButton from "@/components/DownloadCsvButton";
 
 export const dynamic = "force-dynamic";
 
@@ -80,7 +81,21 @@ async function ApprovalsTab({ supabase }: { supabase: Awaited<ReturnType<typeof 
 
   return (
     <div>
-      <h2 className="mb-1 text-lg font-bold">Referee &amp; staff accounts</h2>
+      <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-lg font-bold">Referee &amp; staff accounts</h2>
+        {profiles.length > 0 && (
+          <DownloadCsvButton
+            filename="staff-accounts"
+            rows={profiles.map((p) => ({
+              Name: p.full_name ?? "",
+              Role: roleLabel[p.role] ?? p.role,
+              Country: p.country ?? "",
+              Email: p.email ?? "",
+              Status: p.approved ? "Approved" : "Pending",
+            }))}
+          />
+        )}
+      </div>
       <p className="mb-3 text-sm text-neutral-500">
         Assigning referees to recordings and viewing scores now lives on the{" "}
         <Link href="/admin/judging" className="font-semibold text-red-700 underline underline-offset-2">

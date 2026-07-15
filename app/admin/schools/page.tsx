@@ -158,6 +158,7 @@ export default async function AdminSchools({
           ) : (
             <FilterableTable
               rowKey="id"
+              downloadName="schools"
               columns={[
                 { key: "name", label: "Name" },
                 { key: "state", label: "State" },

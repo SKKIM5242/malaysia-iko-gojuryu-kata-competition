@@ -9,6 +9,7 @@ import {
 import { paymentsEnabled } from "@/lib/payments";
 import { AdminShell, Card, adminBtn, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice, formatDate } from "@/components/ui";
+import DownloadCsvButton from "@/components/DownloadCsvButton";
 import type { ClassEnrollment, ClassInvoice, FeePlan, Student } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -182,7 +183,21 @@ export default async function AdminClasses({
             </Card>
           </div>
           <div>
-            <h2 className="mb-3 text-lg font-bold">All students ({students.length})</h2>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-lg font-bold">All students ({students.length})</h2>
+              {students.length > 0 && (
+                <DownloadCsvButton
+                  filename="students"
+                  rows={students.map((s) => ({
+                    Name: s.full_name,
+                    Category: s.category,
+                    Email: s.email ?? "",
+                    Phone: s.phone ?? "",
+                    Status: s.status,
+                  }))}
+                />
+              )}
+            </div>
             {students.length === 0 ? (
               <EmptyState>No students yet — add your first student on the left.</EmptyState>
             ) : (

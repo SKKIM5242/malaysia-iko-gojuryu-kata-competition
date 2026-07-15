@@ -139,6 +139,7 @@ export default async function AdminOrganizers({
       ) : (
         <FilterableTable
           rowKey="id"
+          downloadName="organizer-applications"
           columns={[
             { key: "full_name", label: "Name" },
             { key: "contact", label: "Contact" },

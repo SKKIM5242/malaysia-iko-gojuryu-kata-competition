@@ -210,6 +210,7 @@ export default async function AdminReferees({
           ) : (
             <FilterableTable
               rowKey="id"
+              downloadName="referees"
               columns={[
                 { key: "full_name", label: "Name" },
                 { key: "ic_passport", label: "IC / Passport" },

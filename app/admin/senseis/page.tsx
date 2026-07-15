@@ -159,6 +159,7 @@ export default async function AdminSenseis({
           ) : (
             <FilterableTable
               rowKey="id"
+              downloadName="senseis"
               columns={[
                 { key: "name", label: "Name" },
                 { key: "ic_passport", label: "IC / Passport" },

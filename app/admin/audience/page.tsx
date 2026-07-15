@@ -92,6 +92,7 @@ export default async function AdminAudience({
       ) : (
         <FilterableTable
           rowKey="id"
+          downloadName="audience"
           columns={[
             { key: "full_name", label: "Name" },
             { key: "contact", label: "Contact" },

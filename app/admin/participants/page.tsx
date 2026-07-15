@@ -181,6 +181,7 @@ export default async function AdminParticipants({
           ) : (
             <FilterableTable
               rowKey="id"
+              downloadName="participants"
               columns={[
                 { key: "full_name", label: "Name" },
                 { key: "ic_passport", label: "IC / Passport" },

@@ -7,6 +7,7 @@ import {
 import { AdminShell, Card, adminBtn, adminInput } from "@/components/admin";
 import { CategoryName, EmptyState, SetupNotice, TelegramFullAccessLinks } from "@/components/ui";
 import VideoWatchButton from "@/components/VideoWatchButton";
+import DownloadCsvButton from "@/components/DownloadCsvButton";
 import { getAllTelegramLinks } from "@/lib/telegram";
 import { finalScore } from "@/lib/scoring";
 
@@ -179,6 +180,18 @@ export default async function AdminJudging({
           Every category&apos;s group, for the organiser&apos;s own reference.
         </p>
         <TelegramFullAccessLinks links={getAllTelegramLinks()} />
+      </div>
+
+      <div className="mb-3 flex justify-end">
+        <DownloadCsvButton
+          filename="judging-videos"
+          rows={videoList.map((v) => ({
+            Participant: v.participant?.full_name ?? "",
+            Category: v.registration?.category?.name ?? "",
+            Competition: competitions.find((c) => c.id === v.registration?.competition_id)?.name ?? "",
+            Submitted: v.created_at.slice(0, 10),
+          }))}
+        />
       </div>
 
       <h2 className="mb-3 text-lg font-bold">Referee workload</h2>

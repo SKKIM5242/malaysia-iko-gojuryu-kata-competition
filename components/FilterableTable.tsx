@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
+import DownloadCsvButton from "@/components/DownloadCsvButton";
 
 export interface FilterableColumn {
   key: string;
@@ -21,10 +22,13 @@ export default function FilterableTable({
   columns,
   rows,
   rowKey,
+  downloadName,
 }: {
   columns: FilterableColumn[];
   rows: Array<Record<string, CellValue>>;
   rowKey: string;
+  /** Filename (without extension) for the CSV download button. */
+  downloadName: string;
 }) {
   const [filters, setFilters] = useState<Record<string, string>>({});
 
@@ -40,11 +44,27 @@ export default function FilterableTable({
     );
   }, [rows, filters]);
 
+  const csvRows = useMemo(
+    () =>
+      filtered.map((row) => {
+        const out: Record<string, string> = {};
+        for (const c of columns) {
+          const cell = row[c.key];
+          if (typeof cell === "string") out[c.label] = cell;
+        }
+        return out;
+      }),
+    [filtered, columns],
+  );
+
   return (
     <div>
-      <p className="mb-2 text-xs text-neutral-400">
-        Showing {filtered.length} of {rows.length}. Filters combine (AND).
-      </p>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs text-neutral-400">
+          Showing {filtered.length} of {rows.length}. Filters combine (AND).
+        </p>
+        <DownloadCsvButton rows={csvRows} filename={downloadName} />
+      </div>
       <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white shadow-sm">
         <table className="w-full text-left text-sm" style={{ minWidth: `${columns.length * 150}px` }}>
           <thead className="border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">

@@ -4,6 +4,7 @@ import { schemaReady } from "@/lib/data";
 import { saveAnnouncement, toggleAnnouncement, deleteAnnouncement, moveAnnouncement } from "@/app/actions/admin";
 import { AdminShell, Card, adminBtn, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice, formatDate } from "@/components/ui";
+import DownloadCsvButton from "@/components/DownloadCsvButton";
 
 export const dynamic = "force-dynamic";
 
@@ -81,7 +82,20 @@ export default async function AdminAnnouncements({
         </div>
 
         <div>
-          <h2 className="mb-3 text-lg font-bold">All announcements</h2>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-lg font-bold">All announcements</h2>
+            {announcements.length > 0 && (
+              <DownloadCsvButton
+                filename="announcements"
+                rows={announcements.map((a) => ({
+                  Title: a.title,
+                  Competition: competitions.find((c) => c.id === a.competition_id)?.name ?? "",
+                  Published: a.published ? "Published" : "Draft",
+                  Created: formatDate(a.created_at.slice(0, 10)),
+                }))}
+              />
+            )}
+          </div>
           {announcements.length === 0 ? (
             <EmptyState>No announcements yet — write one on the left.</EmptyState>
           ) : (

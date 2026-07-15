@@ -254,7 +254,7 @@ export default async function AdminParticipantRecords() {
         {refereeRows.length === 0 ? (
           <EmptyState>No referee registrations yet.</EmptyState>
         ) : (
-          <FilterableTable columns={refereeColumns} rows={refereeRows} rowKey="id" />
+          <FilterableTable columns={refereeColumns} rows={refereeRows} rowKey="id" downloadName="referees" />
         )}
       </Section>
 
@@ -262,7 +262,7 @@ export default async function AdminParticipantRecords() {
         {audienceRows.length === 0 ? (
           <EmptyState>No audience registrations yet.</EmptyState>
         ) : (
-          <FilterableTable columns={audienceColumns} rows={audienceRows} rowKey="id" />
+          <FilterableTable columns={audienceColumns} rows={audienceRows} rowKey="id" downloadName="audience" />
         )}
       </Section>
 
@@ -270,7 +270,7 @@ export default async function AdminParticipantRecords() {
         {schoolRows.length === 0 ? (
           <EmptyState>No schools registered yet.</EmptyState>
         ) : (
-          <FilterableTable columns={schoolColumns} rows={schoolRows} rowKey="id" />
+          <FilterableTable columns={schoolColumns} rows={schoolRows} rowKey="id" downloadName="schools" />
         )}
       </Section>
 
@@ -278,7 +278,7 @@ export default async function AdminParticipantRecords() {
         {senseiRows.length === 0 ? (
           <EmptyState>No senseis registered yet.</EmptyState>
         ) : (
-          <FilterableTable columns={senseiColumns} rows={senseiRows} rowKey="id" />
+          <FilterableTable columns={senseiColumns} rows={senseiRows} rowKey="id" downloadName="senseis" />
         )}
       </Section>
 
@@ -286,7 +286,7 @@ export default async function AdminParticipantRecords() {
         {staffRows.length === 0 ? (
           <EmptyState>No staff accounts yet.</EmptyState>
         ) : (
-          <FilterableTable columns={staffColumns} rows={staffRows} rowKey="user_id" />
+          <FilterableTable columns={staffColumns} rows={staffRows} rowKey="user_id" downloadName="staff-accounts" />
         )}
       </Section>
     </AdminShell>

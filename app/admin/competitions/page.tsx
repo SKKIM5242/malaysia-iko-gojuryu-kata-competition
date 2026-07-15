@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { saveCompetition, saveCategory, deleteCategory, mergeCategoryToMix } from "@/app/actions/admin";
 import { AdminShell, Card, adminBtn, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, NoTranslate, SetupNotice, formatDate, formatUSD } from "@/components/ui";
+import DownloadCsvButton from "@/components/DownloadCsvButton";
 import { groupByKata } from "@/lib/division";
 import type { Category } from "@/lib/types";
 
@@ -196,7 +197,24 @@ export default async function AdminCompetitions({
         </div>
 
         <div>
-          <h2 className="mb-3 text-lg font-bold">All competitions</h2>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-lg font-bold">All competitions</h2>
+            {allCategories.length > 0 && (
+              <DownloadCsvButton
+                filename="categories"
+                rows={allCategories.map((cat) => ({
+                  Competition: competitions.find((c) => c.id === cat.competition_id)?.name ?? "",
+                  Category: cat.name,
+                  "Belt Group": cat.belt_group ?? "",
+                  Gender: cat.gender ?? "",
+                  "Age Min": String(cat.age_min ?? ""),
+                  "Age Max": String(cat.age_max ?? ""),
+                  Taken: String(categoryPaidCount.get(cat.id) ?? 0),
+                  Cap: cat.max_participants != null ? String(cat.max_participants) : "",
+                }))}
+              />
+            )}
+          </div>
           {competitions.length === 0 ? (
             <EmptyState>No competitions yet — create one on the left.</EmptyState>
           ) : (

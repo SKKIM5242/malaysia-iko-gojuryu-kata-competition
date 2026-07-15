@@ -136,6 +136,7 @@ export default async function AdminSupport({
       ) : (
         <FilterableTable
           rowKey="id"
+          downloadName="customer-support-applications"
           columns={[
             { key: "full_name", label: "Name" },
             { key: "contact", label: "Contact" },

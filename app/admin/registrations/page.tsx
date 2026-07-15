@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { updatePaymentStatus, deleteRegistration, createInvitationCode } from "@/app/actions/admin";
 import { AdminShell, Card, adminBtn, adminBtnSecondary, adminInput, adminLabel } from "@/components/admin";
 import { CategoryName, EmptyState, SetupNotice, StatusBadge } from "@/components/ui";
+import DownloadCsvButton from "@/components/DownloadCsvButton";
 import type { PaymentStatus } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -97,6 +98,22 @@ export default async function AdminRegistrations({
       {rows.length === 0 ? (
         <EmptyState>No registrations{filter ? ` with status "${filter}"` : ""} yet.</EmptyState>
       ) : (
+        <>
+        <div className="mb-2 flex justify-end">
+          <DownloadCsvButton
+            filename="registrations"
+            rows={rows.map((r) => ({
+              "Reference ID": r.id.slice(0, 8).toUpperCase(),
+              Participant: r.participant?.full_name ?? "",
+              "IC / Passport": r.participant?.ic_passport ?? "",
+              Category: r.category?.name ?? "",
+              Division: r.division ?? "",
+              School: r.participant?.school?.name ?? "",
+              "Payment Reference": r.payment_reference ?? "",
+              Status: r.payment_status,
+            }))}
+          />
+        </div>
         <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white shadow-sm">
           <table className="w-full min-w-[900px] text-left text-sm">
             <thead className="border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
@@ -179,6 +196,7 @@ export default async function AdminRegistrations({
             </tbody>
           </table>
         </div>
+        </>
       )}
       <p className="mt-4 text-xs text-neutral-400">
         Mark Paid only after sighting the bank transfer confirmation. Every change is written to the audit log.

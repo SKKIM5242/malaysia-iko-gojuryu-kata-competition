@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { CategoryName } from "@/components/ui";
 import VideoWatchButton from "@/components/VideoWatchButton";
+import DownloadCsvButton from "@/components/DownloadCsvButton";
 
 export interface ParticipantRecordRow {
   registrationId: string;
@@ -67,12 +68,25 @@ export default function ParticipantRecordsTable({ rows }: { rows: ParticipantRec
     );
   }, [rows, filters]);
 
+  const csvRows = useMemo(
+    () =>
+      filtered.map((row) => {
+        const out: Record<string, string> = {};
+        for (const c of COLUMNS) out[c.label] = String(row[c.key] ?? "");
+        return out;
+      }),
+    [filtered],
+  );
+
   return (
     <div>
-      <p className="mb-3 text-xs text-neutral-400">
-        Showing {filtered.length} of {rows.length} successful registrations. Type in any column&apos;s filter
-        box to narrow the list — filters combine (AND).
-      </p>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs text-neutral-400">
+          Showing {filtered.length} of {rows.length} successful registrations. Type in any column&apos;s filter
+          box to narrow the list — filters combine (AND).
+        </p>
+        <DownloadCsvButton rows={csvRows} filename="participants" />
+      </div>
       <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white shadow-sm">
         <table className="w-full min-w-[2200px] text-left text-sm">
           <thead className="border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
