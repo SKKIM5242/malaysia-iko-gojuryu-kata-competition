@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 declare global {
   interface Window {
@@ -63,10 +63,22 @@ function chunkText(text: string): string[] {
   return chunks;
 }
 
-const MALE_VOICE_HINTS = ["david", "mark", "guy", "daniel", "alex", "fred", "tom", "james", "george", "male"];
+// First names of common system voices across languages/platforms (Windows
+// SAPI, Edge/Azure neural voices, macOS voices) so gender curation works for
+// more than just English. Best-effort — coverage depends on what's actually
+// installed on the visitor's device.
+const MALE_VOICE_HINTS = [
+  "david", "mark", "guy", "daniel", "alex", "fred", "tom", "james", "george", "ryan", "conrad", "stefan",
+  "henri", "paul", "pablo", "alvaro", "diego", "antonio", "cosimo", "pavel", "dmitry", "naayf", "hamed",
+  "hemant", "madhur", "pattara", "niwat", "kangkang", "zhiwei", "yunyang", "yunxi", "ichiro", "keita",
+  "injoon", "andika", "nammin", "male",
+];
 const FEMALE_VOICE_HINTS = [
   "zira", "eva", "samantha", "victoria", "susan", "karen", "moira", "tessa", "fiona", "aria", "jenny",
-  "salli", "joanna", "kendra", "ivy", "female",
+  "salli", "joanna", "kendra", "ivy", "hazel", "sonia", "denise", "hedda", "katja", "helena", "laura",
+  "elvira", "elsa", "isabella", "maria", "helia", "francisca", "irina", "svetlana", "hoda", "salma",
+  "kalpana", "swara", "premwadee", "achara", "hoaimy", "gadis", "yating", "hanhan", "huihui", "yaoyao",
+  "xiaoxiao", "haruka", "nanami", "heami", "sunhi", "hortense", "julie", "female",
 ];
 
 function guessVoiceGender(name: string): "male" | "female" | "unknown" {
@@ -76,18 +88,25 @@ function guessVoiceGender(name: string): "male" | "female" | "unknown" {
   return "unknown";
 }
 
-/** Picks up to 2 male + 2 female voices (preferring English) to keep the
- * dropdown short. Falls back to whatever's installed if gender can't be
- * guessed from the voice name — the exact voices available always depend
- * on the visitor's own OS/browser, not on this app. */
-function curateVoices(all: SpeechSynthesisVoice[]): SpeechSynthesisVoice[] {
-  if (all.length === 0) return [];
-  const english = all.filter((v) => v.lang.toLowerCase().startsWith("en"));
-  const pool = english.length > 0 ? english : all;
-  const males = pool.filter((v) => guessVoiceGender(v.name) === "male").slice(0, 2);
-  const females = pool.filter((v) => guessVoiceGender(v.name) === "female").slice(0, 2);
+/** Strips platform branding ("Microsoft David - English (United States)" →
+ * "David") so the dropdown just shows the voice's given name. */
+function cleanVoiceLabel(name: string): string {
+  return name.replace(/^(Microsoft|Google|Apple)\s+/i, "").split(" - ")[0].trim();
+}
+
+/** Picks up to 2 male + 2 female voices that actually speak the given
+ * language (matched by BCP-47 prefix, e.g. "zh" matches "zh-CN"/"zh-TW") —
+ * so Read Aloud sounds like a native speaker of whatever the page is
+ * currently translated into, instead of an English voice mangling
+ * non-English text. Returns [] if no voice for that language is installed;
+ * callers should leave the browser's own default voice in charge then. */
+function curateVoicesForLanguage(all: SpeechSynthesisVoice[], langPrefix: string): SpeechSynthesisVoice[] {
+  const matches = all.filter((v) => v.lang.toLowerCase().startsWith(langPrefix.toLowerCase()));
+  if (matches.length === 0) return [];
+  const males = matches.filter((v) => guessVoiceGender(v.name) === "male").slice(0, 2);
+  const females = matches.filter((v) => guessVoiceGender(v.name) === "female").slice(0, 2);
   const curated = [...males, ...females];
-  return curated.length >= 2 ? curated : pool.slice(0, 6);
+  return curated.length > 0 ? curated : matches.slice(0, 4);
 }
 
 export default function AccessibilityToolbar() {
@@ -97,13 +116,14 @@ export default function AccessibilityToolbar() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [rate, setRate] = useState(1);
-  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [allVoices, setAllVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [selectedVoiceURI, setSelectedVoiceURI] = useState("");
 
   const queueRef = useRef<string[]>([]);
   const indexRef = useRef(0);
   const rateRef = useRef(1);
   const voiceRef = useRef<SpeechSynthesisVoice | null>(null);
+  const selectedLangRef = useRef("en");
   const keepAliveRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -111,20 +131,32 @@ export default function AccessibilityToolbar() {
   }, [rate]);
 
   useEffect(() => {
-    voiceRef.current = voices.find((v) => v.voiceURI === selectedVoiceURI) ?? null;
-  }, [voices, selectedVoiceURI]);
-
-  useEffect(() => {
     if (typeof window === "undefined" || !window.speechSynthesis) return;
-    const loadVoices = () => {
-      const curated = curateVoices(window.speechSynthesis.getVoices());
-      setVoices(curated);
-      setSelectedVoiceURI((prev) => prev || curated[0]?.voiceURI || "");
-    };
+    const loadVoices = () => setAllVoices(window.speechSynthesis.getVoices());
     loadVoices();
     window.speechSynthesis.addEventListener("voiceschanged", loadVoices);
     return () => window.speechSynthesis.removeEventListener("voiceschanged", loadVoices);
   }, []);
+
+  const langPrefix = selectedLang.split("-")[0];
+  const curatedVoices = useMemo(
+    () => curateVoicesForLanguage(allVoices, langPrefix),
+    [allVoices, langPrefix]
+  );
+
+  useEffect(() => {
+    selectedLangRef.current = selectedLang;
+  }, [selectedLang]);
+
+  useEffect(() => {
+    setSelectedVoiceURI((prev) =>
+      curatedVoices.some((v) => v.voiceURI === prev) ? prev : curatedVoices[0]?.voiceURI ?? ""
+    );
+  }, [curatedVoices]);
+
+  useEffect(() => {
+    voiceRef.current = curatedVoices.find((v) => v.voiceURI === selectedVoiceURI) ?? null;
+  }, [curatedVoices, selectedVoiceURI]);
 
   const stopKeepAlive = useCallback(() => {
     if (keepAliveRef.current) clearInterval(keepAliveRef.current);
@@ -155,6 +187,7 @@ export default function AccessibilityToolbar() {
     }
     const utterance = new SpeechSynthesisUtterance(queue[idx]);
     utterance.rate = rateRef.current;
+    utterance.lang = selectedLangRef.current;
     if (voiceRef.current) utterance.voice = voiceRef.current;
     utterance.onend = () => {
       indexRef.current += 1;
@@ -312,11 +345,11 @@ export default function AccessibilityToolbar() {
               Select some text on the page first to read just that part — otherwise the whole page is read.
             </p>
 
-            {voices.length > 0 && (
-              <div className="mt-2.5">
-                <label htmlFor="a11y-voice-select" className="mb-1 block text-[11px] font-semibold text-neutral-500">
-                  Voice Selection
-                </label>
+            <div className="mt-2.5">
+              <label htmlFor="a11y-voice-select" className="mb-1 block text-[11px] font-semibold text-neutral-500">
+                Voice Selection
+              </label>
+              {curatedVoices.length > 0 ? (
                 <select
                   id="a11y-voice-select"
                   value={selectedVoiceURI}
@@ -324,14 +357,18 @@ export default function AccessibilityToolbar() {
                   title="Choose a reading voice"
                   className="w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
                 >
-                  {voices.map((v) => (
+                  {curatedVoices.map((v) => (
                     <option key={v.voiceURI} value={v.voiceURI}>
-                      {v.name}
+                      {current.flag} {cleanVoiceLabel(v.name)}
                     </option>
                   ))}
                 </select>
-              </div>
-            )}
+              ) : (
+                <p className="text-[11px] text-neutral-400">
+                  No {current.label} voice installed on this device — using the browser&apos;s default voice.
+                </p>
+              )}
+            </div>
           </div>
 
           <div>
