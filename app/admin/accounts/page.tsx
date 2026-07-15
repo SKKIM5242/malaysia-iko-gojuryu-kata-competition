@@ -1,16 +1,18 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { schemaReady } from "@/lib/data";
-import { setProfileApproval, createInvitationCode, toggleInvitationCode } from "@/app/actions/admin";
+import { setProfileApproval, createInvitationCode, toggleInvitationCode, publishAccessMatrixAnnouncement } from "@/app/actions/admin";
 import { AdminShell, Card, adminBtn, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice } from "@/components/ui";
 import DownloadCsvButton from "@/components/DownloadCsvButton";
+import { ACCESS_MATRIX } from "@/lib/access-matrix";
 
 export const dynamic = "force-dynamic";
 
 const TABS = [
   ["approvals", "Approvals"],
   ["codes", "Invitation codes"],
+  ["access", "Access Matrix"],
 ] as const;
 
 interface ProfileRow {
@@ -61,7 +63,58 @@ export default async function AdminAccounts({
 
       {tab === "approvals" && <ApprovalsTab supabase={supabase} />}
       {tab === "codes" && <CodesTab supabase={supabase} />}
+      {tab === "access" && <AccessMatrixTab />}
     </AdminShell>
+  );
+}
+
+function AccessMatrixTab() {
+  return (
+    <div>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="text-lg font-bold">Access Matrix</h2>
+          <p className="text-sm text-neutral-500">
+            What each role can actually do, read straight from the route gating and server-action
+            guards in the code — not a description of intent.
+          </p>
+        </div>
+        <form action={publishAccessMatrixAnnouncement}>
+          <button type="submit" className={adminBtn}>Publish as announcement</button>
+        </form>
+      </div>
+      <p className="mb-4 text-xs text-neutral-400">
+        This creates a new draft announcement for you to review and publish — republish whenever
+        access rules change so the posted copy stays current.
+      </p>
+      <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white shadow-sm">
+        <table className="w-full min-w-[720px] text-left text-sm">
+          <thead className="border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
+            <tr>
+              <th className="px-3 py-2">Resource</th>
+              <th className="px-3 py-2">Admin</th>
+              <th className="px-3 py-2">Organizer / Staff</th>
+              <th className="px-3 py-2">Customer Support</th>
+              <th className="px-3 py-2">Referee / Judge</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-neutral-100">
+            {ACCESS_MATRIX.map((row) => (
+              <tr key={row.resource} className="align-top hover:bg-neutral-50">
+                <td className="px-3 py-2 font-medium">
+                  {row.resource}
+                  {row.note && <p className="mt-1 text-xs font-normal text-neutral-400">{row.note}</p>}
+                </td>
+                <td className="px-3 py-2 whitespace-nowrap">{row.admin}</td>
+                <td className="px-3 py-2 whitespace-nowrap">{row.organizer}</td>
+                <td className="px-3 py-2 whitespace-nowrap">{row.customerSupport}</td>
+                <td className="px-3 py-2 whitespace-nowrap">{row.referee}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }
 

@@ -10,6 +10,7 @@ import { kataBaseOf } from "@/lib/division";
 import { notifyRefereeAssignment, sendConfirmationEmail, notifyAnnouncementPublished } from "@/lib/notify";
 import type { PaymentStatus } from "@/lib/types";
 import { parseCsvWithHeader, type CsvUploadResult } from "@/lib/csv-bulk";
+import { accessMatrixToMarkdown } from "@/lib/access-matrix";
 
 /**
  * Admin server actions. Sprint 3 runs these under the v1 open RLS policies;
@@ -479,6 +480,34 @@ export async function deleteAnnouncement(formData: FormData) {
   revalidatePath("/");
   revalidatePath("/announcements");
   backTo(returnTo, { ok: "Announcement deleted." });
+}
+
+/** Creates a new draft announcement pre-filled with the current Access
+ * Matrix (see lib/access-matrix.ts), then sends the admin to Announcements
+ * to review and publish it. Never auto-publishes — the admin should read it
+ * over first. Call again (from the Accounts page) whenever access rules
+ * change, to keep the published copy current. */
+export async function publishAccessMatrixAnnouncement() {
+  const returnTo = "/admin/accounts?tab=access";
+  const { supabase, actorId } = await getActor();
+  const actorRole = await getActorRole(supabase, actorId);
+  if (actorRole !== "admin") {
+    backTo(returnTo, { error: "Only the Super Admin can publish the Access Matrix." });
+  }
+  const generatedAt = new Date().toISOString().slice(0, 10);
+  const values = {
+    competition_id: null,
+    title: `Admin Panel Access Matrix — updated ${generatedAt}`,
+    body: accessMatrixToMarkdown(generatedAt),
+    published: false,
+  };
+  const { data, error } = await supabase.from("announcements").insert(values).select("id").single();
+  if (error) backTo(returnTo, { error: "Could not create the announcement." });
+  await writeAudit(supabase, {
+    table_name: "announcements", record_id: data!.id, action: "announcement_created",
+    new_value: { title: values.title }, actor_id: actorId,
+  });
+  redirect(`/admin/announcements?edit=${data!.id}`);
 }
 
 // ── Schools ──────────────────────────────────────────────────────────────────
