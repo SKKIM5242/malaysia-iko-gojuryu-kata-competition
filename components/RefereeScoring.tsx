@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { submitScore } from "@/app/actions/account";
+import { CategoryName } from "@/components/ui";
 
 export interface ScoringItem {
   videoId: string;
@@ -22,7 +23,7 @@ function ScoreRow({ item }: { item: ScoringItem }) {
         <div>
           <p className="font-bold text-neutral-900">{item.participantName}</p>
           <p className="text-xs text-neutral-500">
-            {item.participantCountry ?? "—"} · {item.categoryName ?? "—"}
+            {item.participantCountry ?? "—"} · <CategoryName name={item.categoryName} />
           </p>
         </div>
         {saved && <span className="text-xs font-semibold text-green-700">✔ Score saved</span>}

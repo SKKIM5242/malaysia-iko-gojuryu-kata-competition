@@ -4,7 +4,7 @@ import { schemaReady } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
 import { updatePaymentStatus, deleteRegistration, createInvitationCode } from "@/app/actions/admin";
 import { AdminShell, Card, adminBtn, adminBtnSecondary, adminInput, adminLabel } from "@/components/admin";
-import { EmptyState, SetupNotice, StatusBadge } from "@/components/ui";
+import { CategoryName, EmptyState, SetupNotice, StatusBadge } from "@/components/ui";
 import type { PaymentStatus } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -119,7 +119,7 @@ export default async function AdminRegistrations({
                   <td className="px-4 py-3 font-medium">{r.participant?.full_name ?? "—"}</td>
                   <td className="px-4 py-3 font-mono text-xs">{r.participant?.ic_passport ?? "—"}</td>
                   <td className="max-w-[200px] truncate px-4 py-3" title={r.category?.name ?? undefined}>
-                    {r.category?.name ?? "—"}
+                    <CategoryName name={r.category?.name} />
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-xs">{r.division ?? "—"}</td>
                   <td className="max-w-[180px] truncate px-4 py-3" title={r.participant?.school?.name ?? undefined}>

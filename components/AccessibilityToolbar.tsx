@@ -63,6 +63,33 @@ function chunkText(text: string): string[] {
   return chunks;
 }
 
+const MALE_VOICE_HINTS = ["david", "mark", "guy", "daniel", "alex", "fred", "tom", "james", "george", "male"];
+const FEMALE_VOICE_HINTS = [
+  "zira", "eva", "samantha", "victoria", "susan", "karen", "moira", "tessa", "fiona", "aria", "jenny",
+  "salli", "joanna", "kendra", "ivy", "female",
+];
+
+function guessVoiceGender(name: string): "male" | "female" | "unknown" {
+  const n = name.toLowerCase();
+  if (MALE_VOICE_HINTS.some((hint) => n.includes(hint))) return "male";
+  if (FEMALE_VOICE_HINTS.some((hint) => n.includes(hint))) return "female";
+  return "unknown";
+}
+
+/** Picks up to 2 male + 2 female voices (preferring English) to keep the
+ * dropdown short. Falls back to whatever's installed if gender can't be
+ * guessed from the voice name — the exact voices available always depend
+ * on the visitor's own OS/browser, not on this app. */
+function curateVoices(all: SpeechSynthesisVoice[]): SpeechSynthesisVoice[] {
+  if (all.length === 0) return [];
+  const english = all.filter((v) => v.lang.toLowerCase().startsWith("en"));
+  const pool = english.length > 0 ? english : all;
+  const males = pool.filter((v) => guessVoiceGender(v.name) === "male").slice(0, 2);
+  const females = pool.filter((v) => guessVoiceGender(v.name) === "female").slice(0, 2);
+  const curated = [...males, ...females];
+  return curated.length >= 2 ? curated : pool.slice(0, 6);
+}
+
 export default function AccessibilityToolbar() {
   const [open, setOpen] = useState(false);
   const [langMenuOpen, setLangMenuOpen] = useState(false);
@@ -70,15 +97,34 @@ export default function AccessibilityToolbar() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [rate, setRate] = useState(1);
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [selectedVoiceURI, setSelectedVoiceURI] = useState("");
 
   const queueRef = useRef<string[]>([]);
   const indexRef = useRef(0);
   const rateRef = useRef(1);
+  const voiceRef = useRef<SpeechSynthesisVoice | null>(null);
   const keepAliveRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     rateRef.current = rate;
   }, [rate]);
+
+  useEffect(() => {
+    voiceRef.current = voices.find((v) => v.voiceURI === selectedVoiceURI) ?? null;
+  }, [voices, selectedVoiceURI]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+    const loadVoices = () => {
+      const curated = curateVoices(window.speechSynthesis.getVoices());
+      setVoices(curated);
+      setSelectedVoiceURI((prev) => prev || curated[0]?.voiceURI || "");
+    };
+    loadVoices();
+    window.speechSynthesis.addEventListener("voiceschanged", loadVoices);
+    return () => window.speechSynthesis.removeEventListener("voiceschanged", loadVoices);
+  }, []);
 
   const stopKeepAlive = useCallback(() => {
     if (keepAliveRef.current) clearInterval(keepAliveRef.current);
@@ -109,6 +155,7 @@ export default function AccessibilityToolbar() {
     }
     const utterance = new SpeechSynthesisUtterance(queue[idx]);
     utterance.rate = rateRef.current;
+    if (voiceRef.current) utterance.voice = voiceRef.current;
     utterance.onend = () => {
       indexRef.current += 1;
       speakNext();
@@ -215,14 +262,25 @@ export default function AccessibilityToolbar() {
   return (
     <div className="fixed bottom-4 right-4 z-[60] flex flex-col items-end gap-2 print:hidden">
       {open && (
-        <div className="w-72 rounded-xl border border-neutral-200 bg-white p-4 shadow-2xl">
-          <div className="mb-4">
+        <div className="relative w-72 rounded-xl border border-neutral-200 bg-white p-4 shadow-2xl">
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            aria-label="Close accessibility panel"
+            title="Close"
+            className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
+          >
+            ✕
+          </button>
+
+          <div className="mb-4 pr-6">
             <p className="mb-2 text-xs font-bold uppercase tracking-wide text-neutral-500">Read Aloud</p>
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={handlePlayPause}
                 aria-label={isSpeaking && !isPaused ? "Pause reading" : "Play reading"}
+                title={isSpeaking && !isPaused ? "Pause reading" : "Play reading"}
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-red-700 text-white hover:bg-red-600"
               >
                 {isSpeaking && !isPaused ? "⏸" : "▶"}
@@ -232,6 +290,7 @@ export default function AccessibilityToolbar() {
                 onClick={handleStop}
                 disabled={!isSpeaking}
                 aria-label="Stop reading"
+                title="Stop reading"
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-neutral-300 text-neutral-600 hover:bg-neutral-50 disabled:opacity-40"
               >
                 ⏹
@@ -244,6 +303,7 @@ export default function AccessibilityToolbar() {
                 value={rate}
                 onChange={(e) => setRate(parseFloat(e.target.value))}
                 aria-label="Reading speed"
+                title="Reading speed"
                 className="flex-1 accent-red-700"
               />
               <span className="w-9 shrink-0 text-right text-xs text-neutral-500">{rate.toFixed(1)}x</span>
@@ -251,6 +311,27 @@ export default function AccessibilityToolbar() {
             <p className="mt-1.5 text-[11px] text-neutral-400">
               Select some text on the page first to read just that part — otherwise the whole page is read.
             </p>
+
+            {voices.length > 0 && (
+              <div className="mt-2.5">
+                <label htmlFor="a11y-voice-select" className="mb-1 block text-[11px] font-semibold text-neutral-500">
+                  Voice Selection
+                </label>
+                <select
+                  id="a11y-voice-select"
+                  value={selectedVoiceURI}
+                  onChange={(e) => setSelectedVoiceURI(e.target.value)}
+                  title="Choose a reading voice"
+                  className="w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
+                >
+                  {voices.map((v) => (
+                    <option key={v.voiceURI} value={v.voiceURI}>
+                      {v.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
           <div>
@@ -258,6 +339,7 @@ export default function AccessibilityToolbar() {
             <button
               type="button"
               onClick={() => setLangMenuOpen((v) => !v)}
+              title="Translate this page"
               className="flex w-full items-center justify-between rounded-md border border-neutral-300 px-3 py-2 text-sm hover:bg-neutral-50"
             >
               <span>
@@ -290,6 +372,7 @@ export default function AccessibilityToolbar() {
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-label="Accessibility: read aloud and translate"
+        title={open ? "Close Read Aloud & Translate" : "Read Aloud & Translate"}
         className="flex h-12 w-12 items-center justify-center rounded-full bg-neutral-900 text-xl text-white shadow-lg hover:bg-neutral-800"
       >
         🌐

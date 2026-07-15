@@ -5,7 +5,7 @@ import {
   assignRefereeToVideo, unassignRefereeFromVideo, setJudgesRequired, autoAssignReferees,
 } from "@/app/actions/admin";
 import { AdminShell, Card, adminBtn, adminInput } from "@/components/admin";
-import { EmptyState, SetupNotice, TelegramFullAccessLinks } from "@/components/ui";
+import { CategoryName, EmptyState, SetupNotice, TelegramFullAccessLinks } from "@/components/ui";
 import { getAllTelegramLinks } from "@/lib/telegram";
 import { finalScore } from "@/lib/scoring";
 
@@ -104,7 +104,7 @@ export default async function AdminJudging({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="font-bold text-neutral-900">{v.participant?.full_name ?? "Unknown participant"}</p>
-            <p className="text-sm text-neutral-500">{v.registration?.category?.name ?? "—"}</p>
+            <p className="text-sm text-neutral-500"><CategoryName name={v.registration?.category?.name} /></p>
           </div>
           {playbackUrl && (
             <a

@@ -8,15 +8,17 @@ import {
 } from "@/lib/data";
 import {
   EmptyState,
+  NoTranslate,
   SectionTitle,
   SetupNotice,
   SiteFooter,
   SiteHeader,
   formatDate,
   formatUSD,
+  protectKataNames,
 } from "@/components/ui";
 import { Markdown } from "@/lib/markdown";
-import { groupByKata } from "@/lib/division";
+import { groupByKata, kataBases } from "@/lib/division";
 import { createClient } from "@/lib/supabase/server";
 import type { Category } from "@/lib/types";
 
@@ -118,7 +120,10 @@ export default async function Home() {
             </Link>
             {competitions[0]?.description && (
               <p className="mt-6 max-w-3xl whitespace-pre-line text-sm text-neutral-600">
-                {competitions[0].description}
+                {protectKataNames(
+                  competitions[0].description,
+                  kataBases(categoriesByCompetition.get(competitions[0].id) ?? [])
+                )}
               </p>
             )}
           </section>
@@ -159,7 +164,8 @@ export default async function Home() {
                         {groupByKata(cats).map(([base, subCats]) => (
                           <details key={base} className="rounded-lg border border-neutral-200 bg-white shadow-sm">
                             <summary className="cursor-pointer px-4 py-2.5 text-sm font-semibold text-neutral-800 hover:bg-neutral-50">
-                              {base} <span className="font-normal text-neutral-400">({subCats.length} sub-categories)</span>
+                              <NoTranslate>{base}</NoTranslate>{" "}
+                              <span className="font-normal text-neutral-400">({subCats.length} sub-categories)</span>
                             </summary>
                             <ul className="space-y-1 px-4 pb-3">
                               {subCats.map((cat) => {

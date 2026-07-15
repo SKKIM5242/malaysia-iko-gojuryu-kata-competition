@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCategories, schemaReady } from "@/lib/data";
-import { EmptyState, SectionTitle, SetupNotice, SiteFooter, SiteHeader, formatDate } from "@/components/ui";
+import { EmptyState, NoTranslate, SectionTitle, SetupNotice, SiteFooter, SiteHeader, formatDate } from "@/components/ui";
 import { groupByKata } from "@/lib/division";
 import { finalScore } from "@/lib/scoring";
 import { winnersRevealDate } from "@/lib/winners";
@@ -145,7 +145,7 @@ async function CompetitionWinners({
           {groupByKata(withWinners).map(([base, cats]) => (
             <details key={base} className="rounded-lg border border-neutral-200 bg-white shadow-sm" open>
               <summary className="cursor-pointer px-4 py-2.5 text-sm font-semibold text-neutral-800 hover:bg-neutral-50">
-                {base}
+                <NoTranslate>{base}</NoTranslate>
               </summary>
               <div className="space-y-3 px-4 pb-4">
                 {cats.map((cat) => {

@@ -4,7 +4,7 @@ import { schemaReady, getCategories } from "@/lib/data";
 import { getAllCompetitions } from "@/lib/admin-data";
 import { loadRecordingsByCategory } from "@/lib/arena";
 import { groupByKata } from "@/lib/division";
-import { SetupNotice, SiteFooter, SiteHeader } from "@/components/ui";
+import { NoTranslate, SetupNotice, SiteFooter, SiteHeader } from "@/components/ui";
 import AuthForms from "@/components/AuthForms";
 import type { Category } from "@/lib/types";
 
@@ -121,7 +121,7 @@ export default async function KataCategoriesPage() {
                       {groupByKata(cats).map(([base, subCats]) => (
                         <details key={base} className="rounded-lg border border-neutral-200 bg-white shadow-sm">
                           <summary className="cursor-pointer px-4 py-2.5 text-sm font-semibold text-neutral-800 hover:bg-neutral-50">
-                            {base}{" "}
+                            <NoTranslate>{base}</NoTranslate>{" "}
                             <span className="font-normal text-neutral-400">({subCats.length} sub-categories)</span>
                           </summary>
                           <div className="space-y-3 px-4 pb-4">

@@ -4,7 +4,7 @@ import { schemaReady } from "@/lib/data";
 import { getAllCompetitions } from "@/lib/admin-data";
 import { loadKataArena, type ArenaEntry } from "@/lib/arena";
 import { winnersRevealed } from "@/lib/winners";
-import { SetupNotice, SiteFooter, SiteHeader } from "@/components/ui";
+import { CategoryName, SetupNotice, SiteFooter, SiteHeader } from "@/components/ui";
 import AuthForms from "@/components/AuthForms";
 import ClaimForm from "@/components/ClaimForm";
 
@@ -35,7 +35,7 @@ function RecordingCard({
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <p className="font-bold text-neutral-900">{entry.participantName}</p>
-          <p className="text-sm text-neutral-500">{entry.categoryName ?? "—"}</p>
+          <p className="text-sm text-neutral-500"><CategoryName name={entry.categoryName} /></p>
         </div>
         <div className="flex items-center gap-2">
           {showFinalScore && entry.finalScore != null && (

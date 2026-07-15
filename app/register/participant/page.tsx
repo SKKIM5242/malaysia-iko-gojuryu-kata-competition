@@ -9,7 +9,7 @@ import {
   schemaReady,
 } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
-import { EmptyState, SetupNotice, SiteFooter, SiteHeader, formatDate, formatUSD } from "@/components/ui";
+import { EmptyState, NoTranslate, SetupNotice, SiteFooter, SiteHeader, formatDate, formatUSD } from "@/components/ui";
 import RegisterForm from "@/components/RegisterForm";
 import { paymentsEnabled } from "@/lib/payments";
 import { groupByKata } from "@/lib/division";
@@ -83,7 +83,8 @@ export default async function RegisterPage({
                     {groupByKata(categoriesByTier.get(c.id) ?? []).map(([base, cats]) => (
                       <details key={base} className="rounded border border-neutral-100">
                         <summary className="cursor-pointer px-2 py-1.5 text-sm font-semibold text-neutral-800 hover:bg-neutral-50">
-                          {base} <span className="font-normal text-neutral-400">({cats.length} sub-categories)</span>
+                          <NoTranslate>{base}</NoTranslate>{" "}
+                          <span className="font-normal text-neutral-400">({cats.length} sub-categories)</span>
                         </summary>
                         <ul className="space-y-1 px-2 pb-2 pl-5">
                           {cats.map((cat) => {

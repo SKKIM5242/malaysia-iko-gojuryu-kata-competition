@@ -216,6 +216,44 @@ export function TelegramFullAccessLinks({
   );
 }
 
+/** Wraps content so Google's Website Translator (and similar tools) leaves
+ * it untouched — used for kata names, which are fixed terms of art (e.g.
+ * "Kata Sanchi") that shouldn't be machine-translated. */
+export function NoTranslate({ children }: { children: ReactNode }) {
+  return (
+    <span translate="no" className="notranslate">
+      {children}
+    </span>
+  );
+}
+
+/** Renders a hierarchical category name ("«kata» — «belt» — Age «lo»–«hi»")
+ * with only the kata segment protected from translation. */
+export function CategoryName({ name }: { name?: string | null }) {
+  if (!name) return <>—</>;
+  const [kata, ...rest] = name.split(" — ");
+  return (
+    <>
+      <NoTranslate>{kata}</NoTranslate>
+      {rest.length > 0 ? ` — ${rest.join(" — ")}` : ""}
+    </>
+  );
+}
+
+/** Wraps every occurrence of a known kata name inside free-text (e.g. a
+ * competition description) so it survives page translation untouched, while
+ * the surrounding prose still translates normally. */
+export function protectKataNames(text: string, kataNames: string[]): ReactNode[] {
+  if (kataNames.length === 0) return [text];
+  const escaped = [...kataNames]
+    .sort((a, b) => b.length - a.length)
+    .map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const parts = text.split(new RegExp(`(${escaped.join("|")})`, "g"));
+  return parts.map((part, i) =>
+    kataNames.includes(part) ? <NoTranslate key={i}>{part}</NoTranslate> : <span key={i}>{part}</span>
+  );
+}
+
 export function formatDate(d: string | null | undefined): string {
   if (!d) return "TBA";
   try {

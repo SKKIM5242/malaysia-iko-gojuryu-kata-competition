@@ -6,7 +6,7 @@ import {
   getSchools,
   schemaReady,
 } from "@/lib/data";
-import { EmptyState, SetupNotice, SiteFooter, SiteHeader, formatUSD } from "@/components/ui";
+import { CategoryName, EmptyState, SetupNotice, SiteFooter, SiteHeader, formatUSD } from "@/components/ui";
 import { kataBases } from "@/lib/division";
 
 export const dynamic = "force-dynamic";
@@ -171,7 +171,7 @@ export default async function ParticipantsPage({
                       <td className="px-4 py-3 text-neutral-400">{(page - 1) * PAGE_SIZE + i + 1}</td>
                       <td className="px-4 py-3 font-medium text-neutral-900">{r.participant?.full_name ?? "—"}</td>
                       <td className="max-w-[220px] truncate px-4 py-3" title={r.category?.name ?? undefined}>
-                        {r.category?.name ?? "—"}
+                        <CategoryName name={r.category?.name} />
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-xs">{r.division ?? "—"}</td>
                       <td className="px-4 py-3">{r.participant?.belt_rank ?? "—"}</td>
