@@ -2,8 +2,6 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function updateSession(request: NextRequest) {
-  const supabaseResponse = NextResponse.next({ request });
-
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -12,11 +10,30 @@ export async function updateSession(request: NextRequest) {
   // are required", crashing the edge middleware on every route (500
   // MIDDLEWARE_INVOCATION_FAILED).
   if (!url || !anonKey) {
-    return supabaseResponse;
+    return NextResponse.next({ request });
   }
 
+  // Declared outside the try block (not just `let` inside it) so that if
+  // something throws after Supabase has already refreshed the session, the
+  // catch below can still return the response carrying the NEW cookies —
+  // otherwise a refreshed-but-then-discarded session forces a full
+  // re-login next time the (now stale) refresh token is used.
+  let response = NextResponse.next({ request });
+
+  // Every redirect must carry forward whatever cookies are on `response` at
+  // that point (a session refresh may have just written new ones) — a bare
+  // `NextResponse.redirect(url)` starts a fresh response with none of them,
+  // silently dropping a just-refreshed session on any redirect.
+  const redirectTo = (pathname: string) => {
+    const target = request.nextUrl.clone();
+    target.pathname = pathname;
+    target.search = "";
+    const redirectResponse = NextResponse.redirect(target);
+    response.cookies.getAll().forEach((cookie) => redirectResponse.cookies.set(cookie));
+    return redirectResponse;
+  };
+
   try {
-    let response = supabaseResponse;
     const supabase = createServerClient(url, anonKey, {
       cookies: {
         getAll() {
@@ -59,10 +76,7 @@ export async function updateSession(request: NextRequest) {
     //                               judging (view only)
     if (request.nextUrl.pathname.startsWith("/admin")) {
       if (!user) {
-        const loginUrl = request.nextUrl.clone();
-        loginUrl.pathname = "/login";
-        loginUrl.search = "";
-        return NextResponse.redirect(loginUrl);
+        return redirectTo("/login");
       }
       const { data: profile } = await supabase
         .from("profiles")
@@ -71,18 +85,12 @@ export async function updateSession(request: NextRequest) {
         .maybeSingle();
       const role = profile?.approved ? profile.role : null;
       const path = request.nextUrl.pathname;
-      const toAccount = () => {
-        const homeUrl = request.nextUrl.clone();
-        homeUrl.pathname = "/account";
-        homeUrl.search = "";
-        return NextResponse.redirect(homeUrl);
-      };
 
       if (role === "admin") {
         // full access
       } else if (role === "organizer" || role === "staff") {
         if (path.startsWith("/admin/accounts")) {
-          return toAccount();
+          return redirectTo("/account");
         }
       } else if (role === "customer_support") {
         const allowedPrefixes = [
@@ -92,10 +100,7 @@ export async function updateSession(request: NextRequest) {
         ];
         const ok = path === "/admin" || allowedPrefixes.some((p) => path === p || path.startsWith(`${p}/`));
         if (!ok) {
-          const redirectUrl = request.nextUrl.clone();
-          redirectUrl.pathname = "/admin/registrations";
-          redirectUrl.search = "";
-          return NextResponse.redirect(redirectUrl);
+          return redirectTo("/admin/registrations");
         }
       } else if (role === "referee") {
         const allowedPrefixes = [
@@ -104,18 +109,17 @@ export async function updateSession(request: NextRequest) {
         ];
         const ok = path === "/admin" || allowedPrefixes.some((p) => path === p || path.startsWith(`${p}/`));
         if (!ok) {
-          const redirectUrl = request.nextUrl.clone();
-          redirectUrl.pathname = "/admin/competitions";
-          redirectUrl.search = "";
-          return NextResponse.redirect(redirectUrl);
+          return redirectTo("/admin/competitions");
         }
       } else {
-        return toAccount();
+        return redirectTo("/account");
       }
     }
     return response;
   } catch {
-    // Never let an auth hiccup crash the entire edge middleware
-    return supabaseResponse;
+    // Never let an auth hiccup crash the entire edge middleware — but still
+    // return `response`, not a blank NextResponse, so a session refresh that
+    // already succeeded isn't thrown away by a later, unrelated error.
+    return response;
   }
 }
