@@ -69,16 +69,16 @@ export default function AccessibilityToolbar() {
   const [selectedLang, setSelectedLang] = useState("en");
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
-  const [volume, setVolume] = useState(1);
+  const [rate, setRate] = useState(1);
 
   const queueRef = useRef<string[]>([]);
   const indexRef = useRef(0);
-  const volumeRef = useRef(1);
+  const rateRef = useRef(1);
   const keepAliveRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    volumeRef.current = volume;
-  }, [volume]);
+    rateRef.current = rate;
+  }, [rate]);
 
   const stopKeepAlive = useCallback(() => {
     if (keepAliveRef.current) clearInterval(keepAliveRef.current);
@@ -108,7 +108,7 @@ export default function AccessibilityToolbar() {
       return;
     }
     const utterance = new SpeechSynthesisUtterance(queue[idx]);
-    utterance.volume = volumeRef.current;
+    utterance.rate = rateRef.current;
     utterance.onend = () => {
       indexRef.current += 1;
       speakNext();
@@ -125,7 +125,8 @@ export default function AccessibilityToolbar() {
     const synth = window.speechSynthesis;
     if (!isSpeaking) {
       synth.cancel();
-      queueRef.current = chunkText(getReadableText());
+      const selected = window.getSelection()?.toString().trim();
+      queueRef.current = chunkText(selected || getReadableText());
       indexRef.current = 0;
       setIsSpeaking(true);
       setIsPaused(false);
@@ -237,15 +238,19 @@ export default function AccessibilityToolbar() {
               </button>
               <input
                 type="range"
-                min={0}
-                max={1}
-                step={0.05}
-                value={volume}
-                onChange={(e) => setVolume(parseFloat(e.target.value))}
-                aria-label="Volume"
+                min={0.5}
+                max={2}
+                step={0.1}
+                value={rate}
+                onChange={(e) => setRate(parseFloat(e.target.value))}
+                aria-label="Reading speed"
                 className="flex-1 accent-red-700"
               />
+              <span className="w-9 shrink-0 text-right text-xs text-neutral-500">{rate.toFixed(1)}x</span>
             </div>
+            <p className="mt-1.5 text-[11px] text-neutral-400">
+              Select some text on the page first to read just that part — otherwise the whole page is read.
+            </p>
           </div>
 
           <div>
