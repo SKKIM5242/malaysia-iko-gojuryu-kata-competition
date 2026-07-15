@@ -107,14 +107,19 @@ export function SiteHeader() {
 export function SiteFooter() {
   return (
     <>
-      <footer className="mt-16 border-t border-neutral-200 bg-neutral-50">
-        <div className="mx-auto max-w-6xl px-4 py-8 text-sm text-neutral-500">
+      {/* Bottom Menu — reserves space in normal flow (spacer) then pins the
+          whole footer (info + nav links) to the bottom of the viewport, so
+          it stays visible while scrolling a long page, mirroring the sticky
+          SiteHeader at the top. */}
+      <div aria-hidden className="h-52 sm:h-36" />
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-neutral-200 bg-neutral-50 text-neutral-500">
+        <div className="mx-auto max-w-6xl px-4 py-2 text-xs">
           <p className="font-semibold text-neutral-700">
             Malaysia Open Karate-do Kata Competition - Goju-ryu or IKO Goju-ryu Version Only.
             Specially for all Goju-ryu Karateka to compete globally without leaving their beloved
             Country.
           </p>
-          <p className="mt-1">
+          <p className="mt-0.5">
             Organiser:{" "}
             <a
               href="https://www.mixo.io/site/iko-goju-ryu-karate-do-m-sdn-bhd-wt9nk"
@@ -125,7 +130,7 @@ export function SiteFooter() {
               IKO GOJU-RYU KARATE-DO MALAYSIA SDN BHD
             </a>
           </p>
-          <p className="mt-1">
+          <p className="mt-0.5">
             <Link href="/announcements" className="underline underline-offset-2">Announcements</Link> ·{" "}
             <Link href="/participants" className="underline underline-offset-2">Participants</Link> ·{" "}
             <Link href="/register" className="underline underline-offset-2">Register participant</Link> ·{" "}
@@ -134,24 +139,19 @@ export function SiteFooter() {
             <Link href="/register/bulk" className="underline underline-offset-2">Bulk registration</Link>
           </p>
         </div>
-      </footer>
-      {/* Bottom Menu — reserves space in normal flow (spacer) then pins the
-          same key nav links to the bottom of the viewport, so it stays
-          visible while scrolling a long page, mirroring the sticky
-          SiteHeader at the top. */}
-      <div aria-hidden className="h-20 sm:h-14" />
-      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-neutral-200 bg-neutral-950 text-white">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-1 px-4 py-2 text-xs sm:text-sm">
-          <Link href="/" className="rounded px-2.5 py-1 hover:bg-neutral-800">Home</Link>
-          <Link href="/participants" className="rounded px-2.5 py-1 hover:bg-neutral-800">Participants</Link>
-          <Link href="/winners" className="rounded px-2.5 py-1 hover:bg-neutral-800">Winners</Link>
-          <Link href="/kata-arena" className="rounded px-2.5 py-1 hover:bg-neutral-800">Kata Arena</Link>
-          <Link href="/announcements" className="rounded px-2.5 py-1 hover:bg-neutral-800">Announcements</Link>
-          <Link href="/register" className="rounded bg-red-700 px-3 py-1 font-semibold hover:bg-red-600">
-            Register
-          </Link>
-        </div>
-      </nav>
+        <nav className="border-t border-neutral-800 bg-neutral-950 text-white">
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-1 px-4 py-2 text-xs sm:text-sm">
+            <Link href="/" className="rounded px-2.5 py-1 hover:bg-neutral-800">Home</Link>
+            <Link href="/participants" className="rounded px-2.5 py-1 hover:bg-neutral-800">Participants</Link>
+            <Link href="/winners" className="rounded px-2.5 py-1 hover:bg-neutral-800">Winners</Link>
+            <Link href="/kata-arena" className="rounded px-2.5 py-1 hover:bg-neutral-800">Kata Arena</Link>
+            <Link href="/announcements" className="rounded px-2.5 py-1 hover:bg-neutral-800">Announcements</Link>
+            <Link href="/register" className="rounded bg-red-700 px-3 py-1 font-semibold hover:bg-red-600">
+              Register
+            </Link>
+          </div>
+        </nav>
+      </div>
     </>
   );
 }

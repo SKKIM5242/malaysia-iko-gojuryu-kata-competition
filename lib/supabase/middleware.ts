@@ -88,6 +88,7 @@ export async function updateSession(request: NextRequest) {
         const allowedPrefixes = [
           "/admin/registrations", "/admin/participants", "/admin/competitions",
           "/admin/announcements", "/admin/senseis", "/admin/referees", "/admin/audience", "/admin/judging",
+          "/admin/telegram",
         ];
         const ok = path === "/admin" || allowedPrefixes.some((p) => path === p || path.startsWith(`${p}/`));
         if (!ok) {
@@ -99,7 +100,7 @@ export async function updateSession(request: NextRequest) {
       } else if (role === "referee") {
         const allowedPrefixes = [
           "/admin/competitions", "/admin/registrations", "/admin/participants",
-          "/admin/announcements", "/admin/judging",
+          "/admin/announcements", "/admin/judging", "/admin/telegram",
         ];
         const ok = path === "/admin" || allowedPrefixes.some((p) => path === p || path.startsWith(`${p}/`));
         if (!ok) {

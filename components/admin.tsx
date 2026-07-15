@@ -17,6 +17,8 @@ const FULL_NAV: Array<[string, string]> = [
   ["Support", "/admin/support"],
   ["Judging", "/admin/judging"],
   ["Kata Categories", "/kata-categories"],
+  ["Kata Arena", "/kata-arena"],
+  ["Telegram Links", "/admin/telegram"],
   ["Classes", "/admin/classes"],
   ["Accounts", "/admin/accounts"],
 ];
@@ -32,6 +34,8 @@ const CUSTOMER_SUPPORT_NAV: Array<[string, string]> = [
   ["Audience", "/admin/audience"],
   ["Judging", "/admin/judging"],
   ["Kata Categories", "/kata-categories"],
+  ["Kata Arena", "/kata-arena"],
+  ["Telegram Links", "/admin/telegram"],
 ];
 
 const REFEREE_NAV: Array<[string, string]> = [
@@ -42,6 +46,8 @@ const REFEREE_NAV: Array<[string, string]> = [
   ["Participants", "/admin/participants"],
   ["Judging", "/admin/judging"],
   ["Kata Categories", "/kata-categories"],
+  ["Kata Arena", "/kata-arena"],
+  ["Telegram Links", "/admin/telegram"],
 ];
 
 export async function AdminShell({
