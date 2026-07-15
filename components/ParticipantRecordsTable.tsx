@@ -14,6 +14,8 @@ export interface ParticipantRecordRow {
   gender: string;
   beltRank: string;
   rankConfirmation: string;
+  certificateUrl: string | null;
+  homeAddress: string;
   country: string;
   cityTown: string;
   email: string;
@@ -37,6 +39,7 @@ const COLUMNS: Array<{ key: keyof ParticipantRecordRow; label: string }> = [
   { key: "gender", label: "Gender" },
   { key: "beltRank", label: "Belt" },
   { key: "rankConfirmation", label: "Rank Confirmation" },
+  { key: "homeAddress", label: "Home Address" },
   { key: "country", label: "Country" },
   { key: "cityTown", label: "City/Town" },
   { key: "email", label: "Email" },
@@ -79,6 +82,7 @@ export default function ParticipantRecordsTable({ rows }: { rows: ParticipantRec
                   {c.label}
                 </th>
               ))}
+              <th className="px-3 py-2.5 whitespace-nowrap">Certificate</th>
               <th className="px-3 py-2.5 whitespace-nowrap">Recording</th>
             </tr>
             <tr className="border-t border-neutral-200 bg-white normal-case">
@@ -93,12 +97,13 @@ export default function ParticipantRecordsTable({ rows }: { rows: ParticipantRec
                 </th>
               ))}
               <th className="px-2 py-1.5" />
+              <th className="px-2 py-1.5" />
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100">
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={COLUMNS.length + 1} className="px-3 py-6 text-center text-neutral-400">
+                <td colSpan={COLUMNS.length + 2} className="px-3 py-6 text-center text-neutral-400">
                   No records match these filters.
                 </td>
               </tr>
@@ -146,6 +151,20 @@ export default function ParticipantRecordsTable({ rows }: { rows: ParticipantRec
                   </td>
                   <td className="whitespace-nowrap px-3 py-2 text-xs">{row.recordingDate || "—"}</td>
                   <td className="whitespace-nowrap px-3 py-2 text-xs">{row.attempts}</td>
+                  <td className="whitespace-nowrap px-3 py-2">
+                    {row.certificateUrl ? (
+                      <a
+                        href={row.certificateUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="rounded border border-neutral-300 px-3 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
+                      >
+                        View
+                      </a>
+                    ) : (
+                      <span className="text-xs text-neutral-400">—</span>
+                    )}
+                  </td>
                   <td className="whitespace-nowrap px-3 py-2">
                     {row.videoUrl ? (
                       <VideoWatchButton url={row.videoUrl} />

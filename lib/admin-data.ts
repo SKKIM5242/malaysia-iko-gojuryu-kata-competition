@@ -6,7 +6,31 @@ import type {
   Participant,
   PaymentStatus,
   Registration,
+  School,
+  Sensei,
 } from "@/lib/types";
+
+export interface RefereeRecord {
+  id: string; full_name: string; ic_passport: string; date_of_birth: string | null;
+  gender: string | null; karate_rank: string | null; judging_experience_count: number | null;
+  school: string | null; email: string | null; phone: string | null; home_address: string | null;
+  city_town: string | null; home_country: string | null;
+  bank_name: string | null; bank_account_no: string | null; bank_account_name: string | null;
+  certificate_path: string | null; invitation_code: string | null;
+  payment_status: string; status: string; created_at: string;
+  certificateUrl: string | null;
+}
+
+export interface AudienceRecord {
+  id: string; full_name: string; email: string | null; phone: string | null;
+  home_country: string | null; invitation_code: string | null;
+  payment_status: string; created_at: string;
+}
+
+export interface StaffAccountRecord {
+  user_id: string; role: string; full_name: string | null; country: string | null;
+  email: string | null; approved: boolean; created_at: string;
+}
 
 export interface AdminCounts {
   registrations: { total: number; pending: number; paid: number; rejected: number };
@@ -111,6 +135,7 @@ export interface ParticipantRecord {
   recordAttempts: number;
   videoCreatedAt: string | null;
   videoUrl: string | null;
+  certificateUrl: string | null;
 }
 
 /** One row per successfully-paid registration, joining participant details,
@@ -153,10 +178,20 @@ export async function getParticipantRecords(): Promise<ParticipantRecord[]> {
     }
   }
 
+  const certPaths = regList.map((r) => r.participant?.certificate_path).filter((p): p is string => !!p);
+  const certUrlByPath = new Map<string, string>();
+  if (certPaths.length > 0) {
+    const { data: signedCerts } = await supabase.storage.from("certificates").createSignedUrls(certPaths, 3600);
+    for (const s of signedCerts ?? []) {
+      if (s.path && s.signedUrl) certUrlByPath.set(s.path, s.signedUrl);
+    }
+  }
+
   return regList
     .filter((r) => r.participant)
     .map((r) => {
       const video = videoByReg.get(r.id);
+      const certPath = r.participant?.certificate_path;
       return {
         registrationId: r.id,
         competitionName: r.competition?.name ?? null,
@@ -165,8 +200,77 @@ export async function getParticipantRecords(): Promise<ParticipantRecord[]> {
         recordAttempts: attemptsByReg.get(r.id) ?? 0,
         videoCreatedAt: video?.createdAt ?? null,
         videoUrl: video ? (signedUrlByPath.get(video.storagePath) ?? null) : null,
+        certificateUrl: certPath ? (certUrlByPath.get(certPath) ?? null) : null,
       };
     });
+}
+
+export async function getRefereeRecords(): Promise<RefereeRecord[]> {
+  const supabase = await createClient();
+  const { data } = await supabase.from("referees").select("*").order("created_at", { ascending: false });
+  const referees = (data as Omit<RefereeRecord, "certificateUrl">[]) ?? [];
+  const certPaths = referees.map((r) => r.certificate_path).filter((p): p is string => !!p);
+  const certUrlByPath = new Map<string, string>();
+  if (certPaths.length > 0) {
+    const { data: signed } = await supabase.storage.from("certificates").createSignedUrls(certPaths, 3600);
+    for (const s of signed ?? []) {
+      if (s.path && s.signedUrl) certUrlByPath.set(s.path, s.signedUrl);
+    }
+  }
+  return referees.map((r) => ({
+    ...r,
+    certificateUrl: r.certificate_path ? (certUrlByPath.get(r.certificate_path) ?? null) : null,
+  }));
+}
+
+export async function getAudienceRecords(): Promise<AudienceRecord[]> {
+  const supabase = await createClient();
+  const { data } = await supabase.from("audiences").select("*").order("created_at", { ascending: false });
+  return (data as AudienceRecord[]) ?? [];
+}
+
+export async function getSchoolRecords(): Promise<School[]> {
+  const supabase = await createClient();
+  const { data } = await supabase.from("schools").select("*").order("created_at", { ascending: false });
+  return (data as School[]) ?? [];
+}
+
+export interface SenseiRecord extends Sensei {
+  certificateUrl: string | null;
+}
+
+export async function getSenseiRecords(): Promise<SenseiRecord[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("senseis")
+    .select("*, school:schools(id,name)")
+    .order("created_at", { ascending: false });
+  const senseis = (data as Sensei[]) ?? [];
+  const certPaths = senseis.map((s) => s.certificate_path).filter((p): p is string => !!p);
+  const certUrlByPath = new Map<string, string>();
+  if (certPaths.length > 0) {
+    const { data: signed } = await supabase.storage.from("certificates").createSignedUrls(certPaths, 3600);
+    for (const s of signed ?? []) {
+      if (s.path && s.signedUrl) certUrlByPath.set(s.path, s.signedUrl);
+    }
+  }
+  return senseis.map((s) => ({
+    ...s,
+    certificateUrl: s.certificate_path ? (certUrlByPath.get(s.certificate_path) ?? null) : null,
+  }));
+}
+
+/** Login accounts for the three roles without their own community
+ * registration table — Admin/Organizer and Customer Support are created
+ * directly (see app/actions/admin.ts createStaffAccount). */
+export async function getStaffAccountRecords(): Promise<StaffAccountRecord[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("profiles")
+    .select("user_id, role, full_name, country, email, approved, created_at")
+    .in("role", ["admin", "organizer", "staff", "customer_support"])
+    .order("created_at", { ascending: false });
+  return (data as StaffAccountRecord[]) ?? [];
 }
 
 export async function getRecentAuditLogs(limit = 20): Promise<AuditLog[]> {
