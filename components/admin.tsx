@@ -152,11 +152,21 @@ export function Card({ children }: { children: ReactNode }) {
 /** Upload-or-take-a-picture field for a latest rank certificate. Reused on
  * the Sensei, Participant, and Referee/Judge admin forms (Schools have no
  * rank, so they don't get this field). */
-export function CertificateField({ currentUrl }: { currentUrl?: string | null }) {
+export function CertificateField({
+  currentUrl,
+  required,
+}: {
+  currentUrl?: string | null;
+  /** Set on create-only forms where a certificate is mandatory (e.g.
+   * Senseis) — never on edit, since re-uploading shouldn't be forced when
+   * a certificate is already on file. */
+  required?: boolean;
+}) {
+  const mustUpload = required && !currentUrl;
   return (
     <div>
       <label htmlFor="certificate" className={adminLabel}>
-        Latest rank certificate{" "}
+        Latest rank certificate{mustUpload ? " *" : ""}{" "}
         <span className="font-normal text-neutral-400">(upload a file or take a picture)</span>
       </label>
       <input
@@ -165,6 +175,7 @@ export function CertificateField({ currentUrl }: { currentUrl?: string | null })
         type="file"
         accept="image/*,application/pdf"
         capture="environment"
+        required={mustUpload}
         className="w-full rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm file:mr-3 file:rounded file:border-0 file:bg-neutral-900 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-white"
       />
       <div className="mt-1 flex items-center gap-3">

@@ -3,7 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { schemaReady } from "@/lib/data";
 import { updateCommunityStatus, saveReferee, deleteReferee, createInvitationCode } from "@/app/actions/admin";
 import { AdminShell, Card, CertificateField, adminBtn, adminInput, adminLabel } from "@/components/admin";
-import { EmptyState, SetupNotice } from "@/components/ui";
+import { EmptyState, SetupNotice, formatDate } from "@/components/ui";
+import FilterableTable from "@/components/FilterableTable";
 
 export const dynamic = "force-dynamic";
 
@@ -207,76 +208,82 @@ export default async function AdminReferees({
           {refereeList.length === 0 ? (
             <EmptyState>No referee registrations yet.</EmptyState>
           ) : (
-            <div className="space-y-3">
-              {refereeList.map((r) => (
-                <Card key={r.id}>
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div>
-                      <p className="font-bold text-neutral-900">{r.full_name}</p>
-                      <p className="font-mono text-xs text-neutral-400">{r.ic_passport}</p>
-                      <p className="mt-0.5 text-xs text-neutral-500">
-                        {r.karate_rank ?? "—"} · {r.email}{r.phone ? ` · ${r.phone}` : ""}
-                      </p>
-                      <p className="text-xs text-neutral-500">
-                        {[r.home_address, r.city_town, r.home_country].filter(Boolean).join(", ") || "—"}
-                      </p>
-                      <p className="text-xs text-neutral-500">
-                        Judged {r.judging_experience_count ?? 0} time{r.judging_experience_count === 1 ? "" : "s"} before
-                      </p>
-                      <p className="mt-0.5 text-xs">
-                        {r.bank_name}
-                        {r.bank_account_no ? <span className="font-mono"> · {r.bank_account_no}</span> : ""}
-                      </p>
-                      <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
-                        {r.certificate_path && certUrls.get(r.certificate_path) ? (
-                          <a href={certUrls.get(r.certificate_path)} target="_blank" rel="noopener noreferrer"
-                            className="font-semibold text-green-700 underline underline-offset-2">Rank certificate</a>
-                        ) : (
-                          <span className="text-red-500">No rank certificate</span>
-                        )}
-                        {(r.international_certificate_paths ?? []).map((path, i) => (
-                          certUrls.get(path) ? (
-                            <a key={path} href={certUrls.get(path)} target="_blank" rel="noopener noreferrer"
-                              className="font-semibold text-blue-700 underline underline-offset-2">
-                              Intl. cert {i + 1}
-                            </a>
-                          ) : null
-                        ))}
-                        {r.invitation_code && (
-                          <span className="font-mono text-purple-700">code: {r.invitation_code}</span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex shrink-0 gap-1.5">
-                      <Link
-                        href={`/admin/referees?editref=${r.id}`}
-                        className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
-                      >
-                        Edit
-                      </Link>
-                      <form action={deleteReferee}>
-                        <input type="hidden" name="id" value={r.id} />
-                        <button className="rounded border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50">
-                          Delete
-                        </button>
-                      </form>
-                    </div>
+            <FilterableTable
+              rowKey="id"
+              columns={[
+                { key: "full_name", label: "Name" },
+                { key: "ic_passport", label: "IC / Passport" },
+                { key: "date_of_birth", label: "DOB" },
+                { key: "gender", label: "Gender" },
+                { key: "karate_rank", label: "Rank" },
+                { key: "judging_experience_count", label: "Judging Experience" },
+                { key: "school", label: "School" },
+                { key: "location", label: "Location" },
+                { key: "contact", label: "Contact" },
+                { key: "bank", label: "Bank" },
+                { key: "certificates", label: "Certificates" },
+                { key: "invitation_code", label: "Invitation Code" },
+                { key: "deposit", label: "Deposit" },
+                { key: "approval", label: "Approval" },
+                { key: "actions", label: "Actions" },
+              ]}
+              rows={refereeList.map((r) => ({
+                id: r.id,
+                full_name: r.full_name,
+                ic_passport: r.ic_passport,
+                date_of_birth: formatDate(r.date_of_birth),
+                gender: r.gender ?? "",
+                karate_rank: r.karate_rank ?? "",
+                judging_experience_count: String(r.judging_experience_count ?? 0),
+                school: r.school ?? "",
+                location: [r.home_address, r.city_town, r.home_country].filter(Boolean).join(", "),
+                contact: [r.email, r.phone].filter(Boolean).join(" · "),
+                bank: [r.bank_name, r.bank_account_no].filter(Boolean).join(" · "),
+                certificates: (
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    {r.certificate_path && certUrls.get(r.certificate_path) ? (
+                      <a href={certUrls.get(r.certificate_path)} target="_blank" rel="noopener noreferrer"
+                        className="font-semibold text-green-700 underline underline-offset-2">Rank cert</a>
+                    ) : (
+                      <span className="text-red-500">None</span>
+                    )}
+                    {(r.international_certificate_paths ?? []).map((path, i) => (
+                      certUrls.get(path) ? (
+                        <a key={path} href={certUrls.get(path)} target="_blank" rel="noopener noreferrer"
+                          className="font-semibold text-blue-700 underline underline-offset-2">
+                          Intl. {i + 1}
+                        </a>
+                      ) : null
+                    ))}
                   </div>
-                  <div className="mt-3 flex flex-wrap items-center gap-4 border-t border-neutral-100 pt-3">
-                    <div>
-                      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-neutral-400">Deposit</p>
-                      <StatusButtons table="referees" id={r.id} field="payment_status" current={r.payment_status}
-                        options={["pending", "paid", "waived", "refunded", "forfeited"]} />
-                    </div>
-                    <div>
-                      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-neutral-400">Approval</p>
-                      <StatusButtons table="referees" id={r.id} field="status" current={r.status}
-                        options={["pending", "approved", "rejected"]} />
-                    </div>
+                ),
+                invitation_code: r.invitation_code ?? "",
+                deposit: (
+                  <StatusButtons table="referees" id={r.id} field="payment_status" current={r.payment_status}
+                    options={["pending", "paid", "waived", "refunded", "forfeited"]} />
+                ),
+                approval: (
+                  <StatusButtons table="referees" id={r.id} field="status" current={r.status}
+                    options={["pending", "approved", "rejected"]} />
+                ),
+                actions: (
+                  <div className="flex gap-1.5">
+                    <Link
+                      href={`/admin/referees?editref=${r.id}`}
+                      className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
+                    >
+                      Edit
+                    </Link>
+                    <form action={deleteReferee}>
+                      <input type="hidden" name="id" value={r.id} />
+                      <button className="rounded border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50">
+                        Delete
+                      </button>
+                    </form>
                   </div>
-                </Card>
-              ))}
-            </div>
+                ),
+              }))}
+            />
           )}
         </div>
       </div>

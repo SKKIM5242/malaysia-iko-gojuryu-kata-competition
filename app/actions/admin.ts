@@ -497,6 +497,9 @@ export async function saveSchool(formData: FormData) {
     home_country: String(formData.get("home_country") ?? "").trim() || null,
     email: String(formData.get("email") ?? "").trim() || null,
     phone: String(formData.get("phone") ?? "").trim() || null,
+    bank_name: String(formData.get("bank_name") ?? "").trim() || null,
+    bank_account_no: String(formData.get("bank_account_no") ?? "").trim() || null,
+    bank_account_name: String(formData.get("bank_account_name") ?? "").trim() || null,
   };
   if (!values.name) backTo(returnTo, { error: "School name is required." });
   if (!values.contact_title || !values.contact_name || !values.contact_karate_title || !values.contact_rank) {
@@ -507,6 +510,9 @@ export async function saveSchool(formData: FormData) {
   }
   if (!values.email || !values.phone) {
     backTo(returnTo, { error: "Email address and mobile phone are required." });
+  }
+  if (!values.bank_name || !values.bank_account_no || !values.bank_account_name) {
+    backTo(returnTo, { error: "Bank name, account number, and account holder name are required." });
   }
   const record = { ...values, gender: values.contact_title === "Mr." ? "male" : "female" };
   const { supabase, actorId } = await getActor();
@@ -554,6 +560,8 @@ export async function saveSensei(formData: FormData) {
   const returnTo = "/admin/senseis";
   const values = {
     name: String(formData.get("name") ?? "").trim(),
+    ic_passport: String(formData.get("ic_passport") ?? "").trim() || null,
+    date_of_birth: String(formData.get("date_of_birth") ?? "").trim() || null,
     rank: String(formData.get("rank") ?? "").trim() || null,
     gender: String(formData.get("gender") ?? "").trim() || null,
     school_id: String(formData.get("school_id") ?? "") || null,
@@ -562,8 +570,13 @@ export async function saveSensei(formData: FormData) {
     home_country: String(formData.get("home_country") ?? "").trim() || null,
     email: String(formData.get("email") ?? "").trim() || null,
     phone: String(formData.get("phone") ?? "").trim() || null,
+    bank_name: String(formData.get("bank_name") ?? "").trim() || null,
+    bank_account_no: String(formData.get("bank_account_no") ?? "").trim() || null,
+    bank_account_name: String(formData.get("bank_account_name") ?? "").trim() || null,
   };
   if (!values.name) backTo(returnTo, { error: "Sensei name is required." });
+  if (!values.ic_passport) backTo(returnTo, { error: "IC / Passport is required." });
+  if (!values.rank) backTo(returnTo, { error: "Rank is required." });
   if (!values.gender || !["male", "female"].includes(values.gender)) {
     backTo(returnTo, { error: "Sex is required." });
   }
@@ -576,6 +589,9 @@ export async function saveSensei(formData: FormData) {
   const { supabase, actorId } = await getActor();
 
   const certificatePath = await uploadCertificateIfPresent(supabase, formData, "sensei", returnTo);
+  if (!id && !certificatePath) {
+    backTo(returnTo, { error: "Latest rank certificate is required." });
+  }
 
   if (!id) {
     // Guard against duplicate submissions (e.g. double-clicks)
@@ -1068,6 +1084,22 @@ export async function createStaffAccount(formData: FormData) {
   if (!full_name || !email) {
     backTo(returnTo, { error: "Full name and email are required." });
   }
+  const extra = {
+    ic_passport: String(formData.get("ic_passport") ?? "").trim() || null,
+    date_of_birth: String(formData.get("date_of_birth") ?? "").trim() || null,
+    gender: String(formData.get("gender") ?? "").trim() || null,
+    belt_rank: String(formData.get("belt_rank") ?? "").trim() || null,
+    home_address: String(formData.get("home_address") ?? "").trim() || null,
+    city_town: String(formData.get("city_town") ?? "").trim() || null,
+    country: String(formData.get("country") ?? "").trim() || null,
+    phone: String(formData.get("phone") ?? "").trim() || null,
+    bank_name: String(formData.get("bank_name") ?? "").trim() || null,
+    bank_account_no: String(formData.get("bank_account_no") ?? "").trim() || null,
+    bank_account_name: String(formData.get("bank_account_name") ?? "").trim() || null,
+  };
+  if (!extra.ic_passport) {
+    backTo(returnTo, { error: "IC / Passport is required." });
+  }
 
   const { supabase, actorId } = await getActor();
   const actorRole = await getActorRole(supabase, actorId);
@@ -1077,6 +1109,8 @@ export async function createStaffAccount(formData: FormData) {
   if (role === "customer_support" && !["admin", "organizer", "staff"].includes(actorRole ?? "")) {
     backTo(returnTo, { error: "Only Super Admin or Admin / Organizer can create Customer Support accounts." });
   }
+
+  const certificatePath = await uploadCertificateIfPresent(supabase, formData, "staff", returnTo);
 
   const tempPassword = crypto.randomUUID().replace(/-/g, "").slice(0, 14);
   const admin = createAdminClient();
@@ -1091,13 +1125,16 @@ export async function createStaffAccount(formData: FormData) {
   }
   // handle_new_user already inserted a profiles row with approved=false;
   // flip it here via the service-role client (never via client metadata).
-  await admin.from("profiles").update({ approved: true }).eq("user_id", created!.user!.id);
+  await admin
+    .from("profiles")
+    .update({ approved: true, ...extra, certificate_path: certificatePath })
+    .eq("user_id", created!.user!.id);
 
   await writeAudit(supabase, {
     table_name: "profiles",
     record_id: created!.user!.id,
     action: "staff_account_created",
-    new_value: { role, full_name, email },
+    new_value: { role, full_name, email, ...extra },
     actor_id: actorId,
   });
 

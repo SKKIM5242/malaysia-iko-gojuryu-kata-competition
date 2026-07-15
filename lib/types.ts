@@ -31,6 +31,9 @@ export interface School {
   city_town: string | null;
   email: string | null;
   phone: string | null;
+  bank_name: string | null;
+  bank_account_no: string | null;
+  bank_account_name: string | null;
   created_at: string;
 }
 
@@ -38,6 +41,8 @@ export interface Sensei {
   id: string;
   user_id: string | null;
   name: string;
+  ic_passport: string | null;
+  date_of_birth: string | null;
   rank: string | null;
   gender: string | null;
   school_id: string | null;
@@ -48,6 +53,9 @@ export interface Sensei {
   registered_by: string | null;
   email: string | null;
   phone: string | null;
+  bank_name: string | null;
+  bank_account_no: string | null;
+  bank_account_name: string | null;
   created_at: string;
   school?: Pick<School, "id" | "name"> | null;
 }

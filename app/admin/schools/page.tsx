@@ -3,6 +3,7 @@ import { getSchools, schemaReady } from "@/lib/data";
 import { saveSchool, deleteSchool, createInvitationCode } from "@/app/actions/admin";
 import { AdminShell, Card, adminBtn, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice } from "@/components/ui";
+import FilterableTable from "@/components/FilterableTable";
 
 export const dynamic = "force-dynamic";
 
@@ -121,6 +122,23 @@ export default async function AdminSchools({
                   <input id="phone" name="phone" type="tel" required defaultValue={editing?.phone ?? ""} className={adminInput} placeholder="+60…" />
                 </div>
               </div>
+              <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3">
+                <p className="text-xs font-bold uppercase tracking-wide text-neutral-500">Bank details *</p>
+                <div className="mt-2 grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="bank_name" className={adminLabel}>Bank name *</label>
+                    <input id="bank_name" name="bank_name" required defaultValue={editing?.bank_name ?? ""} className={adminInput} />
+                  </div>
+                  <div>
+                    <label htmlFor="bank_account_no" className={adminLabel}>Account no. *</label>
+                    <input id="bank_account_no" name="bank_account_no" required defaultValue={editing?.bank_account_no ?? ""} className={adminInput} />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label htmlFor="bank_account_name" className={adminLabel}>Account holder name *</label>
+                    <input id="bank_account_name" name="bank_account_name" required defaultValue={editing?.bank_account_name ?? ""} className={adminInput} />
+                  </div>
+                </div>
+              </div>
               <div className="flex gap-2">
                 <button type="submit" className={adminBtn}>{editing ? "Save changes" : "Add school"}</button>
                 {editing && (
@@ -138,65 +156,44 @@ export default async function AdminSchools({
           {schools.length === 0 ? (
             <EmptyState>No schools yet — add one on the left.</EmptyState>
           ) : (
-            <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white shadow-sm">
-              <table className="w-full min-w-[480px] text-left text-sm">
-                <thead className="border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
-                  <tr>
-                    <th className="px-4 py-3">Name</th>
-                    <th className="px-4 py-3">State</th>
-                    <th className="px-4 py-3">Person in-charge</th>
-                    <th className="px-4 py-3">Location</th>
-                    <th className="px-4 py-3">Contact</th>
-                    <th className="px-4 py-3">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-neutral-100">
-                  {schools.map((s) => (
-                    <tr key={s.id} className="hover:bg-neutral-50">
-                      <td className="max-w-[240px] truncate px-4 py-3 font-medium" title={s.name}>{s.name}</td>
-                      <td className="px-4 py-3">{s.state ?? "—"}</td>
-                      <td className="px-4 py-3 text-xs">
-                        {s.contact_name ? (
-                          <>
-                            {[s.contact_title, s.contact_name].filter(Boolean).join(" ")}
-                            {s.contact_karate_title && (
-                              <span className="block text-neutral-500">
-                                {s.contact_karate_title}{s.contact_rank ? ` — ${s.contact_rank}` : ""}
-                              </span>
-                            )}
-                          </>
-                        ) : (
-                          "—"
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-xs" title={[s.home_address, s.city_town].filter(Boolean).join(", ") || undefined}>
-                        {s.home_country ?? "—"}
-                      </td>
-                      <td className="px-4 py-3 text-xs">
-                        {s.email ?? "—"}
-                        {s.phone && <span className="block text-neutral-500">{s.phone}</span>}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex gap-1.5">
-                          <Link
-                            href={`/admin/schools?edit=${s.id}`}
-                            className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
-                          >
-                            Edit
-                          </Link>
-                          <form action={deleteSchool}>
-                            <input type="hidden" name="id" value={s.id} />
-                            <button className="rounded border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50">
-                              Delete
-                            </button>
-                          </form>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <FilterableTable
+              rowKey="id"
+              columns={[
+                { key: "name", label: "Name" },
+                { key: "state", label: "State" },
+                { key: "person_in_charge", label: "Person in-charge" },
+                { key: "location", label: "Location" },
+                { key: "contact", label: "Contact" },
+                { key: "bank", label: "Bank" },
+                { key: "actions", label: "Actions" },
+              ]}
+              rows={schools.map((s) => ({
+                id: s.id,
+                name: s.name,
+                state: s.state ?? "",
+                person_in_charge: [s.contact_title, s.contact_name].filter(Boolean).join(" ") +
+                  (s.contact_karate_title ? ` (${s.contact_karate_title}${s.contact_rank ? ` — ${s.contact_rank}` : ""})` : ""),
+                location: [s.home_address, s.city_town, s.home_country].filter(Boolean).join(", "),
+                contact: [s.email, s.phone].filter(Boolean).join(" · "),
+                bank: [s.bank_name, s.bank_account_no, s.bank_account_name].filter(Boolean).join(" · "),
+                actions: (
+                  <div className="flex gap-1.5">
+                    <Link
+                      href={`/admin/schools?edit=${s.id}`}
+                      className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
+                    >
+                      Edit
+                    </Link>
+                    <form action={deleteSchool}>
+                      <input type="hidden" name="id" value={s.id} />
+                      <button className="rounded border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50">
+                        Delete
+                      </button>
+                    </form>
+                  </div>
+                ),
+              }))}
+            />
           )}
         </div>
       </div>

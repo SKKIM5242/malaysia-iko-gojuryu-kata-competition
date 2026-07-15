@@ -3,6 +3,7 @@ import { schemaReady } from "@/lib/data";
 import { updateCommunityStatus, createInvitationCode } from "@/app/actions/admin";
 import { AdminShell, Card, adminBtn, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice } from "@/components/ui";
+import FilterableTable from "@/components/FilterableTable";
 
 export const dynamic = "force-dynamic";
 
@@ -89,33 +90,27 @@ export default async function AdminAudience({
       {!audiences || audiences.length === 0 ? (
         <EmptyState>No audience registrations yet.</EmptyState>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white shadow-sm">
-          <table className="w-full min-w-[720px] text-left text-sm">
-            <thead className="border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
-              <tr>
-                <th className="px-3 py-2.5">Name</th>
-                <th className="px-3 py-2.5">Contact</th>
-                <th className="px-3 py-2.5">Country</th>
-                <th className="px-3 py-2.5">Code</th>
-                <th className="px-3 py-2.5">Payment</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-100">
-              {(audiences as Audience[]).map((a) => (
-                <tr key={a.id} className="hover:bg-neutral-50">
-                  <td className="px-3 py-2.5 font-medium">{a.full_name}</td>
-                  <td className="px-3 py-2.5 text-xs">{a.email}{a.phone ? ` · ${a.phone}` : ""}</td>
-                  <td className="px-3 py-2.5">{a.home_country ?? "—"}</td>
-                  <td className="px-3 py-2.5 font-mono text-xs">{a.invitation_code ?? "—"}</td>
-                  <td className="px-3 py-2.5">
-                    <StatusButtons table="audiences" id={a.id} field="payment_status" current={a.payment_status}
-                      options={["pending", "paid", "waived"]} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <FilterableTable
+          rowKey="id"
+          columns={[
+            { key: "full_name", label: "Name" },
+            { key: "contact", label: "Contact" },
+            { key: "home_country", label: "Country" },
+            { key: "invitation_code", label: "Code" },
+            { key: "payment", label: "Payment" },
+          ]}
+          rows={(audiences as Audience[]).map((a) => ({
+            id: a.id,
+            full_name: a.full_name,
+            contact: [a.email, a.phone].filter(Boolean).join(" · "),
+            home_country: a.home_country ?? "",
+            invitation_code: a.invitation_code ?? "",
+            payment: (
+              <StatusButtons table="audiences" id={a.id} field="payment_status" current={a.payment_status}
+                options={["pending", "paid", "waived"]} />
+            ),
+          }))}
+        />
       )}
     </AdminShell>
   );

@@ -3,7 +3,8 @@ import { getSchools, getSenseis, schemaReady } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
 import { saveSensei, deleteSensei, createInvitationCode } from "@/app/actions/admin";
 import { AdminShell, Card, CertificateField, adminBtn, adminInput, adminLabel } from "@/components/admin";
-import { EmptyState, SetupNotice } from "@/components/ui";
+import { EmptyState, SetupNotice, formatDate } from "@/components/ui";
+import FilterableTable from "@/components/FilterableTable";
 
 export const dynamic = "force-dynamic";
 
@@ -67,8 +68,16 @@ export default async function AdminSenseis({
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label htmlFor="rank" className={adminLabel}>Rank</label>
-                  <input id="rank" name="rank" defaultValue={editing?.rank ?? ""} className={adminInput} placeholder="e.g. Godan" />
+                  <label htmlFor="ic_passport" className={adminLabel}>IC / Passport *</label>
+                  <input id="ic_passport" name="ic_passport" required defaultValue={editing?.ic_passport ?? ""} className={adminInput} />
+                </div>
+                <div>
+                  <label htmlFor="date_of_birth" className={adminLabel}>Date of birth</label>
+                  <input id="date_of_birth" name="date_of_birth" type="date" defaultValue={editing?.date_of_birth ?? ""} className={adminInput} />
+                </div>
+                <div>
+                  <label htmlFor="rank" className={adminLabel}>Rank *</label>
+                  <input id="rank" name="rank" required defaultValue={editing?.rank ?? ""} className={adminInput} placeholder="e.g. Godan" />
                 </div>
                 <div>
                   <label htmlFor="gender" className={adminLabel}>Sex *</label>
@@ -78,8 +87,9 @@ export default async function AdminSenseis({
                     <option value="female">Female</option>
                   </select>
                 </div>
-                <div>
+                <div className="sm:col-span-2">
                   <CertificateField
+                    required
                     currentUrl={editing?.certificate_path ? certUrls.get(editing.certificate_path) : undefined}
                   />
                 </div>
@@ -113,6 +123,23 @@ export default async function AdminSenseis({
                   <input id="phone" name="phone" type="tel" required defaultValue={editing?.phone ?? ""} className={adminInput} placeholder="+60…" />
                 </div>
               </div>
+              <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3">
+                <p className="text-xs font-bold uppercase tracking-wide text-neutral-500">Payout bank details</p>
+                <div className="mt-2 grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="bank_name" className={adminLabel}>Bank name</label>
+                    <input id="bank_name" name="bank_name" defaultValue={editing?.bank_name ?? ""} className={adminInput} />
+                  </div>
+                  <div>
+                    <label htmlFor="bank_account_no" className={adminLabel}>Account no.</label>
+                    <input id="bank_account_no" name="bank_account_no" defaultValue={editing?.bank_account_no ?? ""} className={adminInput} />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label htmlFor="bank_account_name" className={adminLabel}>Account holder name</label>
+                    <input id="bank_account_name" name="bank_account_name" defaultValue={editing?.bank_account_name ?? ""} className={adminInput} />
+                  </div>
+                </div>
+              </div>
               <div className="flex gap-2">
                 <button type="submit" className={adminBtn}>{editing ? "Save changes" : "Add sensei"}</button>
                 {editing && (
@@ -130,69 +157,63 @@ export default async function AdminSenseis({
           {senseis.length === 0 ? (
             <EmptyState>No senseis yet — add one on the left.</EmptyState>
           ) : (
-            <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white shadow-sm">
-              <table className="w-full min-w-[560px] text-left text-sm">
-                <thead className="border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
-                  <tr>
-                    <th className="px-4 py-3">Name</th>
-                    <th className="px-4 py-3">Rank</th>
-                    <th className="px-4 py-3">Certificate</th>
-                    <th className="px-4 py-3">Location</th>
-                    <th className="px-4 py-3">Contact</th>
-                    <th className="px-4 py-3">School</th>
-                    <th className="px-4 py-3">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-neutral-100">
-                  {senseis.map((s) => (
-                    <tr key={s.id} className="hover:bg-neutral-50">
-                      <td className="px-4 py-3 font-medium">{s.name}</td>
-                      <td className="px-4 py-3">{s.rank ?? "—"}</td>
-                      <td className="px-4 py-3 text-xs">
-                        {s.certificate_path && certUrls.get(s.certificate_path) ? (
-                          <a
-                            href={certUrls.get(s.certificate_path)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="font-semibold text-green-700 underline underline-offset-2"
-                          >
-                            View
-                          </a>
-                        ) : (
-                          <span className="text-neutral-400">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-xs" title={[s.home_address, s.city_town].filter(Boolean).join(", ") || undefined}>
-                        {s.home_country ?? "—"}
-                      </td>
-                      <td className="px-4 py-3 text-xs">
-                        {s.email ?? "—"}
-                        {s.phone && <span className="block text-neutral-500">{s.phone}</span>}
-                      </td>
-                      <td className="max-w-[220px] truncate px-4 py-3" title={s.school?.name ?? undefined}>
-                        {s.school?.name ?? "—"}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex gap-1.5">
-                          <Link
-                            href={`/admin/senseis?edit=${s.id}`}
-                            className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
-                          >
-                            Edit
-                          </Link>
-                          <form action={deleteSensei}>
-                            <input type="hidden" name="id" value={s.id} />
-                            <button className="rounded border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50">
-                              Delete
-                            </button>
-                          </form>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <FilterableTable
+              rowKey="id"
+              columns={[
+                { key: "name", label: "Name" },
+                { key: "ic_passport", label: "IC / Passport" },
+                { key: "date_of_birth", label: "DOB" },
+                { key: "rank", label: "Rank" },
+                { key: "gender", label: "Sex" },
+                { key: "certificate", label: "Certificate" },
+                { key: "location", label: "Location" },
+                { key: "contact", label: "Contact" },
+                { key: "bank", label: "Payout Bank" },
+                { key: "school", label: "School" },
+                { key: "actions", label: "Actions" },
+              ]}
+              rows={senseis.map((s) => ({
+                id: s.id,
+                name: s.name,
+                ic_passport: s.ic_passport ?? "",
+                date_of_birth: formatDate(s.date_of_birth),
+                rank: s.rank ?? "",
+                gender: s.gender ?? "",
+                certificate:
+                  s.certificate_path && certUrls.get(s.certificate_path) ? (
+                    <a
+                      href={certUrls.get(s.certificate_path)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-semibold text-green-700 underline underline-offset-2"
+                    >
+                      View
+                    </a>
+                  ) : (
+                    <span className="text-neutral-400">—</span>
+                  ),
+                location: [s.home_address, s.city_town, s.home_country].filter(Boolean).join(", "),
+                contact: [s.email, s.phone].filter(Boolean).join(" · "),
+                bank: [s.bank_name, s.bank_account_no, s.bank_account_name].filter(Boolean).join(" · "),
+                school: s.school?.name ?? "",
+                actions: (
+                  <div className="flex gap-1.5">
+                    <Link
+                      href={`/admin/senseis?edit=${s.id}`}
+                      className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
+                    >
+                      Edit
+                    </Link>
+                    <form action={deleteSensei}>
+                      <input type="hidden" name="id" value={s.id} />
+                      <button className="rounded border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50">
+                        Delete
+                      </button>
+                    </form>
+                  </div>
+                ),
+              }))}
+            />
           )}
         </div>
       </div>

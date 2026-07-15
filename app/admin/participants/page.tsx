@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { saveParticipant, deleteParticipant } from "@/app/actions/admin";
 import { AdminShell, Card, CertificateField, adminBtn, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice, formatDate } from "@/components/ui";
+import FilterableTable from "@/components/FilterableTable";
 
 export const dynamic = "force-dynamic";
 
@@ -178,85 +179,65 @@ export default async function AdminParticipants({
           {participants.length === 0 ? (
             <EmptyState>No participants yet.</EmptyState>
           ) : (
-            <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white shadow-sm">
-              <table className="w-full min-w-[640px] text-left text-sm">
-                <thead className="border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
-                  <tr>
-                    <th className="px-4 py-3">Name</th>
-                    <th className="px-4 py-3">IC / Passport</th>
-                    <th className="px-4 py-3">DOB</th>
-                    <th className="px-4 py-3">Belt</th>
-                    <th className="px-4 py-3">Rank status</th>
-                    <th className="px-4 py-3">Country</th>
-                    <th className="px-4 py-3">School</th>
-                    <th className="px-4 py-3">Payout bank</th>
-                    <th className="px-4 py-3">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-neutral-100">
-                  {participants.map((p) => (
-                    <tr key={p.id} className="hover:bg-neutral-50">
-                      <td className="px-4 py-3 font-medium">{p.full_name}</td>
-                      <td className="px-4 py-3 font-mono text-xs">{p.ic_passport}</td>
-                      <td className="px-4 py-3 whitespace-nowrap">{formatDate(p.date_of_birth)}</td>
-                      <td className="px-4 py-3">{p.belt_rank ?? "—"}</td>
-                      <td className="px-4 py-3 text-xs">
-                        {p.certificate_path && certUrls.get(p.certificate_path) ? (
-                          <a
-                            href={certUrls.get(p.certificate_path)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="font-semibold text-green-700 underline underline-offset-2"
-                          >
-                            View certificate
-                          </a>
-                        ) : p.rank_confirmation === "sensei_confirmed" ? (
-                          <span className="font-semibold text-green-700">Sensei confirmed</span>
-                        ) : p.rank_confirmation === "pending_confirmation" ? (
-                          <span className="text-amber-600">Pending</span>
-                        ) : (
-                          <span className="text-neutral-400">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-xs" title={[p.home_address, p.city_town].filter(Boolean).join(", ") || undefined}>
-                        {p.home_country ?? "—"}
-                      </td>
-                      <td className="max-w-[180px] truncate px-4 py-3" title={p.school?.name ?? undefined}>
-                        {p.school?.name ?? "—"}
-                      </td>
-                      <td className="px-4 py-3 text-xs">
-                        {p.bank ? (
-                          <span title={p.bank.bank_account_name}>
-                            {p.bank.bank_name}
-                            <span className="block font-mono text-neutral-500">{p.bank.bank_account_no}</span>
-                          </span>
-                        ) : (
-                          <span className="text-neutral-400">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex gap-1.5">
-                          <Link
-                            href={`/admin/participants?edit=${p.id}`}
-                            className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
-                          >
-                            Edit
-                          </Link>
-                          {canDelete && (
-                            <form action={deleteParticipant}>
-                              <input type="hidden" name="id" value={p.id} />
-                              <button className="rounded border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50">
-                                Delete
-                              </button>
-                            </form>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <FilterableTable
+              rowKey="id"
+              columns={[
+                { key: "full_name", label: "Name" },
+                { key: "ic_passport", label: "IC / Passport" },
+                { key: "date_of_birth", label: "DOB" },
+                { key: "belt_rank", label: "Belt" },
+                { key: "rank_status", label: "Rank status" },
+                { key: "home_country", label: "Country" },
+                { key: "school", label: "School" },
+                { key: "bank", label: "Payout bank" },
+                { key: "actions", label: "Actions" },
+              ]}
+              rows={participants.map((p) => ({
+                id: p.id,
+                full_name: p.full_name,
+                ic_passport: p.ic_passport,
+                date_of_birth: formatDate(p.date_of_birth),
+                belt_rank: p.belt_rank ?? "",
+                rank_status:
+                  p.certificate_path && certUrls.get(p.certificate_path) ? (
+                    <a
+                      href={certUrls.get(p.certificate_path)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-semibold text-green-700 underline underline-offset-2"
+                    >
+                      View certificate
+                    </a>
+                  ) : p.rank_confirmation === "sensei_confirmed" ? (
+                    <span className="font-semibold text-green-700">Sensei confirmed</span>
+                  ) : p.rank_confirmation === "pending_confirmation" ? (
+                    <span className="text-amber-600">Pending</span>
+                  ) : (
+                    <span className="text-neutral-400">—</span>
+                  ),
+                home_country: p.home_country ?? "",
+                school: p.school?.name ?? "",
+                bank: p.bank ? `${p.bank.bank_name} · ${p.bank.bank_account_no}` : "",
+                actions: (
+                  <div className="flex gap-1.5">
+                    <Link
+                      href={`/admin/participants?edit=${p.id}`}
+                      className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
+                    >
+                      Edit
+                    </Link>
+                    {canDelete && (
+                      <form action={deleteParticipant}>
+                        <input type="hidden" name="id" value={p.id} />
+                        <button className="rounded border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50">
+                          Delete
+                        </button>
+                      </form>
+                    )}
+                  </div>
+                ),
+              }))}
+            />
           )}
         </div>
       </div>
