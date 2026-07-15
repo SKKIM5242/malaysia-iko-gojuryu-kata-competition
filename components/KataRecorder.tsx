@@ -22,8 +22,8 @@ function pickMimeType(): string {
 }
 
 /** Draws the branded competition frame: colorful title banner, live camera
- * feed, a tatami-mat standing zone, and a light watermark — all burned into
- * the recorded pixels via canvas.captureStream(), never the raw camera feed. */
+ * feed, and a light watermark — all burned into the recorded pixels via
+ * canvas.captureStream(), never the raw camera feed. */
 function drawFrame(
   ctx: CanvasRenderingContext2D,
   video: HTMLVideoElement,
@@ -34,7 +34,6 @@ function drawFrame(
   ctx.drawImage(video, 0, 0, w, h);
 
   const topH = Math.round(h * 0.11);
-  const bottomH = Math.round(h * 0.14);
 
   // Top banner — colorful gradient declaration
   const grad = ctx.createLinearGradient(0, 0, w, 0);
@@ -56,50 +55,14 @@ function drawFrame(
   ctx.fillText("Organized by IKO GOJU-RYU KARATE-DO MALAYSIA SDN BHD", w / 2, topH * 0.82);
   ctx.shadowBlur = 0;
 
-  // Bottom tatami-mat floor guide
-  const tileSize = Math.max(18, Math.round(w / 14));
-  const bottomY = h - bottomH;
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(0, bottomY, w, bottomH);
-  ctx.clip();
-  ctx.globalAlpha = 0.55;
-  for (let y = bottomY - (bottomY % tileSize); y < h; y += tileSize) {
-    for (let x = 0; x < w; x += tileSize) {
-      const even = (Math.round(x / tileSize) + Math.round(y / tileSize)) % 2 === 0;
-      ctx.fillStyle = even ? "#15803d" : "#166534";
-      ctx.fillRect(x, y, tileSize, tileSize);
-      ctx.strokeStyle = "rgba(255,255,255,0.25)";
-      ctx.strokeRect(x, y, tileSize, tileSize);
-    }
-  }
-  ctx.globalAlpha = 1;
-  ctx.restore();
-
-  // Standing-zone marker
-  const zoneW = w * 0.42;
-  const zoneX = (w - zoneW) / 2;
-  ctx.save();
-  ctx.strokeStyle = "#fde047";
-  ctx.lineWidth = Math.max(2, w * 0.004);
-  ctx.setLineDash([10, 8]);
-  ctx.strokeRect(zoneX, bottomY + 4, zoneW, bottomH - 8);
-  ctx.setLineDash([]);
-  ctx.fillStyle = "#fde047";
-  ctx.shadowColor = "rgba(0,0,0,0.7)";
-  ctx.shadowBlur = 3;
-  ctx.font = `bold ${Math.max(10, Math.round(bottomH * 0.28))}px Arial, sans-serif`;
-  ctx.fillText("STAND HERE", w / 2, bottomY + bottomH / 2 + bottomH * 0.1);
-  ctx.restore();
-
-  // Light watermark, just above the tatami strip
+  // Light watermark, bottom of frame
   ctx.save();
   ctx.globalAlpha = 0.38;
   ctx.fillStyle = "#ffffff";
   ctx.shadowColor = "rgba(0,0,0,0.55)";
   ctx.shadowBlur = 3;
   ctx.font = `${Math.max(9, Math.round(w * 0.018))}px Arial, sans-serif`;
-  ctx.fillText(watermark, w / 2, bottomY - 8);
+  ctx.fillText(watermark, w / 2, h - 10);
   ctx.restore();
 }
 
