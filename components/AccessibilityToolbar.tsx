@@ -119,12 +119,19 @@ export default function AccessibilityToolbar() {
   const [allVoices, setAllVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [selectedVoiceURI, setSelectedVoiceURI] = useState("");
 
+  const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
+
   const queueRef = useRef<string[]>([]);
   const indexRef = useRef(0);
+  const charIndexRef = useRef(0);
   const rateRef = useRef(1);
   const voiceRef = useRef<SpeechSynthesisVoice | null>(null);
   const selectedLangRef = useRef("en");
+  const restartingRef = useRef(false);
   const keepAliveRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const draggingRef = useRef(false);
+  const dragOffsetRef = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
     rateRef.current = rate;
@@ -158,6 +165,42 @@ export default function AccessibilityToolbar() {
     voiceRef.current = curatedVoices.find((v) => v.voiceURI === selectedVoiceURI) ?? null;
   }, [curatedVoices, selectedVoiceURI]);
 
+  const handleDragMove = useCallback((e: PointerEvent) => {
+    if (!draggingRef.current) return;
+    const panelW = panelRef.current?.offsetWidth ?? 288;
+    const panelH = panelRef.current?.offsetHeight ?? 300;
+    const x = Math.min(Math.max(8, e.clientX - dragOffsetRef.current.x), window.innerWidth - panelW - 8);
+    const y = Math.min(Math.max(8, e.clientY - dragOffsetRef.current.y), window.innerHeight - panelH - 8);
+    setDragPos({ x, y });
+  }, []);
+
+  const handleDragEnd = useCallback(() => {
+    draggingRef.current = false;
+    window.removeEventListener("pointermove", handleDragMove);
+    window.removeEventListener("pointerup", handleDragEnd);
+  }, [handleDragMove]);
+
+  const handleDragStart = useCallback(
+    (e: React.PointerEvent) => {
+      const rect = panelRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      e.preventDefault();
+      draggingRef.current = true;
+      dragOffsetRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      setDragPos({ x: rect.left, y: rect.top });
+      window.addEventListener("pointermove", handleDragMove);
+      window.addEventListener("pointerup", handleDragEnd);
+    },
+    [handleDragMove, handleDragEnd]
+  );
+
+  useEffect(() => {
+    return () => {
+      window.removeEventListener("pointermove", handleDragMove);
+      window.removeEventListener("pointerup", handleDragEnd);
+    };
+  }, [handleDragMove, handleDragEnd]);
+
   const stopKeepAlive = useCallback(() => {
     if (keepAliveRef.current) clearInterval(keepAliveRef.current);
     keepAliveRef.current = null;
@@ -189,17 +232,50 @@ export default function AccessibilityToolbar() {
     utterance.rate = rateRef.current;
     utterance.lang = selectedLangRef.current;
     if (voiceRef.current) utterance.voice = voiceRef.current;
+    utterance.onboundary = (e) => {
+      charIndexRef.current = e.charIndex;
+    };
     utterance.onend = () => {
       indexRef.current += 1;
+      charIndexRef.current = 0;
       speakNext();
     };
     utterance.onerror = () => {
+      // A cancel() triggered by a live speed change fires this too — swallow
+      // it there so it doesn't look like reading stopped/broke.
+      if (restartingRef.current) {
+        restartingRef.current = false;
+        return;
+      }
       setIsSpeaking(false);
       setIsPaused(false);
       stopKeepAlive();
     };
     window.speechSynthesis.speak(utterance);
   }, [stopKeepAlive]);
+
+  /** Speed slider changes can't alter an utterance already in progress (the
+   * Web Speech API bakes `rate` in at speak()-time), so to make it feel
+   * "live" we cancel the current chunk and re-speak only its unread
+   * remainder (tracked via onboundary) at the new rate. */
+  const applyRateChange = useCallback(
+    (newRate: number) => {
+      setRate(newRate);
+      rateRef.current = newRate;
+      const synth = window.speechSynthesis;
+      if (!isSpeaking || isPaused || !synth.speaking) return;
+      const currentChunk = queueRef.current[indexRef.current];
+      if (!currentChunk) return;
+      const remaining = currentChunk.slice(charIndexRef.current).trimStart();
+      if (!remaining) return;
+      restartingRef.current = true;
+      queueRef.current[indexRef.current] = remaining;
+      charIndexRef.current = 0;
+      synth.cancel();
+      setTimeout(() => speakNext(), 50);
+    },
+    [isSpeaking, isPaused, speakNext]
+  );
 
   const handlePlayPause = useCallback(() => {
     const synth = window.speechSynthesis;
@@ -295,7 +371,11 @@ export default function AccessibilityToolbar() {
   return (
     <div className="fixed bottom-4 right-4 z-[60] flex flex-col items-end gap-2 print:hidden">
       {open && (
-        <div className="relative w-72 rounded-xl border border-neutral-200 bg-white p-4 shadow-2xl">
+        <div
+          ref={panelRef}
+          className="relative w-72 rounded-xl border border-neutral-200 bg-white p-4 shadow-2xl"
+          style={dragPos ? { position: "fixed", left: dragPos.x, top: dragPos.y, right: "auto", bottom: "auto" } : undefined}
+        >
           <button
             type="button"
             onClick={() => setOpen(false)}
@@ -305,6 +385,15 @@ export default function AccessibilityToolbar() {
           >
             ✕
           </button>
+
+          <div
+            onPointerDown={handleDragStart}
+            title="Drag to move"
+            aria-label="Drag to move this panel"
+            className="mb-2 flex cursor-move justify-center rounded-md py-1 pr-6 hover:bg-neutral-50"
+          >
+            <span className="h-1 w-10 rounded-full bg-neutral-300" />
+          </div>
 
           <div className="mb-4 pr-6">
             <p className="mb-2 text-xs font-bold uppercase tracking-wide text-neutral-500">Read Aloud</p>
@@ -334,9 +423,9 @@ export default function AccessibilityToolbar() {
                 max={2}
                 step={0.1}
                 value={rate}
-                onChange={(e) => setRate(parseFloat(e.target.value))}
+                onChange={(e) => applyRateChange(parseFloat(e.target.value))}
                 aria-label="Reading speed"
-                title="Reading speed"
+                title="Reading speed — adjusts live, even mid-sentence, in any language"
                 className="flex-1 accent-red-700"
               />
               <span className="w-9 shrink-0 text-right text-xs text-neutral-500">{rate.toFixed(1)}x</span>
@@ -350,24 +439,36 @@ export default function AccessibilityToolbar() {
                 Voice Selection
               </label>
               {curatedVoices.length > 0 ? (
-                <select
-                  id="a11y-voice-select"
-                  value={selectedVoiceURI}
-                  onChange={(e) => setSelectedVoiceURI(e.target.value)}
-                  title="Choose a reading voice"
-                  className="w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
-                >
-                  {curatedVoices.map((v) => (
-                    <option key={v.voiceURI} value={v.voiceURI}>
-                      {current.flag} {cleanVoiceLabel(v.name)}
-                    </option>
-                  ))}
-                </select>
+                <>
+                  <select
+                    id="a11y-voice-select"
+                    value={selectedVoiceURI}
+                    onChange={(e) => setSelectedVoiceURI(e.target.value)}
+                    title="Choose a reading voice"
+                    className="w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
+                  >
+                    {curatedVoices.map((v) => (
+                      <option key={v.voiceURI} value={v.voiceURI}>
+                        {current.flag} {cleanVoiceLabel(v.name)}
+                      </option>
+                    ))}
+                  </select>
+                  {curatedVoices.length < 4 && (
+                    <p className="mt-1 text-[11px] text-neutral-400">
+                      Only {curatedVoices.length} {current.label} voice{curatedVoices.length === 1 ? "" : "s"} found
+                      on this device (aiming for up to 2 male + 2 female).
+                    </p>
+                  )}
+                </>
               ) : (
                 <p className="text-[11px] text-neutral-400">
-                  No {current.label} voice installed on this device — using the browser&apos;s default voice.
+                  No {current.label} voice installed on this device — using the browser&apos;s default voice
+                  instead.
                 </p>
               )}
+              <p className="mt-1 text-[11px] text-neutral-400">
+                Voice Selection depends on your device&apos;s OS system availability.
+              </p>
             </div>
           </div>
 
