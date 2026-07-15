@@ -24,35 +24,6 @@ const FULL_NAV: Array<[string, string]> = [
   ["Accounts", "/admin/accounts"],
 ];
 
-const CUSTOMER_SUPPORT_NAV: Array<[string, string]> = [
-  ["Dashboard", "/admin"],
-  ["Registrations", "/admin/registrations"],
-  ["Competitions", "/admin/competitions"],
-  ["Announcements", "/admin/announcements"],
-  ["Senseis", "/admin/senseis"],
-  ["Participants", "/admin/participants"],
-  ["Referees", "/admin/referees"],
-  ["Audience", "/admin/audience"],
-  ["Judging", "/admin/judging"],
-  ["Kata Categories", "/kata-categories"],
-  ["Kata Arena", "/kata-arena"],
-  ["Participant Records", "/admin/records"],
-  ["Telegram Links", "/admin/telegram"],
-];
-
-const REFEREE_NAV: Array<[string, string]> = [
-  ["Dashboard", "/admin"],
-  ["Registrations", "/admin/registrations"],
-  ["Competitions", "/admin/competitions"],
-  ["Announcements", "/admin/announcements"],
-  ["Participants", "/admin/participants"],
-  ["Judging", "/admin/judging"],
-  ["Kata Categories", "/kata-categories"],
-  ["Kata Arena", "/kata-arena"],
-  ["Participant Records", "/admin/records"],
-  ["Telegram Links", "/admin/telegram"],
-];
-
 export async function AdminShell({
   title,
   active,
@@ -74,13 +45,9 @@ export async function AdminShell({
   const role = profile?.role ?? null;
 
   const nav =
-    role === "customer_support"
-      ? CUSTOMER_SUPPORT_NAV
-      : role === "referee"
-        ? REFEREE_NAV
-        : role === "organizer" || role === "staff"
-          ? FULL_NAV.filter(([, href]) => href !== "/admin/accounts")
-          : FULL_NAV;
+    role === "admin"
+      ? FULL_NAV
+      : FULL_NAV.filter(([, href]) => href !== "/admin/accounts");
   return (
     <div className="min-h-screen bg-neutral-100">
       <header className="border-b border-neutral-800 bg-neutral-950 text-white">

@@ -57,23 +57,15 @@ export async function updateSession(request: NextRequest) {
     } = await supabase.auth.getUser();
 
     // Admin routes require an approved admin-tier session — a signed-in
-    // participant must NOT reach /admin just by being logged in. Tiers share
-    // /admin with different route allow-lists:
-    //   admin (Super Admin)      -> everything
-    //   organizer / staff        -> everything except /admin/accounts;
-    //                               /admin/judging is reachable but the page
-    //                               itself only shows them a read-only view
-    //                               (no assign-referee / scoring-config UI)
-    //   customer_support         -> dashboard, registrations, participants,
-    //                               competitions, announcements, senseis,
-    //                               referees, audience, and judging
-    //                               (judging + registrations approve/reject
-    //                               are further narrowed at the page/action
-    //                               level — see app/actions/admin.ts)
-    //   referee                  -> dashboard, competitions (category-level
-    //                               actions there), registrations (view
-    //                               only), participants, announcements, and
-    //                               judging (view only)
+    // participant must NOT reach /admin just by being logged in. Per the
+    // organiser's explicit instruction, every approved staff-tier role
+    // (admin, organizer/staff, customer_support, referee) gets full access
+    // to every /admin listing page, including bank/IC details on Schools,
+    // Senseis, Organizers, and Support — only /admin/accounts (staff
+    // account approvals + invitation codes) stays restricted to the Super
+    // Admin. Write actions for sensitive operations (e.g. assigning
+    // referees, approving registrations) are narrowed further at the
+    // page/action level — see app/actions/admin.ts.
     if (request.nextUrl.pathname.startsWith("/admin")) {
       if (!user) {
         return redirectTo("/login");
@@ -88,28 +80,9 @@ export async function updateSession(request: NextRequest) {
 
       if (role === "admin") {
         // full access
-      } else if (role === "organizer" || role === "staff") {
+      } else if (role === "organizer" || role === "staff" || role === "customer_support" || role === "referee") {
         if (path.startsWith("/admin/accounts")) {
-          return redirectTo("/account");
-        }
-      } else if (role === "customer_support") {
-        const allowedPrefixes = [
-          "/admin/registrations", "/admin/participants", "/admin/competitions",
-          "/admin/announcements", "/admin/senseis", "/admin/referees", "/admin/audience", "/admin/judging",
-          "/admin/telegram", "/admin/records",
-        ];
-        const ok = path === "/admin" || allowedPrefixes.some((p) => path === p || path.startsWith(`${p}/`));
-        if (!ok) {
-          return redirectTo("/admin/registrations");
-        }
-      } else if (role === "referee") {
-        const allowedPrefixes = [
-          "/admin/competitions", "/admin/registrations", "/admin/participants",
-          "/admin/announcements", "/admin/judging", "/admin/telegram", "/admin/records",
-        ];
-        const ok = path === "/admin" || allowedPrefixes.some((p) => path === p || path.startsWith(`${p}/`));
-        if (!ok) {
-          return redirectTo("/admin/competitions");
+          return redirectTo("/admin");
         }
       } else {
         return redirectTo("/account");
