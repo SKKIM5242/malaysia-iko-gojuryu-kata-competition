@@ -18,6 +18,7 @@ const FULL_NAV: Array<[string, string]> = [
   ["Judging", "/admin/judging"],
   ["Kata Categories", "/kata-categories"],
   ["Kata Arena", "/kata-arena"],
+  ["Participant Records", "/admin/records"],
   ["Telegram Links", "/admin/telegram"],
   ["Classes", "/admin/classes"],
   ["Accounts", "/admin/accounts"],
@@ -35,6 +36,7 @@ const CUSTOMER_SUPPORT_NAV: Array<[string, string]> = [
   ["Judging", "/admin/judging"],
   ["Kata Categories", "/kata-categories"],
   ["Kata Arena", "/kata-arena"],
+  ["Participant Records", "/admin/records"],
   ["Telegram Links", "/admin/telegram"],
 ];
 
@@ -47,6 +49,7 @@ const REFEREE_NAV: Array<[string, string]> = [
   ["Judging", "/admin/judging"],
   ["Kata Categories", "/kata-categories"],
   ["Kata Arena", "/kata-arena"],
+  ["Participant Records", "/admin/records"],
   ["Telegram Links", "/admin/telegram"],
 ];
 

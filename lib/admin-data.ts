@@ -103,6 +103,72 @@ export async function getAllParticipants(): Promise<Participant[]> {
   return (data as unknown as Participant[]) ?? [];
 }
 
+export interface ParticipantRecord {
+  registrationId: string;
+  competitionName: string | null;
+  categoryName: string | null;
+  participant: Participant;
+  recordAttempts: number;
+  videoCreatedAt: string | null;
+  videoUrl: string | null;
+}
+
+/** One row per successfully-paid registration, joining participant details,
+ * assigned category, submitted-kata-video status, and re-record attempt
+ * count — the dataset behind the admin Participant Records page. */
+export async function getParticipantRecords(): Promise<ParticipantRecord[]> {
+  const supabase = await createClient();
+  const { data: regs } = await supabase
+    .from("registrations")
+    .select(
+      "id, participant:participants(*, school:schools(id,name,state), sensei:senseis(id,name,rank), bank:participant_bank_details(bank_name,bank_account_no,bank_account_name)), category:categories(id,name), competition:competitions(id,name)",
+    )
+    .eq("payment_status", "paid")
+    .order("created_at", { ascending: false });
+  const regList =
+    (regs as unknown as Array<{
+      id: string;
+      participant: Participant | null;
+      category: { id: string; name: string } | null;
+      competition: { id: string; name: string } | null;
+    }>) ?? [];
+  if (regList.length === 0) return [];
+
+  const regIds = regList.map((r) => r.id);
+  const [{ data: videos }, { data: profiles }] = await Promise.all([
+    supabase.from("kata_videos").select("registration_id, storage_path, created_at").in("registration_id", regIds),
+    supabase.from("profiles").select("registration_id, record_attempts").in("registration_id", regIds),
+  ]);
+  const videoByReg = new Map(
+    (videos ?? []).map((v) => [v.registration_id as string, { storagePath: v.storage_path as string, createdAt: v.created_at as string }]),
+  );
+  const attemptsByReg = new Map((profiles ?? []).map((p) => [p.registration_id as string, p.record_attempts as number]));
+
+  const paths = [...videoByReg.values()].map((v) => v.storagePath);
+  const signedUrlByPath = new Map<string, string>();
+  if (paths.length > 0) {
+    const { data: signed } = await supabase.storage.from("kata-videos").createSignedUrls(paths, 3600);
+    for (const s of signed ?? []) {
+      if (s.path && s.signedUrl) signedUrlByPath.set(s.path, s.signedUrl);
+    }
+  }
+
+  return regList
+    .filter((r) => r.participant)
+    .map((r) => {
+      const video = videoByReg.get(r.id);
+      return {
+        registrationId: r.id,
+        competitionName: r.competition?.name ?? null,
+        categoryName: r.category?.name ?? null,
+        participant: r.participant as Participant,
+        recordAttempts: attemptsByReg.get(r.id) ?? 0,
+        videoCreatedAt: video?.createdAt ?? null,
+        videoUrl: video ? (signedUrlByPath.get(video.storagePath) ?? null) : null,
+      };
+    });
+}
+
 export async function getRecentAuditLogs(limit = 20): Promise<AuditLog[]> {
   const supabase = await createClient();
   const { data } = await supabase

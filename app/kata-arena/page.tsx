@@ -7,6 +7,7 @@ import { winnersRevealed } from "@/lib/winners";
 import { CategoryName, NoTranslate, SetupNotice, SiteFooter, SiteHeader } from "@/components/ui";
 import AuthForms from "@/components/AuthForms";
 import ClaimForm from "@/components/ClaimForm";
+import VideoWatchButton from "@/components/VideoWatchButton";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Kata Arena" };
@@ -43,16 +44,7 @@ function RecordingCard({
               Final {entry.finalScore.toFixed(1)}
             </span>
           )}
-          {entry.playbackUrl && (
-            <a
-              href={entry.playbackUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="rounded border border-neutral-300 px-3 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
-            >
-              Watch
-            </a>
-          )}
+          <VideoWatchButton url={entry.playbackUrl} />
         </div>
       </div>
       {showJudgeScores && (

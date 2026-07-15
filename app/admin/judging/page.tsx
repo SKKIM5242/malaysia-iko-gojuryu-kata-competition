@@ -6,6 +6,7 @@ import {
 } from "@/app/actions/admin";
 import { AdminShell, Card, adminBtn, adminInput } from "@/components/admin";
 import { CategoryName, EmptyState, SetupNotice, TelegramFullAccessLinks } from "@/components/ui";
+import VideoWatchButton from "@/components/VideoWatchButton";
 import { getAllTelegramLinks } from "@/lib/telegram";
 import { finalScore } from "@/lib/scoring";
 
@@ -106,16 +107,7 @@ export default async function AdminJudging({
             <p className="font-bold text-neutral-900">{v.participant?.full_name ?? "Unknown participant"}</p>
             <p className="text-sm text-neutral-500"><CategoryName name={v.registration?.category?.name} /></p>
           </div>
-          {playbackUrl && (
-            <a
-              href={playbackUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="shrink-0 rounded border border-neutral-300 px-3 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
-            >
-              Watch recording
-            </a>
-          )}
+          <VideoWatchButton url={playbackUrl ?? null} label="Watch recording" />
         </div>
 
         <div className="mt-3 flex flex-wrap items-center gap-1.5">
