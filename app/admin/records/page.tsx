@@ -1,3 +1,4 @@
+import { createClient } from "@/lib/supabase/server";
 import { schemaReady } from "@/lib/data";
 import {
   getAudienceRecords,
@@ -69,6 +70,15 @@ export default async function AdminParticipantRecords() {
     getSenseiRecords(),
     getStaffAccountRecords(),
   ]);
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { data: myProfile } = user
+    ? await supabase.from("profiles").select("role").eq("user_id", user.id).maybeSingle()
+    : { data: null };
+  const isAdmin = myProfile?.role === "admin";
 
   const participantRows: ParticipantRecordRow[] = participantRecords.map((r) => ({
     registrationId: r.registrationId,
@@ -246,7 +256,7 @@ export default async function AdminParticipantRecords() {
         {participantRows.length === 0 ? (
           <EmptyState>No successful registrations yet.</EmptyState>
         ) : (
-          <ParticipantRecordsTable rows={participantRows} />
+          <ParticipantRecordsTable rows={participantRows} isAdmin={isAdmin} />
         )}
       </Section>
 

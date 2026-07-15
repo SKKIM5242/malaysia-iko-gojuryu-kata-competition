@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { CategoryName } from "@/components/ui";
 import VideoWatchButton from "@/components/VideoWatchButton";
 import DownloadCsvButton from "@/components/DownloadCsvButton";
+import AdminVideoUploadForm from "@/components/AdminVideoUploadForm";
 
 export interface ParticipantRecordRow {
   registrationId: string;
@@ -53,7 +54,13 @@ const COLUMNS: Array<{ key: keyof ParticipantRecordRow; label: string }> = [
   { key: "attempts", label: "Re-record Attempts" },
 ];
 
-export default function ParticipantRecordsTable({ rows }: { rows: ParticipantRecordRow[] }) {
+export default function ParticipantRecordsTable({
+  rows,
+  isAdmin = false,
+}: {
+  rows: ParticipantRecordRow[];
+  isAdmin?: boolean;
+}) {
   const [filters, setFilters] = useState<Partial<Record<keyof ParticipantRecordRow, string>>>({});
 
   const filtered = useMemo(() => {
@@ -180,11 +187,14 @@ export default function ParticipantRecordsTable({ rows }: { rows: ParticipantRec
                     )}
                   </td>
                   <td className="whitespace-nowrap px-3 py-2">
-                    {row.videoUrl ? (
-                      <VideoWatchButton url={row.videoUrl} />
-                    ) : (
-                      <span className="text-xs text-neutral-400">—</span>
-                    )}
+                    <div className="flex flex-col items-start gap-1.5">
+                      {row.videoUrl ? (
+                        <VideoWatchButton url={row.videoUrl} />
+                      ) : (
+                        !isAdmin && <span className="text-xs text-neutral-400">—</span>
+                      )}
+                      {isAdmin && <AdminVideoUploadForm registrationId={row.registrationId} />}
+                    </div>
                   </td>
                 </tr>
               ))

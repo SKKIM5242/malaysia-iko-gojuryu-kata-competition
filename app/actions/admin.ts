@@ -1089,6 +1089,73 @@ export async function autoAssignReferees(formData: FormData) {
   });
 }
 
+export interface AdminVideoUploadState {
+  ok: boolean;
+  error?: string;
+}
+
+/**
+ * Admin-only backup path: attaches a recording to a registration on the
+ * participant's behalf (e.g. their live-camera submission failed, or they
+ * sent the organiser a video another way) — the file itself is uploaded
+ * client-side straight to the kata-videos bucket (see migration 0030's
+ * admin storage policy) before this is called with just the resulting
+ * path. Replaces any existing recording for that registration rather than
+ * erroring, since "fix a broken submission" is the whole point.
+ */
+export async function adminAttachVideo(
+  _prev: AdminVideoUploadState,
+  formData: FormData,
+): Promise<AdminVideoUploadState> {
+  const registrationId = String(formData.get("registration_id") ?? "");
+  const path = String(formData.get("path") ?? "");
+  const mime = String(formData.get("mime") ?? "video/mp4");
+  const { supabase, actorId } = await getActor();
+  const actorRole = await getActorRole(supabase, actorId);
+  if (actorRole !== "admin") {
+    return { ok: false, error: "Only the Super Admin can upload a recording on a participant's behalf." };
+  }
+  if (!registrationId || !path) return { ok: false, error: "Missing recording upload." };
+
+  const { data: reg } = await supabase
+    .from("registrations").select("id, participant_id").eq("id", registrationId).maybeSingle();
+  if (!reg) return { ok: false, error: "Registration not found." };
+
+  const { data: existing } = await supabase
+    .from("kata_videos").select("id").eq("registration_id", registrationId).maybeSingle();
+  if (existing) {
+    const { error } = await supabase
+      .from("kata_videos")
+      .update({ storage_path: path, mime, status: "submitted" })
+      .eq("id", existing.id);
+    if (error) return { ok: false, error: "Could not replace the recording." };
+    await writeAudit(supabase, {
+      table_name: "kata_videos", record_id: existing.id, action: "kata_video_admin_replaced",
+      new_value: { storage_path: path }, actor_id: actorId,
+    });
+  } else {
+    const { data, error } = await supabase
+      .from("kata_videos")
+      .insert({
+        registration_id: registrationId,
+        participant_id: reg.participant_id,
+        user_id: actorId,
+        storage_path: path,
+        mime,
+      })
+      .select("id").single();
+    if (error) return { ok: false, error: "Could not attach the recording." };
+    await writeAudit(supabase, {
+      table_name: "kata_videos", record_id: data!.id, action: "kata_video_admin_uploaded",
+      new_value: { storage_path: path, registration_id: registrationId }, actor_id: actorId,
+    });
+  }
+  revalidatePath("/admin/records");
+  revalidatePath("/kata-arena");
+  revalidatePath("/admin/judging");
+  return { ok: true };
+}
+
 // ── Organizer / Customer Support account creation ───────────────────────────
 
 const ROLE_LABEL: Record<string, string> = {
