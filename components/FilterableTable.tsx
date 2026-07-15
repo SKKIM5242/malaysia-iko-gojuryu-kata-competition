@@ -7,6 +7,12 @@ export interface FilterableColumn {
   label: string;
 }
 
+/** A cell is either plain filterable text, or a pre-rendered React node
+ * (e.g. a certificate link) built server-side — never a function. Server
+ * Components can pass rendered nodes to Client Components like this one,
+ * but never a callback/closure (RSC serialization forbids it). */
+type CellValue = string | ReactNode;
+
 /** Generic per-column-filterable data table — same filter-box-per-column
  * pattern as the Participant Records table, reused for every other
  * registrant type (Referees, Audience, Schools, Senseis, Staff Accounts)
@@ -14,12 +20,10 @@ export interface FilterableColumn {
 export default function FilterableTable({
   columns,
   rows,
-  renderCell,
   rowKey,
 }: {
   columns: FilterableColumn[];
-  rows: Array<Record<string, string>>;
-  renderCell?: (row: Record<string, string>, key: string) => ReactNode;
+  rows: Array<Record<string, CellValue>>;
   rowKey: string;
 }) {
   const [filters, setFilters] = useState<Record<string, string>>({});
@@ -28,7 +32,11 @@ export default function FilterableTable({
     const active = Object.entries(filters).filter(([, v]) => v && v.trim() !== "");
     if (active.length === 0) return rows;
     return rows.filter((row) =>
-      active.every(([key, value]) => String(row[key] ?? "").toLowerCase().includes(value.toLowerCase())),
+      active.every(([key, value]) => {
+        const cell = row[key];
+        const text = typeof cell === "string" ? cell : "";
+        return text.toLowerCase().includes(value.toLowerCase());
+      }),
     );
   }, [rows, filters]);
 
@@ -69,12 +77,20 @@ export default function FilterableTable({
               </tr>
             ) : (
               filtered.map((row) => (
-                <tr key={row[rowKey]} className="hover:bg-neutral-50">
-                  {columns.map((c) => (
-                    <td key={c.key} className="max-w-[220px] truncate px-3 py-2" title={row[c.key]}>
-                      {renderCell ? renderCell(row, c.key) : row[c.key] || "—"}
-                    </td>
-                  ))}
+                <tr key={String(row[rowKey])} className="hover:bg-neutral-50">
+                  {columns.map((c) => {
+                    const cell = row[c.key];
+                    const isText = typeof cell === "string";
+                    return (
+                      <td
+                        key={c.key}
+                        className="max-w-[220px] truncate px-3 py-2"
+                        title={isText ? cell : undefined}
+                      >
+                        {isText ? cell || "—" : cell}
+                      </td>
+                    );
+                  })}
                 </tr>
               ))
             )}

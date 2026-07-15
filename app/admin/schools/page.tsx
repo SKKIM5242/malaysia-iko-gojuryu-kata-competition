@@ -59,18 +59,6 @@ export default async function AdminSchools({
                 <label htmlFor="name" className={adminLabel}>Dojo / club name *</label>
                 <input id="name" name="name" required defaultValue={editing?.name ?? ""} className={adminInput} />
               </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label htmlFor="state" className={adminLabel}>State</label>
-                  <select id="state" name="state" defaultValue={editing?.state ?? ""} className={adminInput}>
-                    <option value="">— Select —</option>
-                    {MALAYSIAN_STATES.map((s) => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
               <div className="rounded-md border border-neutral-200 bg-neutral-50 p-4">
                 <p className="text-sm font-semibold text-neutral-700">Person in-charge / Chief Instructor</p>
                 <div className="mt-3 grid gap-4 sm:grid-cols-2">
@@ -104,15 +92,24 @@ export default async function AdminSchools({
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="sm:col-span-2">
-                  <label htmlFor="home_address" className={adminLabel}>Home address *</label>
+                  <label htmlFor="home_address" className={adminLabel}>School/dojo/club address *</label>
                   <input id="home_address" name="home_address" required defaultValue={editing?.home_address ?? ""} className={adminInput} />
+                </div>
+                <div>
+                  <label htmlFor="state" className={adminLabel}>State</label>
+                  <select id="state" name="state" defaultValue={editing?.state ?? ""} className={adminInput}>
+                    <option value="">— Select —</option>
+                    {MALAYSIAN_STATES.map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label htmlFor="city_town" className={adminLabel}>City / Town *</label>
                   <input id="city_town" name="city_town" required defaultValue={editing?.city_town ?? ""} className={adminInput} />
                 </div>
                 <div>
-                  <label htmlFor="home_country" className={adminLabel}>Home country *</label>
+                  <label htmlFor="home_country" className={adminLabel}>Country *</label>
                   <input id="home_country" name="home_country" required defaultValue={editing?.home_country ?? (editing ? "" : "Malaysia")} className={adminInput} />
                 </div>
                 <div>

@@ -33,6 +33,24 @@ function Section({ id, title, children }: { id: string; title: string; children:
   );
 }
 
+/** Builds the cell value server-side (a plain React element, not a
+ * callback) — Server Components may pass rendered nodes to Client
+ * Components, just never a function. */
+function certLink(url: string | null) {
+  return url ? (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="rounded border border-neutral-300 px-3 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
+    >
+      View
+    </a>
+  ) : (
+    <span className="text-xs text-neutral-400">—</span>
+  );
+}
+
 export default async function AdminParticipantRecords() {
   const ready = await schemaReady();
   if (!ready) {
@@ -115,7 +133,7 @@ export default async function AdminParticipantRecords() {
     bank: r.bank_name ? `${r.bank_name} · ${r.bank_account_no} · ${r.bank_account_name}` : "",
     payment_status: r.payment_status,
     status: r.status,
-    certificateUrl: r.certificateUrl ?? "",
+    certificateUrl: certLink(r.certificateUrl),
   }));
 
   const audienceColumns = [
@@ -194,7 +212,7 @@ export default async function AdminParticipantRecords() {
     registered_by: s.registered_by ?? "",
     email: s.email ?? "",
     phone: s.phone ?? "",
-    certificateUrl: s.certificateUrl ?? "",
+    certificateUrl: certLink(s.certificateUrl),
   }));
 
   const staffColumns = [
@@ -213,20 +231,6 @@ export default async function AdminParticipantRecords() {
     email: s.email ?? "",
     approved: s.approved ? "Approved" : "Pending",
   }));
-
-  const certLink = (url: string) =>
-    url ? (
-      <a
-        href={url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="rounded border border-neutral-300 px-3 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
-      >
-        View
-      </a>
-    ) : (
-      <span className="text-xs text-neutral-400">—</span>
-    );
 
   return (
     <AdminShell title="Participant Records" active="/admin/records">
@@ -250,14 +254,7 @@ export default async function AdminParticipantRecords() {
         {refereeRows.length === 0 ? (
           <EmptyState>No referee registrations yet.</EmptyState>
         ) : (
-          <FilterableTable
-            columns={refereeColumns}
-            rows={refereeRows}
-            rowKey="id"
-            renderCell={(row, key) =>
-              key === "certificateUrl" ? certLink(String(row.certificateUrl)) : (row[key] || "—")
-            }
-          />
+          <FilterableTable columns={refereeColumns} rows={refereeRows} rowKey="id" />
         )}
       </Section>
 
@@ -281,14 +278,7 @@ export default async function AdminParticipantRecords() {
         {senseiRows.length === 0 ? (
           <EmptyState>No senseis registered yet.</EmptyState>
         ) : (
-          <FilterableTable
-            columns={senseiColumns}
-            rows={senseiRows}
-            rowKey="id"
-            renderCell={(row, key) =>
-              key === "certificateUrl" ? certLink(String(row.certificateUrl)) : (row[key] || "—")
-            }
-          />
+          <FilterableTable columns={senseiColumns} rows={senseiRows} rowKey="id" />
         )}
       </Section>
 
