@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import InactivityGuard from "@/components/InactivityGuard";
+import AccessibilityToolbar from "@/components/AccessibilityToolbar";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
@@ -28,6 +29,7 @@ export default function RootLayout({
       <body className="min-h-screen bg-neutral-100 text-neutral-900 antialiased">
         {children}
         <InactivityGuard />
+        <AccessibilityToolbar />
       </body>
     </html>
   );

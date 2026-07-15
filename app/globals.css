@@ -1,1 +1,19 @@
 @import "tailwindcss";
+
+/* Hide Google Website Translator's default chrome — we drive it via our own
+   AccessibilityToolbar dropdown instead of its default banner/gadget. The
+   banner is a direct child of <body> with class "skiptranslate" (older
+   ".goog-te-banner-frame" no longer matches current widget markup). */
+body > .skiptranslate,
+.goog-te-banner-frame,
+.goog-te-gadget-icon {
+  display: none !important;
+}
+body {
+  top: 0 !important;
+}
+#google_translate_element {
+  position: absolute;
+  left: -9999px;
+  top: -9999px;
+}
