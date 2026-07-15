@@ -17,7 +17,7 @@ export default function LoginPage() {
             alt="Malaysia IKO Goju-ryu Karate-do crest"
             className="mx-auto h-20 w-20 rounded-xl bg-white p-1"
           />
-          <h1 className="mt-3 text-xl font-bold">Organiser login</h1>
+          <h1 className="mt-3 text-xl font-bold">Admin/Organizer Login</h1>
           <p className="mt-1 text-sm text-neutral-400">
             Malaysia Open Karate-do Kata Competition - Goju-ryu or IKO Goju-ryu Version Only.
             Specially for all Goju-ryu Karateka to compete globally without leaving their beloved
