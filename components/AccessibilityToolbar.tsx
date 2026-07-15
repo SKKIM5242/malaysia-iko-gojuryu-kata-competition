@@ -369,7 +369,16 @@ export default function AccessibilityToolbar() {
   const current = LANGUAGES.find((l) => l.code === selectedLang) ?? LANGUAGES[0];
 
   return (
-    <div className="fixed bottom-4 right-4 z-[60] flex flex-col items-end gap-2 print:hidden">
+    <div className="fixed top-56 right-4 z-[60] flex flex-col items-end gap-2 sm:top-20 print:hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-label="Accessibility: read aloud and translate"
+        title={open ? "Close Read Aloud & Translate" : "Read Aloud & Translate"}
+        className="flex h-12 w-12 items-center justify-center rounded-full bg-neutral-900 text-xl text-white shadow-lg hover:bg-neutral-800"
+      >
+        🌐
+      </button>
       {open && (
         <div
           ref={panelRef}
@@ -505,16 +514,6 @@ export default function AccessibilityToolbar() {
           </div>
         </div>
       )}
-
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-label="Accessibility: read aloud and translate"
-        title={open ? "Close Read Aloud & Translate" : "Read Aloud & Translate"}
-        className="flex h-12 w-12 items-center justify-center rounded-full bg-neutral-900 text-xl text-white shadow-lg hover:bg-neutral-800"
-      >
-        🌐
-      </button>
       <div id="google_translate_element" />
     </div>
   );

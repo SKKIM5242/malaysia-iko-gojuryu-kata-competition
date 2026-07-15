@@ -1,5 +1,6 @@
 import type { createClient } from "@/lib/supabase/server";
 import { finalScore } from "@/lib/scoring";
+import { kataBaseOf } from "@/lib/division";
 
 export interface JudgeScoreEntry {
   judgeName: string;
@@ -102,6 +103,21 @@ export async function loadKataArena(
       };
     }),
   );
+}
+
+/** Groups arena entries by kata event (the part of their category name
+ * before " — belt — age"), preserving first-seen order — so Kata Arena can
+ * show recordings organised the same way as the Kata Listing elsewhere on
+ * the site, letting a participant see exactly where their own submission
+ * sits among its kata + category. */
+export function groupArenaByKata(entries: ArenaEntry[]): Array<[string, ArenaEntry[]]> {
+  const groups = new Map<string, ArenaEntry[]>();
+  for (const e of entries) {
+    const base = e.categoryName ? kataBaseOf(e.categoryName) : "Uncategorised";
+    if (!groups.has(base)) groups.set(base, []);
+    groups.get(base)!.push(e);
+  }
+  return [...groups.entries()];
 }
 
 export interface CategoryRecording {

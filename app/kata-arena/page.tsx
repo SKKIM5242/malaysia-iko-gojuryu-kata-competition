@@ -2,9 +2,9 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { schemaReady } from "@/lib/data";
 import { getAllCompetitions } from "@/lib/admin-data";
-import { loadKataArena, type ArenaEntry } from "@/lib/arena";
+import { groupArenaByKata, loadKataArena, type ArenaEntry } from "@/lib/arena";
 import { winnersRevealed } from "@/lib/winners";
-import { CategoryName, SetupNotice, SiteFooter, SiteHeader } from "@/components/ui";
+import { CategoryName, NoTranslate, SetupNotice, SiteFooter, SiteHeader } from "@/components/ui";
 import AuthForms from "@/components/AuthForms";
 import ClaimForm from "@/components/ClaimForm";
 
@@ -191,9 +191,21 @@ export default async function KataArenaPage() {
                     {arena.length === 0 ? (
                       <p className="text-sm text-neutral-400">No recordings submitted yet.</p>
                     ) : (
-                      <div className="space-y-3">
-                        {arena.map((a) => (
-                          <RecordingCard key={a.videoId} entry={a} showJudgeScores showFinalScore={revealed} />
+                      <div className="space-y-2">
+                        {groupArenaByKata(arena).map(([base, entries]) => (
+                          <details key={base} className="rounded-lg border border-neutral-200 bg-white shadow-sm" open>
+                            <summary className="cursor-pointer px-4 py-2.5 text-sm font-semibold text-neutral-800 hover:bg-neutral-50">
+                              <NoTranslate>{base}</NoTranslate>{" "}
+                              <span className="font-normal text-neutral-400">
+                                ({entries.length} recording{entries.length === 1 ? "" : "s"})
+                              </span>
+                            </summary>
+                            <div className="space-y-3 px-4 pb-4 pt-1">
+                              {entries.map((a) => (
+                                <RecordingCard key={a.videoId} entry={a} showJudgeScores showFinalScore={revealed} />
+                              ))}
+                            </div>
+                          </details>
                         ))}
                       </div>
                     )}
@@ -271,9 +283,21 @@ export default async function KataArenaPage() {
         {visibleArena.length === 0 ? (
           <p className="text-sm text-neutral-400">No recordings submitted yet.</p>
         ) : (
-          <div className="space-y-3">
-            {visibleArena.map((a) => (
-              <RecordingCard key={a.videoId} entry={a} showJudgeScores={false} showFinalScore={revealed} />
+          <div className="space-y-2">
+            {groupArenaByKata(visibleArena).map(([base, entries]) => (
+              <details key={base} className="rounded-lg border border-neutral-200 bg-white shadow-sm" open>
+                <summary className="cursor-pointer px-4 py-2.5 text-sm font-semibold text-neutral-800 hover:bg-neutral-50">
+                  <NoTranslate>{base}</NoTranslate>{" "}
+                  <span className="font-normal text-neutral-400">
+                    ({entries.length} recording{entries.length === 1 ? "" : "s"})
+                  </span>
+                </summary>
+                <div className="space-y-3 px-4 pb-4 pt-1">
+                  {entries.map((a) => (
+                    <RecordingCard key={a.videoId} entry={a} showJudgeScores={false} showFinalScore={revealed} />
+                  ))}
+                </div>
+              </details>
             ))}
           </div>
         )}
