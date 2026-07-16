@@ -25,7 +25,9 @@ export default function DownloadCsvButton({
 }) {
   const handleDownload = () => {
     const csv = toCsv(rows);
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    // Leading BOM tells Excel the bytes are UTF-8 — without it, Excel
+    // guesses a legacy codepage and non-ASCII characters render as mojibake.
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;

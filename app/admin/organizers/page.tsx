@@ -161,12 +161,23 @@ export default async function AdminOrganizers({
             { key: "message", label: "Message" },
             { key: "status", label: "Status" },
           ]}
+          csvColumns={[
+            { key: "full_name", label: "Name" },
+            { key: "email", label: "Email" },
+            { key: "phone", label: "Phone" },
+            { key: "role_requested", label: "Role requested" },
+            { key: "message", label: "Message" },
+            { key: "status_text", label: "Status" },
+          ]}
           rows={applications.map((s) => ({
             id: s.id,
             full_name: s.full_name,
             contact: [s.email, s.phone].filter(Boolean).join(" · "),
+            email: s.email ?? "",
+            phone: s.phone ?? "",
             role_requested: s.role_requested.replace("_", " "),
             message: s.message ?? "",
+            status_text: s.status,
             status: (
               <div className="flex flex-wrap gap-1">
                 {["pending", "approved", "rejected"].map((o) => (

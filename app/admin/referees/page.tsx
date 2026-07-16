@@ -244,6 +244,27 @@ export default async function AdminReferees({
                 { key: "approval", label: "Approval" },
                 { key: "actions", label: "Actions" },
               ]}
+              csvColumns={[
+                { key: "full_name", label: "Name" },
+                { key: "ic_passport", label: "IC / Passport" },
+                { key: "date_of_birth", label: "DOB" },
+                { key: "gender", label: "Gender" },
+                { key: "karate_rank", label: "Rank" },
+                { key: "judging_experience_count", label: "Judging Experience" },
+                { key: "school", label: "School" },
+                { key: "home_address", label: "Home Address" },
+                { key: "city_town", label: "City / Town" },
+                { key: "postcode", label: "Postcode" },
+                { key: "home_country", label: "Country" },
+                { key: "email", label: "Email" },
+                { key: "phone", label: "Phone" },
+                { key: "bank_name", label: "Bank Name" },
+                { key: "bank_account_no", label: "Bank Account No" },
+                { key: "bank_account_name", label: "Bank Account Holder Name" },
+                { key: "invitation_code", label: "Invitation Code" },
+                { key: "payment_status", label: "Deposit Status" },
+                { key: "status", label: "Approval Status" },
+              ]}
               rows={refereeList.map((r) => ({
                 id: r.id,
                 full_name: r.full_name,
@@ -256,6 +277,17 @@ export default async function AdminReferees({
                 location: [r.home_address, r.city_town, r.postcode, r.home_country].filter(Boolean).join(", "),
                 contact: [r.email, r.phone].filter(Boolean).join(" · "),
                 bank: [r.bank_name, r.bank_account_no].filter(Boolean).join(" · "),
+                home_address: r.home_address ?? "",
+                city_town: r.city_town ?? "",
+                postcode: r.postcode ?? "",
+                home_country: r.home_country ?? "",
+                email: r.email ?? "",
+                phone: r.phone ?? "",
+                bank_name: r.bank_name ?? "",
+                bank_account_no: r.bank_account_no ?? "",
+                bank_account_name: r.bank_account_name ?? "",
+                payment_status: r.payment_status,
+                status: r.status,
                 certificates: (
                   <div className="flex flex-wrap items-center gap-2 text-xs">
                     {r.certificate_path && certUrls.get(r.certificate_path) ? (

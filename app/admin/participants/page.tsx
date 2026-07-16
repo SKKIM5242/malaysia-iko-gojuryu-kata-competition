@@ -197,6 +197,17 @@ export default async function AdminParticipants({
                 { key: "bank", label: "Payout bank" },
                 { key: "actions", label: "Actions" },
               ]}
+              csvColumns={[
+                { key: "full_name", label: "Name" },
+                { key: "ic_passport", label: "IC / Passport" },
+                { key: "date_of_birth", label: "DOB" },
+                { key: "belt_rank", label: "Belt" },
+                { key: "home_country", label: "Country" },
+                { key: "school", label: "School" },
+                { key: "bank_name", label: "Bank Name" },
+                { key: "bank_account_no", label: "Bank Account No" },
+                { key: "bank_account_name", label: "Bank Account Holder Name" },
+              ]}
               rows={participants.map((p) => ({
                 id: p.id,
                 full_name: p.full_name,
@@ -223,6 +234,9 @@ export default async function AdminParticipants({
                 home_country: p.home_country ?? "",
                 school: p.school?.name ?? "",
                 bank: p.bank ? `${p.bank.bank_name} · ${p.bank.bank_account_no}` : "",
+                bank_name: p.bank?.bank_name ?? "",
+                bank_account_no: p.bank?.bank_account_no ?? "",
+                bank_account_name: p.bank?.bank_account_name ?? "",
                 actions: (
                   <div className="flex gap-1.5">
                     <Link

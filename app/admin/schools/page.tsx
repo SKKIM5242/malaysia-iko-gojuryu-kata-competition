@@ -182,6 +182,23 @@ export default async function AdminSchools({
                 { key: "bank", label: "Bank" },
                 { key: "actions", label: "Actions" },
               ]}
+              csvColumns={[
+                { key: "name", label: "Name" },
+                { key: "state", label: "State" },
+                { key: "contact_title", label: "Contact Title" },
+                { key: "contact_name", label: "Contact Name" },
+                { key: "contact_karate_title", label: "Contact Karate Title" },
+                { key: "contact_rank", label: "Contact Rank" },
+                { key: "home_address", label: "Home Address" },
+                { key: "city_town", label: "City / Town" },
+                { key: "postcode", label: "Postcode" },
+                { key: "home_country", label: "Country" },
+                { key: "email", label: "Email" },
+                { key: "phone", label: "Phone" },
+                { key: "bank_name", label: "Bank Name" },
+                { key: "bank_account_no", label: "Bank Account No" },
+                { key: "bank_account_name", label: "Bank Account Holder Name" },
+              ]}
               rows={schools.map((s) => ({
                 id: s.id,
                 name: s.name,
@@ -191,6 +208,19 @@ export default async function AdminSchools({
                 location: [s.home_address, s.city_town, s.postcode, s.home_country].filter(Boolean).join(", "),
                 contact: [s.email, s.phone].filter(Boolean).join(" · "),
                 bank: [s.bank_name, s.bank_account_no, s.bank_account_name].filter(Boolean).join(" · "),
+                contact_title: s.contact_title ?? "",
+                contact_name: s.contact_name ?? "",
+                contact_karate_title: s.contact_karate_title ?? "",
+                contact_rank: s.contact_rank ?? "",
+                home_address: s.home_address ?? "",
+                city_town: s.city_town ?? "",
+                postcode: s.postcode ?? "",
+                home_country: s.home_country ?? "",
+                email: s.email ?? "",
+                phone: s.phone ?? "",
+                bank_name: s.bank_name ?? "",
+                bank_account_no: s.bank_account_no ?? "",
+                bank_account_name: s.bank_account_name ?? "",
                 actions: (
                   <div className="flex gap-1.5">
                     <Link

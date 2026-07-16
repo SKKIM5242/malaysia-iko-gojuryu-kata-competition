@@ -26,7 +26,9 @@ export interface ParticipantRecordRow {
   phone: string;
   school: string;
   sensei: string;
-  bank: string;
+  bankName: string;
+  bankAccountNo: string;
+  bankAccountName: string;
   recordingStatus: "Submitted" | "Not submitted";
   recordingDate: string;
   attempts: string;
@@ -50,7 +52,9 @@ const COLUMNS: Array<{ key: keyof ParticipantRecordRow; label: string }> = [
   { key: "phone", label: "Phone" },
   { key: "school", label: "School" },
   { key: "sensei", label: "Sensei" },
-  { key: "bank", label: "Payout Bank" },
+  { key: "bankName", label: "Bank Name" },
+  { key: "bankAccountNo", label: "Bank Account No" },
+  { key: "bankAccountName", label: "Bank Account Holder Name" },
   { key: "recordingStatus", label: "Recording Status" },
   { key: "recordingDate", label: "Recording Date" },
   { key: "attempts", label: "Re-record Attempts" },
@@ -162,6 +166,9 @@ export default function ParticipantRecordsTable({
                   <td className="whitespace-nowrap px-3 py-2 capitalize">{row.gender}</td>
                   <td className="whitespace-nowrap px-3 py-2">{row.beltRank || "—"}</td>
                   <td className="whitespace-nowrap px-3 py-2 text-xs">{row.rankConfirmation || "—"}</td>
+                  <td className="max-w-[200px] truncate px-3 py-2" title={row.homeAddress}>
+                    {row.homeAddress || "—"}
+                  </td>
                   <td className="whitespace-nowrap px-3 py-2">{row.country || "—"}</td>
                   <td className="whitespace-nowrap px-3 py-2">{row.cityTown || "—"}</td>
                   <td className="whitespace-nowrap px-3 py-2 text-xs">{row.email || "—"}</td>
@@ -172,8 +179,10 @@ export default function ParticipantRecordsTable({
                   <td className="max-w-[160px] truncate px-3 py-2" title={row.sensei}>
                     {row.sensei || "—"}
                   </td>
-                  <td className="max-w-[200px] truncate px-3 py-2 text-xs" title={row.bank}>
-                    {row.bank || "—"}
+                  <td className="whitespace-nowrap px-3 py-2 text-xs">{row.bankName || "—"}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-xs">{row.bankAccountNo || "—"}</td>
+                  <td className="max-w-[200px] truncate px-3 py-2 text-xs" title={row.bankAccountName}>
+                    {row.bankAccountName || "—"}
                   </td>
                   <td className="whitespace-nowrap px-3 py-2">
                     <span

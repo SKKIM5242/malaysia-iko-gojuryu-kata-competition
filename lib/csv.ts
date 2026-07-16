@@ -1,5 +1,8 @@
 /** Minimal RFC-4180-ish CSV parser: quoted fields, escaped quotes, CRLF. */
 export function parseCsv(text: string): string[][] {
+  // Strip a leading UTF-8 BOM — present on our own CSV exports and on most
+  // Excel-saved CSVs — so it doesn't get glued onto the first header name.
+  if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
   const rows: string[][] = [];
   let row: string[] = [];
   let field = "";

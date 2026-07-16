@@ -25,12 +25,20 @@ export default function FilterableTable({
   rows,
   rowKey,
   downloadName,
+  csvColumns,
 }: {
   columns: FilterableColumn[];
   rows: Array<Record<string, CellValue>>;
   rowKey: string;
   /** Filename (without extension) for the CSV download button. */
   downloadName: string;
+  /** Overrides `columns` for the CSV export only — lets the on-screen table
+   * keep merged, human-readable columns (e.g. "Contact") while the
+   * downloaded CSV gets each underlying field (Email, Phone) in its own
+   * column, since spreadsheet users need to sort/filter/text-to-columns on
+   * a single value per cell. Callers must include the raw field values as
+   * extra keys on each row alongside the display keys `columns` reads. */
+  csvColumns?: FilterableColumn[];
 }) {
   const [filters, setFilters] = useState<Record<string, Set<string>>>({});
 
@@ -68,13 +76,13 @@ export default function FilterableTable({
     () =>
       filtered.map((row) => {
         const out: Record<string, string> = {};
-        for (const c of columns) {
+        for (const c of csvColumns ?? columns) {
           const cell = row[c.key];
           if (typeof cell === "string") out[c.label] = cell;
         }
         return out;
       }),
-    [filtered, columns],
+    [filtered, columns, csvColumns],
   );
 
   return (

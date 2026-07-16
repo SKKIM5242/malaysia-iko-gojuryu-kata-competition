@@ -140,12 +140,23 @@ export default async function AdminAudience({
             { key: "payment", label: "Payment" },
             { key: "telegram", label: "Telegram" },
           ]}
+          csvColumns={[
+            { key: "full_name", label: "Name" },
+            { key: "email", label: "Email" },
+            { key: "phone", label: "Phone" },
+            { key: "home_country", label: "Country" },
+            { key: "invitation_code", label: "Code" },
+            { key: "payment_status", label: "Payment Status" },
+          ]}
           rows={(audiences as Audience[]).map((a) => ({
             id: a.id,
             full_name: a.full_name,
             contact: [a.email, a.phone].filter(Boolean).join(" · "),
+            email: a.email ?? "",
+            phone: a.phone ?? "",
             home_country: a.home_country ?? "",
             invitation_code: a.invitation_code ?? "",
+            payment_status: a.payment_status,
             payment: (
               <StatusButtons table="audiences" id={a.id} field="payment_status" current={a.payment_status}
                 options={["pending", "paid", "waived"]} />
