@@ -28,7 +28,7 @@ export default function AdminVideoUploadForm({ registrationId }: { registrationI
       .from("kata-videos")
       .upload(path, file, { contentType: file.type || "video/mp4" });
     if (upErr) {
-      setError("Upload failed — please check your connection and try again.");
+      setError(`Upload failed: ${upErr.message}`);
       setBusy(false);
       return;
     }
