@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { signOut } from "@/app/actions/auth";
 import { createClient } from "@/lib/supabase/server";
+import CertificateUploadField from "@/components/CertificateUploadField";
 
 const FULL_NAV: Array<[string, string]> = [
   ["Dashboard", "/admin"],
@@ -133,20 +134,11 @@ export function CertificateField({
   return (
     <div>
       <label htmlFor="certificate" className={adminLabel}>
-        Latest rank certificate{mustUpload ? " *" : ""}{" "}
-        <span className="font-normal text-neutral-400">(upload a file or take a picture)</span>
+        Latest rank certificate{mustUpload ? " *" : ""}
       </label>
-      <input
-        id="certificate"
-        name="certificate"
-        type="file"
-        accept="image/*,application/pdf"
-        capture="environment"
-        required={mustUpload}
-        className="w-full rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm file:mr-3 file:rounded file:border-0 file:bg-neutral-900 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-white"
-      />
+      <CertificateUploadField id="certificate" name="certificate" required={mustUpload} />
       <div className="mt-1 flex items-center gap-3">
-        <p className="text-xs text-neutral-400">Max 10 MB. Leave blank to keep the existing certificate.</p>
+        <p className="text-xs text-neutral-400">Leave blank to keep the existing certificate.</p>
         {currentUrl && (
           <a
             href={currentUrl}

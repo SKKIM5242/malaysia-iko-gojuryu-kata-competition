@@ -8,6 +8,7 @@ import {
   type CommunityState,
 } from "@/app/actions/community";
 import { TelegramJoinButton } from "@/components/ui";
+import CertificateUploadField from "@/components/CertificateUploadField";
 
 const initial: CommunityState = { ok: false };
 const inputCls =
@@ -105,11 +106,8 @@ export function RefereeForm({ telegramLink }: { telegramLink: string | null }) {
           <input id="school" name="school" className={inputCls} />
         </div>
         <div>
-          <label htmlFor="certificate" className={labelCls}>
-            Latest rank certificate * <span className="font-normal text-neutral-400">(photo or file)</span>
-          </label>
-          <input id="certificate" name="certificate" type="file" accept="image/*,application/pdf" capture="environment" required
-            className="w-full rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm file:mr-3 file:rounded file:border-0 file:bg-neutral-900 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-white" />
+          <label htmlFor="certificate" className={labelCls}>Latest rank certificate *</label>
+          <CertificateUploadField id="certificate" name="certificate" required />
           <Err m={e.certificate} />
         </div>
         <div className="sm:col-span-2">
@@ -293,10 +291,9 @@ export function StaffForm({ telegramLink }: { telegramLink: string | null }) {
         </div>
         <div>
           <label htmlFor="certificate" className={labelCls}>
-            Latest rank certificate <span className="font-normal text-neutral-400">(optional — photo or file)</span>
+            Latest rank certificate <span className="font-normal text-neutral-400">(optional)</span>
           </label>
-          <input id="certificate" name="certificate" type="file" accept="image/*,application/pdf" capture="environment"
-            className="w-full rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm file:mr-3 file:rounded file:border-0 file:bg-neutral-900 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-white" />
+          <CertificateUploadField id="certificate" name="certificate" />
         </div>
         <div>
           <label htmlFor="international_certificates" className={labelCls}>
