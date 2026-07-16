@@ -12,6 +12,10 @@ export interface ArenaEntry {
   participantId: string | null;
   participantName: string;
   categoryName: string | null;
+  /** Only used to scope a School/Sensei login's view to their own
+   * students — never shown to anyone. */
+  schoolId: string | null;
+  senseiId: string | null;
   playbackUrl: string | null;
   /** Trimmed-mean aggregate — Kata Arena never shows this to anyone except
    * a participant's own entry after winners are announced; the Winners
@@ -40,14 +44,14 @@ export async function loadKataArena(
   const { data: videos } = await supabase
     .from("kata_videos")
     .select(
-      "id, storage_path, participant:participants(id, full_name), registration:registrations(category:categories(name))",
+      "id, storage_path, participant:participants(id, full_name, school_id, sensei_id), registration:registrations(category:categories(name))",
     )
     .in("registration_id", regIds);
   const videoList =
     (videos as unknown as Array<{
       id: string;
       storage_path: string;
-      participant: { id: string; full_name: string } | null;
+      participant: { id: string; full_name: string; school_id: string | null; sensei_id: string | null } | null;
       registration: { category: { name: string } | null } | null;
     }>) ?? [];
   if (videoList.length === 0) return [];
@@ -94,6 +98,8 @@ export async function loadKataArena(
         participantId: v.participant?.id ?? null,
         participantName: v.participant?.full_name ?? "Unknown participant",
         categoryName: v.registration?.category?.name ?? null,
+        schoolId: v.participant?.school_id ?? null,
+        senseiId: v.participant?.sensei_id ?? null,
         playbackUrl: signed?.signedUrl ?? null,
         finalScore: finalScore(scoresByVideo.get(v.id) ?? []),
         judgeScores: assigned.map((uid) => ({

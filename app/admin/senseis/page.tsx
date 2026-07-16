@@ -1,13 +1,39 @@
 import Link from "next/link";
 import { getSchools, getSenseis, schemaReady } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
-import { saveSensei, deleteSensei, createInvitationCode, generateRecordInvitationCode, bulkUploadSenseis } from "@/app/actions/admin";
+import { saveSensei, deleteSensei, createInvitationCode, generateRecordInvitationCode, updateCommunityStatus, bulkUploadSenseis } from "@/app/actions/admin";
 import { AdminShell, Card, CertificateField, adminBtn, adminBtnSecondary, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice, formatDate } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
 
 export const dynamic = "force-dynamic";
+
+function PaymentButtons({ id, current }: { id: string; current: string }) {
+  return (
+    <div className="flex flex-wrap gap-1">
+      {["pending", "paid", "waived"].map((o) => (
+        <form key={o} action={updateCommunityStatus}>
+          <input type="hidden" name="table" value="senseis" />
+          <input type="hidden" name="id" value={id} />
+          <input type="hidden" name="field" value="payment_status" />
+          <input type="hidden" name="value" value={o} />
+          <input type="hidden" name="return_to" value="/admin/senseis" />
+          <button
+            disabled={o === current}
+            className={`rounded border px-2 py-0.5 text-xs font-semibold capitalize ${
+              o === current
+                ? "border-neutral-900 bg-neutral-900 text-white"
+                : "border-neutral-300 bg-white text-neutral-600 hover:bg-neutral-50"
+            }`}
+          >
+            {o}
+          </button>
+        </form>
+      ))}
+    </div>
+  );
+}
 
 export default async function AdminSenseis({
   searchParams,
@@ -211,6 +237,7 @@ export default async function AdminSenseis({
                 { key: "contact", label: "Contact" },
                 { key: "bank", label: "Payout Bank" },
                 { key: "school", label: "School" },
+                { key: "payment", label: "USD 10 Fee" },
                 { key: "actions", label: "Actions" },
               ]}
               csvColumns={[
@@ -230,6 +257,7 @@ export default async function AdminSenseis({
                 { key: "bank_account_no", label: "Bank Account No" },
                 { key: "bank_account_name", label: "Bank Account Holder Name" },
                 { key: "school", label: "School" },
+                { key: "payment_status_text", label: "USD 10 Fee Status" },
               ]}
               rows={senseis.map((s) => ({
                 id: s.id,
@@ -265,6 +293,8 @@ export default async function AdminSenseis({
                 bank_account_no: s.bank_account_no ?? "",
                 bank_account_name: s.bank_account_name ?? "",
                 school: s.school?.name ?? "",
+                payment_status_text: s.payment_status,
+                payment: <PaymentButtons id={s.id} current={s.payment_status} />,
                 actions: (
                   <div className="flex gap-1.5">
                     <Link

@@ -42,6 +42,19 @@ function Success({
         <strong>{name}</strong> is now in the directory and can be selected on registration forms.
       </p>
       <div className="mt-4 text-sm text-green-800">{next}</div>
+      <div className="mx-auto mt-6 max-w-md rounded-md border border-amber-200 bg-amber-50 p-4 text-left text-xs text-amber-900">
+        <p className="font-bold">One more step — sign in to watch your students&apos; recordings</p>
+        <p className="mt-1">
+          Ask the organiser for a personal invitation code tied to this exact record, then use it
+          to sign in via <Link href="/account?mode=signup" className="underline">Kata Arena Log In</Link>.
+          A USD 10 registration fee unlocks unlimited sign-in to watch your students&apos; kata
+          recordings and judge scores as they come in — no waiting for winners day.
+        </p>
+        <p className="mt-1">
+          Sign up 10 or more participants and you qualify for a 10% share of their registration
+          fees — the more students you bring in, the more this pays for itself.
+        </p>
+      </div>
       <div className="mx-auto mt-4 max-w-md text-green-900">
         <TelegramJoinButton href={telegramLink} />
       </div>
@@ -73,6 +86,12 @@ export function SchoolForm({ telegramLink }: { telegramLink: string | null }) {
           {state.error}
         </div>
       )}
+      <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
+        Registering here is free and just lists your school in the directory. Afterwards, a USD 10
+        registration fee unlocks unlimited sign-in to watch your own students&apos; kata
+        recordings and judge scores — and 10 or more participants qualifies you for a 10% share
+        of their registration fees.
+      </div>
       <div>
         <label htmlFor="name" className={labelCls}>School / Dojo name *</label>
         <input id="name" name="name" required className={inputCls} placeholder="e.g. Dojo Goju-ryu Johor Bahru" />
@@ -190,6 +209,12 @@ export function SenseiForm({
           {state.error}
         </div>
       )}
+      <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
+        Registering here is free and just lists you in the directory. Afterwards, a USD 10
+        registration fee unlocks unlimited sign-in to watch your own students&apos; kata
+        recordings and judge scores — and 10 or more participants qualifies you for a 10% share
+        of their registration fees.
+      </div>
       <div>
         <label htmlFor="registered_by" className={labelCls}>Who is registering? *</label>
         <select

@@ -694,6 +694,8 @@ export async function updateCommunityStatus(formData: FormData) {
     },
     audiences: { payment_status: ["pending", "paid", "waived"] },
     staff_applications: { status: ["pending", "approved", "rejected"] },
+    schools: { payment_status: ["pending", "paid", "waived"] },
+    senseis: { payment_status: ["pending", "paid", "waived"] },
   };
   if (!allowed[table]?.[field]?.includes(value) || !id) {
     backTo(returnTo, { error: "Invalid update." });
@@ -1011,7 +1013,7 @@ export async function generateRecordInvitationCode(formData: FormData) {
   const { data: inserted, error } = await supabase
     .from("invitation_codes")
     .insert({
-      code, role, email: record!.email, max_uses: 1, generated_by,
+      code, role, email: record!.email, max_uses: 1, generated_by, for_record_id: id,
       note: `Personal code for ${role} record ${id.slice(0, 8).toUpperCase()}`,
     })
     .select("id")

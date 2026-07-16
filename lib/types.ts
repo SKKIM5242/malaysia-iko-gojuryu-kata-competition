@@ -36,6 +36,7 @@ export interface School {
   bank_account_no: string | null;
   bank_account_name: string | null;
   invitation_code: string | null;
+  payment_status: "pending" | "paid" | "waived";
   created_at: string;
 }
 
@@ -60,6 +61,7 @@ export interface Sensei {
   bank_account_no: string | null;
   bank_account_name: string | null;
   invitation_code: string | null;
+  payment_status: "pending" | "paid" | "waived";
   created_at: string;
   school?: Pick<School, "id" | "name"> | null;
 }

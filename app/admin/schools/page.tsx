@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getSchools, schemaReady } from "@/lib/data";
-import { saveSchool, deleteSchool, createInvitationCode, generateRecordInvitationCode, bulkUploadSchools } from "@/app/actions/admin";
+import { saveSchool, deleteSchool, createInvitationCode, generateRecordInvitationCode, updateCommunityStatus, bulkUploadSchools } from "@/app/actions/admin";
 import { AdminShell, Card, adminBtn, adminBtnSecondary, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
@@ -13,6 +13,32 @@ const MALAYSIAN_STATES = [
   "Negeri Sembilan", "Pahang", "Perak", "Perlis", "Pulau Pinang",
   "Putrajaya", "Sabah", "Sarawak", "Selangor", "Terengganu",
 ];
+
+function PaymentButtons({ id, current }: { id: string; current: string }) {
+  return (
+    <div className="flex flex-wrap gap-1">
+      {["pending", "paid", "waived"].map((o) => (
+        <form key={o} action={updateCommunityStatus}>
+          <input type="hidden" name="table" value="schools" />
+          <input type="hidden" name="id" value={id} />
+          <input type="hidden" name="field" value="payment_status" />
+          <input type="hidden" name="value" value={o} />
+          <input type="hidden" name="return_to" value="/admin/schools" />
+          <button
+            disabled={o === current}
+            className={`rounded border px-2 py-0.5 text-xs font-semibold capitalize ${
+              o === current
+                ? "border-neutral-900 bg-neutral-900 text-white"
+                : "border-neutral-300 bg-white text-neutral-600 hover:bg-neutral-50"
+            }`}
+          >
+            {o}
+          </button>
+        </form>
+      ))}
+    </div>
+  );
+}
 
 export default async function AdminSchools({
   searchParams,
@@ -205,6 +231,7 @@ export default async function AdminSchools({
                 { key: "location", label: "Location" },
                 { key: "contact", label: "Contact" },
                 { key: "bank", label: "Bank" },
+                { key: "payment", label: "USD 10 Fee" },
                 { key: "actions", label: "Actions" },
               ]}
               csvColumns={[
@@ -224,6 +251,7 @@ export default async function AdminSchools({
                 { key: "bank_name", label: "Bank Name" },
                 { key: "bank_account_no", label: "Bank Account No" },
                 { key: "bank_account_name", label: "Bank Account Holder Name" },
+                { key: "payment_status_text", label: "USD 10 Fee Status" },
               ]}
               rows={schools.map((s) => ({
                 id: s.id,
@@ -248,6 +276,8 @@ export default async function AdminSchools({
                 bank_name: s.bank_name ?? "",
                 bank_account_no: s.bank_account_no ?? "",
                 bank_account_name: s.bank_account_name ?? "",
+                payment_status_text: s.payment_status,
+                payment: <PaymentButtons id={s.id} current={s.payment_status} />,
                 actions: (
                   <div className="flex gap-1.5">
                     <Link

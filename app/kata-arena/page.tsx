@@ -15,12 +15,14 @@ export const metadata = { title: "Kata Arena" };
 const PRIVILEGED_ROLES = ["admin", "organizer", "staff", "customer_support", "referee", "audience"];
 
 interface ProfileRow {
-  role: "participant" | "referee" | "staff" | "admin" | "organizer" | "customer_support" | "audience";
+  role: "participant" | "referee" | "staff" | "admin" | "organizer" | "customer_support" | "audience" | "school" | "sensei";
   full_name: string | null;
   approved: boolean;
   participant_id: string | null;
   registration_id: string | null;
   record_attempts: number;
+  school_id: string | null;
+  sensei_id: string | null;
 }
 
 function RecordingCard({
@@ -121,7 +123,7 @@ export default async function KataArenaPage({
 
   const { data: profileData } = await supabase
     .from("profiles")
-    .select("role, full_name, approved, participant_id, registration_id, record_attempts")
+    .select("role, full_name, approved, participant_id, registration_id, record_attempts, school_id, sensei_id")
     .eq("user_id", user.id)
     .maybeSingle();
   const profile = profileData as ProfileRow | null;
@@ -195,6 +197,85 @@ export default async function KataArenaPage({
                     <h2 className="mb-3 text-lg font-bold">{c.name}</h2>
                     {arena.length === 0 ? (
                       <p className="text-sm text-neutral-400">No recordings submitted yet.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {groupArenaByKata(arena).map(([base, entries]) => (
+                          <details key={base} className="rounded-lg border border-neutral-200 bg-white shadow-sm" open>
+                            <summary className="cursor-pointer px-4 py-2.5 text-sm font-semibold text-neutral-800 hover:bg-neutral-50">
+                              <NoTranslate>{base}</NoTranslate>{" "}
+                              <span className="font-normal text-neutral-400">
+                                ({entries.length} recording{entries.length === 1 ? "" : "s"})
+                              </span>
+                            </summary>
+                            <div className="space-y-3 px-4 pb-4 pt-1">
+                              {entries.map((a) => (
+                                <RecordingCard key={a.videoId} entry={a} showJudgeScores showFinalScore={revealed} />
+                              ))}
+                            </div>
+                          </details>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              }),
+            )
+          )}
+        </main>
+        <SiteFooter />
+      </>
+    );
+  }
+
+  // ── School / Sensei: same individual-judge-score view as the privileged
+  // roles above, but filtered down to just their own students. ──────────────
+  if (profile.role === "school" || profile.role === "sensei") {
+    const scopeId = profile.role === "school" ? profile.school_id : profile.sensei_id;
+    if (!scopeId) {
+      return (
+        <>
+          <SiteHeader />
+          <main className="mx-auto max-w-2xl px-4 py-10">
+            <h1 className="text-2xl font-bold tracking-tight">Kata Arena</h1>
+            <p className="mt-2 text-sm text-neutral-500">
+              Your account isn&apos;t linked to a school/sensei record yet — contact the organiser
+              for a personal invitation code.
+            </p>
+          </main>
+          <SiteFooter />
+        </>
+      );
+    }
+    const competitions = await getAllCompetitions();
+    return (
+      <>
+        <SiteHeader />
+        <main className="mx-auto max-w-3xl px-4 py-10">
+          <h1 className="text-2xl font-bold tracking-tight">Kata Arena</h1>
+          <p className="mt-1 mb-8 text-sm text-neutral-500">
+            Every recording submitted by your own students, with each referee&apos;s individual
+            score — visible any time, not just after winners are announced. Final (average)
+            scores and standings stay hidden until then — see the{" "}
+            <Link href="/winners" className="underline">
+              Winners page
+            </Link>
+            .
+          </p>
+          {competitions.length === 0 ? (
+            <p className="text-sm text-neutral-400">No competitions yet.</p>
+          ) : (
+            await Promise.all(
+              competitions.map(async (c) => {
+                const fullArena = await loadKataArena(supabase, c.id);
+                const arena = fullArena.filter((a) =>
+                  profile.role === "school" ? a.schoolId === scopeId : a.senseiId === scopeId,
+                );
+                const revealed = winnersRevealed(c.registration_deadline);
+                return (
+                  <div key={c.id} className="mb-10">
+                    <h2 className="mb-3 text-lg font-bold">{c.name}</h2>
+                    {arena.length === 0 ? (
+                      <p className="text-sm text-neutral-400">No recordings from your students yet.</p>
                     ) : (
                       <div className="space-y-2">
                         {groupArenaByKata(arena).map(([base, entries]) => (

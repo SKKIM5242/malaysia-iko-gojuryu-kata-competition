@@ -86,6 +86,11 @@ export async function registerSchool(
     bodyLines: [
       `"${name}" is now in the directory and can be selected on registration forms.`,
       "Next: register your Sensei / Coach, then register participants.",
+      "",
+      "One more step: ask the organiser for a personal invitation code for this record, then " +
+        "sign in via Kata Arena Log In. A USD 10 registration fee unlocks unlimited sign-in to " +
+        "watch your own students' kata recordings and judge scores any time — 10 or more " +
+        "participants qualifies you for a 10% share of their registration fees.",
     ],
   });
   return { ok: true, name };
@@ -222,6 +227,11 @@ export async function registerSensei(
     bodyLines: [
       `"${name}" is now in the directory.`,
       "Next: register participants or bulk-register your students.",
+      "",
+      "One more step: ask the organiser for a personal invitation code for this record, then " +
+        "sign in via Kata Arena Log In. A USD 10 registration fee unlocks unlimited sign-in to " +
+        "watch your own students' kata recordings and judge scores any time — 10 or more " +
+        "participants qualifies you for a 10% share of their registration fees.",
     ],
   });
   return { ok: true, name };

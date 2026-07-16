@@ -9,20 +9,14 @@ const inputCls =
   "w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm focus:border-red-600 focus:outline-none focus:ring-1 focus:ring-red-600";
 const labelCls = "mb-1 block text-sm font-medium text-neutral-700";
 
-/** Only participant/referee/audience create a login account through this
- * form. The other four are directory entries or admin-only accounts with
- * their own dedicated pages — selecting one here just links out to it. */
+/** Only participant/referee/audience/school/sensei create a login account
+ * through this form. Organizer/Customer Support are admin-only accounts
+ * with their own dedicated pages — selecting one here just links out to it.
+ * School/Sensei directory records (with bank/contact details) are still
+ * created separately on their own registration page — this is the *second*
+ * step, signing in to view their own students' recordings, which needs a
+ * personal invitation code generated from that existing directory record. */
 const REDIRECT_ROLES: Record<string, { label: string; href: string; blurb: string }> = {
-  school: {
-    label: "School / Dojo / Club",
-    href: "/register/school",
-    blurb: "Schools/Dojos don't get a login here — register your school in the directory instead.",
-  },
-  sensei: {
-    label: "Sensei / Shihan / Hanshi",
-    href: "/register/sensei",
-    blurb: "Senseis don't get a login here — register in the directory so students can select you.",
-  },
   organizer: {
     label: "Organizer",
     href: "/register/staff",
@@ -152,6 +146,22 @@ export default function AuthForms({ defaultMode = "signin" }: { defaultMode?: "s
             </p>
           </div>
         )}
+        {mode === "signup" && (role === "school" || role === "sensei") && (
+          <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
+            <p>
+              Signing in here is the second step — your School/Sensei must already be registered
+              in the directory (with contact and bank details) before you can get a personal
+              invitation code from your own record&apos;s Edit page. That code links this login to
+              your students only.
+            </p>
+            <p className="mt-1">
+              A USD 10 registration fee unlocks unlimited sign-in to watch your own students&apos;
+              kata recordings and judge scores as they come in — no waiting for winners day. Get
+              10 or more participants signed up under your school/sensei and you qualify for a 10%
+              share of their registration fees.
+            </p>
+          </div>
+        )}
         {mode === "signup" && REDIRECT_ROLES[role] ? (
           <div className="rounded-md border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-600">
             <p>{REDIRECT_ROLES[role].blurb}</p>
@@ -170,6 +180,17 @@ export default function AuthForms({ defaultMode = "signin" }: { defaultMode?: "s
                 <input id="auth_invite" name="invite_code" className={inputCls} placeholder="e.g. IKO-JUDGE-2026" />
                 <p className="mt-1 text-xs text-neutral-400">
                   A valid code activates your account immediately — no payment, no waiting for approval.
+                </p>
+              </div>
+            )}
+            {mode === "signup" && (role === "school" || role === "sensei") && (
+              <div>
+                <label htmlFor="auth_invite" className={labelCls}>Invitation code *</label>
+                <input id="auth_invite" name="invite_code" required className={inputCls} placeholder="e.g. SCHOOL-4F9A2B" />
+                <p className="mt-1 text-xs text-neutral-400">
+                  Required — get this from your school/sensei&apos;s own record on the admin site
+                  (ask the organiser if you don&apos;t have one yet). It's what links this account
+                  to your students only.
                 </p>
               </div>
             )}
