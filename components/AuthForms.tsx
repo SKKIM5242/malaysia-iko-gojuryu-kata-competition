@@ -9,6 +9,32 @@ const inputCls =
   "w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm focus:border-red-600 focus:outline-none focus:ring-1 focus:ring-red-600";
 const labelCls = "mb-1 block text-sm font-medium text-neutral-700";
 
+/** Only participant/referee/audience create a login account through this
+ * form. The other four are directory entries or admin-only accounts with
+ * their own dedicated pages — selecting one here just links out to it. */
+const REDIRECT_ROLES: Record<string, { label: string; href: string; blurb: string }> = {
+  school: {
+    label: "School / Dojo / Club",
+    href: "/register/school",
+    blurb: "Schools/Dojos don't get a login here — register your school in the directory instead.",
+  },
+  sensei: {
+    label: "Sensei / Shihan / Hanshi",
+    href: "/register/sensei",
+    blurb: "Senseis don't get a login here — register in the directory so students can select you.",
+  },
+  organizer: {
+    label: "Organizer",
+    href: "/register/staff",
+    blurb: "Admin/Organizer accounts have no self-signup — submit an application for the organiser to review.",
+  },
+  customer_support: {
+    label: "Customer Services Support",
+    href: "/register/staff",
+    blurb: "Customer Support accounts have no self-signup — submit an application for the organiser to review.",
+  },
+};
+
 export default function AuthForms({ defaultMode = "signin" }: { defaultMode?: "signin" | "signup" }) {
   const router = useRouter();
   const [mode, setMode] = useState<"signin" | "signup">(defaultMode);
@@ -88,7 +114,7 @@ export default function AuthForms({ defaultMode = "signin" }: { defaultMode?: "s
         <p className="mt-1">
           <strong>Audience / Spectator</strong> accounts are charged per sign-in — some have a
           limited number of sign-ins, and once used up that account can no longer sign in. A new
-          subscription needs a new account set up with a new email address.
+          subscription is necessary.
         </p>
         <p className="mt-1">
           <strong>Participants</strong> competing in the Kata Competition have unlimited sign-in
@@ -101,29 +127,44 @@ export default function AuthForms({ defaultMode = "signin" }: { defaultMode?: "s
           <div className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</div>
         )}
         {mode === "signup" && (
+          <div>
+            <label htmlFor="auth_role" className={labelCls}>I am registering as *</label>
+            <select
+              id="auth_role"
+              name="role"
+              required
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              className={inputCls}
+            >
+              <option value="school">School / Dojo / Club</option>
+              <option value="sensei">Sensei / Shihan / Hanshi</option>
+              <option value="participant">Participant (record my kata)</option>
+              <option value="referee">Referee / Judge</option>
+              <option value="audience">Audience / Spectator (view Kata Arena)</option>
+              <option value="customer_support">Customer Services Support</option>
+              <option value="organizer">Organizer</option>
+            </select>
+            <p className="mt-1 text-xs text-neutral-400">
+              Referee/Judge and Audience accounts need the organiser&apos;s approval before they
+              activate — unless you have an invitation code below. Once approved, sign-in is
+              unlimited and free.
+            </p>
+          </div>
+        )}
+        {mode === "signup" && REDIRECT_ROLES[role] ? (
+          <div className="rounded-md border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-600">
+            <p>{REDIRECT_ROLES[role].blurb}</p>
+            <Link
+              href={REDIRECT_ROLES[role].href}
+              className="mt-3 inline-block rounded-md bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-600"
+            >
+              Go to {REDIRECT_ROLES[role].label} registration →
+            </Link>
+          </div>
+        ) : (
           <>
-            <div>
-              <label htmlFor="auth_role" className={labelCls}>I am registering as *</label>
-              <select
-                id="auth_role"
-                name="role"
-                required
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                className={inputCls}
-              >
-                <option value="participant">Participant (record my kata)</option>
-                <option value="referee">Referee / Judge</option>
-                <option value="audience">Audience / Spectator (view Kata Arena)</option>
-              </select>
-              <p className="mt-1 text-xs text-neutral-400">
-                Referee/Judge and Audience accounts need the organiser&apos;s approval before they
-                activate — unless you have an invitation code below. Once approved, sign-in is
-                unlimited and free. Admin / Organizer and Customer Support accounts are created
-                directly by the organiser — there is no self-signup for those.
-              </p>
-            </div>
-            {(role === "referee" || role === "audience") && (
+            {mode === "signup" && (role === "referee" || role === "audience") && (
               <div>
                 <label htmlFor="auth_invite" className={labelCls}>Invitation code (optional)</label>
                 <input id="auth_invite" name="invite_code" className={inputCls} placeholder="e.g. IKO-JUDGE-2026" />
@@ -132,68 +173,72 @@ export default function AuthForms({ defaultMode = "signin" }: { defaultMode?: "s
                 </p>
               </div>
             )}
+            {mode === "signup" && (
+              <>
+                <div>
+                  <label htmlFor="auth_name" className={labelCls}>Full name *</label>
+                  <input id="auth_name" name="full_name" required className={inputCls} />
+                </div>
+                <div>
+                  <label htmlFor="auth_country" className={labelCls}>Country *</label>
+                  <input id="auth_country" name="country" required defaultValue="Malaysia" className={inputCls} />
+                </div>
+              </>
+            )}
             <div>
-              <label htmlFor="auth_name" className={labelCls}>Full name *</label>
-              <input id="auth_name" name="full_name" required className={inputCls} />
+              <label htmlFor="auth_email" className={labelCls}>Email *</label>
+              <input id="auth_email" name="email" type="email" required autoComplete="email" className={inputCls} />
             </div>
             <div>
-              <label htmlFor="auth_country" className={labelCls}>Country *</label>
-              <input id="auth_country" name="country" required defaultValue="Malaysia" className={inputCls} />
+              <label htmlFor="auth_password" className={labelCls}>Password *</label>
+              <input
+                id="auth_password"
+                name="password"
+                type="password"
+                required
+                minLength={8}
+                autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                className={inputCls}
+              />
+              {mode === "signin" && (
+                <Link
+                  href="/account/forgot-password"
+                  className="mt-1 inline-block text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700"
+                >
+                  Forgot password?
+                </Link>
+              )}
             </div>
+            {mode === "signup" && (
+              <label htmlFor="terms_accepted" className="flex items-start gap-2 text-xs text-neutral-600">
+                <input id="terms_accepted" name="terms_accepted" type="checkbox" required className="mt-0.5" />
+                <span>
+                  I agree to the Kata Arena{" "}
+                  <a
+                    href="/terms"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-semibold text-red-700 underline underline-offset-2"
+                  >
+                    Terms &amp; Conditions
+                  </a>
+                  . *
+                </span>
+              </label>
+            )}
+            <label htmlFor="not_a_robot" className="flex items-center gap-2 text-xs text-neutral-600">
+              <input id="not_a_robot" name="not_a_robot" type="checkbox" required />
+              <span>I am not a robot or AI. *</span>
+            </label>
+            <button
+              type="submit"
+              disabled={pending}
+              className="w-full rounded-md bg-red-700 px-4 py-2.5 font-semibold text-white hover:bg-red-600 disabled:opacity-60"
+            >
+              {pending ? "Please wait…" : mode === "signup" ? "Create account" : "Sign in"}
+            </button>
           </>
         )}
-        <div>
-          <label htmlFor="auth_email" className={labelCls}>Email *</label>
-          <input id="auth_email" name="email" type="email" required autoComplete="email" className={inputCls} />
-        </div>
-        <div>
-          <label htmlFor="auth_password" className={labelCls}>Password *</label>
-          <input
-            id="auth_password"
-            name="password"
-            type="password"
-            required
-            minLength={8}
-            autoComplete={mode === "signup" ? "new-password" : "current-password"}
-            className={inputCls}
-          />
-          {mode === "signin" && (
-            <Link
-              href="/account/forgot-password"
-              className="mt-1 inline-block text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700"
-            >
-              Forgot password?
-            </Link>
-          )}
-        </div>
-        {mode === "signup" && (
-          <label htmlFor="terms_accepted" className="flex items-start gap-2 text-xs text-neutral-600">
-            <input id="terms_accepted" name="terms_accepted" type="checkbox" required className="mt-0.5" />
-            <span>
-              I agree to the Kata Arena{" "}
-              <a
-                href="/terms"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-semibold text-red-700 underline underline-offset-2"
-              >
-                Terms &amp; Conditions
-              </a>
-              . *
-            </span>
-          </label>
-        )}
-        <label htmlFor="not_a_robot" className="flex items-center gap-2 text-xs text-neutral-600">
-          <input id="not_a_robot" name="not_a_robot" type="checkbox" required />
-          <span>I am not a robot or AI. *</span>
-        </label>
-        <button
-          type="submit"
-          disabled={pending}
-          className="w-full rounded-md bg-red-700 px-4 py-2.5 font-semibold text-white hover:bg-red-600 disabled:opacity-60"
-        >
-          {pending ? "Please wait…" : mode === "signup" ? "Create account" : "Sign in"}
-        </button>
       </form>
     </div>
   );

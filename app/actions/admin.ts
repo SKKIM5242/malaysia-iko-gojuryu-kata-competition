@@ -969,7 +969,7 @@ export async function createInvitationCode(formData: FormData) {
     .insert({ code, role, note, max_uses: maxUsesRaw ? Number(maxUsesRaw) : null, generated_by })
     .select("id")
     .single();
-  if (error) backTo(returnTo, { error: "Could not create code — it may already exist." });
+  if (error) backTo(returnTo, { error: `Could not create code: ${error.message}` });
   await writeAudit(supabase, {
     table_name: "invitation_codes", record_id: data!.id, action: "invitation_code_created",
     new_value: { code, role }, actor_id: actorId,

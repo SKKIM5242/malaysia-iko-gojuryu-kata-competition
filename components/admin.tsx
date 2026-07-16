@@ -23,6 +23,7 @@ const FULL_NAV: Array<[string, string]> = [
   ["Telegram Links", "/admin/telegram"],
   ["Classes", "/admin/classes"],
   ["Accounts", "/admin/accounts"],
+  ["Kata Arena Log In", "/account"],
 ];
 
 export async function AdminShell({

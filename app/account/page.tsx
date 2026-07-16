@@ -154,11 +154,16 @@ export default async function AccountPage({
   const profile = profileData as ProfileRow | null;
 
   const SignOutButton = (
-    <form action={signOut}>
-      <button className="text-sm text-neutral-400 underline underline-offset-2 hover:text-neutral-700">
-        Sign out
-      </button>
-    </form>
+    <div>
+      <form action={signOut}>
+        <button className="rounded-md border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-50">
+          Sign out
+        </button>
+      </form>
+      <p className="mt-1.5 text-xs text-neutral-400">
+        Signing out takes you to the Sign in / Create account page.
+      </p>
+    </div>
   );
 
   if (!profile) {
