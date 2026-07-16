@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/app/actions/auth";
+import { claimAndStartRecording } from "@/app/actions/account";
 import { schemaReady } from "@/lib/data";
 import { SetupNotice, SiteFooter, SiteHeader, TelegramFullAccessLinks } from "@/components/ui";
 import AuthForms from "@/components/AuthForms";
 import ClaimForm from "@/components/ClaimForm";
 import KataRecorder from "@/components/KataRecorder";
+import VideoWatchButton from "@/components/VideoWatchButton";
 import RefereeScoring, { type ScoringItem } from "@/components/RefereeScoring";
 import { getAllTelegramLinks, getTelegramBotConnectUrl } from "@/lib/telegram";
 
@@ -18,11 +20,84 @@ interface ProfileRow {
   role: "participant" | "referee" | "staff" | "admin" | "organizer" | "customer_support" | "audience";
   full_name: string | null;
   country: string | null;
+  email: string | null;
   approved: boolean;
   participant_id: string | null;
   registration_id: string | null;
   record_attempts: number;
   telegram_chat_id: string | null;
+}
+
+interface PendingRegistration {
+  id: string;
+  categoryName: string | null;
+  competitionName: string | null;
+}
+
+/** Every OTHER paid registration whose participant email matches this
+ * account's sign-in email and that has no recording yet — lets a
+ * participant who registered up to 3 times switch which one they're
+ * currently recording without retyping reference ID + IC each time. */
+async function getPendingRegistrations(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  email: string | null,
+  excludeRegistrationId: string | null,
+): Promise<PendingRegistration[]> {
+  if (!email) return [];
+  const { data: myParticipants } = await supabase.from("participants").select("id").ilike("email", email);
+  const participantIds = (myParticipants ?? []).map((p) => p.id as string);
+  if (participantIds.length === 0) return [];
+
+  const { data: regs } = await supabase
+    .from("registrations")
+    .select("id, category:categories(name), competition:competitions(name)")
+    .in("participant_id", participantIds)
+    .eq("payment_status", "paid");
+  const regList =
+    (regs as unknown as Array<{
+      id: string;
+      category: { name: string } | null;
+      competition: { name: string } | null;
+    }>) ?? [];
+  if (regList.length === 0) return [];
+
+  const regIds = regList.map((r) => r.id);
+  const { data: videos } = await supabase.from("kata_videos").select("registration_id").in("registration_id", regIds);
+  const recorded = new Set((videos ?? []).map((v) => v.registration_id as string));
+
+  return regList
+    .filter((r) => !recorded.has(r.id) && r.id !== excludeRegistrationId)
+    .map((r) => ({ id: r.id, categoryName: r.category?.name ?? null, competitionName: r.competition?.name ?? null }));
+}
+
+function PendingRecordingsList({ items }: { items: PendingRegistration[] }) {
+  if (items.length === 0) return null;
+  return (
+    <div className="rounded-lg border border-amber-300 bg-amber-50 p-4">
+      <p className="font-bold text-amber-900">
+        {items.length} more registration{items.length === 1 ? "" : "s"} waiting for a recording
+      </p>
+      <div className="mt-3 space-y-2">
+        {items.map((r) => (
+          <div
+            key={r.id}
+            className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-200 bg-white px-3 py-2"
+          >
+            <div>
+              <p className="text-sm font-semibold text-neutral-800">{r.categoryName ?? "Category not set"}</p>
+              <p className="text-xs text-neutral-500">{r.competitionName ?? ""}</p>
+            </div>
+            <form action={claimAndStartRecording}>
+              <input type="hidden" name="registration_id" value={r.id} />
+              <button className="rounded-md bg-red-700 px-4 py-1.5 text-xs font-semibold text-white hover:bg-red-600">
+                Start Recording
+              </button>
+            </form>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function watermarkText(eventDate: string | null | undefined): string {
@@ -35,9 +110,9 @@ function watermarkText(eventDate: string | null | undefined): string {
 export default async function AccountPage({
   searchParams,
 }: {
-  searchParams: Promise<{ mode?: string }>;
+  searchParams: Promise<{ mode?: string; claim_error?: string }>;
 }) {
-  const { mode } = await searchParams;
+  const { mode, claim_error: claimError } = await searchParams;
   const ready = await schemaReady();
   if (!ready) {
     return (
@@ -275,6 +350,7 @@ export default async function AccountPage({
 
   // ── Participant ──────────────────────────────────────────────────────────
   if (!profile.registration_id) {
+    const pending = await getPendingRegistrations(supabase, profile.email, null);
     return (
       <>
         <SiteHeader />
@@ -283,6 +359,19 @@ export default async function AccountPage({
           <p className="mt-1 mb-6 text-sm text-neutral-500">
             Signed in as {profile.full_name ?? user.email}.
           </p>
+          {claimError && (
+            <div className="mb-4 rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
+              {claimError}
+            </div>
+          )}
+          {pending.length > 0 && (
+            <div className="mb-6">
+              <PendingRecordingsList items={pending} />
+            </div>
+          )}
+          <p className="mb-2 text-sm font-semibold text-neutral-700">
+            Registered with a different email, or none of the above is yours?
+          </p>
           <ClaimForm />
           <div className="mt-4">{SignOutButton}</div>
         </main>
@@ -290,6 +379,8 @@ export default async function AccountPage({
       </>
     );
   }
+
+  const pendingOthers = await getPendingRegistrations(supabase, profile.email, profile.registration_id);
 
   const { data: existingVideo } = await supabase
     .from("kata_videos")
@@ -330,7 +421,14 @@ export default async function AccountPage({
             <div className="rounded-lg border border-green-300 bg-green-50 p-6">
               <p className="font-bold text-green-900">✅ Your kata recording is submitted</p>
               {ownVideoUrl ? (
-                <video controls className="mt-3 w-full rounded-md bg-black" src={ownVideoUrl} />
+                <div className="mt-3">
+                  <VideoWatchButton
+                    url={ownVideoUrl}
+                    label="Watch your recording"
+                    className="rounded-md bg-neutral-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-neutral-700"
+                    deletable={{ registrationId: profile.registration_id, attemptsUsed: profile.record_attempts }}
+                  />
+                </div>
               ) : (
                 <p className="mt-2 text-sm text-green-800">Thank you — it is ready for judging.</p>
               )}
@@ -347,6 +445,7 @@ export default async function AccountPage({
                 Go to Kata Arena
               </Link>
             </div>
+            <PendingRecordingsList items={pendingOthers} />
           </div>
         ) : (
           <div className="space-y-8">
@@ -363,6 +462,7 @@ export default async function AccountPage({
                 Go to Kata Arena
               </Link>
             </div>
+            <PendingRecordingsList items={pendingOthers} />
           </div>
         )}
         <div className="mt-6">{SignOutButton}</div>

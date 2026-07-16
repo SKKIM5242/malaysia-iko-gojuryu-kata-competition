@@ -20,16 +20,21 @@ interface ProfileRow {
   approved: boolean;
   participant_id: string | null;
   registration_id: string | null;
+  record_attempts: number;
 }
 
 function RecordingCard({
   entry,
   showJudgeScores,
   showFinalScore,
+  ownDelete,
 }: {
   entry: ArenaEntry;
   showJudgeScores: boolean;
   showFinalScore: boolean;
+  /** Set only for the signed-in participant's own entry — renders a Delete
+   * option (capped at 3 total) inside the Watch modal. */
+  ownDelete?: { registrationId: string; attemptsUsed: number };
 }) {
   return (
     <div className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
@@ -44,7 +49,7 @@ function RecordingCard({
               Final {entry.finalScore.toFixed(1)}
             </span>
           )}
-          <VideoWatchButton url={entry.playbackUrl} />
+          <VideoWatchButton url={entry.playbackUrl} deletable={ownDelete} />
         </div>
       </div>
       {showJudgeScores && (
@@ -116,7 +121,7 @@ export default async function KataArenaPage({
 
   const { data: profileData } = await supabase
     .from("profiles")
-    .select("role, full_name, approved, participant_id, registration_id")
+    .select("role, full_name, approved, participant_id, registration_id, record_attempts")
     .eq("user_id", user.id)
     .maybeSingle();
   const profile = profileData as ProfileRow | null;
@@ -288,7 +293,7 @@ export default async function KataArenaPage({
               href="/account"
               className="mt-3 inline-block rounded-md bg-red-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-600"
             >
-              Record your kata
+              Start Recording
             </Link>
           </div>
         )}
@@ -306,7 +311,17 @@ export default async function KataArenaPage({
                 </summary>
                 <div className="space-y-3 px-4 pb-4 pt-1">
                   {entries.map((a) => (
-                    <RecordingCard key={a.videoId} entry={a} showJudgeScores={false} showFinalScore={revealed} />
+                    <RecordingCard
+                      key={a.videoId}
+                      entry={a}
+                      showJudgeScores={false}
+                      showFinalScore={revealed}
+                      ownDelete={
+                        a.participantId === profile.participant_id && profile.registration_id
+                          ? { registrationId: profile.registration_id, attemptsUsed: profile.record_attempts }
+                          : undefined
+                      }
+                    />
                   ))}
                 </div>
               </details>
