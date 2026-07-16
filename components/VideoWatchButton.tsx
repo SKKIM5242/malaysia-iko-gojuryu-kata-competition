@@ -3,9 +3,9 @@
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { deleteSubmittedVideo, type DeleteVideoState } from "@/app/actions/account";
+import BuyExtraAttemptsButton from "@/components/BuyExtraAttemptsButton";
 
 const initialDeleteState: DeleteVideoState = { ok: false };
-const MAX_ATTEMPTS = 3;
 
 /** Opens the recording in an in-page modal instead of a new tab — used on
  * Kata Arena, Judging, and the admin Participant Records table so watching
@@ -22,7 +22,7 @@ export default function VideoWatchButton({
   url: string | null;
   label?: string;
   className?: string;
-  deletable?: { registrationId: string; attemptsUsed: number };
+  deletable?: { registrationId: string; attemptsUsed: number; maxAttempts: number; hasPendingPurchase: boolean };
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -40,7 +40,8 @@ export default function VideoWatchButton({
   if (!url) return null;
 
   const attemptsUsed = state.attemptsUsed ?? deletable?.attemptsUsed ?? 0;
-  const attemptsLeft = Math.max(0, MAX_ATTEMPTS - attemptsUsed);
+  const maxAttempts = deletable?.maxAttempts ?? 3;
+  const attemptsLeft = Math.max(0, maxAttempts - attemptsUsed);
 
   return (
     <>
@@ -63,7 +64,7 @@ export default function VideoWatchButton({
             <div className="absolute -top-10 right-0 flex items-center gap-3">
               {deletable && (
                 <span className="text-xs font-semibold text-white">
-                  {attemptsUsed} of {MAX_ATTEMPTS} deletions used
+                  {attemptsUsed} of {maxAttempts} deletions used
                 </span>
               )}
               <button
@@ -83,6 +84,11 @@ export default function VideoWatchButton({
               <div className="mt-3 rounded-lg bg-white p-3">
                 {state.error && (
                   <p className="mb-2 text-xs font-semibold text-red-600">{state.error}</p>
+                )}
+                {attemptsLeft <= 0 && (
+                  <div className="mb-2">
+                    <BuyExtraAttemptsButton hasPendingPurchase={deletable.hasPendingPurchase} />
+                  </div>
                 )}
                 {!confirming ? (
                   <button

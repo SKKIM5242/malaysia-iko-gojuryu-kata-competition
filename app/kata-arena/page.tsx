@@ -21,6 +21,7 @@ interface ProfileRow {
   participant_id: string | null;
   registration_id: string | null;
   record_attempts: number;
+  bonus_record_attempts: number;
   school_id: string | null;
   sensei_id: string | null;
 }
@@ -35,8 +36,8 @@ function RecordingCard({
   showJudgeScores: boolean;
   showFinalScore: boolean;
   /** Set only for the signed-in participant's own entry — renders a Delete
-   * option (capped at 3 total) inside the Watch modal. */
-  ownDelete?: { registrationId: string; attemptsUsed: number };
+   * option (capped at 3 + any purchased bonus) inside the Watch modal. */
+  ownDelete?: { registrationId: string; attemptsUsed: number; maxAttempts: number; hasPendingPurchase: boolean };
 }) {
   return (
     <div className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
@@ -123,7 +124,7 @@ export default async function KataArenaPage({
 
   const { data: profileData } = await supabase
     .from("profiles")
-    .select("role, full_name, approved, participant_id, registration_id, record_attempts, school_id, sensei_id")
+    .select("role, full_name, approved, participant_id, registration_id, record_attempts, bonus_record_attempts, school_id, sensei_id")
     .eq("user_id", user.id)
     .maybeSingle();
   const profile = profileData as ProfileRow | null;
@@ -349,6 +350,14 @@ export default async function KataArenaPage({
 
   const fullArena = await loadKataArena(supabase, competition.id);
   const revealed = winnersRevealed(competition.registration_deadline);
+  const maxAttempts = 3 + (profile.bonus_record_attempts ?? 0);
+  const { data: pendingPurchase } = await supabase
+    .from("attempt_purchases")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("status", "pending")
+    .maybeSingle();
+  const hasPendingPurchase = !!pendingPurchase;
   // Own recording is always visible; other participants' recordings only
   // unlock once winners are announced.
   const visibleArena = revealed
@@ -402,7 +411,12 @@ export default async function KataArenaPage({
                       showFinalScore={revealed}
                       ownDelete={
                         a.participantId === profile.participant_id && profile.registration_id
-                          ? { registrationId: profile.registration_id, attemptsUsed: profile.record_attempts }
+                          ? {
+                              registrationId: profile.registration_id,
+                              attemptsUsed: profile.record_attempts,
+                              maxAttempts,
+                              hasPendingPurchase,
+                            }
                           : undefined
                       }
                     />

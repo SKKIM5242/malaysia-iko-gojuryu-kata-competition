@@ -8,13 +8,13 @@ import {
   getSenseiRecords,
   getStaffAccountRecords,
 } from "@/lib/admin-data";
-import { AdminShell } from "@/components/admin";
+import { AdminShell, adminBtnSecondary } from "@/components/admin";
 import { EmptyState, SetupNotice, formatDate } from "@/components/ui";
 import ParticipantRecordsTable, { type ParticipantRecordRow } from "@/components/ParticipantRecordsTable";
 import FilterableTable from "@/components/FilterableTable";
+import { markAttemptPurchasePaid } from "@/app/actions/admin";
 
 export const dynamic = "force-dynamic";
-const MAX_ATTEMPTS = 3;
 
 const ROLE_LABEL: Record<string, string> = {
   admin: "Admin (owner)",
@@ -80,6 +80,20 @@ export default async function AdminParticipantRecords() {
     : { data: null };
   const isAdmin = myProfile?.role === "admin";
 
+  const { data: purchases } = await supabase
+    .from("attempt_purchases")
+    .select("id, user_id, status, created_at, paid_at")
+    .order("created_at", { ascending: false });
+  const purchaseList = purchases ?? [];
+  const purchaseUserIds = [...new Set(purchaseList.map((p) => p.user_id as string))];
+  const { data: purchaseProfiles } =
+    purchaseUserIds.length > 0
+      ? await supabase.from("profiles").select("user_id, full_name, email").in("user_id", purchaseUserIds)
+      : { data: [] };
+  const nameByUserId = new Map(
+    (purchaseProfiles ?? []).map((p) => [p.user_id as string, (p.full_name as string) || (p.email as string) || p.user_id as string]),
+  );
+
   const participantRows: ParticipantRecordRow[] = participantRecords.map((r) => ({
     registrationId: r.registrationId,
     competition: r.competitionName ?? "—",
@@ -103,7 +117,7 @@ export default async function AdminParticipantRecords() {
     bankAccountName: r.participant.bank?.bank_account_name ?? "",
     recordingStatus: r.videoCreatedAt ? "Submitted" : "Not submitted",
     recordingDate: r.videoCreatedAt ? formatDate(r.videoCreatedAt.slice(0, 10)) : "",
-    attempts: `${r.recordAttempts}/${MAX_ATTEMPTS}`,
+    attempts: `${r.recordAttempts}/${r.maxAttempts}`,
     videoUrl: r.videoUrl,
   }));
 
@@ -261,6 +275,39 @@ export default async function AdminParticipantRecords() {
           <EmptyState>No successful registrations yet.</EmptyState>
         ) : (
           <ParticipantRecordsTable rows={participantRows} isAdmin={isAdmin} />
+        )}
+      </Section>
+
+      <Section id="attempt-purchases" title="Extra Attempt Purchases (USD 10 for 3 more)">
+        {purchaseList.length === 0 ? (
+          <EmptyState>No purchase requests yet.</EmptyState>
+        ) : (
+          <div className="space-y-2">
+            {purchaseList.map((p) => (
+              <div
+                key={p.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-neutral-200 p-3 text-sm"
+              >
+                <div>
+                  <p className="font-semibold text-neutral-900">{nameByUserId.get(p.user_id as string)}</p>
+                  <p className="text-xs text-neutral-400">
+                    Requested {formatDate((p.created_at as string).slice(0, 10))}
+                    {p.paid_at ? ` · Confirmed ${formatDate((p.paid_at as string).slice(0, 10))}` : ""}
+                  </p>
+                </div>
+                {p.status === "paid" ? (
+                  <span className="rounded-full border border-green-300 bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-800">
+                    Paid — 3 attempts added
+                  </span>
+                ) : (
+                  <form action={markAttemptPurchasePaid}>
+                    <input type="hidden" name="id" value={p.id} />
+                    <button type="submit" className={adminBtnSecondary}>Confirm payment received</button>
+                  </form>
+                )}
+              </div>
+            ))}
+          </div>
         )}
       </Section>
 

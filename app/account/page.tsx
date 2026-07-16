@@ -25,6 +25,7 @@ interface ProfileRow {
   participant_id: string | null;
   registration_id: string | null;
   record_attempts: number;
+  bonus_record_attempts: number;
   telegram_chat_id: string | null;
 }
 
@@ -387,6 +388,15 @@ export default async function AccountPage({
 
   const pendingOthers = await getPendingRegistrations(supabase, profile.email, profile.registration_id);
 
+  const maxAttempts = 3 + (profile.bonus_record_attempts ?? 0);
+  const { data: pendingPurchase } = await supabase
+    .from("attempt_purchases")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("status", "pending")
+    .maybeSingle();
+  const hasPendingPurchase = !!pendingPurchase;
+
   const { data: existingVideo } = await supabase
     .from("kata_videos")
     .select("id, storage_path")
@@ -431,7 +441,12 @@ export default async function AccountPage({
                     url={ownVideoUrl}
                     label="Watch your recording"
                     className="rounded-md bg-neutral-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-neutral-700"
-                    deletable={{ registrationId: profile.registration_id, attemptsUsed: profile.record_attempts }}
+                    deletable={{
+                      registrationId: profile.registration_id,
+                      attemptsUsed: profile.record_attempts,
+                      maxAttempts,
+                      hasPendingPurchase,
+                    }}
                   />
                 </div>
               ) : (
@@ -454,7 +469,12 @@ export default async function AccountPage({
           </div>
         ) : (
           <div className="space-y-8">
-            <KataRecorder initialAttempts={profile.record_attempts} watermark={watermarkText(eventDate)} />
+            <KataRecorder
+              initialAttempts={profile.record_attempts}
+              maxAttempts={maxAttempts}
+              hasPendingPurchase={hasPendingPurchase}
+              watermark={watermarkText(eventDate)}
+            />
             <div>
               <p className="mb-2 text-sm text-neutral-500">
                 Already registered but not ready to record yet? You can still watch every submitted

@@ -3,9 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRecordAttempt, submitKataVideo } from "@/app/actions/account";
+import BuyExtraAttemptsButton from "@/components/BuyExtraAttemptsButton";
 
 const MAX_SECONDS = 5 * 60;
-const MAX_ATTEMPTS = 3;
 
 type Phase = "idle" | "live" | "recording" | "review" | "uploading" | "done";
 
@@ -68,9 +68,13 @@ function drawFrame(
 
 export default function KataRecorder({
   initialAttempts,
+  maxAttempts,
+  hasPendingPurchase,
   watermark,
 }: {
   initialAttempts: number;
+  maxAttempts: number;
+  hasPendingPurchase: boolean;
   watermark: string;
 }) {
   const [phase, setPhase] = useState<Phase>("idle");
@@ -88,7 +92,7 @@ export default function KataRecorder({
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const recordedBlobRef = useRef<Blob | null>(null);
 
-  const attemptsLeft = Math.max(0, MAX_ATTEMPTS - attempts);
+  const attemptsLeft = Math.max(0, maxAttempts - attempts);
   const canReRecord = attemptsLeft > 0;
 
   useEffect(() => {
@@ -249,9 +253,14 @@ export default function KataRecorder({
       )}
 
       <div className="rounded-md border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
-        You have <strong>{attemptsLeft}</strong> of {MAX_ATTEMPTS} delete-and-re-record chances left.
+        You have <strong>{attemptsLeft}</strong> of {maxAttempts} delete-and-re-record chances left.
         Recording is limited to <strong>5 minutes</strong>. No file upload or editing is allowed — only
         this in-app camera recorder.
+        {attemptsLeft <= 0 && (
+          <div className="mt-2">
+            <BuyExtraAttemptsButton hasPendingPurchase={hasPendingPurchase} />
+          </div>
+        )}
       </div>
 
       <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">

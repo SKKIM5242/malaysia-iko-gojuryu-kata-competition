@@ -133,6 +133,7 @@ export interface ParticipantRecord {
   categoryName: string | null;
   participant: Participant;
   recordAttempts: number;
+  maxAttempts: number;
   videoCreatedAt: string | null;
   videoUrl: string | null;
   certificateUrl: string | null;
@@ -162,12 +163,15 @@ export async function getParticipantRecords(): Promise<ParticipantRecord[]> {
   const regIds = regList.map((r) => r.id);
   const [{ data: videos }, { data: profiles }] = await Promise.all([
     supabase.from("kata_videos").select("registration_id, storage_path, created_at").in("registration_id", regIds),
-    supabase.from("profiles").select("registration_id, record_attempts").in("registration_id", regIds),
+    supabase.from("profiles").select("registration_id, record_attempts, bonus_record_attempts").in("registration_id", regIds),
   ]);
   const videoByReg = new Map(
     (videos ?? []).map((v) => [v.registration_id as string, { storagePath: v.storage_path as string, createdAt: v.created_at as string }]),
   );
   const attemptsByReg = new Map((profiles ?? []).map((p) => [p.registration_id as string, p.record_attempts as number]));
+  const maxAttemptsByReg = new Map(
+    (profiles ?? []).map((p) => [p.registration_id as string, 3 + (p.bonus_record_attempts as number ?? 0)]),
+  );
 
   const paths = [...videoByReg.values()].map((v) => v.storagePath);
   const signedUrlByPath = new Map<string, string>();
@@ -198,6 +202,7 @@ export async function getParticipantRecords(): Promise<ParticipantRecord[]> {
         categoryName: r.category?.name ?? null,
         participant: r.participant as Participant,
         recordAttempts: attemptsByReg.get(r.id) ?? 0,
+        maxAttempts: maxAttemptsByReg.get(r.id) ?? 3,
         videoCreatedAt: video?.createdAt ?? null,
         videoUrl: video ? (signedUrlByPath.get(video.storagePath) ?? null) : null,
         certificateUrl: certPath ? (certUrlByPath.get(certPath) ?? null) : null,

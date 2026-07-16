@@ -130,6 +130,34 @@ export async function useRecordAttempt(): Promise<number> {
   return typeof data === "number" ? data : 5;
 }
 
+/** Requests 3 more delete-and-re-record chances for USD 10 — creates a
+ * pending request the organiser confirms manually (same pattern as every
+ * other payment here, since there's no real payment gateway). Refuses a
+ * second request while one is already pending. */
+export async function requestExtraAttempts(
+  _prev: AccountActionState,
+  _formData: FormData,
+): Promise<AccountActionState> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sign in first." };
+
+  const { data: existing } = await supabase
+    .from("attempt_purchases")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("status", "pending")
+    .maybeSingle();
+  if (existing) return { ok: false, error: "You already have a purchase request awaiting confirmation." };
+
+  const { error } = await supabase.from("attempt_purchases").insert({ user_id: user.id });
+  if (error) return { ok: false, error: "Could not submit the request — please try again." };
+  revalidatePath("/account");
+  return { ok: true };
+}
+
 /** Register the uploaded recording as the participant's competition entry. */
 export async function submitKataVideo(
   _prev: AccountActionState,

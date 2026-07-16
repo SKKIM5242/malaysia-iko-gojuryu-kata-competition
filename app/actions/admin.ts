@@ -1909,3 +1909,51 @@ export async function linkRefereeAccount(formData: FormData) {
   });
   backTo(returnTo, { ok: "Account linked." });
 }
+
+// ── Extra re-record attempt purchases (USD 10 for 3 more) ───────────────────
+
+/** Confirms a participant's USD 10 payment and adds 3 more
+ * delete-and-re-record chances to their account. */
+export async function markAttemptPurchasePaid(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const returnTo = "/admin/records";
+  const { supabase, actorId } = await getActor();
+  const { data: purchase } = await supabase
+    .from("attempt_purchases")
+    .select("id, user_id, status")
+    .eq("id", id)
+    .maybeSingle();
+  if (!purchase || purchase.status !== "pending") {
+    backTo(returnTo, { error: "That request is no longer pending." });
+  }
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("bonus_record_attempts, full_name, email")
+    .eq("user_id", purchase!.user_id)
+    .maybeSingle();
+  const { error: err1 } = await supabase
+    .from("profiles")
+    .update({ bonus_record_attempts: (profile?.bonus_record_attempts ?? 0) + 3 })
+    .eq("user_id", purchase!.user_id);
+  const { error: err2 } = await supabase
+    .from("attempt_purchases")
+    .update({ status: "paid", paid_at: new Date().toISOString() })
+    .eq("id", id);
+  if (err1 || err2) backTo(returnTo, { error: "Could not confirm the purchase — please try again." });
+  await writeAudit(supabase, {
+    table_name: "attempt_purchases", record_id: id, action: "attempt_purchase_confirmed",
+    new_value: { user_id: purchase!.user_id }, actor_id: actorId,
+  });
+  if (profile?.email) {
+    await sendConfirmationEmail({
+      toEmail: profile.email,
+      recipientName: profile.full_name ?? "there",
+      subject: "Your USD 10 payment is confirmed — 3 more attempts added",
+      bodyLines: [
+        "Your USD 10 payment for extra delete-and-re-record attempts has been confirmed.",
+        "3 more chances have been added to your account — go back to My Account to continue recording.",
+      ],
+    });
+  }
+  backTo(returnTo, { ok: "Purchase confirmed — 3 attempts added." });
+}
