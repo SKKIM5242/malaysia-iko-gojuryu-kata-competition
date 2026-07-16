@@ -1845,3 +1845,39 @@ export async function setCommissionPayoutStatus(formData: FormData) {
   });
   backTo(returnTo, { ok: "Payout status updated." });
 }
+
+// ── Customer Support shift log (USD 8/hour) ─────────────────────────────────
+
+/** Manual clock-in — deliberately not tied to page-session timestamps,
+ * since Customer Support also works via the Telegram assistant/community
+ * groups where there's no page session to derive a sign-in time from. */
+export async function clockIn(formData: FormData) {
+  const returnTo = "/admin/support";
+  const { supabase, actorId } = await getActor();
+  if (!actorId) backTo(returnTo, { error: "Sign in first." });
+  const { data: open } = await supabase
+    .from("support_shifts")
+    .select("id")
+    .eq("user_id", actorId!)
+    .is("clock_out_at", null)
+    .maybeSingle();
+  if (open) backTo(returnTo, { error: "You already have an open shift — clock out first." });
+  const { error } = await supabase.from("support_shifts").insert({ user_id: actorId });
+  if (error) backTo(returnTo, { error: "Could not clock in — please try again." });
+  backTo(returnTo, { ok: "Clocked in." });
+}
+
+export async function clockOut(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const task_summary = String(formData.get("task_summary") ?? "").trim() || null;
+  const returnTo = "/admin/support";
+  const { supabase, actorId } = await getActor();
+  if (!actorId || !id) backTo(returnTo, { error: "Invalid request." });
+  const { error } = await supabase
+    .from("support_shifts")
+    .update({ clock_out_at: new Date().toISOString(), task_summary })
+    .eq("id", id)
+    .eq("user_id", actorId!);
+  if (error) backTo(returnTo, { error: "Could not clock out — please try again." });
+  backTo(returnTo, { ok: "Clocked out." });
+}

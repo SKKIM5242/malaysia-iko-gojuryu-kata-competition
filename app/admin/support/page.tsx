@@ -1,12 +1,17 @@
 import { createClient } from "@/lib/supabase/server";
 import { schemaReady } from "@/lib/data";
-import { updateCommunityStatus, createStaffAccount, bulkUploadSupport } from "@/app/actions/admin";
-import { AdminShell, Card, CertificateField, adminBtn, adminInput, adminLabel } from "@/components/admin";
+import { updateCommunityStatus, createStaffAccount, bulkUploadSupport, clockIn, clockOut } from "@/app/actions/admin";
+import { getOpenShift, getAllShifts } from "@/lib/support-shifts";
+import { AdminShell, Card, CertificateField, adminBtn, adminBtnSecondary, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
 
 export const dynamic = "force-dynamic";
+
+function formatDateTime(iso: string): string {
+  return new Date(iso).toLocaleString("en-MY", { dateStyle: "medium", timeStyle: "short" });
+}
 
 interface StaffApp {
   id: string; full_name: string; email: string | null; phone: string | null;
@@ -36,6 +41,13 @@ export default async function AdminSupport({
     ? await supabase.from("profiles").select("role").eq("user_id", user.id).maybeSingle()
     : { data: null };
   const canCreate = ["admin", "organizer", "staff"].includes(myProfile?.role ?? "");
+  const isCustomerSupport = myProfile?.role === "customer_support";
+  const isAdminTier = ["admin", "organizer", "staff", "customer_support"].includes(myProfile?.role ?? "");
+
+  const [openShift, allShifts] = await Promise.all([
+    isCustomerSupport && user ? getOpenShift(user.id) : Promise.resolve(null),
+    isAdminTier ? getAllShifts() : Promise.resolve([]),
+  ]);
 
   const { data: apps } = await supabase
     .from("staff_applications")
@@ -46,6 +58,41 @@ export default async function AdminSupport({
 
   return (
     <AdminShell title="Customer Support" active="/admin/support" flash={{ ok: params.ok, error: params.error }}>
+      {isCustomerSupport && (
+        <div className="mb-8">
+          <h2 className="mb-3 text-lg font-bold">Your shift</h2>
+          <Card>
+            <p className="mb-3 text-xs text-neutral-400">
+              Clock in/out here even when your work was replying via the Telegram assistant or
+              community groups — there's no other way to log that time. Paid at USD 8/hour.
+            </p>
+            {openShift ? (
+              <form action={clockOut} className="space-y-3">
+                <input type="hidden" name="id" value={openShift.id} />
+                <p className="text-sm text-neutral-700">
+                  Clocked in since <strong>{formatDateTime(openShift.clockInAt)}</strong>
+                </p>
+                <div>
+                  <label htmlFor="task_summary" className={adminLabel}>Task summary (optional)</label>
+                  <textarea
+                    id="task_summary"
+                    name="task_summary"
+                    rows={2}
+                    className={adminInput}
+                    placeholder="e.g. Answered 6 participant queries on Telegram about recording issues"
+                  />
+                </div>
+                <button type="submit" className={adminBtn}>Clock out</button>
+              </form>
+            ) : (
+              <form action={clockIn}>
+                <button type="submit" className={adminBtnSecondary}>Clock in</button>
+              </form>
+            )}
+          </Card>
+        </div>
+      )}
+
       {canCreate && (
         <div className="mb-8">
           <div className="mb-6">
@@ -209,6 +256,37 @@ export default async function AdminSupport({
         Approving an application here does not create a login by itself — use the &quot;Create a Customer
         Support account&quot; form above to actually grant access.
       </p>
+
+      {isAdminTier && (
+        <div className="mt-8">
+          <h2 className="mb-3 text-lg font-bold">Shift log — USD 8/hour</h2>
+          {allShifts.length === 0 ? (
+            <EmptyState>No shifts logged yet.</EmptyState>
+          ) : (
+            <FilterableTable
+              rowKey="id"
+              downloadName="support-shifts"
+              columns={[
+                { key: "name", label: "Name" },
+                { key: "clock_in", label: "Clock In" },
+                { key: "clock_out", label: "Clock Out" },
+                { key: "hours", label: "Hours" },
+                { key: "pay", label: "Pay (USD)" },
+                { key: "task_summary", label: "Task Summary" },
+              ]}
+              rows={allShifts.map((s) => ({
+                id: s.id,
+                name: s.userName,
+                clock_in: formatDateTime(s.clockInAt),
+                clock_out: s.clockOutAt ? formatDateTime(s.clockOutAt) : "— still clocked in —",
+                hours: s.hours != null ? s.hours.toFixed(2) : "",
+                pay: s.payUsd != null ? `$${s.payUsd.toFixed(2)}` : "",
+                task_summary: s.taskSummary ?? "",
+              }))}
+            />
+          )}
+        </div>
+      )}
     </AdminShell>
   );
 }
