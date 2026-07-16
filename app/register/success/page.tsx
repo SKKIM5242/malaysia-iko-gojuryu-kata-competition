@@ -51,7 +51,7 @@ export default async function RegisterSuccessPage({
                 <p className="text-sm font-semibold text-green-900">2) Create your login account</p>
                 <div className="mt-2 text-center">
                   <Link
-                    href="/account?mode=signup"
+                    href="/kata-arena?mode=signup"
                     className="inline-block rounded-md bg-red-700 px-6 py-2.5 font-semibold text-white hover:bg-red-600"
                   >
                     Create login Account
@@ -65,13 +65,13 @@ export default async function RegisterSuccessPage({
                 </p>
                 <div className="mt-2 flex flex-wrap items-center justify-center gap-3">
                   <Link
-                    href="/account"
+                    href="/kata-arena?mode=signup"
                     className="rounded-md bg-red-700 px-6 py-2.5 font-semibold text-white hover:bg-red-600"
                   >
                     Start Recording Kata
                   </Link>
                   <Link
-                    href="/"
+                    href="/kata-arena"
                     className="rounded-md border border-green-300 bg-white px-6 py-2.5 font-semibold text-green-800 hover:bg-green-50"
                   >
                     Sign in later for Recording

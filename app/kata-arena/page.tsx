@@ -70,7 +70,12 @@ function RecordingCard({
   );
 }
 
-export default async function KataArenaPage() {
+export default async function KataArenaPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ mode?: string }>;
+}) {
+  const { mode } = await searchParams;
   const ready = await schemaReady();
   if (!ready) {
     return (
@@ -102,7 +107,7 @@ export default async function KataArenaPage() {
             submitted. Final scores and standings stay hidden for everyone until winners are
             announced.
           </p>
-          <AuthForms />
+          <AuthForms defaultMode={mode === "signup" ? "signup" : "signin"} />
         </main>
         <SiteFooter />
       </>
@@ -260,6 +265,7 @@ export default async function KataArenaPage() {
   const visibleArena = revealed
     ? fullArena
     : fullArena.filter((a) => a.participantId === profile.participant_id);
+  const hasOwnRecording = fullArena.some((a) => a.participantId === profile.participant_id);
 
   return (
     <>
@@ -272,6 +278,20 @@ export default async function KataArenaPage() {
             ? "Winners have been announced, so every participant's recording and final score is now visible below."
             : "Other participants' recordings and every final score stay hidden until winners are announced."}
         </p>
+        {!hasOwnRecording && (
+          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4">
+            <p className="text-sm font-semibold text-red-900">You haven&apos;t recorded your kata yet.</p>
+            <p className="mt-1 text-sm text-red-800">
+              Recording uses your device&apos;s camera, so it happens on the My Account page.
+            </p>
+            <Link
+              href="/account"
+              className="mt-3 inline-block rounded-md bg-red-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-600"
+            >
+              Record your kata
+            </Link>
+          </div>
+        )}
         {visibleArena.length === 0 ? (
           <p className="text-sm text-neutral-400">No recordings submitted yet.</p>
         ) : (
