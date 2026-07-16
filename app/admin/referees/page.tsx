@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { schemaReady } from "@/lib/data";
 import { updateCommunityStatus, saveReferee, deleteReferee, createInvitationCode, bulkUploadReferees } from "@/app/actions/admin";
-import { AdminShell, Card, CertificateField, adminBtn, adminInput, adminLabel } from "@/components/admin";
+import { AdminShell, Card, CertificateField, adminBtn, adminBtnSecondary, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice, formatDate } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
@@ -84,25 +84,6 @@ export default async function AdminReferees({
   return (
     <AdminShell title="Referees / Judges" active="/admin/referees" flash={{ ok: params.ok, error: params.error }}>
       <div className="mb-8">
-        <h2 className="mb-3 text-lg font-bold">Referee / Judge invitation code</h2>
-        <Card>
-          <form action={createInvitationCode} className="flex flex-wrap items-end gap-3">
-            <input type="hidden" name="role" value="referee" />
-            <input type="hidden" name="return_to" value="/admin/referees" />
-            <div>
-              <label htmlFor="ref_code_note" className={adminLabel}>Note (optional)</label>
-              <input id="ref_code_note" name="note" className={adminInput} placeholder="e.g. July intake" />
-            </div>
-            <button type="submit" className={adminBtn}>Generate unlimited-use code</button>
-          </form>
-          <p className="mt-2 text-xs text-neutral-400">
-            Waives the USD 100 deposit for anyone who signs up as Referee / Judge with the code — unlimited uses.
-            Manage or deactivate codes in Admin → Accounts → Invitation codes.
-          </p>
-        </Card>
-      </div>
-
-      <div className="mb-8">
         <CsvUploadForm
           action={bulkUploadReferees}
           templateHref="/referees-template.csv"
@@ -115,6 +96,26 @@ export default async function AdminReferees({
         <div>
           <h2 className="mb-3 text-lg font-bold">{editing ? "Edit Referee/Judge" : "Add Referee/Judge"}</h2>
           <Card>
+            {!editing && (
+              <div className="mb-4 rounded-md border border-neutral-200 bg-neutral-50 p-3">
+                <p className="text-xs font-bold uppercase tracking-wide text-neutral-500">
+                  Referee / Judge invitation code
+                </p>
+                <form action={createInvitationCode} className="mt-2 flex flex-wrap items-end gap-3">
+                  <input type="hidden" name="role" value="referee" />
+                  <input type="hidden" name="return_to" value="/admin/referees" />
+                  <div>
+                    <label htmlFor="ref_code_note" className={adminLabel}>Note (optional)</label>
+                    <input id="ref_code_note" name="note" className={adminInput} placeholder="e.g. July intake" />
+                  </div>
+                  <button type="submit" className={adminBtnSecondary}>Generate unlimited-use code</button>
+                </form>
+                <p className="mt-1 text-xs text-neutral-400">
+                  Waives the USD 100 deposit for anyone who signs up with the code — unlimited uses. Manage
+                  or revoke codes in Admin → Accounts → Invitation codes.
+                </p>
+              </div>
+            )}
             <form action={saveReferee} className="space-y-4">
               {editing && <input type="hidden" name="id" value={editing.id} />}
               <div>

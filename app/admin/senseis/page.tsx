@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getSchools, getSenseis, schemaReady } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
 import { saveSensei, deleteSensei, createInvitationCode, bulkUploadSenseis } from "@/app/actions/admin";
-import { AdminShell, Card, CertificateField, adminBtn, adminInput, adminLabel } from "@/components/admin";
+import { AdminShell, Card, CertificateField, adminBtn, adminBtnSecondary, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice, formatDate } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
@@ -41,23 +41,6 @@ export default async function AdminSenseis({
   return (
     <AdminShell title="Senseis" active="/admin/senseis" flash={{ ok: params.ok, error: params.error }}>
       <div className="mb-8">
-        <h2 className="mb-3 text-lg font-bold">Sensei / Coach invitation code</h2>
-        <Card>
-          <form action={createInvitationCode} className="flex flex-wrap items-end gap-3">
-            <input type="hidden" name="role" value="school" />
-            <input type="hidden" name="return_to" value="/admin/senseis" />
-            <div>
-              <label htmlFor="sensei_code_note" className={adminLabel}>Note (optional)</label>
-              <input id="sensei_code_note" name="note" className={adminInput} placeholder="e.g. Visiting instructors" />
-            </div>
-            <button type="submit" className={adminBtn}>Generate unlimited-use code</button>
-          </form>
-          <p className="mt-2 text-xs text-neutral-400">
-            Shared with Schools / Dojos too. Manage or deactivate codes in Admin → Accounts → Invitation codes.
-          </p>
-        </Card>
-      </div>
-      <div className="mb-8">
         <CsvUploadForm
           action={bulkUploadSenseis}
           templateHref="/senseis-template.csv"
@@ -69,6 +52,25 @@ export default async function AdminSenseis({
         <div>
           <h2 className="mb-3 text-lg font-bold">{editing ? "Edit sensei" : "Add sensei"}</h2>
           <Card>
+            {!editing && (
+              <div className="mb-4 rounded-md border border-neutral-200 bg-neutral-50 p-3">
+                <p className="text-xs font-bold uppercase tracking-wide text-neutral-500">
+                  Sensei / Coach invitation code
+                </p>
+                <form action={createInvitationCode} className="mt-2 flex flex-wrap items-end gap-3">
+                  <input type="hidden" name="role" value="school" />
+                  <input type="hidden" name="return_to" value="/admin/senseis" />
+                  <div>
+                    <label htmlFor="sensei_code_note" className={adminLabel}>Note (optional)</label>
+                    <input id="sensei_code_note" name="note" className={adminInput} placeholder="e.g. Visiting instructors" />
+                  </div>
+                  <button type="submit" className={adminBtnSecondary}>Generate unlimited-use code</button>
+                </form>
+                <p className="mt-1 text-xs text-neutral-400">
+                  Shared with Schools / Dojos too. Manage or revoke codes in Admin → Accounts → Invitation codes.
+                </p>
+              </div>
+            )}
             <form action={saveSensei} className="space-y-4">
               {editing && <input type="hidden" name="id" value={editing.id} />}
               <div>

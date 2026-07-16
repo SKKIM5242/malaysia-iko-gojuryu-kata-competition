@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getSchools, schemaReady } from "@/lib/data";
 import { saveSchool, deleteSchool, createInvitationCode, bulkUploadSchools } from "@/app/actions/admin";
-import { AdminShell, Card, adminBtn, adminInput, adminLabel } from "@/components/admin";
+import { AdminShell, Card, adminBtn, adminBtnSecondary, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
@@ -35,23 +35,6 @@ export default async function AdminSchools({
   return (
     <AdminShell title="Schools" active="/admin/schools" flash={{ ok: params.ok, error: params.error }}>
       <div className="mb-8">
-        <h2 className="mb-3 text-lg font-bold">School / Dojo invitation code</h2>
-        <Card>
-          <form action={createInvitationCode} className="flex flex-wrap items-end gap-3">
-            <input type="hidden" name="role" value="school" />
-            <input type="hidden" name="return_to" value="/admin/schools" />
-            <div>
-              <label htmlFor="school_code_note" className={adminLabel}>Note (optional)</label>
-              <input id="school_code_note" name="note" className={adminInput} placeholder="e.g. Regional dojos" />
-            </div>
-            <button type="submit" className={adminBtn}>Generate unlimited-use code</button>
-          </form>
-          <p className="mt-2 text-xs text-neutral-400">
-            Shared with Senseis / Coaches too. Manage or deactivate codes in Admin → Accounts → Invitation codes.
-          </p>
-        </Card>
-      </div>
-      <div className="mb-8">
         <CsvUploadForm
           action={bulkUploadSchools}
           templateHref="/schools-template.csv"
@@ -62,6 +45,25 @@ export default async function AdminSchools({
         <div>
           <h2 className="mb-3 text-lg font-bold">{editing ? "Edit school" : "Add school"}</h2>
           <Card>
+            {!editing && (
+              <div className="mb-4 rounded-md border border-neutral-200 bg-neutral-50 p-3">
+                <p className="text-xs font-bold uppercase tracking-wide text-neutral-500">
+                  School / Dojo invitation code
+                </p>
+                <form action={createInvitationCode} className="mt-2 flex flex-wrap items-end gap-3">
+                  <input type="hidden" name="role" value="school" />
+                  <input type="hidden" name="return_to" value="/admin/schools" />
+                  <div>
+                    <label htmlFor="school_code_note" className={adminLabel}>Note (optional)</label>
+                    <input id="school_code_note" name="note" className={adminInput} placeholder="e.g. Regional dojos" />
+                  </div>
+                  <button type="submit" className={adminBtnSecondary}>Generate unlimited-use code</button>
+                </form>
+                <p className="mt-1 text-xs text-neutral-400">
+                  Shared with Senseis / Coaches too. Manage or revoke codes in Admin → Accounts → Invitation codes.
+                </p>
+              </div>
+            )}
             <form action={saveSchool} className="space-y-4">
               {editing && <input type="hidden" name="id" value={editing.id} />}
               <div>

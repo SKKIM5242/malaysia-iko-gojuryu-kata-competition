@@ -920,9 +920,15 @@ export async function createInvitationCode(formData: FormData) {
   // "Generate" buttons don't ask for a custom code — mint a short random one.
   const code = providedCode || `${role.toUpperCase()}-${crypto.randomUUID().slice(0, 6).toUpperCase()}`;
   const { supabase, actorId } = await getActor();
+  // Who generated it is read from the signer's own session, never typed in —
+  // falls back to their account email when they haven't set a display name.
+  const { data: myProfile } = actorId
+    ? await supabase.from("profiles").select("full_name, email").eq("user_id", actorId).maybeSingle()
+    : { data: null };
+  const generated_by = myProfile?.full_name || myProfile?.email || null;
   const { data, error } = await supabase
     .from("invitation_codes")
-    .insert({ code, role, note, max_uses: maxUsesRaw ? Number(maxUsesRaw) : null })
+    .insert({ code, role, note, max_uses: maxUsesRaw ? Number(maxUsesRaw) : null, generated_by })
     .select("id")
     .single();
   if (error) backTo(returnTo, { error: "Could not create code — it may already exist." });
