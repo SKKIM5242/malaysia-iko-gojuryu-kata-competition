@@ -1,2 +1,2 @@
-full_name,email,ic_passport,date_of_birth,gender,belt_rank,home_address,city_town,country,phone,bank_name,bank_account_no,bank_account_name
-Nurul Huda binti Ismail,nurul@example.com,900101-14-5678,1990-01-01,female,3rd Kyu,5 Jalan Anggerik,Shah Alam,Malaysia,+60123334444,Maybank,2345-6789-0123,Nurul Huda binti Ismail
+full_name,email,ic_passport,date_of_birth,gender,belt_rank,home_address,city_town,postcode,country,phone,bank_name,bank_account_no,bank_account_name
+Nurul Huda binti Ismail,nurul@example.com,900101-14-5678,1990-01-01,female,3rd Kyu,5 Jalan Anggerik,Shah Alam,40100,Malaysia,+60123334444,Maybank,2345-6789-0123,Nurul Huda binti Ismail

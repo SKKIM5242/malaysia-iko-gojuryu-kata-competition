@@ -1227,14 +1227,24 @@ export async function createStaffAccount(formData: FormData) {
     belt_rank: String(formData.get("belt_rank") ?? "").trim() || null,
     home_address: String(formData.get("home_address") ?? "").trim() || null,
     city_town: String(formData.get("city_town") ?? "").trim() || null,
+    postcode: String(formData.get("postcode") ?? "").trim() || null,
     country: String(formData.get("country") ?? "").trim() || null,
     phone: String(formData.get("phone") ?? "").trim() || null,
     bank_name: String(formData.get("bank_name") ?? "").trim() || null,
     bank_account_no: String(formData.get("bank_account_no") ?? "").trim() || null,
     bank_account_name: String(formData.get("bank_account_name") ?? "").trim() || null,
   };
-  if (!extra.ic_passport) {
-    backTo(returnTo, { error: "IC / Passport is required." });
+  if (!extra.ic_passport || !extra.date_of_birth || !extra.gender) {
+    backTo(returnTo, { error: "IC / Passport, date of birth, and gender are required." });
+  }
+  if (!extra.home_address || !extra.city_town || !extra.postcode || !extra.country) {
+    backTo(returnTo, { error: "Home address, city/town, postcode, and country are required." });
+  }
+  if (!extra.phone) {
+    backTo(returnTo, { error: "Mobile phone is required." });
+  }
+  if (!extra.bank_name || !extra.bank_account_no || !extra.bank_account_name) {
+    backTo(returnTo, { error: "Bank details are required." });
   }
 
   const { supabase, actorId } = await getActor();
@@ -1588,7 +1598,7 @@ export async function bulkUploadAudience(_prev: CsvUploadResult, formData: FormD
 
 const STAFF_CSV_COLUMNS = [
   "full_name", "email", "ic_passport", "date_of_birth", "gender", "belt_rank",
-  "home_address", "city_town", "country", "phone",
+  "home_address", "city_town", "postcode", "country", "phone",
   "bank_name", "bank_account_no", "bank_account_name",
 ] as const;
 
@@ -1627,22 +1637,41 @@ async function bulkCreateStaffAccounts(formData: FormData, role: "organizer" | "
     const full_name = get(r, "full_name") || `Row ${rowNo}`;
     const email = get(r, "email");
     const ic_passport = get(r, "ic_passport");
-    if (!full_name || !email || !ic_passport) {
-      failures.push({ row: rowNo, name: full_name, error: "Full name, email, and IC/Passport are required" });
+    const date_of_birth = get(r, "date_of_birth");
+    const gender = get(r, "gender");
+    const home_address = get(r, "home_address");
+    const city_town = get(r, "city_town");
+    const postcode = get(r, "postcode");
+    const country = get(r, "country");
+    const phone = get(r, "phone");
+    const bank_name = get(r, "bank_name");
+    const bank_account_no = get(r, "bank_account_no");
+    const bank_account_name = get(r, "bank_account_name");
+    if (!full_name || !email || !ic_passport || !date_of_birth || !gender) {
+      failures.push({ row: rowNo, name: full_name, error: "Full name, email, IC/Passport, date of birth, and gender are required" });
+      continue;
+    }
+    if (!home_address || !city_town || !postcode || !country || !phone) {
+      failures.push({ row: rowNo, name: full_name, error: "Home address, city/town, postcode, country, and phone are required" });
+      continue;
+    }
+    if (!bank_name || !bank_account_no || !bank_account_name) {
+      failures.push({ row: rowNo, name: full_name, error: "Bank details are required" });
       continue;
     }
     const extra = {
       ic_passport,
-      date_of_birth: get(r, "date_of_birth") || null,
-      gender: get(r, "gender") || null,
+      date_of_birth,
+      gender,
       belt_rank: get(r, "belt_rank") || null,
-      home_address: get(r, "home_address") || null,
-      city_town: get(r, "city_town") || null,
-      country: get(r, "country") || null,
-      phone: get(r, "phone") || null,
-      bank_name: get(r, "bank_name") || null,
-      bank_account_no: get(r, "bank_account_no") || null,
-      bank_account_name: get(r, "bank_account_name") || null,
+      home_address,
+      city_town,
+      postcode,
+      country,
+      phone,
+      bank_name,
+      bank_account_no,
+      bank_account_name,
     };
     const tempPassword = crypto.randomUUID().replace(/-/g, "").slice(0, 14);
     const { data: created, error } = await admin.auth.admin.createUser({

@@ -74,13 +74,13 @@ export default async function AdminSupport({
                   <input id="cs_ic_passport" name="ic_passport" required className={adminInput} />
                 </div>
                 <div>
-                  <label htmlFor="cs_date_of_birth" className={adminLabel}>Date of birth</label>
-                  <input id="cs_date_of_birth" name="date_of_birth" type="date" className={adminInput} />
+                  <label htmlFor="cs_date_of_birth" className={adminLabel}>Date of birth *</label>
+                  <input id="cs_date_of_birth" name="date_of_birth" type="date" required className={adminInput} />
                 </div>
                 <div>
-                  <label htmlFor="cs_gender" className={adminLabel}>Gender</label>
-                  <select id="cs_gender" name="gender" defaultValue="" className={adminInput}>
-                    <option value="">— Select —</option>
+                  <label htmlFor="cs_gender" className={adminLabel}>Gender *</label>
+                  <select id="cs_gender" name="gender" required defaultValue="" className={adminInput}>
+                    <option value="" disabled>— Select —</option>
                     <option value="male">Male</option>
                     <option value="female">Female</option>
                   </select>
@@ -90,39 +90,44 @@ export default async function AdminSupport({
                   <input id="cs_belt_rank" name="belt_rank" className={adminInput} placeholder="e.g. 3rd Kyu" />
                 </div>
                 <div className="sm:col-span-2">
+                  <p className="mb-1 text-xs text-neutral-400">Latest rank certificate (if applicable)</p>
                   <CertificateField />
                 </div>
                 <div className="sm:col-span-2">
-                  <label htmlFor="cs_home_address" className={adminLabel}>Home address</label>
-                  <input id="cs_home_address" name="home_address" className={adminInput} />
+                  <label htmlFor="cs_home_address" className={adminLabel}>Home address *</label>
+                  <input id="cs_home_address" name="home_address" required className={adminInput} />
                 </div>
                 <div>
-                  <label htmlFor="cs_city_town" className={adminLabel}>City / Town</label>
-                  <input id="cs_city_town" name="city_town" className={adminInput} />
+                  <label htmlFor="cs_city_town" className={adminLabel}>City / Town *</label>
+                  <input id="cs_city_town" name="city_town" required className={adminInput} />
                 </div>
                 <div>
-                  <label htmlFor="cs_country" className={adminLabel}>Country</label>
-                  <input id="cs_country" name="country" defaultValue="Malaysia" className={adminInput} />
+                  <label htmlFor="cs_postcode" className={adminLabel}>Postcode *</label>
+                  <input id="cs_postcode" name="postcode" required className={adminInput} placeholder="e.g. 50000" />
                 </div>
                 <div>
-                  <label htmlFor="cs_phone" className={adminLabel}>Mobile phone</label>
-                  <input id="cs_phone" name="phone" type="tel" className={adminInput} placeholder="+60…" />
+                  <label htmlFor="cs_country" className={adminLabel}>Country *</label>
+                  <input id="cs_country" name="country" required defaultValue="Malaysia" className={adminInput} />
+                </div>
+                <div>
+                  <label htmlFor="cs_phone" className={adminLabel}>Mobile phone *</label>
+                  <input id="cs_phone" name="phone" type="tel" required className={adminInput} placeholder="+60…" />
                 </div>
               </div>
               <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3">
-                <p className="text-xs font-bold uppercase tracking-wide text-neutral-500">Bank details</p>
+                <p className="text-xs font-bold uppercase tracking-wide text-neutral-500">Bank details *</p>
                 <div className="mt-2 grid gap-4 sm:grid-cols-2">
                   <div>
-                    <label htmlFor="cs_bank_name" className={adminLabel}>Bank name</label>
-                    <input id="cs_bank_name" name="bank_name" className={adminInput} />
+                    <label htmlFor="cs_bank_name" className={adminLabel}>Bank name *</label>
+                    <input id="cs_bank_name" name="bank_name" required className={adminInput} />
                   </div>
                   <div>
-                    <label htmlFor="cs_bank_account_no" className={adminLabel}>Account no.</label>
-                    <input id="cs_bank_account_no" name="bank_account_no" className={adminInput} />
+                    <label htmlFor="cs_bank_account_no" className={adminLabel}>Account no. *</label>
+                    <input id="cs_bank_account_no" name="bank_account_no" required className={adminInput} />
                   </div>
                   <div className="sm:col-span-2">
-                    <label htmlFor="cs_bank_account_name" className={adminLabel}>Account holder name</label>
-                    <input id="cs_bank_account_name" name="bank_account_name" className={adminInput} />
+                    <label htmlFor="cs_bank_account_name" className={adminLabel}>Account holder name *</label>
+                    <input id="cs_bank_account_name" name="bank_account_name" required className={adminInput} />
                   </div>
                 </div>
               </div>
