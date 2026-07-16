@@ -175,6 +175,9 @@ export default async function KataArenaPage({
             </Link>
             .
           </p>
+          <p className="mb-4 text-xs font-semibold text-red-700">
+            A Referee/Judge&apos;s score is final once submitted — no appeal is available.
+          </p>
           <p className="mb-8 text-sm">
             <Link href="/kata-categories" className="font-semibold text-red-700 underline underline-offset-2">
               Browse recordings by kata category →

@@ -79,6 +79,23 @@ export default function AuthForms({ defaultMode = "signin" }: { defaultMode?: "s
         </button>
       </div>
 
+      <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
+        <p className="font-bold">Note</p>
+        <p className="mt-1">
+          For your security, staying signed in with no activity for 30 minutes will automatically
+          sign you out.
+        </p>
+        <p className="mt-1">
+          <strong>Audience / Spectator</strong> accounts are charged per sign-in — some have a
+          limited number of sign-ins, and once used up that account can no longer sign in. A new
+          subscription needs a new account set up with a new email address.
+        </p>
+        <p className="mt-1">
+          <strong>Participants</strong> competing in the Kata Competition have unlimited sign-in
+          to view only.
+        </p>
+      </div>
+
       <form onSubmit={handleSubmit} className="space-y-4 rounded-lg border border-neutral-200 bg-white p-6 shadow-sm">
         {error && (
           <div className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</div>
