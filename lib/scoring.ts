@@ -13,3 +13,10 @@ export function finalScore(scores: number[]): number | null {
   }
   return counted.reduce((a, b) => a + b, 0) / counted.length;
 }
+
+/** A Total Score of exactly 0 from any one judge disqualifies the entry —
+ * announced nowhere publicly (Winners page, category listings), regardless
+ * of what the other judges gave. */
+export function isDisqualified(scores: number[]): boolean {
+  return scores.some((s) => s === 0);
+}

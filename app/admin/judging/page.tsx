@@ -5,11 +5,10 @@ import {
   assignRefereeToVideo, unassignRefereeFromVideo, setJudgesRequired, autoAssignReferees,
 } from "@/app/actions/admin";
 import { AdminShell, Card, adminBtn, adminInput } from "@/components/admin";
-import { CategoryName, EmptyState, SetupNotice, TelegramFullAccessLinks } from "@/components/ui";
+import { CategoryName, EmptyState, SetupNotice } from "@/components/ui";
 import VideoWatchButton from "@/components/VideoWatchButton";
 import DownloadCsvButton from "@/components/DownloadCsvButton";
-import { getAllTelegramLinks } from "@/lib/telegram";
-import { finalScore } from "@/lib/scoring";
+import { finalScore, isDisqualified } from "@/lib/scoring";
 
 export const dynamic = "force-dynamic";
 
@@ -62,6 +61,7 @@ export default async function AdminJudging({
   const videoList = (videos as unknown as VideoRow[]) ?? [];
   const refereeList = referees ?? [];
   const refereeName = new Map(refereeList.map((r) => [r.user_id, r.full_name ?? r.user_id.slice(0, 8)]));
+  const refereeCountry = new Map(refereeList.map((r) => [r.user_id, r.country ?? null]));
 
   const assignedByVideo = new Map<string, string[]>();
   for (const a of assignments ?? []) {
@@ -92,7 +92,7 @@ export default async function AdminJudging({
     videosByCompetition.set(compId, list);
   }
 
-  function renderVideoCard(v: VideoRow) {
+  function renderVideoCard(v: VideoRow, queuePosition: number | null, dq: boolean) {
     const assigned = assignedByVideo.get(v.id) ?? [];
     const available = refereeList.filter((r) => !assigned.includes(r.user_id));
     const submittedScores = assigned
@@ -108,7 +108,18 @@ export default async function AdminJudging({
             <p className="font-bold text-neutral-900">{v.participant?.full_name ?? "Unknown participant"}</p>
             <p className="text-sm text-neutral-500"><CategoryName name={v.registration?.category?.name} /></p>
           </div>
-          <VideoWatchButton url={playbackUrl ?? null} label="Watch recording" />
+          <div className="flex items-center gap-2">
+            {dq ? (
+              <span className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-bold text-red-800">
+                Disqualified
+              </span>
+            ) : queuePosition != null ? (
+              <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-800">
+                Queue #{queuePosition}
+              </span>
+            ) : null}
+            <VideoWatchButton url={playbackUrl ?? null} label="Watch recording" />
+          </div>
         </div>
 
         <div className="mt-3 flex flex-wrap items-center gap-1.5">
@@ -117,14 +128,16 @@ export default async function AdminJudging({
           ) : (
             assigned.map((uid) => {
               const score = scoreByKey.get(`${v.id}:${uid}`);
+              const country = refereeCountry.get(uid);
               return (
                 <span
                   key={uid}
                   className="flex items-center gap-1.5 rounded-full border border-neutral-300 bg-neutral-50 px-2.5 py-1 text-xs font-semibold text-neutral-700"
                 >
                   {refereeName.get(uid) ?? uid.slice(0, 8)}
-                  <span className={score != null ? "text-green-700" : "text-amber-600"}>
-                    {score != null ? score.toFixed(1) : "pending"}
+                  {country && <span className="font-normal text-neutral-400">({country})</span>}
+                  <span className={score != null && score === 0 ? "font-bold text-red-700" : score != null ? "text-green-700" : "text-amber-600"}>
+                    {score != null ? `Total ${score.toFixed(1)}` : "pending"}
                   </span>
                   {isAdmin && (
                     <form action={unassignRefereeFromVideo}>
@@ -140,7 +153,7 @@ export default async function AdminJudging({
           )}
           {final != null && (
             <span className="rounded-full bg-neutral-900 px-2.5 py-1 text-xs font-semibold text-white">
-              Final {final.toFixed(1)} ({submittedScores.length}/{assigned.length} scored
+              Average {final.toFixed(1)} ({submittedScores.length}/{assigned.length} scored
               {trimmed ? ", high/low dropped" : ""})
             </span>
           )}
@@ -174,12 +187,10 @@ export default async function AdminJudging({
 
   return (
     <AdminShell title="Judging" active="/admin/judging" flash={{ ok: params.ok, error: params.error }}>
-      <div className="mb-8">
-        <h2 className="mb-3 text-lg font-bold">Telegram — full access</h2>
-        <p className="mb-3 text-sm text-neutral-500">
-          Every category&apos;s group, for the organiser&apos;s own reference.
-        </p>
-        <TelegramFullAccessLinks links={getAllTelegramLinks()} />
+      <div className="mb-3 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+        Every score a Referee/Judge submits is <strong>final — no appeal is available</strong>. A
+        judge&apos;s individual score is visible to everyone as soon as they submit it; the
+        Average Score and standings stay hidden from the public until winners are announced.
       </div>
 
       <div className="mb-3 flex justify-end">
@@ -276,7 +287,27 @@ export default async function AdminJudging({
             {compVideos.length === 0 ? (
               <EmptyState>No kata recordings submitted yet for this competition.</EmptyState>
             ) : (
-              <div className="space-y-4">{compVideos.map(renderVideoCard)}</div>
+              <div className="space-y-4">
+                {(() => {
+                  // Live leaderboard within this competition: rank every
+                  // scored, non-disqualified video by its current average —
+                  // "Winner in line" position, updating as judges score.
+                  const ranked = compVideos
+                    .map((v) => {
+                      const assigned = assignedByVideo.get(v.id) ?? [];
+                      const scores = assigned
+                        .map((uid) => scoreByKey.get(`${v.id}:${uid}`))
+                        .filter((s): s is number => s != null);
+                      return { v, dq: isDisqualified(scores), final: finalScore(scores) };
+                    });
+                  const queueByVideoId = new Map<string, number>();
+                  ranked
+                    .filter((r) => !r.dq && r.final != null)
+                    .sort((a, b) => (b.final ?? 0) - (a.final ?? 0))
+                    .forEach((r, i) => queueByVideoId.set(r.v.id, i + 1));
+                  return ranked.map(({ v, dq }) => renderVideoCard(v, queueByVideoId.get(v.id) ?? null, dq));
+                })()}
+              </div>
             )}
           </div>
         );

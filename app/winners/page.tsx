@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCategories, schemaReady } from "@/lib/data";
 import { EmptyState, NoTranslate, SectionTitle, SetupNotice, SiteFooter, SiteHeader, formatDate } from "@/components/ui";
 import { groupByKata } from "@/lib/division";
-import { finalScore } from "@/lib/scoring";
+import { finalScore, isDisqualified } from "@/lib/scoring";
 import { winnersRevealDate } from "@/lib/winners";
 import type { Competition } from "@/lib/types";
 
@@ -59,7 +59,11 @@ async function computeWinners(
   for (const r of regList) {
     const video = videoByReg.get(r.id);
     if (!video) continue;
-    const fs = finalScore(scoresByVideo.get(video.id) ?? []);
+    const videoScores = scoresByVideo.get(video.id) ?? [];
+    // A single judge's Total Score of 0 disqualifies this entry — it never
+    // appears in the public winners announcement, whatever the others gave.
+    if (isDisqualified(videoScores)) continue;
+    const fs = finalScore(videoScores);
     if (fs == null) continue;
     const list = byCategory.get(r.category_id) ?? [];
     list.push({ name: r.participant?.full_name ?? "Unknown participant", score: fs, videoId: video.id, storagePath: video.storagePath });
