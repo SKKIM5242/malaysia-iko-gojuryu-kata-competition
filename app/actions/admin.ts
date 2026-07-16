@@ -1881,3 +1881,31 @@ export async function clockOut(formData: FormData) {
   if (error) backTo(returnTo, { error: "Could not clock out — please try again." });
   backTo(returnTo, { ok: "Clocked out." });
 }
+
+// ── Referee <-> login manual link (fallback for mismatched emails) ─────────
+
+/** referees.user_id is auto-linked by email at signup (migration 0040), but
+ * a referee who signed up with a different email than their directory
+ * record needs this manual override — admin types the email they actually
+ * sign in with, and it's matched against profiles directly. */
+export async function linkRefereeAccount(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const loginEmail = String(formData.get("login_email") ?? "").trim();
+  const returnTo = "/admin/referees";
+  if (!id || !loginEmail) backTo(returnTo, { error: "Enter the email they sign in with." });
+  const { supabase, actorId } = await getActor();
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("user_id")
+    .eq("role", "referee")
+    .ilike("email", loginEmail)
+    .maybeSingle();
+  if (!profile) backTo(returnTo, { error: `No Referee/Judge login found for ${loginEmail}.` });
+  const { error } = await supabase.from("referees").update({ user_id: profile!.user_id }).eq("id", id);
+  if (error) backTo(returnTo, { error: "Could not link the account — please try again." });
+  await writeAudit(supabase, {
+    table_name: "referees", record_id: id, action: "referee_account_linked",
+    new_value: { user_id: profile!.user_id, login_email: loginEmail }, actor_id: actorId,
+  });
+  backTo(returnTo, { ok: "Account linked." });
+}

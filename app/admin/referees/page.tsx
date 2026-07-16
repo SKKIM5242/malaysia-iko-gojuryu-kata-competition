@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { schemaReady } from "@/lib/data";
-import { updateCommunityStatus, saveReferee, deleteReferee, createInvitationCode, bulkUploadReferees } from "@/app/actions/admin";
+import { updateCommunityStatus, saveReferee, deleteReferee, createInvitationCode, linkRefereeAccount, bulkUploadReferees } from "@/app/actions/admin";
 import { AdminShell, Card, CertificateField, adminBtn, adminBtnSecondary, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice, formatDate } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
@@ -18,6 +18,7 @@ interface Referee {
   bank_name: string | null; bank_account_no: string | null; bank_account_name: string | null;
   certificate_path: string | null; international_certificate_paths: string[] | null;
   invitation_code: string | null;
+  user_id: string | null;
   payment_status: string; status: string; created_at: string;
 }
 
@@ -217,6 +218,31 @@ export default async function AdminReferees({
               </div>
             </form>
           </Card>
+          {editing && (
+            <div className="mt-4 rounded-md border border-neutral-200 bg-neutral-50 p-3">
+              <p className="text-xs font-bold uppercase tracking-wide text-neutral-500">Login account</p>
+              {editing.user_id ? (
+                <p className="mt-1 text-xs text-green-700">
+                  Linked — commission calculations use this referee&apos;s actual judging activity.
+                </p>
+              ) : (
+                <>
+                  <p className="mt-1 text-xs text-neutral-400">
+                    Not linked yet. Auto-links at sign-up if they use the same email as above — if
+                    they signed in with a different email, enter it here to link manually.
+                  </p>
+                  <form action={linkRefereeAccount} className="mt-2 flex flex-wrap items-end gap-3">
+                    <input type="hidden" name="id" value={editing.id} />
+                    <div>
+                      <label htmlFor="login_email" className={adminLabel}>Their sign-in email</label>
+                      <input id="login_email" name="login_email" type="email" className={adminInput} placeholder="name@example.com" />
+                    </div>
+                    <button type="submit" className={adminBtnSecondary}>Link account</button>
+                  </form>
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         <div>

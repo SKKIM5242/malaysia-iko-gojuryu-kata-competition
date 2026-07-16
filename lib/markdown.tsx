@@ -38,6 +38,13 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
   return nodes;
 }
 
+/** Matches a GFM table separator row: `|---|:--:|--:|` etc. */
+const TABLE_SEPARATOR = /^\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?$/;
+
+function parseTableRow(line: string): string[] {
+  return line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
+}
+
 export function Markdown({ text }: { text: string }) {
   const blocks = text.split(/\n{2,}/);
   return (
@@ -53,6 +60,36 @@ export function Markdown({ text }: { text: string }) {
           return <h4 key={bi} className="font-bold">{content}</h4>;
         }
         const lines = trimmed.split("\n");
+        if (lines.length >= 2 && lines[0].includes("|") && TABLE_SEPARATOR.test(lines[1])) {
+          const headerCells = parseTableRow(lines[0]);
+          const bodyRows = lines.slice(2).map(parseTableRow);
+          return (
+            <div key={bi} className="overflow-x-auto rounded-lg border border-neutral-200">
+              <table className="w-full min-w-[480px] border-collapse text-sm">
+                <thead>
+                  <tr className="border-b-2 border-neutral-300 bg-neutral-50">
+                    {headerCells.map((c, ci) => (
+                      <th key={ci} className="px-3 py-2 text-left font-bold text-neutral-800">
+                        {renderInline(c, `th${bi}-${ci}`)}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {bodyRows.map((row, ri) => (
+                    <tr key={ri} className="border-b border-neutral-100 last:border-b-0">
+                      {row.map((c, ci) => (
+                        <td key={ci} className="px-3 py-2 align-top">
+                          {renderInline(c, `td${bi}-${ri}-${ci}`)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        }
         if (lines.every((l) => /^\s*[-*]\s+/.test(l))) {
           return (
             <ul key={bi} className="list-disc pl-5 space-y-1">

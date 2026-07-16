@@ -5,6 +5,7 @@ import { saveAnnouncement, toggleAnnouncement, deleteAnnouncement, moveAnnouncem
 import { AdminShell, Card, adminBtn, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice, formatDate } from "@/components/ui";
 import DownloadCsvButton from "@/components/DownloadCsvButton";
+import { Markdown } from "@/lib/markdown";
 
 export const dynamic = "force-dynamic";
 
@@ -148,6 +149,16 @@ export default async function AdminAnnouncements({
                       </form>
                     </div>
                   </div>
+                  {a.body && (
+                    <details className="mt-2">
+                      <summary className="cursor-pointer text-xs font-semibold text-neutral-500 hover:text-neutral-700">
+                        Preview rendered body
+                      </summary>
+                      <div className="mt-2 border-t border-neutral-100 pt-2 text-sm">
+                        <Markdown text={a.body} />
+                      </div>
+                    </details>
+                  )}
                 </Card>
               ))}
             </div>

@@ -43,7 +43,7 @@ export async function computeCommissions(): Promise<CommissionRow[]> {
   ] = await Promise.all([
     supabase.from("schools").select("id, name, bank_name, bank_account_no, bank_account_name"),
     supabase.from("senseis").select("id, name, bank_name, bank_account_no, bank_account_name"),
-    supabase.from("referees").select("id, full_name, email, bank_name, bank_account_no, bank_account_name"),
+    supabase.from("referees").select("id, full_name, email, user_id, bank_name, bank_account_no, bank_account_name"),
     supabase.from("participants").select("id, school_id, sensei_id"),
     supabase.from("registrations").select("id, participant_id, competition_id, payment_status"),
     supabase.from("competitions").select("id, registration_fee_usd"),
@@ -105,9 +105,9 @@ export async function computeCommissions(): Promise<CommissionRow[]> {
     });
   }
 
-  // Referees have no directory<->login foreign key today, so match by email
-  // (best-effort -- see the "referees" table's schema) to find which
-  // auth user actually judged videos as this referee.
+  // referees.user_id is the real link now (migration 0040, kept in sync by
+  // handle_new_user going forward) -- email match only covers the rare case
+  // where that backfill/trigger hasn't linked a row yet.
   const userIdByEmail = new Map<string, string>(
     (refProfiles ?? []).map((p) => [String(p.email ?? "").toLowerCase(), p.user_id as string]),
   );
@@ -124,7 +124,7 @@ export async function computeCommissions(): Promise<CommissionRow[]> {
   }
 
   for (const r of referees ?? []) {
-    const uid = userIdByEmail.get(String(r.email ?? "").toLowerCase());
+    const uid = (r.user_id as string | null) ?? userIdByEmail.get(String(r.email ?? "").toLowerCase());
     const judgedRegIds = uid ? judgedRegistrationsByUser.get(uid) ?? new Set<string>() : new Set<string>();
     const totalFees = [...judgedRegIds].reduce((sum, regId) => sum + (feeByRegistration.get(regId) ?? 0), 0);
     rows.push({
