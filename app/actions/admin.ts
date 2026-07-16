@@ -608,15 +608,20 @@ export async function saveSensei(formData: FormData) {
   };
   if (!values.name) backTo(returnTo, { error: "Sensei name is required." });
   if (!values.ic_passport) backTo(returnTo, { error: "IC / Passport is required." });
+  if (!values.date_of_birth) backTo(returnTo, { error: "Date of birth is required." });
   if (!values.rank) backTo(returnTo, { error: "Rank is required." });
   if (!values.gender || !["male", "female"].includes(values.gender)) {
     backTo(returnTo, { error: "Sex is required." });
   }
+  if (!values.school_id) backTo(returnTo, { error: "School is required." });
   if (!values.home_address || !values.city_town || !values.postcode || !values.home_country) {
-    backTo(returnTo, { error: "Home address, city/town, postcode, and home country are required." });
+    backTo(returnTo, { error: "Personal home address, city/town, postcode, and home country are required." });
   }
   if (!values.email || !values.phone) {
     backTo(returnTo, { error: "Email address and mobile phone are required." });
+  }
+  if (!values.bank_name || !values.bank_account_no || !values.bank_account_name) {
+    backTo(returnTo, { error: "Personal bank details (bank name, account number, and account holder name) are required." });
   }
   const { supabase, actorId } = await getActor();
 
@@ -718,6 +723,7 @@ export async function saveReferee(formData: FormData) {
     phone: String(formData.get("phone") ?? "").trim() || null,
     home_address: String(formData.get("home_address") ?? "").trim() || null,
     city_town: String(formData.get("city_town") ?? "").trim() || null,
+    postcode: String(formData.get("postcode") ?? "").trim() || null,
     home_country: String(formData.get("home_country") ?? "").trim() || null,
     bank_name: String(formData.get("bank_name") ?? "").trim() || null,
     bank_account_no: String(formData.get("bank_account_no") ?? "").trim() || null,
@@ -727,9 +733,24 @@ export async function saveReferee(formData: FormData) {
   if (!values.full_name || !values.ic_passport) {
     backTo(returnTo, { error: "Name and IC/passport are required." });
   }
+  if (!values.date_of_birth || !values.gender || !values.karate_rank || values.judging_experience_count == null) {
+    backTo(returnTo, { error: "Date of birth, gender, karate rank, and judging experience are required." });
+  }
+  if (!values.school || !values.email || !values.phone) {
+    backTo(returnTo, { error: "School/organisation, email, and mobile phone are required." });
+  }
+  if (!values.home_address || !values.city_town || !values.postcode || !values.home_country) {
+    backTo(returnTo, { error: "Home address, city/town, postcode, and home country are required." });
+  }
+  if (!values.bank_name || !values.bank_account_no || !values.bank_account_name) {
+    backTo(returnTo, { error: "Bank details are required." });
+  }
   const { supabase, actorId } = await getActor();
 
   const certificatePath = await uploadCertificateIfPresent(supabase, formData, "referee", returnTo);
+  if (!id && !certificatePath) {
+    backTo(returnTo, { error: "Latest rank certificate is required." });
+  }
 
   if (id) {
     const { data: before } = await supabase.from("referees").select("*").eq("id", id).maybeSingle();
@@ -782,6 +803,7 @@ export async function saveParticipant(formData: FormData) {
     rank_confirmation: String(formData.get("rank_confirmation") ?? "") || null,
     home_address: String(formData.get("home_address") ?? "").trim() || null,
     city_town: String(formData.get("city_town") ?? "").trim() || null,
+    postcode: String(formData.get("postcode") ?? "").trim() || null,
     home_country: String(formData.get("home_country") ?? "").trim() || null,
     email: String(formData.get("email") ?? "").trim() || null,
     phone: String(formData.get("phone") ?? "").trim() || null,
@@ -791,11 +813,26 @@ export async function saveParticipant(formData: FormData) {
   if (!values.full_name || !values.ic_passport) {
     backTo(returnTo, { error: "Name and IC/passport are required." });
   }
+  if (!values.date_of_birth || !values.gender || !values.belt_rank || !values.rank_confirmation) {
+    backTo(returnTo, { error: "Date of birth, gender, belt rank, and rank confirmation are required." });
+  }
+  if (!values.home_address || !values.city_town || !values.postcode || !values.home_country) {
+    backTo(returnTo, { error: "Home address, city/town, postcode, and home country are required." });
+  }
+  if (!values.email || !values.phone) {
+    backTo(returnTo, { error: "Email address and mobile phone are required." });
+  }
+  if (!values.school_id || !values.sensei_id) {
+    backTo(returnTo, { error: "School and sensei are required." });
+  }
   const bank = {
     bank_name: String(formData.get("bank_name") ?? "").trim(),
     bank_account_no: String(formData.get("bank_account_no") ?? "").trim(),
     bank_account_name: String(formData.get("bank_account_name") ?? "").trim(),
   };
+  if (!bank.bank_name || !bank.bank_account_no || !bank.bank_account_name) {
+    backTo(returnTo, { error: "Reward payout bank details are required." });
+  }
   const { supabase, actorId } = await getActor();
 
   const certificatePath = await uploadCertificateIfPresent(supabase, formData, "participant", returnTo);
@@ -1392,14 +1429,20 @@ export async function bulkUploadSenseis(_prev: CsvUploadResult, formData: FormDa
     };
     if (!record.name) { failures.push({ row: rowNo, name, error: "Sensei name is required" }); continue; }
     if (!record.ic_passport) { failures.push({ row: rowNo, name, error: "IC / Passport is required" }); continue; }
+    if (!record.date_of_birth) { failures.push({ row: rowNo, name, error: "Date of birth is required" }); continue; }
     if (!record.rank) { failures.push({ row: rowNo, name, error: "Rank is required" }); continue; }
     if (!gender || !["male", "female"].includes(gender)) { failures.push({ row: rowNo, name, error: "Gender must be male or female" }); continue; }
+    if (!schoolId) { failures.push({ row: rowNo, name, error: "School is required" }); continue; }
     if (!record.home_address || !record.city_town || !record.postcode || !record.home_country) {
-      failures.push({ row: rowNo, name, error: "Home address, city/town, postcode, and home country are required" });
+      failures.push({ row: rowNo, name, error: "Personal home address, city/town, postcode, and home country are required" });
       continue;
     }
     if (!record.email || !record.phone) {
       failures.push({ row: rowNo, name, error: "Email address and mobile phone are required" });
+      continue;
+    }
+    if (!record.bank_name || !record.bank_account_no || !record.bank_account_name) {
+      failures.push({ row: rowNo, name, error: "Personal bank details are required" });
       continue;
     }
 

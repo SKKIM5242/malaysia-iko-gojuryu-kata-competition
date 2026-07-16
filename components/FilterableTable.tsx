@@ -2,6 +2,8 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import DownloadCsvButton from "@/components/DownloadCsvButton";
+import ColumnFilterDropdown from "@/components/ColumnFilterDropdown";
+import DualScrollBox from "@/components/DualScrollBox";
 
 export interface FilterableColumn {
   key: string;
@@ -30,16 +32,34 @@ export default function FilterableTable({
   /** Filename (without extension) for the CSV download button. */
   downloadName: string;
 }) {
-  const [filters, setFilters] = useState<Record<string, string>>({});
+  const [filters, setFilters] = useState<Record<string, Set<string>>>({});
+
+  const uniqueValues = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    for (const c of columns) {
+      const seen = new Set<string>();
+      const values: string[] = [];
+      for (const row of rows) {
+        const cell = row[c.key];
+        if (typeof cell !== "string") continue;
+        if (!seen.has(cell)) {
+          seen.add(cell);
+          values.push(cell);
+        }
+      }
+      map[c.key] = values;
+    }
+    return map;
+  }, [rows, columns]);
 
   const filtered = useMemo(() => {
-    const active = Object.entries(filters).filter(([, v]) => v && v.trim() !== "");
+    const active = Object.entries(filters).filter(([, v]) => v && v.size > 0);
     if (active.length === 0) return rows;
     return rows.filter((row) =>
-      active.every(([key, value]) => {
+      active.every(([key, values]) => {
         const cell = row[key];
         const text = typeof cell === "string" ? cell : "";
-        return text.toLowerCase().includes(value.toLowerCase());
+        return values.has(text);
       }),
     );
   }, [rows, filters]);
@@ -65,7 +85,7 @@ export default function FilterableTable({
         </p>
         <DownloadCsvButton rows={csvRows} filename={downloadName} />
       </div>
-      <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white shadow-sm">
+      <DualScrollBox>
         <table className="w-full text-left text-sm" style={{ minWidth: `${columns.length * 150}px` }}>
           <thead className="border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
             <tr>
@@ -78,11 +98,10 @@ export default function FilterableTable({
             <tr className="border-t border-neutral-200 bg-white normal-case">
               {columns.map((c) => (
                 <th key={c.key} className="px-2 py-1.5">
-                  <input
-                    value={filters[c.key] ?? ""}
-                    onChange={(e) => setFilters((f) => ({ ...f, [c.key]: e.target.value }))}
-                    placeholder="Filter…"
-                    className="w-full min-w-[90px] rounded border border-neutral-300 px-1.5 py-1 text-xs font-normal focus:border-red-600 focus:outline-none"
+                  <ColumnFilterDropdown
+                    values={uniqueValues[c.key] ?? []}
+                    selected={filters[c.key] ?? new Set()}
+                    onChange={(next) => setFilters((f) => ({ ...f, [c.key]: next }))}
                   />
                 </th>
               ))}
@@ -116,7 +135,7 @@ export default function FilterableTable({
             )}
           </tbody>
         </table>
-      </div>
+      </DualScrollBox>
     </div>
   );
 }

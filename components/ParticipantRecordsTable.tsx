@@ -5,6 +5,8 @@ import { CategoryName } from "@/components/ui";
 import VideoWatchButton from "@/components/VideoWatchButton";
 import DownloadCsvButton from "@/components/DownloadCsvButton";
 import AdminVideoUploadForm from "@/components/AdminVideoUploadForm";
+import ColumnFilterDropdown from "@/components/ColumnFilterDropdown";
+import DualScrollBox from "@/components/DualScrollBox";
 
 export interface ParticipantRecordRow {
   registrationId: string;
@@ -61,16 +63,31 @@ export default function ParticipantRecordsTable({
   rows: ParticipantRecordRow[];
   isAdmin?: boolean;
 }) {
-  const [filters, setFilters] = useState<Partial<Record<keyof ParticipantRecordRow, string>>>({});
+  const [filters, setFilters] = useState<Partial<Record<keyof ParticipantRecordRow, Set<string>>>>({});
+
+  const uniqueValues = useMemo(() => {
+    const map: Partial<Record<keyof ParticipantRecordRow, string[]>> = {};
+    for (const c of COLUMNS) {
+      const seen = new Set<string>();
+      const values: string[] = [];
+      for (const row of rows) {
+        const text = String(row[c.key] ?? "");
+        if (!seen.has(text)) {
+          seen.add(text);
+          values.push(text);
+        }
+      }
+      map[c.key] = values;
+    }
+    return map;
+  }, [rows]);
 
   const filtered = useMemo(() => {
-    const active = Object.entries(filters).filter(([, v]) => v && v.trim() !== "");
+    const active = Object.entries(filters).filter(([, v]) => v && v.size > 0);
     if (active.length === 0) return rows;
     return rows.filter((row) =>
-      active.every(([key, value]) =>
-        String(row[key as keyof ParticipantRecordRow] ?? "")
-          .toLowerCase()
-          .includes(value!.toLowerCase()),
+      active.every(([key, values]) =>
+        (values as Set<string>).has(String(row[key as keyof ParticipantRecordRow] ?? "")),
       ),
     );
   }, [rows, filters]);
@@ -94,7 +111,7 @@ export default function ParticipantRecordsTable({
         </p>
         <DownloadCsvButton rows={csvRows} filename="participants" />
       </div>
-      <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white shadow-sm">
+      <DualScrollBox>
         <table className="w-full min-w-[2200px] text-left text-sm">
           <thead className="border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
             <tr>
@@ -109,11 +126,10 @@ export default function ParticipantRecordsTable({
             <tr className="border-t border-neutral-200 bg-white normal-case">
               {COLUMNS.map((c) => (
                 <th key={c.key} className="px-2 py-1.5">
-                  <input
-                    value={filters[c.key] ?? ""}
-                    onChange={(e) => setFilters((f) => ({ ...f, [c.key]: e.target.value }))}
-                    placeholder="Filter…"
-                    className="w-full min-w-[100px] rounded border border-neutral-300 px-1.5 py-1 text-xs font-normal focus:border-red-600 focus:outline-none"
+                  <ColumnFilterDropdown
+                    values={uniqueValues[c.key] ?? []}
+                    selected={filters[c.key] ?? new Set()}
+                    onChange={(next) => setFilters((f) => ({ ...f, [c.key]: next }))}
                   />
                 </th>
               ))}
@@ -201,7 +217,7 @@ export default function ParticipantRecordsTable({
             )}
           </tbody>
         </table>
-      </div>
+      </DualScrollBox>
     </div>
   );
 }

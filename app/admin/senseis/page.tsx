@@ -81,8 +81,8 @@ export default async function AdminSenseis({
                   <input id="ic_passport" name="ic_passport" required defaultValue={editing?.ic_passport ?? ""} className={adminInput} />
                 </div>
                 <div>
-                  <label htmlFor="date_of_birth" className={adminLabel}>Date of birth</label>
-                  <input id="date_of_birth" name="date_of_birth" type="date" defaultValue={editing?.date_of_birth ?? ""} className={adminInput} />
+                  <label htmlFor="date_of_birth" className={adminLabel}>Date of birth *</label>
+                  <input id="date_of_birth" name="date_of_birth" type="date" required defaultValue={editing?.date_of_birth ?? ""} className={adminInput} />
                 </div>
                 <div>
                   <label htmlFor="rank" className={adminLabel}>Rank *</label>
@@ -103,16 +103,16 @@ export default async function AdminSenseis({
                   />
                 </div>
                 <div>
-                  <label htmlFor="school_id" className={adminLabel}>School</label>
-                  <select id="school_id" name="school_id" defaultValue={editing?.school_id ?? ""} className={adminInput}>
-                    <option value="">— None —</option>
+                  <label htmlFor="school_id" className={adminLabel}>School *</label>
+                  <select id="school_id" name="school_id" required defaultValue={editing?.school_id ?? ""} className={adminInput}>
+                    <option value="" disabled>Select school</option>
                     {schools.map((s) => (
                       <option key={s.id} value={s.id}>{s.name}</option>
                     ))}
                   </select>
                 </div>
                 <div className="sm:col-span-2">
-                  <label htmlFor="home_address" className={adminLabel}>Home address *</label>
+                  <label htmlFor="home_address" className={adminLabel}>Personal Home Address *</label>
                   <input id="home_address" name="home_address" required defaultValue={editing?.home_address ?? ""} className={adminInput} />
                 </div>
                 <div>
@@ -137,19 +137,19 @@ export default async function AdminSenseis({
                 </div>
               </div>
               <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3">
-                <p className="text-xs font-bold uppercase tracking-wide text-neutral-500">Payout bank details</p>
+                <p className="text-xs font-bold uppercase tracking-wide text-neutral-500">Personal Bank Details *</p>
                 <div className="mt-2 grid gap-4 sm:grid-cols-2">
                   <div>
-                    <label htmlFor="bank_name" className={adminLabel}>Bank name</label>
-                    <input id="bank_name" name="bank_name" defaultValue={editing?.bank_name ?? ""} className={adminInput} />
+                    <label htmlFor="bank_name" className={adminLabel}>Bank name *</label>
+                    <input id="bank_name" name="bank_name" required defaultValue={editing?.bank_name ?? ""} className={adminInput} />
                   </div>
                   <div>
-                    <label htmlFor="bank_account_no" className={adminLabel}>Account no.</label>
-                    <input id="bank_account_no" name="bank_account_no" defaultValue={editing?.bank_account_no ?? ""} className={adminInput} />
+                    <label htmlFor="bank_account_no" className={adminLabel}>Account no. *</label>
+                    <input id="bank_account_no" name="bank_account_no" required defaultValue={editing?.bank_account_no ?? ""} className={adminInput} />
                   </div>
                   <div className="sm:col-span-2">
-                    <label htmlFor="bank_account_name" className={adminLabel}>Account holder name</label>
-                    <input id="bank_account_name" name="bank_account_name" defaultValue={editing?.bank_account_name ?? ""} className={adminInput} />
+                    <label htmlFor="bank_account_name" className={adminLabel}>Account holder name *</label>
+                    <input id="bank_account_name" name="bank_account_name" required defaultValue={editing?.bank_account_name ?? ""} className={adminInput} />
                   </div>
                 </div>
               </div>

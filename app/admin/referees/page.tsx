@@ -14,7 +14,7 @@ interface Referee {
   gender: string | null; karate_rank: string | null; judging_experience_count: number | null;
   school: string | null;
   email: string | null; phone: string | null; home_address: string | null;
-  city_town: string | null; home_country: string | null;
+  city_town: string | null; postcode: string | null; home_country: string | null;
   bank_name: string | null; bank_account_no: string | null; bank_account_name: string | null;
   certificate_path: string | null; international_certificate_paths: string[] | null;
   invitation_code: string | null;
@@ -113,7 +113,7 @@ export default async function AdminReferees({
 
       <div className="grid gap-8 lg:grid-cols-2">
         <div>
-          <h2 className="mb-3 text-lg font-bold">{editing ? "Edit referee / judge" : "Add referee / judge"}</h2>
+          <h2 className="mb-3 text-lg font-bold">{editing ? "Edit Referee/Judge" : "Add Referee/Judge"}</h2>
           <Card>
             <form action={saveReferee} className="space-y-4">
               {editing && <input type="hidden" name="id" value={editing.id} />}
@@ -127,82 +127,87 @@ export default async function AdminReferees({
                   <input id="ic_passport" name="ic_passport" required defaultValue={editing?.ic_passport ?? ""} className={adminInput} />
                 </div>
                 <div>
-                  <label htmlFor="date_of_birth" className={adminLabel}>Date of birth</label>
-                  <input id="date_of_birth" name="date_of_birth" type="date" defaultValue={editing?.date_of_birth ?? ""} className={adminInput} />
+                  <label htmlFor="date_of_birth" className={adminLabel}>Date of birth *</label>
+                  <input id="date_of_birth" name="date_of_birth" type="date" required defaultValue={editing?.date_of_birth ?? ""} className={adminInput} />
                 </div>
                 <div>
-                  <label htmlFor="gender" className={adminLabel}>Gender</label>
-                  <select id="gender" name="gender" defaultValue={editing?.gender ?? ""} className={adminInput}>
-                    <option value="">— Select —</option>
+                  <label htmlFor="gender" className={adminLabel}>Gender *</label>
+                  <select id="gender" name="gender" required defaultValue={editing?.gender ?? ""} className={adminInput}>
+                    <option value="" disabled>— Select —</option>
                     <option value="male">Male</option>
                     <option value="female">Female</option>
                   </select>
                 </div>
                 <div>
-                  <label htmlFor="karate_rank" className={adminLabel}>Karate rank</label>
-                  <input id="karate_rank" name="karate_rank" defaultValue={editing?.karate_rank ?? ""} className={adminInput} placeholder="e.g. Godan" />
+                  <label htmlFor="karate_rank" className={adminLabel}>Karate rank *</label>
+                  <input id="karate_rank" name="karate_rank" required defaultValue={editing?.karate_rank ?? ""} className={adminInput} placeholder="e.g. Godan" />
                 </div>
                 <div>
                   <label htmlFor="judging_experience_count" className={adminLabel}>
-                    No. of times judging Kata competition
+                    No. of times judging Kata competition *
                   </label>
-                  <input id="judging_experience_count" name="judging_experience_count" type="number" min="0" step="1" defaultValue={editing?.judging_experience_count ?? ""} className={adminInput} />
+                  <input id="judging_experience_count" name="judging_experience_count" type="number" min="0" step="1" required defaultValue={editing?.judging_experience_count ?? ""} className={adminInput} />
                 </div>
                 <div className="sm:col-span-2">
                   <CertificateField
+                    required
                     currentUrl={editing?.certificate_path ? certUrls.get(editing.certificate_path) : undefined}
                   />
                 </div>
                 <div>
-                  <label htmlFor="school" className={adminLabel}>School / organisation</label>
-                  <input id="school" name="school" defaultValue={editing?.school ?? ""} className={adminInput} />
+                  <label htmlFor="school" className={adminLabel}>School / organisation *</label>
+                  <input id="school" name="school" required defaultValue={editing?.school ?? ""} className={adminInput} />
                 </div>
                 <div>
-                  <label htmlFor="email" className={adminLabel}>Email</label>
-                  <input id="email" name="email" type="email" defaultValue={editing?.email ?? ""} className={adminInput} />
+                  <label htmlFor="email" className={adminLabel}>Email *</label>
+                  <input id="email" name="email" type="email" required defaultValue={editing?.email ?? ""} className={adminInput} />
                 </div>
                 <div>
-                  <label htmlFor="phone" className={adminLabel}>Mobile / WhatsApp</label>
-                  <input id="phone" name="phone" defaultValue={editing?.phone ?? ""} className={adminInput} placeholder="+60…" />
+                  <label htmlFor="phone" className={adminLabel}>Mobile / WhatsApp *</label>
+                  <input id="phone" name="phone" required defaultValue={editing?.phone ?? ""} className={adminInput} placeholder="+60…" />
                 </div>
                 <div>
                   <label htmlFor="invitation_code" className={adminLabel}>Invitation code</label>
                   <input id="invitation_code" name="invitation_code" defaultValue={editing?.invitation_code ?? ""} className={adminInput} />
                 </div>
                 <div className="sm:col-span-2">
-                  <label htmlFor="home_address" className={adminLabel}>Home address</label>
-                  <input id="home_address" name="home_address" defaultValue={editing?.home_address ?? ""} className={adminInput} />
+                  <label htmlFor="home_address" className={adminLabel}>Home address *</label>
+                  <input id="home_address" name="home_address" required defaultValue={editing?.home_address ?? ""} className={adminInput} />
                 </div>
                 <div>
-                  <label htmlFor="city_town" className={adminLabel}>City / Town</label>
-                  <input id="city_town" name="city_town" defaultValue={editing?.city_town ?? ""} className={adminInput} />
+                  <label htmlFor="city_town" className={adminLabel}>City / Town *</label>
+                  <input id="city_town" name="city_town" required defaultValue={editing?.city_town ?? ""} className={adminInput} />
                 </div>
                 <div>
-                  <label htmlFor="home_country" className={adminLabel}>Home country</label>
-                  <input id="home_country" name="home_country" defaultValue={editing?.home_country ?? (editing ? "" : "Malaysia")} className={adminInput} />
+                  <label htmlFor="postcode" className={adminLabel}>Postcode *</label>
+                  <input id="postcode" name="postcode" required defaultValue={editing?.postcode ?? ""} className={adminInput} placeholder="e.g. 50000" />
+                </div>
+                <div>
+                  <label htmlFor="home_country" className={adminLabel}>Home country *</label>
+                  <input id="home_country" name="home_country" required defaultValue={editing?.home_country ?? (editing ? "" : "Malaysia")} className={adminInput} />
                 </div>
               </div>
               <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3">
                 <p className="text-xs font-bold uppercase tracking-wide text-neutral-500">
-                  Bank details — deposit return &amp; referee/judge reward
+                  Bank details — deposit return &amp; referee/judge reward *
                 </p>
                 <div className="mt-2 grid gap-4 sm:grid-cols-2">
                   <div>
-                    <label htmlFor="bank_name" className={adminLabel}>Bank name</label>
-                    <input id="bank_name" name="bank_name" defaultValue={editing?.bank_name ?? ""} className={adminInput} />
+                    <label htmlFor="bank_name" className={adminLabel}>Bank name *</label>
+                    <input id="bank_name" name="bank_name" required defaultValue={editing?.bank_name ?? ""} className={adminInput} />
                   </div>
                   <div>
-                    <label htmlFor="bank_account_no" className={adminLabel}>Account no.</label>
-                    <input id="bank_account_no" name="bank_account_no" defaultValue={editing?.bank_account_no ?? ""} className={adminInput} />
+                    <label htmlFor="bank_account_no" className={adminLabel}>Account no. *</label>
+                    <input id="bank_account_no" name="bank_account_no" required defaultValue={editing?.bank_account_no ?? ""} className={adminInput} />
                   </div>
                   <div className="sm:col-span-2">
-                    <label htmlFor="bank_account_name" className={adminLabel}>Account holder name</label>
-                    <input id="bank_account_name" name="bank_account_name" defaultValue={editing?.bank_account_name ?? ""} className={adminInput} />
+                    <label htmlFor="bank_account_name" className={adminLabel}>Account holder name *</label>
+                    <input id="bank_account_name" name="bank_account_name" required defaultValue={editing?.bank_account_name ?? ""} className={adminInput} />
                   </div>
                 </div>
               </div>
               <div className="flex gap-2">
-                <button type="submit" className={adminBtn}>{editing ? "Save changes" : "Add referee / judge"}</button>
+                <button type="submit" className={adminBtn}>{editing ? "Save changes" : "Add Referee/Judge"}</button>
                 {editing && (
                   <Link href="/admin/referees" className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-semibold text-neutral-600 hover:bg-neutral-50">
                     Cancel
@@ -247,7 +252,7 @@ export default async function AdminReferees({
                 karate_rank: r.karate_rank ?? "",
                 judging_experience_count: String(r.judging_experience_count ?? 0),
                 school: r.school ?? "",
-                location: [r.home_address, r.city_town, r.home_country].filter(Boolean).join(", "),
+                location: [r.home_address, r.city_town, r.postcode, r.home_country].filter(Boolean).join(", "),
                 contact: [r.email, r.phone].filter(Boolean).join(" · "),
                 bank: [r.bank_name, r.bank_account_no].filter(Boolean).join(" · "),
                 certificates: (

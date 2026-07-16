@@ -75,25 +75,25 @@ export default async function AdminParticipants({
                   <input id="ic_passport" name="ic_passport" required defaultValue={editing?.ic_passport ?? ""} className={adminInput} />
                 </div>
                 <div>
-                  <label htmlFor="date_of_birth" className={adminLabel}>Date of birth</label>
-                  <input id="date_of_birth" name="date_of_birth" type="date" defaultValue={editing?.date_of_birth ?? ""} className={adminInput} />
+                  <label htmlFor="date_of_birth" className={adminLabel}>Date of birth *</label>
+                  <input id="date_of_birth" name="date_of_birth" type="date" required defaultValue={editing?.date_of_birth ?? ""} className={adminInput} />
                 </div>
                 <div>
-                  <label htmlFor="gender" className={adminLabel}>Gender</label>
-                  <select id="gender" name="gender" defaultValue={editing?.gender ?? ""} className={adminInput}>
-                    <option value="">— Select —</option>
+                  <label htmlFor="gender" className={adminLabel}>Gender *</label>
+                  <select id="gender" name="gender" required defaultValue={editing?.gender ?? ""} className={adminInput}>
+                    <option value="" disabled>— Select —</option>
                     <option value="male">Male</option>
                     <option value="female">Female</option>
                   </select>
                 </div>
                 <div>
-                  <label htmlFor="belt_rank" className={adminLabel}>Belt rank</label>
-                  <input id="belt_rank" name="belt_rank" defaultValue={editing?.belt_rank ?? ""} className={adminInput} placeholder="e.g. 3rd Kyu" />
+                  <label htmlFor="belt_rank" className={adminLabel}>Belt rank *</label>
+                  <input id="belt_rank" name="belt_rank" required defaultValue={editing?.belt_rank ?? ""} className={adminInput} placeholder="e.g. 3rd Kyu" />
                 </div>
                 <div>
-                  <label htmlFor="rank_confirmation" className={adminLabel}>Rank confirmation</label>
-                  <select id="rank_confirmation" name="rank_confirmation" defaultValue={editing?.rank_confirmation ?? ""} className={adminInput}>
-                    <option value="">—</option>
+                  <label htmlFor="rank_confirmation" className={adminLabel}>Rank confirmation *</label>
+                  <select id="rank_confirmation" name="rank_confirmation" required defaultValue={editing?.rank_confirmation ?? ""} className={adminInput}>
+                    <option value="" disabled>—</option>
                     <option value="sensei_confirmed">Sensei Confirmed</option>
                     <option value="certificate_uploaded">Certificate Uploaded</option>
                     <option value="pending_confirmation">Pending Confirmation</option>
@@ -105,38 +105,42 @@ export default async function AdminParticipants({
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <label htmlFor="home_address" className={adminLabel}>Home address</label>
-                  <input id="home_address" name="home_address" defaultValue={editing?.home_address ?? ""} className={adminInput} />
+                  <label htmlFor="home_address" className={adminLabel}>Home address *</label>
+                  <input id="home_address" name="home_address" required defaultValue={editing?.home_address ?? ""} className={adminInput} />
                 </div>
                 <div>
-                  <label htmlFor="city_town" className={adminLabel}>City / Town</label>
-                  <input id="city_town" name="city_town" defaultValue={editing?.city_town ?? ""} className={adminInput} />
+                  <label htmlFor="city_town" className={adminLabel}>City / Town *</label>
+                  <input id="city_town" name="city_town" required defaultValue={editing?.city_town ?? ""} className={adminInput} />
                 </div>
                 <div>
-                  <label htmlFor="home_country" className={adminLabel}>Home country</label>
-                  <input id="home_country" name="home_country" defaultValue={editing?.home_country ?? (editing ? "" : "Malaysia")} className={adminInput} />
+                  <label htmlFor="postcode" className={adminLabel}>Postcode *</label>
+                  <input id="postcode" name="postcode" required defaultValue={editing?.postcode ?? ""} className={adminInput} placeholder="e.g. 50000" />
                 </div>
                 <div>
-                  <label htmlFor="email" className={adminLabel}>Email address</label>
-                  <input id="email" name="email" type="email" defaultValue={editing?.email ?? ""} className={adminInput} />
+                  <label htmlFor="home_country" className={adminLabel}>Home country *</label>
+                  <input id="home_country" name="home_country" required defaultValue={editing?.home_country ?? (editing ? "" : "Malaysia")} className={adminInput} />
                 </div>
                 <div>
-                  <label htmlFor="phone" className={adminLabel}>Mobile phone</label>
-                  <input id="phone" name="phone" type="tel" defaultValue={editing?.phone ?? ""} className={adminInput} placeholder="+60…" />
+                  <label htmlFor="email" className={adminLabel}>Email address *</label>
+                  <input id="email" name="email" type="email" required defaultValue={editing?.email ?? ""} className={adminInput} />
                 </div>
                 <div>
-                  <label htmlFor="school_id" className={adminLabel}>School</label>
-                  <select id="school_id" name="school_id" defaultValue={editing?.school_id ?? ""} className={adminInput}>
-                    <option value="">— None —</option>
+                  <label htmlFor="phone" className={adminLabel}>Mobile phone *</label>
+                  <input id="phone" name="phone" type="tel" required defaultValue={editing?.phone ?? ""} className={adminInput} placeholder="+60…" />
+                </div>
+                <div>
+                  <label htmlFor="school_id" className={adminLabel}>School *</label>
+                  <select id="school_id" name="school_id" required defaultValue={editing?.school_id ?? ""} className={adminInput}>
+                    <option value="" disabled>Select school</option>
                     {schools.map((s) => (
                       <option key={s.id} value={s.id}>{s.name}</option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label htmlFor="sensei_id" className={adminLabel}>Sensei</label>
-                  <select id="sensei_id" name="sensei_id" defaultValue={editing?.sensei_id ?? ""} className={adminInput}>
-                    <option value="">— None —</option>
+                  <label htmlFor="sensei_id" className={adminLabel}>Sensei *</label>
+                  <select id="sensei_id" name="sensei_id" required defaultValue={editing?.sensei_id ?? ""} className={adminInput}>
+                    <option value="" disabled>Select sensei</option>
                     {senseis.map((s) => (
                       <option key={s.id} value={s.id}>{s.name}</option>
                     ))}
@@ -145,20 +149,20 @@ export default async function AdminParticipants({
               </div>
               <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3">
                 <p className="text-xs font-bold uppercase tracking-wide text-neutral-500">
-                  Reward payout bank details
+                  Reward payout bank details *
                 </p>
                 <div className="mt-2 grid gap-4 sm:grid-cols-2">
                   <div>
-                    <label htmlFor="bank_name" className={adminLabel}>Bank name</label>
-                    <input id="bank_name" name="bank_name" defaultValue={editing?.bank?.bank_name ?? ""} className={adminInput} placeholder="e.g. Maybank" />
+                    <label htmlFor="bank_name" className={adminLabel}>Bank name *</label>
+                    <input id="bank_name" name="bank_name" required defaultValue={editing?.bank?.bank_name ?? ""} className={adminInput} placeholder="e.g. Maybank" />
                   </div>
                   <div>
-                    <label htmlFor="bank_account_no" className={adminLabel}>Account no.</label>
-                    <input id="bank_account_no" name="bank_account_no" defaultValue={editing?.bank?.bank_account_no ?? ""} className={adminInput} />
+                    <label htmlFor="bank_account_no" className={adminLabel}>Account no. *</label>
+                    <input id="bank_account_no" name="bank_account_no" required defaultValue={editing?.bank?.bank_account_no ?? ""} className={adminInput} />
                   </div>
                   <div className="sm:col-span-2">
-                    <label htmlFor="bank_account_name" className={adminLabel}>Account holder name</label>
-                    <input id="bank_account_name" name="bank_account_name" defaultValue={editing?.bank?.bank_account_name ?? ""} className={adminInput} />
+                    <label htmlFor="bank_account_name" className={adminLabel}>Account holder name *</label>
+                    <input id="bank_account_name" name="bank_account_name" required defaultValue={editing?.bank?.bank_account_name ?? ""} className={adminInput} />
                   </div>
                 </div>
               </div>
