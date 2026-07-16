@@ -1,2 +1,2 @@
-name,state,contact_title,contact_name,contact_karate_title,contact_rank,home_address,city_town,home_country,email,phone,bank_name,bank_account_no,bank_account_name
-Sakura Karate Dojo,Selangor,Mr.,Ahmad Faris,Sensei,3rd Dan,12 Jalan Melati,Kuala Lumpur,Malaysia,dojo@example.com,+60121234567,Maybank,1234-5678-9012,Ahmad Faris bin Razali
+name,state,contact_title,contact_name,contact_karate_title,contact_rank,home_address,city_town,postcode,home_country,email,phone,bank_name,bank_account_no,bank_account_name
+Sakura Karate Dojo,Selangor,Mr.,Ahmad Faris,Sensei,3rd Dan,12 Jalan Melati,Kuala Lumpur,50450,Malaysia,dojo@example.com,+60121234567,Maybank,1234-5678-9012,Ahmad Faris bin Razali

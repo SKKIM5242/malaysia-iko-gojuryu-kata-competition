@@ -29,6 +29,7 @@ export interface School {
   home_address: string | null;
   home_country: string | null;
   city_town: string | null;
+  postcode: string | null;
   email: string | null;
   phone: string | null;
   bank_name: string | null;
@@ -49,6 +50,7 @@ export interface Sensei {
   home_address: string | null;
   home_country: string | null;
   city_town: string | null;
+  postcode: string | null;
   certificate_path: string | null;
   registered_by: string | null;
   email: string | null;
@@ -93,6 +95,7 @@ export interface Participant {
   home_address: string | null;
   home_country: string | null;
   city_town: string | null;
+  postcode: string | null;
   certificate_path: string | null;
   rank_confirmation: string | null;
   email: string | null;

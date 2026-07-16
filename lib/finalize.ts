@@ -106,6 +106,7 @@ export async function finalizeStripeSession(sessionId: string): Promise<Finalize
     email: v.email ?? null,
     phone: v.phone ?? null,
     home_address: v.home_address ?? null,
+    postcode: v.postcode ?? null,
     home_country: v.home_country ?? null,
     city_town: v.city_town ?? null,
     certificate_path: v.certificate_path || null,

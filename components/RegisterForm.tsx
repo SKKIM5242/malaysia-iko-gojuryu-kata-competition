@@ -192,6 +192,12 @@ export default function RegisterForm({
         </div>
 
         <div>
+          <label htmlFor="postcode" className={labelCls}>Postcode *</label>
+          <input id="postcode" name="postcode" required className={inputCls} placeholder="e.g. 50000" />
+          <FieldError message={err.postcode} />
+        </div>
+
+        <div>
           <label htmlFor="home_country" className={labelCls}>Home country *</label>
           <input id="home_country" name="home_country" required defaultValue="Malaysia" className={inputCls} />
           <FieldError message={err.home_country} />

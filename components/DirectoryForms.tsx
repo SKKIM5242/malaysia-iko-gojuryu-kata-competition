@@ -138,6 +138,10 @@ export function SchoolForm({ telegramLink }: { telegramLink: string | null }) {
           <input id="city_town" name="city_town" required className={inputCls} />
         </div>
         <div>
+          <label htmlFor="postcode" className={labelCls}>Postcode *</label>
+          <input id="postcode" name="postcode" required className={inputCls} placeholder="e.g. 50000" />
+        </div>
+        <div>
           <label htmlFor="home_country" className={labelCls}>Home country *</label>
           <input id="home_country" name="home_country" required defaultValue="Malaysia" className={inputCls} />
         </div>
@@ -246,6 +250,11 @@ export function SenseiForm({
           <label htmlFor="city_town" className={labelCls}>City / Town *</label>
           <input id="city_town" name="city_town" required className={inputCls} />
           <FieldError message={err.city_town} />
+        </div>
+        <div>
+          <label htmlFor="postcode" className={labelCls}>Postcode *</label>
+          <input id="postcode" name="postcode" required className={inputCls} placeholder="e.g. 50000" />
+          <FieldError message={err.postcode} />
         </div>
         <div>
           <label htmlFor="home_country" className={labelCls}>Home country *</label>

@@ -25,6 +25,7 @@ const REQUIRED: Array<[string, string]> = [
   ["email", "Email address is required"],
   ["phone", "Mobile phone is required"],
   ["home_address", "Home address is required"],
+  ["postcode", "Postcode is required"],
   ["home_country", "Home country is required"],
   ["city_town", "City / town is required"],
   ["school_id", "School is required"],

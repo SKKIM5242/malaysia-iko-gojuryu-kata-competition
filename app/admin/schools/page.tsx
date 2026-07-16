@@ -118,6 +118,10 @@ export default async function AdminSchools({
                   <input id="city_town" name="city_town" required defaultValue={editing?.city_town ?? ""} className={adminInput} />
                 </div>
                 <div>
+                  <label htmlFor="postcode" className={adminLabel}>Postcode *</label>
+                  <input id="postcode" name="postcode" required defaultValue={editing?.postcode ?? ""} className={adminInput} placeholder="e.g. 50000" />
+                </div>
+                <div>
                   <label htmlFor="home_country" className={adminLabel}>Country *</label>
                   <input id="home_country" name="home_country" required defaultValue={editing?.home_country ?? (editing ? "" : "Malaysia")} className={adminInput} />
                 </div>
@@ -182,7 +186,7 @@ export default async function AdminSchools({
                 state: s.state ?? "",
                 person_in_charge: [s.contact_title, s.contact_name].filter(Boolean).join(" ") +
                   (s.contact_karate_title ? ` (${s.contact_karate_title}${s.contact_rank ? ` — ${s.contact_rank}` : ""})` : ""),
-                location: [s.home_address, s.city_town, s.home_country].filter(Boolean).join(", "),
+                location: [s.home_address, s.city_town, s.postcode, s.home_country].filter(Boolean).join(", "),
                 contact: [s.email, s.phone].filter(Boolean).join(" · "),
                 bank: [s.bank_name, s.bank_account_no, s.bank_account_name].filter(Boolean).join(" · "),
                 actions: (

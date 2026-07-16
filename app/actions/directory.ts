@@ -26,6 +26,7 @@ export async function registerSchool(
   const phone = String(formData.get("phone") ?? "").trim();
   const home_address = String(formData.get("home_address") ?? "").trim();
   const city_town = String(formData.get("city_town") ?? "").trim();
+  const postcode = String(formData.get("postcode") ?? "").trim();
   const home_country = String(formData.get("home_country") ?? "").trim();
   if (!name) return { ok: false, error: "School / dojo name is required." };
   if (!contact_title || !["Mr.", "Ms."].includes(contact_title)) {
@@ -38,6 +39,7 @@ export async function registerSchool(
   if (!phone) return { ok: false, error: "Mobile phone is required." };
   if (!home_address) return { ok: false, error: "Home address is required." };
   if (!city_town) return { ok: false, error: "City / Town is required." };
+  if (!postcode) return { ok: false, error: "Postcode is required." };
   if (!home_country) return { ok: false, error: "Home country is required." };
   const gender = contact_title === "Mr." ? "male" : "female";
 
@@ -65,6 +67,7 @@ export async function registerSchool(
     phone,
     home_address,
     city_town,
+    postcode,
     home_country,
   });
   if (error) return { ok: false, error: "Could not register the school. Please try again." };
@@ -104,6 +107,7 @@ export async function registerSensei(
   const phone = String(formData.get("phone") ?? "").trim();
   const home_address = String(formData.get("home_address") ?? "").trim();
   const city_town = String(formData.get("city_town") ?? "").trim();
+  const postcode = String(formData.get("postcode") ?? "").trim();
   const home_country = String(formData.get("home_country") ?? "").trim();
   if (!name) return { ok: false, error: "Sensei / coach name is required." };
   if (!rank) {
@@ -135,6 +139,13 @@ export async function registerSensei(
       ok: false,
       error: "Please fix the highlighted fields.",
       fieldErrors: { city_town: "City / Town is required" },
+    };
+  }
+  if (!postcode) {
+    return {
+      ok: false,
+      error: "Please fix the highlighted fields.",
+      fieldErrors: { postcode: "Postcode is required" },
     };
   }
   if (!home_country) {
@@ -192,6 +203,7 @@ export async function registerSensei(
     certificate_path,
     home_address,
     city_town,
+    postcode,
     home_country,
   });
   if (error) return { ok: false, error: "Could not register the sensei. Please try again." };

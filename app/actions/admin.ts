@@ -524,6 +524,7 @@ export async function saveSchool(formData: FormData) {
     contact_rank: String(formData.get("contact_rank") ?? "").trim() || null,
     home_address: String(formData.get("home_address") ?? "").trim() || null,
     city_town: String(formData.get("city_town") ?? "").trim() || null,
+    postcode: String(formData.get("postcode") ?? "").trim() || null,
     home_country: String(formData.get("home_country") ?? "").trim() || null,
     email: String(formData.get("email") ?? "").trim() || null,
     phone: String(formData.get("phone") ?? "").trim() || null,
@@ -535,8 +536,8 @@ export async function saveSchool(formData: FormData) {
   if (!values.contact_title || !values.contact_name || !values.contact_karate_title || !values.contact_rank) {
     backTo(returnTo, { error: "Person in-charge's title, name, karate title, and rank are required." });
   }
-  if (!values.home_address || !values.city_town || !values.home_country) {
-    backTo(returnTo, { error: "Home address, city/town, and home country are required." });
+  if (!values.home_address || !values.city_town || !values.postcode || !values.home_country) {
+    backTo(returnTo, { error: "Home address, city/town, postcode, and home country are required." });
   }
   if (!values.email || !values.phone) {
     backTo(returnTo, { error: "Email address and mobile phone are required." });
@@ -597,6 +598,7 @@ export async function saveSensei(formData: FormData) {
     school_id: String(formData.get("school_id") ?? "") || null,
     home_address: String(formData.get("home_address") ?? "").trim() || null,
     city_town: String(formData.get("city_town") ?? "").trim() || null,
+    postcode: String(formData.get("postcode") ?? "").trim() || null,
     home_country: String(formData.get("home_country") ?? "").trim() || null,
     email: String(formData.get("email") ?? "").trim() || null,
     phone: String(formData.get("phone") ?? "").trim() || null,
@@ -610,8 +612,8 @@ export async function saveSensei(formData: FormData) {
   if (!values.gender || !["male", "female"].includes(values.gender)) {
     backTo(returnTo, { error: "Sex is required." });
   }
-  if (!values.home_address || !values.city_town || !values.home_country) {
-    backTo(returnTo, { error: "Home address, city/town, and home country are required." });
+  if (!values.home_address || !values.city_town || !values.postcode || !values.home_country) {
+    backTo(returnTo, { error: "Home address, city/town, postcode, and home country are required." });
   }
   if (!values.email || !values.phone) {
     backTo(returnTo, { error: "Email address and mobile phone are required." });
@@ -1257,7 +1259,7 @@ export async function createStaffAccount(formData: FormData) {
 
 const SCHOOL_CSV_COLUMNS = [
   "name", "state", "contact_title", "contact_name", "contact_karate_title", "contact_rank",
-  "home_address", "city_town", "home_country", "email", "phone",
+  "home_address", "city_town", "postcode", "home_country", "email", "phone",
   "bank_name", "bank_account_no", "bank_account_name",
 ] as const;
 
@@ -1289,6 +1291,7 @@ export async function bulkUploadSchools(_prev: CsvUploadResult, formData: FormDa
       contact_rank: get(r, "contact_rank") || null,
       home_address: get(r, "home_address") || null,
       city_town: get(r, "city_town") || null,
+      postcode: get(r, "postcode") || null,
       home_country: get(r, "home_country") || null,
       email: get(r, "email") || null,
       phone: get(r, "phone") || null,
@@ -1301,8 +1304,8 @@ export async function bulkUploadSchools(_prev: CsvUploadResult, formData: FormDa
       failures.push({ row: rowNo, name, error: "Person in-charge's title, name, karate title, and rank are required" });
       continue;
     }
-    if (!record.home_address || !record.city_town || !record.home_country) {
-      failures.push({ row: rowNo, name, error: "Home address, city/town, and home country are required" });
+    if (!record.home_address || !record.city_town || !record.postcode || !record.home_country) {
+      failures.push({ row: rowNo, name, error: "Home address, city/town, postcode, and home country are required" });
       continue;
     }
     if (!record.email || !record.phone) {
@@ -1337,7 +1340,7 @@ export async function bulkUploadSchools(_prev: CsvUploadResult, formData: FormDa
 
 const SENSEI_CSV_COLUMNS = [
   "name", "ic_passport", "date_of_birth", "rank", "gender", "school_name",
-  "home_address", "city_town", "home_country", "email", "phone",
+  "home_address", "city_town", "postcode", "home_country", "email", "phone",
   "bank_name", "bank_account_no", "bank_account_name",
 ] as const;
 
@@ -1379,6 +1382,7 @@ export async function bulkUploadSenseis(_prev: CsvUploadResult, formData: FormDa
       school_id: schoolId,
       home_address: get(r, "home_address") || null,
       city_town: get(r, "city_town") || null,
+      postcode: get(r, "postcode") || null,
       home_country: get(r, "home_country") || null,
       email: get(r, "email") || null,
       phone: get(r, "phone") || null,
@@ -1390,8 +1394,8 @@ export async function bulkUploadSenseis(_prev: CsvUploadResult, formData: FormDa
     if (!record.ic_passport) { failures.push({ row: rowNo, name, error: "IC / Passport is required" }); continue; }
     if (!record.rank) { failures.push({ row: rowNo, name, error: "Rank is required" }); continue; }
     if (!gender || !["male", "female"].includes(gender)) { failures.push({ row: rowNo, name, error: "Gender must be male or female" }); continue; }
-    if (!record.home_address || !record.city_town || !record.home_country) {
-      failures.push({ row: rowNo, name, error: "Home address, city/town, and home country are required" });
+    if (!record.home_address || !record.city_town || !record.postcode || !record.home_country) {
+      failures.push({ row: rowNo, name, error: "Home address, city/town, postcode, and home country are required" });
       continue;
     }
     if (!record.email || !record.phone) {

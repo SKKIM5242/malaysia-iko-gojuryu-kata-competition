@@ -120,6 +120,10 @@ export default async function AdminSenseis({
                   <input id="city_town" name="city_town" required defaultValue={editing?.city_town ?? ""} className={adminInput} />
                 </div>
                 <div>
+                  <label htmlFor="postcode" className={adminLabel}>Postcode *</label>
+                  <input id="postcode" name="postcode" required defaultValue={editing?.postcode ?? ""} className={adminInput} placeholder="e.g. 50000" />
+                </div>
+                <div>
                   <label htmlFor="home_country" className={adminLabel}>Home country *</label>
                   <input id="home_country" name="home_country" required defaultValue={editing?.home_country ?? (editing ? "" : "Malaysia")} className={adminInput} />
                 </div>
@@ -202,7 +206,7 @@ export default async function AdminSenseis({
                   ) : (
                     <span className="text-neutral-400">—</span>
                   ),
-                location: [s.home_address, s.city_town, s.home_country].filter(Boolean).join(", "),
+                location: [s.home_address, s.city_town, s.postcode, s.home_country].filter(Boolean).join(", "),
                 contact: [s.email, s.phone].filter(Boolean).join(" · "),
                 bank: [s.bank_name, s.bank_account_no, s.bank_account_name].filter(Boolean).join(" · "),
                 school: s.school?.name ?? "",

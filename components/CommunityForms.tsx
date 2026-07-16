@@ -140,6 +140,11 @@ export function RefereeForm({ telegramLink }: { telegramLink: string | null }) {
           <Err m={e.city_town} />
         </div>
         <div>
+          <label htmlFor="postcode" className={labelCls}>Postcode *</label>
+          <input id="postcode" name="postcode" required className={inputCls} placeholder="e.g. 50000" />
+          <Err m={e.postcode} />
+        </div>
+        <div>
           <label htmlFor="home_country" className={labelCls}>Home country *</label>
           <input id="home_country" name="home_country" required defaultValue="Malaysia" className={inputCls} />
           <Err m={e.home_country} />
@@ -322,6 +327,11 @@ export function StaffForm({ telegramLink }: { telegramLink: string | null }) {
           <label htmlFor="city_town" className={labelCls}>City / Town *</label>
           <input id="city_town" name="city_town" required className={inputCls} />
           <Err m={e.city_town} />
+        </div>
+        <div>
+          <label htmlFor="postcode" className={labelCls}>Postcode *</label>
+          <input id="postcode" name="postcode" required className={inputCls} placeholder="e.g. 50000" />
+          <Err m={e.postcode} />
         </div>
         <div>
           <label htmlFor="home_country" className={labelCls}>Home country *</label>
