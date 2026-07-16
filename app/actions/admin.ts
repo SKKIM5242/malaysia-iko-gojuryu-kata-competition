@@ -1813,3 +1813,35 @@ export async function bulkUploadOrganizers(_prev: CsvUploadResult, formData: For
 export async function bulkUploadSupport(_prev: CsvUploadResult, formData: FormData): Promise<CsvUploadResult> {
   return bulkCreateStaffAccounts(formData, "customer_support");
 }
+
+// ── Commission payouts ───────────────────────────────────────────────────────
+
+/** Marks a computed School/Sensei/Referee commission as paid or unpaid --
+ * bookkeeping only, the commission amount itself is always recomputed live
+ * from registration data (see lib/commissions.ts), never stored here. */
+export async function setCommissionPayoutStatus(formData: FormData) {
+  const recipientType = String(formData.get("recipient_type") ?? "");
+  const recipientId = String(formData.get("recipient_id") ?? "");
+  const status = String(formData.get("status") ?? "");
+  const returnTo = "/admin/commissions";
+  if (!["school", "sensei", "referee"].includes(recipientType) || !recipientId || !["unpaid", "paid"].includes(status)) {
+    backTo(returnTo, { error: "Invalid request." });
+  }
+  const { supabase, actorId } = await getActor();
+  const { error } = await supabase
+    .from("commission_payouts")
+    .upsert(
+      {
+        recipient_type: recipientType, recipient_id: recipientId, status,
+        paid_at: status === "paid" ? new Date().toISOString() : null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "recipient_type,recipient_id" },
+    );
+  if (error) backTo(returnTo, { error: `Could not update payout status: ${error.message}` });
+  await writeAudit(supabase, {
+    table_name: "commission_payouts", record_id: recipientId, action: "commission_payout_status_changed",
+    new_value: { recipient_type: recipientType, status }, actor_id: actorId,
+  });
+  backTo(returnTo, { ok: "Payout status updated." });
+}
