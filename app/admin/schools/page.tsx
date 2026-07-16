@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getSchools, schemaReady } from "@/lib/data";
-import { saveSchool, deleteSchool, createInvitationCode, bulkUploadSchools } from "@/app/actions/admin";
+import { saveSchool, deleteSchool, createInvitationCode, generateRecordInvitationCode, bulkUploadSchools } from "@/app/actions/admin";
 import { AdminShell, Card, adminBtn, adminBtnSecondary, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
@@ -61,6 +61,26 @@ export default async function AdminSchools({
                 </form>
                 <p className="mt-1 text-xs text-neutral-400">
                   Shared with Senseis / Coaches too. Manage or revoke codes in Admin → Accounts → Invitation codes.
+                </p>
+              </div>
+            )}
+            {editing && (
+              <div className="mb-4 rounded-md border border-neutral-200 bg-neutral-50 p-3">
+                <p className="text-xs font-bold uppercase tracking-wide text-neutral-500">
+                  Personal invitation code for this school
+                </p>
+                <form action={generateRecordInvitationCode} className="mt-2">
+                  <input type="hidden" name="role" value="school" />
+                  <input type="hidden" name="id" value={editing.id} />
+                  <input type="hidden" name="return_to" value="/admin/schools" />
+                  <button type="submit" className={adminBtnSecondary}>
+                    {editing.invitation_code ? "Regenerate personal code" : "Generate personal code"}
+                  </button>
+                </form>
+                <p className="mt-1 text-xs text-neutral-400">
+                  {editing.invitation_code
+                    ? `Current code: ${editing.invitation_code} — bound to ${editing.email}, single use.`
+                    : `Single-use, bound only to ${editing.email || "this school's email"} — for signing in with this specific school's access, not a shared code.`}
                 </p>
               </div>
             )}
@@ -135,6 +155,10 @@ export default async function AdminSchools({
                   <label htmlFor="phone" className={adminLabel}>Mobile phone *</label>
                   <input id="phone" name="phone" type="tel" required defaultValue={editing?.phone ?? ""} className={adminInput} placeholder="+60…" />
                 </div>
+                <div>
+                  <label htmlFor="invitation_code" className={adminLabel}>Invitation code (optional)</label>
+                  <input id="invitation_code" name="invitation_code" defaultValue={editing?.invitation_code ?? ""} className={adminInput} />
+                </div>
               </div>
               <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3">
                 <p className="text-xs font-bold uppercase tracking-wide text-neutral-500">Bank details *</p>
@@ -174,6 +198,7 @@ export default async function AdminSchools({
               rowKey="id"
               downloadName="schools"
               columns={[
+                { key: "reference_id", label: "Reference ID" },
                 { key: "name", label: "Name" },
                 { key: "state", label: "State" },
                 { key: "person_in_charge", label: "Person in-charge" },
@@ -183,6 +208,7 @@ export default async function AdminSchools({
                 { key: "actions", label: "Actions" },
               ]}
               csvColumns={[
+                { key: "reference_id", label: "Reference ID" },
                 { key: "name", label: "Name" },
                 { key: "state", label: "State" },
                 { key: "contact_title", label: "Contact Title" },
@@ -201,6 +227,7 @@ export default async function AdminSchools({
               ]}
               rows={schools.map((s) => ({
                 id: s.id,
+                reference_id: s.id.slice(0, 8).toUpperCase(),
                 name: s.name,
                 state: s.state ?? "",
                 person_in_charge: [s.contact_title, s.contact_name].filter(Boolean).join(" ") +

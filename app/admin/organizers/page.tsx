@@ -113,6 +113,10 @@ export default async function AdminOrganizers({
                   <label htmlFor="org_phone" className={adminLabel}>Mobile phone *</label>
                   <input id="org_phone" name="phone" type="tel" required className={adminInput} placeholder="+60…" />
                 </div>
+                <div>
+                  <label htmlFor="org_invitation_code" className={adminLabel}>Invitation code (optional)</label>
+                  <input id="org_invitation_code" name="invitation_code" className={adminInput} />
+                </div>
               </div>
               <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3">
                 <p className="text-xs font-bold uppercase tracking-wide text-neutral-500">Bank details *</p>
@@ -155,6 +159,7 @@ export default async function AdminOrganizers({
           rowKey="id"
           downloadName="organizer-applications"
           columns={[
+            { key: "reference_id", label: "Reference ID" },
             { key: "full_name", label: "Name" },
             { key: "contact", label: "Contact" },
             { key: "role_requested", label: "Role requested" },
@@ -162,6 +167,7 @@ export default async function AdminOrganizers({
             { key: "status", label: "Status" },
           ]}
           csvColumns={[
+            { key: "reference_id", label: "Reference ID" },
             { key: "full_name", label: "Name" },
             { key: "email", label: "Email" },
             { key: "phone", label: "Phone" },
@@ -171,6 +177,7 @@ export default async function AdminOrganizers({
           ]}
           rows={applications.map((s) => ({
             id: s.id,
+            reference_id: s.id.slice(0, 8).toUpperCase(),
             full_name: s.full_name,
             contact: [s.email, s.phone].filter(Boolean).join(" · "),
             email: s.email ?? "",

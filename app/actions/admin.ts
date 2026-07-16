@@ -531,6 +531,7 @@ export async function saveSchool(formData: FormData) {
     bank_name: String(formData.get("bank_name") ?? "").trim() || null,
     bank_account_no: String(formData.get("bank_account_no") ?? "").trim() || null,
     bank_account_name: String(formData.get("bank_account_name") ?? "").trim() || null,
+    invitation_code: String(formData.get("invitation_code") ?? "").trim() || null,
   };
   if (!values.name) backTo(returnTo, { error: "School name is required." });
   if (!values.contact_title || !values.contact_name || !values.contact_karate_title || !values.contact_rank) {
@@ -605,6 +606,7 @@ export async function saveSensei(formData: FormData) {
     bank_name: String(formData.get("bank_name") ?? "").trim() || null,
     bank_account_no: String(formData.get("bank_account_no") ?? "").trim() || null,
     bank_account_name: String(formData.get("bank_account_name") ?? "").trim() || null,
+    invitation_code: String(formData.get("invitation_code") ?? "").trim() || null,
   };
   if (!values.name) backTo(returnTo, { error: "Sensei name is required." });
   if (!values.ic_passport) backTo(returnTo, { error: "IC / Passport is required." });
@@ -727,6 +729,7 @@ export async function createAudienceMember(formData: FormData) {
     const { data: redeemed } = await supabase.rpc("redeem_invitation_code", {
       p_code: invitation_code,
       p_role: "audience",
+      p_email: email,
     });
     if (redeemed === true) payment_status = "waived";
   }
@@ -847,6 +850,7 @@ export async function saveParticipant(formData: FormData) {
     phone: String(formData.get("phone") ?? "").trim() || null,
     school_id: String(formData.get("school_id") ?? "") || null,
     sensei_id: String(formData.get("sensei_id") ?? "") || null,
+    invitation_code: String(formData.get("invitation_code") ?? "").trim() || null,
   };
   if (!values.full_name || !values.ic_passport) {
     backTo(returnTo, { error: "Name and IC/passport are required." });
@@ -952,7 +956,7 @@ export async function createInvitationCode(formData: FormData) {
   const note = String(formData.get("note") ?? "").trim() || null;
   const maxUsesRaw = String(formData.get("max_uses") ?? "").trim();
   const returnTo = String(formData.get("return_to") ?? "/admin/accounts");
-  if (!["referee", "staff", "audience", "school", "any"].includes(role)) {
+  if (!["referee", "staff", "audience", "school", "sensei", "participant", "organizer", "customer_support", "admin", "any"].includes(role)) {
     backTo(returnTo, { error: "A valid role is required." });
   }
   // "Generate" buttons don't ask for a custom code — mint a short random one.
@@ -975,6 +979,51 @@ export async function createInvitationCode(formData: FormData) {
     new_value: { code, role }, actor_id: actorId,
   });
   backTo(returnTo, { ok: `Invitation code created: ${code}` });
+}
+
+const RECORD_CODE_TABLES: Record<string, string> = { school: "schools", sensei: "senseis" };
+
+/** Generates a personal, single-use invitation code for one already-saved
+ * School/Sensei record, bound to that record's own email (only that email
+ * can redeem it) — auto-recorded onto the record's own invitation_code
+ * column so it stays visible without having to look it up separately. This
+ * is additive to createInvitationCode's generic shared codes above, not a
+ * replacement for them. */
+export async function generateRecordInvitationCode(formData: FormData) {
+  const role = String(formData.get("role") ?? "");
+  const id = String(formData.get("id") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "/admin");
+  const table = RECORD_CODE_TABLES[role];
+  if (!table || !id) backTo(returnTo, { error: "Invalid request." });
+
+  const { supabase, actorId } = await getActor();
+  const { data: record } = await supabase.from(table).select("email").eq("id", id).maybeSingle();
+  if (!record?.email) {
+    backTo(returnTo, { error: "This record needs an email address before a code can be generated." });
+  }
+
+  const code = `${role.toUpperCase()}-${crypto.randomUUID().slice(0, 6).toUpperCase()}`;
+  const { data: myProfile } = actorId
+    ? await supabase.from("profiles").select("full_name, email").eq("user_id", actorId).maybeSingle()
+    : { data: null };
+  const generated_by = myProfile?.full_name || myProfile?.email || null;
+
+  const { data: inserted, error } = await supabase
+    .from("invitation_codes")
+    .insert({
+      code, role, email: record!.email, max_uses: 1, generated_by,
+      note: `Personal code for ${role} record ${id.slice(0, 8).toUpperCase()}`,
+    })
+    .select("id")
+    .single();
+  if (error) backTo(returnTo, { error: `Could not generate code: ${error.message}` });
+
+  await supabase.from(table).update({ invitation_code: code }).eq("id", id);
+  await writeAudit(supabase, {
+    table_name: "invitation_codes", record_id: inserted!.id, action: "invitation_code_created",
+    new_value: { code, role, email: record!.email, for_table: table, for_id: id }, actor_id: actorId,
+  });
+  backTo(returnTo, { ok: `Invitation code generated: ${code}` });
 }
 
 export async function toggleInvitationCode(formData: FormData) {
@@ -1277,6 +1326,7 @@ export async function createStaffAccount(formData: FormData) {
     bank_name: String(formData.get("bank_name") ?? "").trim() || null,
     bank_account_no: String(formData.get("bank_account_no") ?? "").trim() || null,
     bank_account_name: String(formData.get("bank_account_name") ?? "").trim() || null,
+    invitation_code: String(formData.get("invitation_code") ?? "").trim() || null,
   };
   if (!extra.ic_passport || !extra.date_of_birth || !extra.gender) {
     backTo(returnTo, { error: "IC / Passport, date of birth, and gender are required." });

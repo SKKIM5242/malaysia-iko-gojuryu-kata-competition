@@ -228,6 +228,7 @@ export default async function AdminReferees({
               rowKey="id"
               downloadName="referees"
               columns={[
+                { key: "reference_id", label: "Reference ID" },
                 { key: "full_name", label: "Name" },
                 { key: "ic_passport", label: "IC / Passport" },
                 { key: "date_of_birth", label: "DOB" },
@@ -245,6 +246,7 @@ export default async function AdminReferees({
                 { key: "actions", label: "Actions" },
               ]}
               csvColumns={[
+                { key: "reference_id", label: "Reference ID" },
                 { key: "full_name", label: "Name" },
                 { key: "ic_passport", label: "IC / Passport" },
                 { key: "date_of_birth", label: "DOB" },
@@ -267,6 +269,7 @@ export default async function AdminReferees({
               ]}
               rows={refereeList.map((r) => ({
                 id: r.id,
+                reference_id: r.id.slice(0, 8).toUpperCase(),
                 full_name: r.full_name,
                 ic_passport: r.ic_passport,
                 date_of_birth: formatDate(r.date_of_birth),

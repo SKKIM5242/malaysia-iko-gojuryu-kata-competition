@@ -113,6 +113,10 @@ export default async function AdminSupport({
                   <label htmlFor="cs_phone" className={adminLabel}>Mobile phone *</label>
                   <input id="cs_phone" name="phone" type="tel" required className={adminInput} placeholder="+60…" />
                 </div>
+                <div>
+                  <label htmlFor="cs_invitation_code" className={adminLabel}>Invitation code (optional)</label>
+                  <input id="cs_invitation_code" name="invitation_code" className={adminInput} />
+                </div>
               </div>
               <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3">
                 <p className="text-xs font-bold uppercase tracking-wide text-neutral-500">Bank details *</p>
@@ -152,12 +156,14 @@ export default async function AdminSupport({
           rowKey="id"
           downloadName="customer-support-applications"
           columns={[
+            { key: "reference_id", label: "Reference ID" },
             { key: "full_name", label: "Name" },
             { key: "contact", label: "Contact" },
             { key: "message", label: "Message" },
             { key: "status", label: "Status" },
           ]}
           csvColumns={[
+            { key: "reference_id", label: "Reference ID" },
             { key: "full_name", label: "Name" },
             { key: "email", label: "Email" },
             { key: "phone", label: "Phone" },
@@ -166,6 +172,7 @@ export default async function AdminSupport({
           ]}
           rows={applications.map((s) => ({
             id: s.id,
+            reference_id: s.id.slice(0, 8).toUpperCase(),
             full_name: s.full_name,
             contact: [s.email, s.phone].filter(Boolean).join(" · "),
             email: s.email ?? "",

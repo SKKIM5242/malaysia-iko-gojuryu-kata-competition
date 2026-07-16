@@ -210,6 +210,19 @@ async function ApprovalsTab({ supabase }: { supabase: Awaited<ReturnType<typeof 
   );
 }
 
+const CODE_ROLE_LABEL: Record<string, string> = {
+  school: "School / Dojo / Club",
+  sensei: "Sensei / Shihan / Hanshi",
+  participant: "Participant",
+  referee: "Referee / Judge",
+  audience: "Audience / Spectator",
+  customer_support: "Customer Services Support",
+  organizer: "Organizer",
+  admin: "Admin",
+  staff: "Admin / Organizer / Customer Support (legacy)",
+  any: "Either",
+};
+
 async function CodesTab({ supabase }: { supabase: Awaited<ReturnType<typeof createClient>> }) {
   const { data } = await supabase.from("invitation_codes").select("*").order("created_at", { ascending: false });
   const codes = data ?? [];
@@ -228,8 +241,15 @@ async function CodesTab({ supabase }: { supabase: Awaited<ReturnType<typeof crea
               <div>
                 <label htmlFor="code_role" className={adminLabel}>Role *</label>
                 <select id="code_role" name="role" required defaultValue="referee" className={adminInput}>
+                  <option value="school">School / Dojo / Club</option>
+                  <option value="sensei">Sensei / Shihan / Hanshi</option>
+                  <option value="participant">Participant</option>
                   <option value="referee">Referee / Judge</option>
-                  <option value="staff">Admin / Organizer / Customer Support</option>
+                  <option value="audience">Audience / Spectator</option>
+                  <option value="customer_support">Customer Services Support</option>
+                  <option value="organizer">Organizer</option>
+                  <option value="admin">Admin</option>
+                  <option value="staff">Admin / Organizer / Customer Support (legacy)</option>
                   <option value="any">Either</option>
                 </select>
               </div>
@@ -244,8 +264,11 @@ async function CodesTab({ supabase }: { supabase: Awaited<ReturnType<typeof crea
             </div>
             <button type="submit" className={adminBtn}>Create code</button>
             <p className="text-xs text-neutral-400">
-              Anyone signing up as Referee/Judge or Staff with this code activates instantly — no
-              approval step, no payment.
+              Referee/Judge and Audience/Spectator codes waive their fee and activate instantly at
+              public sign-up — no approval step. School and Sensei codes waive the same way from
+              those pages&apos; own invitation-code box. Participant, Organizer, Customer Services
+              Support, and Admin codes are record-keeping only for now — noting which code a
+              manually-added account was given — since those roles have no public self-signup.
             </p>
           </form>
         </Card>
@@ -262,7 +285,7 @@ async function CodesTab({ supabase }: { supabase: Awaited<ReturnType<typeof crea
                   <div>
                     <p className="font-mono font-bold text-neutral-900">{c.code}</p>
                     <p className="mt-0.5 text-sm text-neutral-500">
-                      {c.role} · used {c.use_count}{c.max_uses ? ` / ${c.max_uses}` : " (unlimited)"}
+                      {CODE_ROLE_LABEL[c.role] ?? c.role} · used {c.use_count}{c.max_uses ? ` / ${c.max_uses}` : " (unlimited)"}
                       {c.note ? ` · ${c.note}` : ""}
                     </p>
                     <p className="mt-0.5 text-xs text-neutral-400">

@@ -35,6 +35,7 @@ export interface School {
   bank_name: string | null;
   bank_account_no: string | null;
   bank_account_name: string | null;
+  invitation_code: string | null;
   created_at: string;
 }
 
@@ -58,6 +59,7 @@ export interface Sensei {
   bank_name: string | null;
   bank_account_no: string | null;
   bank_account_name: string | null;
+  invitation_code: string | null;
   created_at: string;
   school?: Pick<School, "id" | "name"> | null;
 }
@@ -102,6 +104,7 @@ export interface Participant {
   phone: string | null;
   school_id: string | null;
   sensei_id: string | null;
+  invitation_code: string | null;
   created_at: string;
   school?: Pick<School, "id" | "name" | "state"> | null;
   sensei?: Pick<Sensei, "id" | "name" | "rank"> | null;

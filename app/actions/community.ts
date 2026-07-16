@@ -101,6 +101,7 @@ export async function registerReferee(
     const { data: redeemed } = await supabase.rpc("redeem_invitation_code", {
       p_code: invitation_code,
       p_role: "referee",
+      p_email: values.email,
     });
     if (redeemed === true) paymentStatus = "waived";
   }
@@ -177,6 +178,7 @@ export async function registerAudience(
     const { data: redeemed } = await supabase.rpc("redeem_invitation_code", {
       p_code: invitation_code,
       p_role: "audience",
+      p_email: values.email,
     });
     if (redeemed === true) paymentStatus = "waived";
   }

@@ -133,6 +133,7 @@ export default async function AdminAudience({
           rowKey="id"
           downloadName="audience"
           columns={[
+            { key: "reference_id", label: "Reference ID" },
             { key: "full_name", label: "Name" },
             { key: "contact", label: "Contact" },
             { key: "home_country", label: "Country" },
@@ -141,6 +142,7 @@ export default async function AdminAudience({
             { key: "telegram", label: "Telegram" },
           ]}
           csvColumns={[
+            { key: "reference_id", label: "Reference ID" },
             { key: "full_name", label: "Name" },
             { key: "email", label: "Email" },
             { key: "phone", label: "Phone" },
@@ -150,6 +152,7 @@ export default async function AdminAudience({
           ]}
           rows={(audiences as Audience[]).map((a) => ({
             id: a.id,
+            reference_id: a.id.slice(0, 8).toUpperCase(),
             full_name: a.full_name,
             contact: [a.email, a.phone].filter(Boolean).join(" · "),
             email: a.email ?? "",

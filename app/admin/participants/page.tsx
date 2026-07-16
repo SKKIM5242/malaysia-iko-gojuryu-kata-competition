@@ -146,6 +146,10 @@ export default async function AdminParticipants({
                     ))}
                   </select>
                 </div>
+                <div>
+                  <label htmlFor="invitation_code" className={adminLabel}>Invitation code (optional)</label>
+                  <input id="invitation_code" name="invitation_code" defaultValue={editing?.invitation_code ?? ""} className={adminInput} />
+                </div>
               </div>
               <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3">
                 <p className="text-xs font-bold uppercase tracking-wide text-neutral-500">

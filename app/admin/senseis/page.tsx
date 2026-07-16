@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getSchools, getSenseis, schemaReady } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
-import { saveSensei, deleteSensei, createInvitationCode, bulkUploadSenseis } from "@/app/actions/admin";
+import { saveSensei, deleteSensei, createInvitationCode, generateRecordInvitationCode, bulkUploadSenseis } from "@/app/actions/admin";
 import { AdminShell, Card, CertificateField, adminBtn, adminBtnSecondary, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice, formatDate } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
@@ -71,6 +71,26 @@ export default async function AdminSenseis({
                 </p>
               </div>
             )}
+            {editing && (
+              <div className="mb-4 rounded-md border border-neutral-200 bg-neutral-50 p-3">
+                <p className="text-xs font-bold uppercase tracking-wide text-neutral-500">
+                  Personal invitation code for this sensei
+                </p>
+                <form action={generateRecordInvitationCode} className="mt-2">
+                  <input type="hidden" name="role" value="sensei" />
+                  <input type="hidden" name="id" value={editing.id} />
+                  <input type="hidden" name="return_to" value="/admin/senseis" />
+                  <button type="submit" className={adminBtnSecondary}>
+                    {editing.invitation_code ? "Regenerate personal code" : "Generate personal code"}
+                  </button>
+                </form>
+                <p className="mt-1 text-xs text-neutral-400">
+                  {editing.invitation_code
+                    ? `Current code: ${editing.invitation_code} — bound to ${editing.email}, single use.`
+                    : `Single-use, bound only to ${editing.email || "this sensei's email"} — for signing in with this specific sensei's access, not a shared code.`}
+                </p>
+              </div>
+            )}
             <form action={saveSensei} className="space-y-4">
               {editing && <input type="hidden" name="id" value={editing.id} />}
               <div>
@@ -137,6 +157,10 @@ export default async function AdminSenseis({
                   <label htmlFor="phone" className={adminLabel}>Mobile phone *</label>
                   <input id="phone" name="phone" type="tel" required defaultValue={editing?.phone ?? ""} className={adminInput} placeholder="+60…" />
                 </div>
+                <div>
+                  <label htmlFor="invitation_code" className={adminLabel}>Invitation code (optional)</label>
+                  <input id="invitation_code" name="invitation_code" defaultValue={editing?.invitation_code ?? ""} className={adminInput} />
+                </div>
               </div>
               <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3">
                 <p className="text-xs font-bold uppercase tracking-wide text-neutral-500">Personal Bank Details *</p>
@@ -176,6 +200,7 @@ export default async function AdminSenseis({
               rowKey="id"
               downloadName="senseis"
               columns={[
+                { key: "reference_id", label: "Reference ID" },
                 { key: "name", label: "Name" },
                 { key: "ic_passport", label: "IC / Passport" },
                 { key: "date_of_birth", label: "DOB" },
@@ -189,6 +214,7 @@ export default async function AdminSenseis({
                 { key: "actions", label: "Actions" },
               ]}
               csvColumns={[
+                { key: "reference_id", label: "Reference ID" },
                 { key: "name", label: "Name" },
                 { key: "ic_passport", label: "IC / Passport" },
                 { key: "date_of_birth", label: "DOB" },
@@ -207,6 +233,7 @@ export default async function AdminSenseis({
               ]}
               rows={senseis.map((s) => ({
                 id: s.id,
+                reference_id: s.id.slice(0, 8).toUpperCase(),
                 name: s.name,
                 ic_passport: s.ic_passport ?? "",
                 date_of_birth: formatDate(s.date_of_birth),
