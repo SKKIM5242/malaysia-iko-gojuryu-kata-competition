@@ -1095,6 +1095,20 @@ export async function assignRefereeToVideo(formData: FormData) {
   backTo(returnTo, { ok: "Referee assigned." });
 }
 
+/** Manually re-sends the same assignment email/Telegram notification a
+ * referee already got automatically when assigned — for when they missed
+ * it the first time. Available to any admin-tier viewer (not just Super
+ * Admin), unlike assign/unassign, since it's a read-only nudge. */
+export async function resendRefereeNotification(formData: FormData) {
+  const videoId = String(formData.get("video_id") ?? "");
+  const refereeUserId = String(formData.get("referee_user_id") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "/admin/judging");
+  if (!videoId || !refereeUserId) backTo(returnTo, { error: "Missing video or referee." });
+  const { supabase } = await getActor();
+  await notifyVideoAssignment(supabase, videoId, refereeUserId);
+  backTo(returnTo, { ok: "Notification sent." });
+}
+
 export async function unassignRefereeFromVideo(formData: FormData) {
   const videoId = String(formData.get("video_id") ?? "");
   const refereeUserId = String(formData.get("referee_user_id") ?? "");

@@ -3,6 +3,7 @@ import { getAllCompetitions } from "@/lib/admin-data";
 import { schemaReady } from "@/lib/data";
 import {
   assignRefereeToVideo, unassignRefereeFromVideo, setJudgesRequired, autoAssignReferees,
+  resendRefereeNotification,
 } from "@/app/actions/admin";
 import { AdminShell, Card, adminBtn, adminInput } from "@/components/admin";
 import { CategoryName, EmptyState, SetupNotice } from "@/components/ui";
@@ -139,6 +140,19 @@ export default async function AdminJudging({
                   <span className={score != null && score === 0 ? "font-bold text-red-700" : score != null ? "text-green-700" : "text-amber-600"}>
                     {score != null ? `Total ${score.toFixed(1)}` : "pending"}
                   </span>
+                  {score == null && (
+                    <form action={resendRefereeNotification}>
+                      <input type="hidden" name="video_id" value={v.id} />
+                      <input type="hidden" name="referee_user_id" value={uid} />
+                      <input type="hidden" name="return_to" value="/admin/judging" />
+                      <button
+                        className="text-neutral-400 hover:text-blue-600"
+                        title="Notify this referee (email + Telegram) that a recording is waiting to be judged"
+                      >
+                        🔔
+                      </button>
+                    </form>
+                  )}
                   {isAdmin && (
                     <form action={unassignRefereeFromVideo}>
                       <input type="hidden" name="video_id" value={v.id} />
