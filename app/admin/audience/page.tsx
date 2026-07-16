@@ -1,10 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
 import { schemaReady } from "@/lib/data";
-import { updateCommunityStatus, createInvitationCode, bulkUploadAudience } from "@/app/actions/admin";
-import { AdminShell, Card, adminBtn, adminInput, adminLabel } from "@/components/admin";
+import { updateCommunityStatus, createInvitationCode, createAudienceMember, bulkUploadAudience } from "@/app/actions/admin";
+import { AdminShell, Card, adminBtn, adminBtnSecondary, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
+import { getTelegramLink } from "@/lib/telegram";
 
 export const dynamic = "force-dynamic";
 
@@ -61,38 +62,67 @@ export default async function AdminAudience({
 
   const supabase = await createClient();
   const { data: audiences } = await supabase.from("audiences").select("*").order("created_at", { ascending: false });
+  const telegramLink = getTelegramLink("audience");
 
   return (
     <AdminShell title="Audience / Spectators" active="/admin/audience" flash={{ ok: params.ok, error: params.error }}>
-      <div className="mb-8">
-        <h2 className="mb-3 text-lg font-bold">Audience invitation code</h2>
-        <Card>
-          <form action={createInvitationCode} className="flex flex-wrap items-end gap-3">
-            <input type="hidden" name="role" value="audience" />
-            <input type="hidden" name="return_to" value="/admin/audience" />
-            <div>
-              <label htmlFor="aud_max_uses" className={adminLabel}>Max uses (blank = unlimited)</label>
-              <input id="aud_max_uses" name="max_uses" type="number" min="1" className={`${adminInput} w-40`} />
-            </div>
-            <div>
-              <label htmlFor="aud_code_note" className={adminLabel}>Note (optional)</label>
-              <input id="aud_code_note" name="note" className={adminInput} placeholder="e.g. VIP guests" />
-            </div>
-            <button type="submit" className={adminBtn}>Generate code</button>
-          </form>
-          <p className="mt-2 text-xs text-neutral-400">
-            Waives the USD 10 sign-in fee for anyone who registers as Audience / Spectator with the code.
-            Manage or deactivate codes in Admin → Accounts → Invitation codes.
-          </p>
-        </Card>
-      </div>
-
       <div className="mb-8">
         <CsvUploadForm
           action={bulkUploadAudience}
           templateHref="/audience-template.csv"
           entityLabel="audience member"
         />
+      </div>
+
+      <div className="mb-8">
+        <h2 className="mb-3 text-lg font-bold">Add Audience / Spectator</h2>
+        <Card>
+          <div className="mb-4 rounded-md border border-neutral-200 bg-neutral-50 p-3">
+            <p className="text-xs font-bold uppercase tracking-wide text-neutral-500">Audience invitation code</p>
+            <form action={createInvitationCode} className="mt-2 flex flex-wrap items-end gap-3">
+              <input type="hidden" name="role" value="audience" />
+              <input type="hidden" name="return_to" value="/admin/audience" />
+              <div>
+                <label htmlFor="aud_max_uses" className={adminLabel}>Max uses (blank = unlimited)</label>
+                <input id="aud_max_uses" name="max_uses" type="number" min="1" className={`${adminInput} w-40`} />
+              </div>
+              <div>
+                <label htmlFor="aud_code_note" className={adminLabel}>Note (optional)</label>
+                <input id="aud_code_note" name="note" className={adminInput} placeholder="e.g. VIP guests" />
+              </div>
+              <button type="submit" className={adminBtnSecondary}>Generate code</button>
+            </form>
+            <p className="mt-1 text-xs text-neutral-400">
+              Waives the USD 10 sign-in fee for anyone who registers (or is added below) with the code.
+              Manage or revoke codes in Admin → Accounts → Invitation codes.
+            </p>
+          </div>
+          <form action={createAudienceMember} className="space-y-4">
+            <div>
+              <label htmlFor="aud_full_name" className={adminLabel}>Full name *</label>
+              <input id="aud_full_name" name="full_name" required className={adminInput} />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label htmlFor="aud_email" className={adminLabel}>Email address *</label>
+                <input id="aud_email" name="email" type="email" required className={adminInput} />
+              </div>
+              <div>
+                <label htmlFor="aud_phone" className={adminLabel}>Mobile phone *</label>
+                <input id="aud_phone" name="phone" type="tel" required className={adminInput} placeholder="+60…" />
+              </div>
+              <div>
+                <label htmlFor="aud_home_country" className={adminLabel}>Country</label>
+                <input id="aud_home_country" name="home_country" defaultValue="Malaysia" className={adminInput} />
+              </div>
+              <div>
+                <label htmlFor="aud_invitation_code" className={adminLabel}>Invitation code (optional)</label>
+                <input id="aud_invitation_code" name="invitation_code" className={adminInput} placeholder="Waives the USD 10 fee" />
+              </div>
+            </div>
+            <button type="submit" className={adminBtn}>Add Audience / Spectator</button>
+          </form>
+        </Card>
       </div>
 
       <h2 className="mb-3 text-lg font-bold">Audience / Spectators — USD 10 sign-in</h2>
@@ -108,6 +138,7 @@ export default async function AdminAudience({
             { key: "home_country", label: "Country" },
             { key: "invitation_code", label: "Code" },
             { key: "payment", label: "Payment" },
+            { key: "telegram", label: "Telegram" },
           ]}
           rows={(audiences as Audience[]).map((a) => ({
             id: a.id,
@@ -118,6 +149,18 @@ export default async function AdminAudience({
             payment: (
               <StatusButtons table="audiences" id={a.id} field="payment_status" current={a.payment_status}
                 options={["pending", "paid", "waived"]} />
+            ),
+            telegram: telegramLink ? (
+              <a
+                href={telegramLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded border border-[#229ED9]/40 px-2.5 py-1 text-xs font-semibold text-[#1c7fb5] hover:bg-[#229ED9]/10"
+              >
+                Join Telegram
+              </a>
+            ) : (
+              <span className="text-neutral-400">—</span>
             ),
           }))}
         />

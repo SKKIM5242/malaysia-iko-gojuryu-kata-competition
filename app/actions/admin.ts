@@ -706,6 +706,44 @@ export async function updateCommunityStatus(formData: FormData) {
   backTo(returnTo, { ok: "Updated." });
 }
 
+/** Admin/Organizer/Customer Support/Referee directly adds an Audience /
+ * Spectator (rather than the person self-registering) — e.g. someone paid
+ * or was invited in person. An invitation code here waives the USD 10 fee
+ * exactly like self-registration does. */
+export async function createAudienceMember(formData: FormData) {
+  const returnTo = "/admin/audience";
+  const full_name = String(formData.get("full_name") ?? "").trim();
+  const email = String(formData.get("email") ?? "").trim();
+  const phone = String(formData.get("phone") ?? "").trim();
+  const home_country = String(formData.get("home_country") ?? "").trim() || null;
+  const invitation_code = String(formData.get("invitation_code") ?? "").trim() || null;
+  if (!full_name || !email || !phone) {
+    backTo(returnTo, { error: "Name, email, and mobile phone are required." });
+  }
+  const { supabase, actorId } = await getActor();
+
+  let payment_status: "pending" | "waived" = "pending";
+  if (invitation_code) {
+    const { data: redeemed } = await supabase.rpc("redeem_invitation_code", {
+      p_code: invitation_code,
+      p_role: "audience",
+    });
+    if (redeemed === true) payment_status = "waived";
+  }
+
+  const id = crypto.randomUUID();
+  const { error } = await supabase.from("audiences").insert({
+    id, full_name, email, phone, home_country, invitation_code, payment_status,
+  });
+  if (error) backTo(returnTo, { error: "Could not add audience member — please try again." });
+  await writeAudit(supabase, {
+    table_name: "audiences", record_id: id, action: "audience_added_by_admin",
+    new_value: { full_name, email, invitation_code }, actor_id: actorId,
+  });
+  revalidatePath("/admin/audience");
+  backTo(returnTo, { ok: `${full_name} added to Audience / Spectators.` });
+}
+
 export async function saveReferee(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const returnTo = "/admin/referees";
