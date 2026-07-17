@@ -44,11 +44,17 @@ export default function TermsPage() {
           <section>
             <h2 className="mb-1 font-bold text-neutral-900">4. Visibility</h2>
             <p>
-              Before a competition&apos;s registration deadline, a Participant can view only their own
-              submitted recording. After the deadline, all Participants&apos; recordings and final
-              scores for that competition become visible to signed-in Participants within Kata
-              Arena. Referees / Judges and Admin / Organizer / Customer Support see the recordings
-              assigned or made visible to their role at any time.
+              Every submitted recording is visible to every signed-in Kata Arena account as soon as
+              it is submitted, listed by kata event in submission order. A recording shows a green
+              status with its total score once every assigned judge has scored it, or a red
+              &quot;Disqualified&quot; status if any one judge gave a Total Score of 0 — no score is
+              shown for a disqualified entry. Referees / Judges see only their own individual score
+              per recording; Admin / Organizer / Customer Support see every judge&apos;s individual
+              score. Official winners and standings are announced separately — see{" "}
+              <a href="/winners" className="font-semibold text-red-700 underline underline-offset-2">
+                Winners
+              </a>
+              .
             </p>
           </section>
           <section>

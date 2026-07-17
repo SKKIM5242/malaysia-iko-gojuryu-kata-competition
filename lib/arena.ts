@@ -1,5 +1,5 @@
 import type { createClient } from "@/lib/supabase/server";
-import { finalScore } from "@/lib/scoring";
+import { finalScore, isDisqualified } from "@/lib/scoring";
 import { kataBaseOf } from "@/lib/division";
 
 export interface JudgeScoreEntry {
@@ -17,10 +17,19 @@ export interface ArenaEntry {
   schoolId: string | null;
   senseiId: string | null;
   playbackUrl: string | null;
-  /** Trimmed-mean aggregate — Kata Arena never shows this to anyone except
-   * a participant's own entry after winners are announced; the Winners
-   * page is the only place it's shown at large. */
+  createdAt: string;
+  /** Trimmed-mean aggregate. Shown in Kata Arena as the round-status total
+   * once `scoresSubmitted` reaches the competition's judges_required — the
+   * Winners page separately reveals rankings/standings 30 days after the
+   * deadline regardless of this. */
   finalScore: number | null;
+  /** true if any one judge gave a Total Score of exactly 0 — the entry is
+   * disqualified regardless of what the other judges gave. */
+  disqualified: boolean;
+  /** How many of the assigned judges have actually submitted a score —
+   * compared against the competition's judges_required to know whether
+   * judging is complete for this recording. */
+  scoresSubmitted: number;
   /** One entry per assigned referee, individual (not aggregated) — this is
    * what Referee/Admin/Organizer/Customer Support/Audience see on Kata
    * Arena instead of the final score. */
@@ -44,13 +53,14 @@ export async function loadKataArena(
   const { data: videos } = await supabase
     .from("kata_videos")
     .select(
-      "id, storage_path, participant:participants(id, full_name, school_id, sensei_id), registration:registrations(category:categories(name))",
+      "id, storage_path, created_at, participant:participants(id, full_name, school_id, sensei_id), registration:registrations(category:categories(name))",
     )
     .in("registration_id", regIds);
   const videoList =
     (videos as unknown as Array<{
       id: string;
       storage_path: string;
+      created_at: string;
       participant: { id: string; full_name: string; school_id: string | null; sensei_id: string | null } | null;
       registration: { category: { name: string } | null } | null;
     }>) ?? [];
@@ -93,6 +103,7 @@ export async function loadKataArena(
     videoList.map(async (v) => {
       const { data: signed } = await supabase.storage.from("kata-videos").createSignedUrl(v.storage_path, 3600);
       const assigned = assignedByVideo.get(v.id) ?? [];
+      const videoScores = scoresByVideo.get(v.id) ?? [];
       return {
         videoId: v.id,
         participantId: v.participant?.id ?? null,
@@ -101,7 +112,10 @@ export async function loadKataArena(
         schoolId: v.participant?.school_id ?? null,
         senseiId: v.participant?.sensei_id ?? null,
         playbackUrl: signed?.signedUrl ?? null,
-        finalScore: finalScore(scoresByVideo.get(v.id) ?? []),
+        createdAt: v.created_at,
+        finalScore: finalScore(videoScores),
+        disqualified: isDisqualified(videoScores),
+        scoresSubmitted: videoScores.length,
         judgeScores: assigned.map((uid) => ({
           judgeName: refereeName.get(uid) ?? uid.slice(0, 8),
           score: scoreByKey.get(`${v.id}:${uid}`) ?? null,
@@ -112,16 +126,20 @@ export async function loadKataArena(
 }
 
 /** Groups arena entries by kata event (the part of their category name
- * before " — belt — age"), preserving first-seen order — so Kata Arena can
- * show recordings organised the same way as the Kata Listing elsewhere on
- * the site, letting a participant see exactly where their own submission
- * sits among its kata + category. */
+ * before " — belt — age"), each group sorted by submission date/time —
+ * so Kata Arena can show recordings organised the same way as the Kata
+ * Listing elsewhere on the site, numbered in the order participants
+ * actually submitted, letting a participant see exactly where their own
+ * submission sits among its kata + category. */
 export function groupArenaByKata(entries: ArenaEntry[]): Array<[string, ArenaEntry[]]> {
   const groups = new Map<string, ArenaEntry[]>();
   for (const e of entries) {
     const base = e.categoryName ? kataBaseOf(e.categoryName) : "Uncategorised";
     if (!groups.has(base)) groups.set(base, []);
     groups.get(base)!.push(e);
+  }
+  for (const list of groups.values()) {
+    list.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   }
   return [...groups.entries()];
 }
