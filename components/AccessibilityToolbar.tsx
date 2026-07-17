@@ -369,7 +369,7 @@ export default function AccessibilityToolbar() {
   const current = LANGUAGES.find((l) => l.code === selectedLang) ?? LANGUAGES[0];
 
   return (
-    <div className="fixed top-56 right-4 z-[60] flex flex-col items-end gap-2 sm:top-20 print:hidden">
+    <div className="fixed top-56 right-4 z-[60] flex flex-col items-end gap-2 sm:top-36 print:hidden">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -399,13 +399,20 @@ export default function AccessibilityToolbar() {
             onPointerDown={handleDragStart}
             title="Drag to move"
             aria-label="Drag to move this panel"
-            className="mb-2 flex cursor-move justify-center rounded-md py-1 pr-6 hover:bg-neutral-50"
+            className="mb-2 flex cursor-move flex-col items-center justify-center gap-1 rounded-md py-1 pr-6 hover:bg-neutral-50"
           >
             <span className="h-1 w-10 rounded-full bg-neutral-300" />
+            <span className="text-center text-[10px] leading-tight text-neutral-400">
+              Move me around the page by clicking this bottom line
+            </span>
           </div>
 
           <div className="mb-4 pr-6">
             <p className="mb-2 text-xs font-bold uppercase tracking-wide text-neutral-500">Read Aloud</p>
+            <p className="mb-1.5 text-[11px] text-neutral-400">
+              Select some text on the page first, then press play to read it aloud — otherwise the
+              play button will read the whole page.
+            </p>
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -439,9 +446,6 @@ export default function AccessibilityToolbar() {
               />
               <span className="w-9 shrink-0 text-right text-xs text-neutral-500">{rate.toFixed(1)}x</span>
             </div>
-            <p className="mt-1.5 text-[11px] text-neutral-400">
-              Select some text on the page first to read just that part — otherwise the whole page is read.
-            </p>
 
             <div className="mt-2.5">
               <label htmlFor="a11y-voice-select" className="mb-1 block text-[11px] font-semibold text-neutral-500">
