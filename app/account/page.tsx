@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { signOut } from "@/app/actions/auth";
 import { claimAndStartRecording } from "@/app/actions/account";
 import { schemaReady } from "@/lib/data";
@@ -158,7 +159,31 @@ export default async function AccountPage({
     .select("*")
     .eq("user_id", user.id)
     .maybeSingle();
-  const profile = profileData as ProfileRow | null;
+  let profile = profileData as ProfileRow | null;
+
+  if (!profile) {
+    // The profiles row is normally created instantly by the handle_new_user()
+    // trigger at signup. If it's ever missing here — an RLS mismatch, or a
+    // row removed outside the app — self-heal with an admin-client lookup
+    // (bypasses RLS) and, failing that, a bare fallback row, instead of
+    // leaving the account stuck on "Setting up your account" forever.
+    const admin = createAdminClient();
+    const { data: existing } = await admin.from("profiles").select("*").eq("user_id", user.id).maybeSingle();
+    if (existing) {
+      profile = existing as ProfileRow;
+    } else {
+      const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
+      const metaRole = typeof meta.role === "string" ? meta.role : "";
+      const allowedRoles = ["participant", "school", "sensei", "referee", "audience", "staff", "organizer", "admin"];
+      const role = allowedRoles.includes(metaRole) ? metaRole : "participant";
+      const { data: created } = await admin
+        .from("profiles")
+        .insert({ user_id: user.id, email: user.email ?? null, role, approved: false })
+        .select("*")
+        .maybeSingle();
+      profile = (created as ProfileRow | null) ?? null;
+    }
+  }
 
   const SignOutButton = (
     <div>
@@ -179,7 +204,11 @@ export default async function AccountPage({
         <SiteHeader />
         <main className="mx-auto max-w-2xl px-4 py-10">
           <h1 className="text-2xl font-bold">My Account</h1>
-          <p className="mt-2 text-sm text-neutral-500">Setting up your account… please refresh in a moment.</p>
+          <p className="mt-2 text-sm text-neutral-500">
+            We couldn&apos;t set up your account automatically. Please sign out and sign in again —
+            if this keeps happening, contact the organiser with the email you signed up with. This
+            is not related to any competition deadline; it does not affect your own recording.
+          </p>
           <div className="mt-4">{SignOutButton}</div>
         </main>
         <SiteFooter />
