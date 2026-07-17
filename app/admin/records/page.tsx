@@ -12,7 +12,7 @@ import { AdminShell, adminBtnSecondary } from "@/components/admin";
 import { EmptyState, SetupNotice, formatDate, formatUSD } from "@/components/ui";
 import ParticipantRecordsTable, { type ParticipantRecordRow } from "@/components/ParticipantRecordsTable";
 import FilterableTable from "@/components/FilterableTable";
-import { markAttemptPurchasePaid, markBulkUploadPaymentPaid } from "@/app/actions/admin";
+import { markAttemptPurchasePaid, markBulkUploadPaymentPaid, markSubscriptionRenewalFulfilled } from "@/app/actions/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -92,6 +92,23 @@ export default async function AdminParticipantRecords() {
       : { data: [] };
   const nameByUserId = new Map(
     (purchaseProfiles ?? []).map((p) => [p.user_id as string, (p.full_name as string) || (p.email as string) || p.user_id as string]),
+  );
+
+  const { data: renewals } = await supabase
+    .from("subscription_renewals")
+    .select("id, user_id, status, created_at, paid_at")
+    .order("created_at", { ascending: false });
+  const renewalList = renewals ?? [];
+  const renewalUserIds = [...new Set(renewalList.map((r) => r.user_id as string))];
+  const { data: renewalProfiles } =
+    renewalUserIds.length > 0
+      ? await supabase.from("profiles").select("user_id, full_name, email, role").in("user_id", renewalUserIds)
+      : { data: [] };
+  const renewalProfileByUserId = new Map(
+    (renewalProfiles ?? []).map((p) => [
+      p.user_id as string,
+      { name: (p.full_name as string) || (p.email as string) || (p.user_id as string), role: p.role as string },
+    ]),
   );
 
   const { data: bulkPayments } = await supabase
@@ -294,6 +311,50 @@ export default async function AdminParticipantRecords() {
         ) : (
           <ParticipantRecordsTable rows={participantRows} isAdmin={isAdmin} />
         )}
+      </Section>
+
+      <Section id="subscription-renewals" title="New Subscription Requests">
+        {renewalList.length === 0 ? (
+          <EmptyState>No renewal requests yet.</EmptyState>
+        ) : (
+          <div className="space-y-2">
+            {renewalList.map((r) => {
+              const info = renewalProfileByUserId.get(r.user_id as string);
+              return (
+                <div
+                  key={r.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-neutral-200 p-3 text-sm"
+                >
+                  <div>
+                    <p className="font-semibold text-neutral-900">
+                      {info?.name ?? "—"}
+                      <span className="font-normal text-neutral-400"> · {info?.role ?? "—"}</span>
+                    </p>
+                    <p className="text-xs text-neutral-400">
+                      Requested {formatDate((r.created_at as string).slice(0, 10))}
+                      {r.paid_at ? ` · Fulfilled ${formatDate((r.paid_at as string).slice(0, 10))}` : ""}
+                    </p>
+                  </div>
+                  {r.status === "pending" ? (
+                    <form action={markSubscriptionRenewalFulfilled}>
+                      <input type="hidden" name="id" value={r.id} />
+                      <button type="submit" className={adminBtnSecondary}>Mark fulfilled</button>
+                    </form>
+                  ) : (
+                    <span className="rounded-full border border-green-300 bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-800">
+                      Fulfilled
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+        <p className="mt-2 text-xs text-neutral-400">
+          Fulfil a request by setting the sign-in limit, competition tier, and/or valid date range
+          on that person&apos;s own Sign-in Control box (Schools/Senseis/Referees/Audience/Support
+          admin pages), then mark it fulfilled here.
+        </p>
       </Section>
 
       <Section id="attempt-purchases" title="Extra Attempt Purchases (USD 10 for 3 more)">

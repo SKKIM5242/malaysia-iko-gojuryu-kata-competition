@@ -12,6 +12,7 @@ export interface Competition {
   status: CompetitionStatus;
   description: string | null;
   judges_required: number;
+  max_participants: number | null;
   created_at: string;
 }
 

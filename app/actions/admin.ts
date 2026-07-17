@@ -2058,3 +2058,22 @@ export async function updateSignInControl(formData: FormData) {
   });
   backTo(returnTo, { ok: "Sign-in control updated." });
 }
+
+/** Marks a "New Subscription" request as fulfilled — the actual renewal
+ * (limit/tier/date range) is set via updateSignInControl on that person's
+ * own admin page; this just clears the request from the pending list. */
+export async function markSubscriptionRenewalFulfilled(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const returnTo = "/admin/records";
+  const { supabase, actorId } = await getActor();
+  const { error } = await supabase
+    .from("subscription_renewals")
+    .update({ status: "paid", paid_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) backTo(returnTo, { error: "Could not update the request — please try again." });
+  await writeAudit(supabase, {
+    table_name: "subscription_renewals", record_id: id, action: "subscription_renewal_fulfilled",
+    actor_id: actorId,
+  });
+  backTo(returnTo, { ok: "Marked as fulfilled." });
+}

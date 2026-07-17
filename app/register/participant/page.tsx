@@ -130,14 +130,32 @@ export default async function RegisterPage({
     ? await Promise.all([getCategories(competition.id), getSchools(), getSenseis()])
     : [[], [], []];
 
+  const supabase = await createClient();
   const categoryTaken: Record<string, number> = {};
   if (categories.length > 0) {
-    const supabase = await createClient();
     const { data: counts } = await supabase.rpc("category_paid_counts", {
       p_category_ids: categories.map((c) => c.id),
     });
     for (const row of (counts as Array<{ category_id: string; cnt: number }>) ?? []) {
       categoryTaken[row.category_id] = row.cnt;
+    }
+  }
+
+  // Once this tier's overall capacity is used up, point participants at
+  // the next tier up (by fee) instead of a dead end.
+  let nextTier: (typeof openCompetitions)[number] | null = null;
+  if (competition?.max_participants != null) {
+    const { count } = await supabase
+      .from("registrations")
+      .select("id", { count: "exact", head: true })
+      .eq("competition_id", competition.id)
+      .eq("payment_status", "paid");
+    if ((count ?? 0) >= competition.max_participants) {
+      const sorted = [...openCompetitions].sort(
+        (a, b) => Number(a.registration_fee_usd ?? 0) - Number(b.registration_fee_usd ?? 0),
+      );
+      const idx = sorted.findIndex((c) => c.id === competition.id);
+      nextTier = idx >= 0 ? (sorted[idx + 1] ?? null) : null;
     }
   }
 
@@ -155,6 +173,19 @@ export default async function RegisterPage({
           <Link href="/register/participant" className="mt-1 inline-block text-xs text-red-700 underline underline-offset-2">
             ← Choose a different tier
           </Link>
+        )}
+
+        {nextTier && (
+          <div className="mt-4 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <strong>{competition!.name}&apos;s slots are all taken up.</strong> Please proceed to
+            register for {nextTier.name} (Fee {formatUSD(nextTier.registration_fee_usd)}) instead.
+            <Link
+              href={`/register/participant?competition=${nextTier.id}`}
+              className="ml-2 font-semibold underline underline-offset-2"
+            >
+              Register for {nextTier.name} →
+            </Link>
+          </div>
         )}
 
         <div className="mt-8">
