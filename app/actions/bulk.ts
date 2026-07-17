@@ -57,6 +57,114 @@ const ROW_REQUIRED: Array<[keyof BulkRow, string]> = [
   ["bank_account_name", "bank account holder"],
 ];
 
+export interface BulkPaymentState {
+  done: boolean;
+  error?: string;
+  status?: "pending" | "paid";
+  paymentId?: string;
+  amountUsd?: number;
+  remainingParticipants?: number;
+}
+
+/** Looks up whether this sensei already has enough paid bulk-upload balance
+ * for the requested headcount; if not, returns (or creates) a pending
+ * request. The sensei pays the organiser manually — bank transfer, same
+ * as every other payment in this app — and the organiser confirms it via
+ * markBulkUploadPaymentPaid in app/actions/admin.ts. */
+export async function requestOrCheckBulkUploadPayment(
+  _prev: BulkPaymentState,
+  formData: FormData,
+): Promise<BulkPaymentState> {
+  const competitionId = String(formData.get("competition_id") ?? "");
+  const schoolId = String(formData.get("school_id") ?? "");
+  const senseiId = String(formData.get("sensei_id") ?? "");
+  const participantCount = Number(formData.get("participant_count") ?? 0);
+  if (!competitionId || !schoolId || !senseiId) {
+    return { done: false, error: "Select the school / dojo and sensei / coach first." };
+  }
+  if (!Number.isInteger(participantCount) || participantCount < 1) {
+    return { done: false, error: "Enter how many participants you're registering (at least 1)." };
+  }
+
+  const supabase = await createClient();
+
+  const { data: existingPaid } = await supabase
+    .from("bulk_upload_payments")
+    .select("id, participant_count")
+    .eq("competition_id", competitionId)
+    .eq("school_id", schoolId)
+    .eq("sensei_id", senseiId)
+    .eq("status", "paid")
+    .gte("participant_count", participantCount)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (existingPaid) {
+    return {
+      done: true, status: "paid", paymentId: existingPaid.id,
+      remainingParticipants: existingPaid.participant_count,
+    };
+  }
+
+  // Don't spam a duplicate pending request for the same headcount.
+  const { data: existingPending } = await supabase
+    .from("bulk_upload_payments")
+    .select("id, amount_usd")
+    .eq("competition_id", competitionId)
+    .eq("school_id", schoolId)
+    .eq("sensei_id", senseiId)
+    .eq("participant_count", participantCount)
+    .eq("status", "pending")
+    .maybeSingle();
+  if (existingPending) {
+    return { done: true, status: "pending", paymentId: existingPending.id, amountUsd: Number(existingPending.amount_usd) };
+  }
+
+  const { data: competition } = await supabase
+    .from("competitions")
+    .select("registration_fee_usd")
+    .eq("id", competitionId)
+    .maybeSingle();
+  if (!competition) return { done: false, error: "Competition not found." };
+  const amountUsd = participantCount * Number(competition.registration_fee_usd ?? 0);
+
+  const { data: created, error } = await supabase
+    .from("bulk_upload_payments")
+    .insert({
+      competition_id: competitionId, school_id: schoolId, sensei_id: senseiId,
+      participant_count: participantCount, amount_usd: amountUsd,
+    })
+    .select("id")
+    .single();
+  if (error) return { done: false, error: "Could not create the payment request. Please try again." };
+  return { done: true, status: "pending", paymentId: created!.id, amountUsd };
+}
+
+/** Sends the sensei one summary email with every participant's Reference
+ * ID after a successful paid batch — each participant also gets their own
+ * confirmation separately, same as single registration. */
+async function sendSenseiSummaryEmail(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  senseiId: string,
+  competitionName: string,
+  entries: Array<{ name: string; referenceId: string }>,
+) {
+  if (entries.length === 0) return;
+  const { data: sensei } = await supabase.from("senseis").select("name, email").eq("id", senseiId).maybeSingle();
+  if (!sensei?.email) return;
+  await sendConfirmationEmail({
+    toEmail: sensei.email,
+    recipientName: sensei.name ?? "Sensei",
+    subject: `Bulk registration confirmed — ${entries.length} participants — ${competitionName}`,
+    bodyLines: [
+      `Your paid bulk registration for ${competitionName} is complete. Each participant's Reference ID:`,
+      ...entries.map((e) => `${e.name}: ${e.referenceId}`),
+      "",
+      "Please share each participant's Reference ID with them — they'll need it (with their IC/passport) to sign in and record their kata.",
+    ],
+  });
+}
+
 export async function bulkRegister(_prev: BulkState, formData: FormData): Promise<BulkState> {
   const competitionId = String(formData.get("competition_id") ?? "");
   const schoolId = String(formData.get("school_id") ?? "");
@@ -90,6 +198,26 @@ export async function bulkRegister(_prev: BulkState, formData: FormData): Promis
     new Date(competition.registration_deadline + "T23:59:59") < new Date()
   ) {
     return { done: false, error: "The registration deadline has passed." };
+  }
+
+  // Never trust a client-supplied payment id — look up (and later consume)
+  // a matching paid, sufficient-balance payment server-side.
+  const { data: payment } = await supabase
+    .from("bulk_upload_payments")
+    .select("id, participant_count")
+    .eq("competition_id", competitionId)
+    .eq("school_id", schoolId)
+    .eq("sensei_id", senseiId)
+    .eq("status", "paid")
+    .gte("participant_count", rows.length)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (!payment) {
+    return {
+      done: false,
+      error: "Pay for this batch first — request and pay for your bulk registration above, then come back here.",
+    };
   }
 
   const { data: catRows } = await supabase
@@ -195,7 +323,10 @@ export async function bulkRegister(_prev: BulkState, formData: FormData): Promis
       participant_id: participantId,
       category_id: resolved.category.id,
       division: row.gender.toLowerCase() === "female" ? "Female" : "Male",
-      payment_status: "pending",
+      // Already paid upfront via the bulk-upload payment gate — unlike
+      // single registration, there's no separate per-participant payment
+      // step for the organiser to confirm later.
+      payment_status: "paid",
     });
     if (rErr) {
       await supabase.from("participants").delete().eq("id", participantId);
@@ -219,13 +350,20 @@ export async function bulkRegister(_prev: BulkState, formData: FormData): Promis
         telegramCategory: "participant",
         bodyLines: [
           `This confirms your registration for ${competition.name} (${row.kata_base}), submitted via bulk registration.`,
-          "Payment status: pending — the organiser confirms each participant once the fee is received.",
+          "Your registration fee has already been paid by your school/sensei — no further payment is needed from you.",
         ],
       }),
     );
   }
 
   await Promise.allSettled(emailJobs.map((job) => job()));
+  await supabase.rpc("consume_bulk_upload_payment", { p_id: payment.id, p_rows_uploaded: results.filter((r) => r.ok).length });
+  await sendSenseiSummaryEmail(
+    supabase,
+    senseiId,
+    competition.name,
+    results.filter((r): r is BulkRowResult & { referenceId: string } => r.ok && !!r.referenceId).map((r) => ({ name: r.name, referenceId: r.referenceId })),
+  );
 
   return { done: true, results };
 }
@@ -302,6 +440,26 @@ export async function bulkRegisterCsv(_prev: CsvBulkState, formData: FormData): 
     new Date(competition.registration_deadline + "T23:59:59") < new Date()
   ) {
     return { done: false, error: "The registration deadline has passed." };
+  }
+
+  // Never trust a client-supplied payment id — look up (and later consume)
+  // a matching paid, sufficient-balance payment server-side.
+  const { data: payment } = await supabase
+    .from("bulk_upload_payments")
+    .select("id, participant_count")
+    .eq("competition_id", competitionId)
+    .eq("school_id", schoolId)
+    .eq("sensei_id", senseiId)
+    .eq("status", "paid")
+    .gte("participant_count", dataRows.length)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (!payment) {
+    return {
+      done: false,
+      error: "Pay for this batch first — request and pay for your bulk registration above, then come back here.",
+    };
   }
 
   const { data: catRows } = await supabase
@@ -434,6 +592,7 @@ export async function bulkRegisterCsv(_prev: CsvBulkState, formData: FormData): 
 
   // Chunked batch inserts
   let registered = 0;
+  const senseiSummaryEntries: Array<{ name: string; referenceId: string }> = [];
   for (let i = 0; i < toInsert.length; i += CHUNK) {
     const chunk = toInsert.slice(i, i + CHUNK);
     const withIds = chunk.map((v) => ({
@@ -479,7 +638,8 @@ export async function bulkRegisterCsv(_prev: CsvBulkState, formData: FormData): 
         participant_id: v.participantId,
         category_id: v.categoryId,
         division: v.gender === "female" ? "Female" : "Male",
-        payment_status: "pending",
+        // Already paid upfront via the bulk-upload payment gate.
+        payment_status: "paid",
       })),
     );
     if (rErr) {
@@ -499,11 +659,14 @@ export async function bulkRegisterCsv(_prev: CsvBulkState, formData: FormData): 
           telegramCategory: "participant",
           bodyLines: [
             `This confirms your registration for ${competition.name} (${v.kataBase}), submitted via CSV bulk upload.`,
-            "Payment status: pending — the organiser confirms each participant once the fee is received.",
+            "Your registration fee has already been paid by your school/sensei — no further payment is needed from you.",
           ],
         }),
       ),
     );
+    for (const v of withIds) {
+      senseiSummaryEntries.push({ name: v.full_name, referenceId: v.registrationId.slice(0, 8).toUpperCase() });
+    }
   }
 
   await writeAudit(supabase, {
@@ -512,6 +675,8 @@ export async function bulkRegisterCsv(_prev: CsvBulkState, formData: FormData): 
     action: "bulk_csv_registration",
     new_value: { rows: dataRows.length, registered, failed: failures.length, sensei_id: senseiId },
   });
+  await supabase.rpc("consume_bulk_upload_payment", { p_id: payment.id, p_rows_uploaded: registered });
+  await sendSenseiSummaryEmail(supabase, senseiId, competition.name, senseiSummaryEntries);
 
   failures.sort((a, b) => a.row - b.row);
   return {

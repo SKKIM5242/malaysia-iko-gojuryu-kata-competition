@@ -11,6 +11,7 @@ import {
 import { EmptyState, SetupNotice, SiteFooter, SiteHeader, formatDate, formatUSD } from "@/components/ui";
 import BulkRegisterForm from "@/components/BulkRegisterForm";
 import CsvBulkForm from "@/components/CsvBulkForm";
+import BulkUploadGate from "@/components/BulkUploadGate";
 import { kataBases } from "@/lib/division";
 
 export const dynamic = "force-dynamic";
@@ -99,8 +100,22 @@ export default async function BulkRegisterPage({
             <EmptyState>Registration is closed for this competition.</EmptyState>
           ) : (
             <>
+              <div className="mb-6 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+                Only an already-registered <strong>School / Dojo</strong> and <strong>Sensei / Coach</strong>{" "}
+                may bulk-upload participants — if either isn&apos;t registered yet, do that first via{" "}
+                <a href="/register/school" className="underline">Register School / Dojo</a> and{" "}
+                <a href="/register/sensei" className="underline">Register Sensei / Coach</a>.
+              </div>
+
+              <BulkUploadGate
+                competitionId={competition.id}
+                registrationFeeUsd={competition.registration_fee_usd}
+                schools={schools}
+                senseis={senseis}
+              />
+
               <section className="mb-10 rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
-                <h2 className="text-lg font-bold">Option A — Excel / CSV upload (up to 10,000 pax)</h2>
+                <h2 className="text-lg font-bold">Step 2, Option A — Excel / CSV upload (up to 10,000 pax)</h2>
                 <p className="mt-1 text-sm text-neutral-600">
                   1. <a href="/bulk-registration-template.csv" download className="font-semibold text-red-700 underline underline-offset-2">
                     Download the CSV template
@@ -115,7 +130,7 @@ export default async function BulkRegisterPage({
               </section>
 
               <section>
-                <h2 className="text-lg font-bold">Option B — fill the table on screen</h2>
+                <h2 className="text-lg font-bold">Step 2, Option B — fill the table on screen</h2>
                 <div className="mt-2 mb-4 rounded-md border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
                   Fill one row per participant — like a spreadsheet. Your{" "}
                   <a href="/register/school" className="font-semibold underline underline-offset-2">School / Dojo</a>{" "}

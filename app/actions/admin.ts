@@ -11,6 +11,7 @@ import { notifyRefereeAssignment, sendConfirmationEmail, notifyAnnouncementPubli
 import type { PaymentStatus } from "@/lib/types";
 import { parseCsvWithHeader, type CsvUploadResult } from "@/lib/csv-bulk";
 import { accessMatrixToMarkdown } from "@/lib/access-matrix";
+import { formatUSD } from "@/components/ui";
 
 /**
  * Admin server actions. Sprint 3 runs these under the v1 open RLS policies;
@@ -1970,4 +1971,50 @@ export async function markAttemptPurchasePaid(formData: FormData) {
     });
   }
   backTo(returnTo, { ok: "Purchase confirmed — 3 attempts added." });
+}
+
+// ── Bulk-upload payment gate (Sensei pays before uploading participants) ────
+
+/** Confirms a sensei's upfront bulk-registration payment — unlocks their
+ * next CSV/table upload for up to the paid headcount (see
+ * consume_bulk_upload_payment, called from app/actions/bulk.ts once the
+ * upload actually succeeds). */
+export async function markBulkUploadPaymentPaid(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const returnTo = "/admin/records";
+  const { supabase, actorId } = await getActor();
+  const { data: payment } = await supabase
+    .from("bulk_upload_payments")
+    .select("id, sensei_id, participant_count, amount_usd, status")
+    .eq("id", id)
+    .maybeSingle();
+  if (!payment || payment.status !== "pending") {
+    backTo(returnTo, { error: "That request is no longer pending." });
+  }
+  const { error } = await supabase
+    .from("bulk_upload_payments")
+    .update({ status: "paid", paid_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) backTo(returnTo, { error: "Could not confirm the payment — please try again." });
+  await writeAudit(supabase, {
+    table_name: "bulk_upload_payments", record_id: id, action: "bulk_upload_payment_confirmed",
+    new_value: { sensei_id: payment!.sensei_id, participant_count: payment!.participant_count }, actor_id: actorId,
+  });
+  const { data: sensei } = await supabase
+    .from("senseis")
+    .select("name, email")
+    .eq("id", payment!.sensei_id)
+    .maybeSingle();
+  if (sensei?.email) {
+    await sendConfirmationEmail({
+      toEmail: sensei.email,
+      recipientName: sensei.name ?? "Sensei",
+      subject: "Your bulk registration payment is confirmed — you can upload now",
+      bodyLines: [
+        `Your payment of ${formatUSD(Number(payment!.amount_usd))} for ${payment!.participant_count} participants is confirmed.`,
+        "Go back to the Bulk registration page and upload your CSV or table using the same School and Sensei — no further payment needed for these participants.",
+      ],
+    });
+  }
+  backTo(returnTo, { ok: "Payment confirmed — sensei can now upload." });
 }

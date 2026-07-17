@@ -9,10 +9,10 @@ import {
   getStaffAccountRecords,
 } from "@/lib/admin-data";
 import { AdminShell, adminBtnSecondary } from "@/components/admin";
-import { EmptyState, SetupNotice, formatDate } from "@/components/ui";
+import { EmptyState, SetupNotice, formatDate, formatUSD } from "@/components/ui";
 import ParticipantRecordsTable, { type ParticipantRecordRow } from "@/components/ParticipantRecordsTable";
 import FilterableTable from "@/components/FilterableTable";
-import { markAttemptPurchasePaid } from "@/app/actions/admin";
+import { markAttemptPurchasePaid, markBulkUploadPaymentPaid } from "@/app/actions/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -93,6 +93,24 @@ export default async function AdminParticipantRecords() {
   const nameByUserId = new Map(
     (purchaseProfiles ?? []).map((p) => [p.user_id as string, (p.full_name as string) || (p.email as string) || p.user_id as string]),
   );
+
+  const { data: bulkPayments } = await supabase
+    .from("bulk_upload_payments")
+    .select("id, sensei_id, school_id, participant_count, amount_usd, status, created_at, paid_at")
+    .order("created_at", { ascending: false });
+  const bulkPaymentList = bulkPayments ?? [];
+  const bulkSenseiIds = [...new Set(bulkPaymentList.map((p) => p.sensei_id as string))];
+  const bulkSchoolIds = [...new Set(bulkPaymentList.map((p) => p.school_id as string))];
+  const [{ data: bulkSenseis }, { data: bulkSchools }] = await Promise.all([
+    bulkSenseiIds.length > 0
+      ? supabase.from("senseis").select("id, name").in("id", bulkSenseiIds)
+      : Promise.resolve({ data: [] }),
+    bulkSchoolIds.length > 0
+      ? supabase.from("schools").select("id, name").in("id", bulkSchoolIds)
+      : Promise.resolve({ data: [] }),
+  ]);
+  const senseiNameById = new Map((bulkSenseis ?? []).map((s) => [s.id as string, s.name as string]));
+  const schoolNameById = new Map((bulkSchools ?? []).map((s) => [s.id as string, s.name as string]));
 
   const participantRows: ParticipantRecordRow[] = participantRecords.map((r) => ({
     registrationId: r.registrationId,
@@ -304,6 +322,50 @@ export default async function AdminParticipantRecords() {
                     <input type="hidden" name="id" value={p.id} />
                     <button type="submit" className={adminBtnSecondary}>Confirm payment received</button>
                   </form>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </Section>
+
+      <Section id="bulk-upload-payments" title="Bulk Upload Payments (Sensei pays before uploading)">
+        {bulkPaymentList.length === 0 ? (
+          <EmptyState>No bulk upload payment requests yet.</EmptyState>
+        ) : (
+          <div className="space-y-2">
+            {bulkPaymentList.map((p) => (
+              <div
+                key={p.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-neutral-200 p-3 text-sm"
+              >
+                <div>
+                  <p className="font-semibold text-neutral-900">
+                    {senseiNameById.get(p.sensei_id as string) ?? "—"}
+                    <span className="font-normal text-neutral-400"> · {schoolNameById.get(p.school_id as string) ?? "—"}</span>
+                  </p>
+                  <p className="text-xs text-neutral-400">
+                    {p.status === "pending" ? "Requested for" : "Remaining balance:"} {p.participant_count}{" "}
+                    participant{p.participant_count === 1 ? "" : "s"} · {formatUSD(Number(p.amount_usd))} ·{" "}
+                    Requested {formatDate((p.created_at as string).slice(0, 10))}
+                    {p.paid_at ? ` · Confirmed ${formatDate((p.paid_at as string).slice(0, 10))}` : ""}
+                  </p>
+                </div>
+                {p.status === "pending" ? (
+                  <form action={markBulkUploadPaymentPaid}>
+                    <input type="hidden" name="id" value={p.id} />
+                    <button type="submit" className={adminBtnSecondary}>Confirm payment received</button>
+                  </form>
+                ) : (
+                  <span
+                    className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${
+                      p.status === "consumed"
+                        ? "border-neutral-300 bg-neutral-50 text-neutral-600"
+                        : "border-green-300 bg-green-50 text-green-800"
+                    }`}
+                  >
+                    {p.status === "consumed" ? "Fully used" : "Paid — ready to upload"}
+                  </span>
                 )}
               </div>
             ))}
