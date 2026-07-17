@@ -68,14 +68,14 @@ export default async function RegisterPage({
                   <div>
                     <p className="font-bold text-neutral-900">{c.name}</p>
                     <p className="text-sm text-neutral-500">
-                      {formatUSD(c.registration_fee_usd)} · deadline {formatDate(c.registration_deadline)}
+                      {formatUSD(c.registration_fee_usd)} per event · deadline {formatDate(c.registration_deadline)}
                     </p>
                   </div>
                   <Link
                     href={`/register/participant?competition=${c.id}`}
                     className="shrink-0 rounded-md bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-600"
                   >
-                    Register — {formatUSD(c.registration_fee_usd)}
+                    Register — {formatUSD(c.registration_fee_usd)} per event
                   </Link>
                 </div>
                 {(categoriesByTier.get(c.id) ?? []).length > 0 && (
@@ -166,7 +166,7 @@ export default async function RegisterPage({
         <h1 className="text-2xl font-bold tracking-tight">Participant registration</h1>
         {competition && (
           <p className="mt-1 text-sm text-neutral-500">
-            {competition.name} · {formatDate(competition.event_date)} · Fee {formatUSD(competition.registration_fee_usd)}
+            {competition.name} · {formatDate(competition.event_date)} · Fee {formatUSD(competition.registration_fee_usd)} per event
           </p>
         )}
         {openCompetitions.length > 1 && (
@@ -178,7 +178,7 @@ export default async function RegisterPage({
         {nextTier && (
           <div className="mt-4 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             <strong>{competition!.name}&apos;s slots are all taken up.</strong> Please proceed to
-            register for {nextTier.name} (Fee {formatUSD(nextTier.registration_fee_usd)}) instead.
+            register for {nextTier.name} (Fee {formatUSD(nextTier.registration_fee_usd)} per event) instead.
             <Link
               href={`/register/participant?competition=${nextTier.id}`}
               className="ml-2 font-semibold underline underline-offset-2"
@@ -213,7 +213,10 @@ export default async function RegisterPage({
                   <a href="/register/bulk" className="font-semibold underline underline-offset-2">bulk registration table</a>{" "}
                   for multiple students. Because your School and Sensei each need their own
                   registration too, the minimum total cost for this tier — your fee plus your
-                  School's and Sensei's — is <strong>{formatUSD(Number(competition.registration_fee_usd ?? 0) * 3)}</strong>.
+                  School's and Sensei's — is{" "}
+                  <strong>{formatUSD(Number(competition.registration_fee_usd ?? 0) * 3)}</strong>.
+                  Maximum is <strong>{formatUSD(Number(competition.registration_fee_usd ?? 0) * 5)}</strong>{" "}
+                  if you participate in 3 Kata events.
                 </p>
                 <p>
                   <strong>Once payment is made, no refund will be given</strong> if a participant does
@@ -237,18 +240,20 @@ export default async function RegisterPage({
               <div className="mb-6 rounded-md border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
                 {paymentsEnabled() && Number(competition.registration_fee_usd ?? 0) > 0 ? (
                   <>
-                    Fields marked * are required. After filling the form you will be taken to a
-                    secure payment page for the fee of{" "}
-                    <strong>{formatUSD(competition.registration_fee_usd)}</strong> — your registration
+                    Fields marked * are required. The fee is{" "}
+                    <strong>{formatUSD(competition.registration_fee_usd)} per kata event</strong> —
+                    choose up to 3 events below and the payment button updates to the total. After
+                    filling the form you will be taken to a secure payment page; your registration
                     is confirmed automatically once payment succeeds. Deadline:{" "}
                     <strong>{formatDate(competition.registration_deadline)}</strong>.
                   </>
                 ) : (
                   <>
-                    Fields marked * are required. After submitting you will receive a reference ID —
-                    transfer the fee of <strong>{formatUSD(competition.registration_fee_usd)}</strong> and send
-                    your receipt to the organiser to confirm your slot. Deadline:{" "}
-                    <strong>{formatDate(competition.registration_deadline)}</strong>.
+                    Fields marked * are required. The fee is{" "}
+                    <strong>{formatUSD(competition.registration_fee_usd)} per kata event</strong> —
+                    choose up to 3 events below. After submitting you will receive a reference ID per
+                    event — transfer the total fee and send your receipt to the organiser to confirm
+                    your slot. Deadline: <strong>{formatDate(competition.registration_deadline)}</strong>.
                   </>
                 )}
               </div>

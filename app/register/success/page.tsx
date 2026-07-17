@@ -28,10 +28,13 @@ export default async function RegisterSuccessPage({
             <p className="text-3xl">✅</p>
             <h1 className="mt-2 text-xl font-bold text-green-900">Payment successful — registration confirmed!</h1>
             <p className="mt-2 text-green-800">
-              Your registration reference ID is{" "}
-              <span className="rounded bg-white px-2 py-0.5 font-mono font-bold tracking-wider">
-                {result.referenceId}
-              </span>
+              Your registration reference ID{result.referenceIds.length > 1 ? "s are" : " is"}{" "}
+              {result.referenceIds.map((id, i) => (
+                <span key={id}>
+                  {i > 0 && ", "}
+                  <span className="rounded bg-white px-2 py-0.5 font-mono font-bold tracking-wider">{id}</span>
+                </span>
+              ))}
             </p>
             <p className="mx-auto mt-3 max-w-md text-sm text-green-800">
               Your payment has been received and your slot is confirmed. Your name now appears on the{" "}
@@ -81,8 +84,9 @@ export default async function RegisterSuccessPage({
             </div>
 
             <p className="mx-auto mt-6 max-w-md text-xs text-green-700">
-              Keep your reference ID <strong>{result.referenceId}</strong> and the IC/passport you
-              registered with — you&apos;ll need both to link your account when you&apos;re ready to record.
+              Keep your reference ID{result.referenceIds.length > 1 ? "s" : ""}{" "}
+              <strong>{result.referenceIds.join(", ")}</strong> and the IC/passport you registered
+              with — you&apos;ll need both to link your account when you&apos;re ready to record.
             </p>
           </div>
         ) : result.status === "unpaid" ? (

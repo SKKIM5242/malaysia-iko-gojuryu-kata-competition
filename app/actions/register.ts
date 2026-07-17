@@ -11,7 +11,7 @@ import type { Category } from "@/lib/types";
 
 export interface RegisterState {
   ok: boolean;
-  referenceId?: string;
+  referenceIds?: string[];
   error?: string;
   fieldErrors?: Record<string, string>;
 }
@@ -80,67 +80,90 @@ export async function submitRegistration(
     return { ok: false, error: "The registration deadline has passed." };
   }
 
-  // Same kata twice? Not allowed. Already have 3 kata entries? Not allowed —
-  // a participant may compete in at most 3 kata events per competition.
-  const { data: alreadyHasKata } = await supabase.rpc("ic_has_kata", {
-    p_ic: values.ic_passport,
-    p_competition: values.competition_id,
-    p_kata_base: values.kata_base,
-  });
-  if (alreadyHasKata === true) {
+  // Up to 3 kata events may be submitted in one go — kata_base is required,
+  // _2/_3 are optional additions to the same registration. Each must be
+  // different, and a participant may compete in at most 3 kata events
+  // total per competition (counting any already registered separately).
+  const kataBase2 = String(formData.get("kata_base_2") ?? "").trim();
+  const kataBase3 = String(formData.get("kata_base_3") ?? "").trim();
+  const kataBases = [values.kata_base, kataBase2, kataBase3].filter(Boolean);
+  if (new Set(kataBases).size !== kataBases.length) {
     return {
       ok: false,
-      error: "You are already registered for this kata.",
-      fieldErrors: { kata_base: "Already registered for this kata" },
+      error: "Each kata event must be different — you can't register the same kata twice.",
+      fieldErrors: { kata_base: "Duplicate kata event" },
     };
   }
+
   const { data: kataCount } = await supabase.rpc("ic_registration_count", {
     p_ic: values.ic_passport,
     p_competition: values.competition_id,
   });
-  if (typeof kataCount === "number" && kataCount >= 3) {
-    return { ok: false, error: "Maximum Kata allow to compete is 3 only." };
+  if (typeof kataCount === "number" && kataCount + kataBases.length > 3) {
+    return {
+      ok: false,
+      error: `Maximum Kata allow to compete is 3 only — you already have ${kataCount} registered for this competition.`,
+    };
+  }
+  for (const kb of kataBases) {
+    const { data: alreadyHasKata } = await supabase.rpc("ic_has_kata", {
+      p_ic: values.ic_passport,
+      p_competition: values.competition_id,
+      p_kata_base: kb,
+    });
+    if (alreadyHasKata === true) {
+      return {
+        ok: false,
+        error: `You are already registered for ${kb}.`,
+        fieldErrors: { kata_base: "Already registered for this kata" },
+      };
+    }
   }
 
   // The registrant picks the kata; the belt (Color/Kyu vs Black Belt & Dan)
-  // and age sub-categories are resolved from their belt rank + date of birth.
+  // and age sub-categories are resolved from their belt rank + date of birth
+  // — the same rules for every event in this submission.
   const { data: catRows } = await supabase
     .from("categories")
     .select("*")
     .eq("competition_id", values.competition_id)
     .order("sort_order");
-  const resolved = resolveCategory(
-    (catRows as Category[]) ?? [],
-    values.kata_base,
-    values.date_of_birth,
-    values.belt_rank,
-    values.gender,
-    competition.event_date,
-  );
-  if (!resolved.category) {
-    return {
-      ok: false,
-      error: resolved.error ?? "No matching category for this kata / age / belt.",
-      fieldErrors: { kata_base: resolved.error ?? "No matching category" },
-    };
-  }
-  values.category_id = resolved.category.id;
-  values.division = values.gender.toLowerCase() === "female" ? "Female" : "Male";
+  const categories = (catRows as Category[]) ?? [];
 
-  // This exact sub-category (kata + belt + age) may have its own cap, tighter
-  // than the competition-wide one.
-  if (resolved.category.max_participants != null) {
-    const { data: categoryPaid } = await supabase.rpc("category_paid_count", {
-      p_category: resolved.category.id,
-    });
-    if (typeof categoryPaid === "number" && categoryPaid >= resolved.category.max_participants) {
+  const resolvedEvents: Array<{ kataBase: string; category: Category }> = [];
+  for (const kb of kataBases) {
+    const resolved = resolveCategory(
+      categories,
+      kb,
+      values.date_of_birth,
+      values.belt_rank,
+      values.gender,
+      competition.event_date,
+    );
+    if (!resolved.category) {
       return {
         ok: false,
-        error: "This sub-category is full. Please choose a different kata or check back later.",
-        fieldErrors: { kata_base: "Sub-category full" },
+        error: resolved.error ?? `No matching category for ${kb}.`,
+        fieldErrors: { kata_base: resolved.error ?? "No matching category" },
       };
     }
+    // This exact sub-category (kata + belt + age) may have its own cap,
+    // tighter than the competition-wide one.
+    if (resolved.category.max_participants != null) {
+      const { data: categoryPaid } = await supabase.rpc("category_paid_count", {
+        p_category: resolved.category.id,
+      });
+      if (typeof categoryPaid === "number" && categoryPaid >= resolved.category.max_participants) {
+        return {
+          ok: false,
+          error: `${kb}'s sub-category is full. Please choose a different kata or check back later.`,
+          fieldErrors: { kata_base: "Sub-category full" },
+        };
+      }
+    }
+    resolvedEvents.push({ kataBase: kb, category: resolved.category });
   }
+  values.division = values.gender.toLowerCase() === "female" ? "Female" : "Male";
 
   // Latest belt/rank certificate: required for single-participant
   // registration — uploaded to private storage before the registration is
@@ -180,10 +203,14 @@ export async function submitRegistration(
   // ── Pay-before-submit: when the gateway is configured and the competition
   // has a fee, no registration row is written yet. The validated payload is
   // parked as a draft and the visitor is sent to Stripe Checkout; the webhook
-  // or the success page finalises it as a paid registration.
-  const fee = Number(competition.registration_fee_usd ?? 0);
+  // or the success page finalises it as N paid registrations (one per event).
+  const feePerEvent = Number(competition.registration_fee_usd ?? 0);
+  const fee = feePerEvent * resolvedEvents.length;
   if (paymentsEnabled() && fee > 0) {
     const draftId = crypto.randomUUID();
+    values.events_json = JSON.stringify(
+      resolvedEvents.map((e) => ({ kata_base: e.kataBase, category_id: e.category.id })),
+    );
     const { error: dErr } = await supabase.from("registration_drafts").insert({
       id: draftId,
       payload: values,
@@ -204,13 +231,13 @@ export async function submitRegistration(
           {
             price_data: {
               currency: "usd",
-              unit_amount: Math.round(fee * 100),
+              unit_amount: Math.round(feePerEvent * 100),
               product_data: {
                 name: `Registration — ${competition.name}`,
-                description: `Participant: ${values.full_name}`,
+                description: `Participant: ${values.full_name} — ${resolvedEvents.map((e) => e.kataBase).join(", ")}`,
               },
             },
-            quantity: 1,
+            quantity: resolvedEvents.length,
           },
         ],
         metadata: { draft_id: draftId },
@@ -232,9 +259,11 @@ export async function submitRegistration(
 
   // ── Manual bank-transfer flow (gateway not configured or free entry) ──
   // Generate ids here — anonymous inserts can't SELECT their own rows back
-  // under the locked-down RLS, so INSERT ... RETURNING would fail.
+  // under the locked-down RLS, so INSERT ... RETURNING would fail. One
+  // participant + one bank-details row covers every event; each event
+  // still gets its own registration row (one kata per registration, as
+  // before), so it can be individually judged and scored.
   const participantId = crypto.randomUUID();
-  const registrationId = crypto.randomUUID();
 
   const { error: pErr } = await supabase.from("participants").insert({
     id: participantId,
@@ -248,6 +277,7 @@ export async function submitRegistration(
     home_address: values.home_address,
     home_country: values.home_country,
     city_town: values.city_town,
+    postcode: values.postcode,
     certificate_path: values.certificate_path || null,
     rank_confirmation: values.rank_confirmation,
     school_id: values.school_id,
@@ -268,45 +298,51 @@ export async function submitRegistration(
     return { ok: false, error: "Could not save bank details. Please try again." };
   }
 
-  const { error: rErr } = await supabase.from("registrations").insert({
-    id: registrationId,
-    competition_id: values.competition_id,
-    participant_id: participantId,
-    category_id: values.category_id,
-    division: values.division,
-    payment_status: "pending",
-    payment_reference: values.payment_reference || null,
-  });
-  if (rErr) {
-    // roll back the orphan participant so a retry doesn't trip the duplicate check
-    await supabase.from("participants").delete().eq("id", participantId);
-    return { ok: false, error: "Could not save registration. Please try again." };
+  const referenceIds: string[] = [];
+  for (const ev of resolvedEvents) {
+    const registrationId = crypto.randomUUID();
+    const { error: rErr } = await supabase.from("registrations").insert({
+      id: registrationId,
+      competition_id: values.competition_id,
+      participant_id: participantId,
+      category_id: ev.category.id,
+      division: values.division,
+      payment_status: "pending",
+      payment_reference: values.payment_reference || null,
+    });
+    if (rErr) {
+      // roll back the orphan participant (and any registrations already
+      // created this loop) so a retry doesn't trip the duplicate check
+      await supabase.from("registrations").delete().eq("participant_id", participantId);
+      await supabase.from("participants").delete().eq("id", participantId);
+      return { ok: false, error: "Could not save registration. Please try again." };
+    }
+    await writeAudit(supabase, {
+      table_name: "registrations",
+      record_id: registrationId,
+      action: "registration_submitted",
+      new_value: {
+        participant_id: participantId,
+        category_id: ev.category.id,
+        kata_base: ev.kataBase,
+        payment_status: "pending",
+      },
+    });
+    referenceIds.push(registrationId.slice(0, 8).toUpperCase());
   }
 
-  await writeAudit(supabase, {
-    table_name: "registrations",
-    record_id: registrationId,
-    action: "registration_submitted",
-    new_value: {
-      participant_id: participantId,
-      category_id: values.category_id,
-      payment_status: "pending",
-    },
-  });
-
-  const referenceId = registrationId.slice(0, 8).toUpperCase();
   await sendConfirmationEmail({
     toEmail: values.email || null,
     recipientName: values.full_name,
     subject: `Registration confirmed — ${competition.name}`,
-    referenceId,
     telegramCategory: "participant",
     bodyLines: [
-      `This confirms your registration for ${competition.name}${values.kata_base ? ` (${values.kata_base})` : ""}.`,
+      `This confirms your registration for ${competition.name} — ${resolvedEvents.length} kata event${resolvedEvents.length === 1 ? "" : "s"}: ${resolvedEvents.map((e) => e.kataBase).join(", ")}.`,
+      `Your reference ID${referenceIds.length > 1 ? "s" : ""}: ${referenceIds.join(", ")}.`,
       "Payment status: pending — transfer the registration fee and send your receipt to the organiser (see the announcement for bank details). The organiser will confirm your payment, after which your name appears on the participants list.",
       "Organiser contact: WhatsApp +60 12-453 2831 / kimsiewkiew@gmail.com",
     ],
   });
 
-  return { ok: true, referenceId };
+  return { ok: true, referenceIds };
 }

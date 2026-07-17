@@ -4,7 +4,7 @@ import { writeAudit } from "@/lib/audit";
 import { sendConfirmationEmail } from "@/lib/notify";
 
 export type FinalizeResult =
-  | { status: "paid"; referenceId: string }
+  | { status: "paid"; referenceIds: string[] }
   | { status: "unpaid" }
   | { status: "error"; message: string };
 
@@ -43,7 +43,7 @@ export async function finalizeInvoiceSession(sessionId: string): Promise<Finaliz
       new_value: { stripe_session: sessionId },
     });
   }
-  return { status: "paid", referenceId: invoiceId.slice(0, 8).toUpperCase() };
+  return { status: "paid", referenceIds: [invoiceId.slice(0, 8).toUpperCase()] };
 }
 
 /**
@@ -64,13 +64,16 @@ export async function finalizeStripeSession(sessionId: string): Promise<Finalize
 
   const admin = createAdminClient();
 
-  // Already finalised (webhook vs success page race)?
+  // Already finalised (webhook vs success page race)? A single payment
+  // covers every event, so there can be more than one registration row
+  // sharing this payment_reference.
   const { data: existing } = await admin
     .from("registrations")
     .select("id")
-    .eq("payment_reference", sessionId)
-    .maybeSingle();
-  if (existing) return { status: "paid", referenceId: existing.id.slice(0, 8).toUpperCase() };
+    .eq("payment_reference", sessionId);
+  if (existing && existing.length > 0) {
+    return { status: "paid", referenceIds: existing.map((r) => r.id.slice(0, 8).toUpperCase()) };
+  }
 
   const draftId = session.metadata?.draft_id;
   if (!draftId) return { status: "error", message: "Payment received but no draft reference — contact the organiser with your Stripe receipt." };
@@ -86,15 +89,23 @@ export async function finalizeStripeSession(sessionId: string): Promise<Finalize
     const { data: again } = await admin
       .from("registrations")
       .select("id")
-      .eq("payment_reference", sessionId)
-      .maybeSingle();
-    if (again) return { status: "paid", referenceId: again.id.slice(0, 8).toUpperCase() };
+      .eq("payment_reference", sessionId);
+    if (again && again.length > 0) {
+      return { status: "paid", referenceIds: again.map((r) => r.id.slice(0, 8).toUpperCase()) };
+    }
     return { status: "error", message: "Payment received but registration data expired — contact the organiser with your Stripe receipt." };
   }
 
   const v = draft.payload as Record<string, string>;
+  // events_json (up to 3 kata events picked in one submission) is the
+  // current format; fall back to the single category_id/kata_base a draft
+  // written before multi-event support would still carry.
+  type DraftEvent = { kata_base: string; category_id: string };
+  const events: DraftEvent[] = v.events_json
+    ? (JSON.parse(v.events_json) as DraftEvent[])
+    : [{ kata_base: v.kata_base ?? "", category_id: v.category_id }];
+
   const participantId = crypto.randomUUID();
-  const registrationId = crypto.randomUUID();
 
   const { error: pErr } = await admin.from("participants").insert({
     id: participantId,
@@ -125,36 +136,41 @@ export async function finalizeStripeSession(sessionId: string): Promise<Finalize
     });
   }
 
-  const { error: rErr } = await admin.from("registrations").insert({
-    id: registrationId,
-    competition_id: v.competition_id,
-    participant_id: participantId,
-    category_id: v.category_id,
-    division: v.division ?? null,
-    payment_status: "paid",
-    payment_reference: sessionId,
-    notes: "Paid online via Stripe Checkout",
-  });
-  if (rErr) {
-    await admin.from("participants").delete().eq("id", participantId);
-    return { status: "error", message: "Payment received but saving failed — contact the organiser with your Stripe receipt." };
-  }
-
-  await writeAudit(admin, {
-    table_name: "registrations",
-    record_id: registrationId,
-    action: "registration_paid_online",
-    new_value: {
+  const referenceIds: string[] = [];
+  for (const ev of events) {
+    const registrationId = crypto.randomUUID();
+    const { error: rErr } = await admin.from("registrations").insert({
+      id: registrationId,
+      competition_id: v.competition_id,
       participant_id: participantId,
-      category_id: v.category_id,
+      category_id: ev.category_id,
+      division: v.division ?? null,
       payment_status: "paid",
-      stripe_session: sessionId,
-    },
-  });
+      payment_reference: sessionId,
+      notes: "Paid online via Stripe Checkout",
+    });
+    if (rErr) {
+      await admin.from("registrations").delete().eq("participant_id", participantId);
+      await admin.from("participants").delete().eq("id", participantId);
+      return { status: "error", message: "Payment received but saving failed — contact the organiser with your Stripe receipt." };
+    }
+    await writeAudit(admin, {
+      table_name: "registrations",
+      record_id: registrationId,
+      action: "registration_paid_online",
+      new_value: {
+        participant_id: participantId,
+        category_id: ev.category_id,
+        kata_base: ev.kata_base,
+        payment_status: "paid",
+        stripe_session: sessionId,
+      },
+    });
+    referenceIds.push(registrationId.slice(0, 8).toUpperCase());
+  }
 
   await admin.from("registration_drafts").delete().eq("id", draftId);
 
-  const referenceId = registrationId.slice(0, 8).toUpperCase();
   const { data: competitionRow } = await admin
     .from("competitions")
     .select("name")
@@ -165,14 +181,14 @@ export async function finalizeStripeSession(sessionId: string): Promise<Finalize
     toEmail: v.email ?? null,
     recipientName: v.full_name,
     subject: `Payment successful — registration confirmed — ${competitionName}`,
-    referenceId,
     telegramCategory: "participant",
     bodyLines: [
-      `This confirms your paid registration for ${competitionName}${v.kata_base ? ` (${v.kata_base})` : ""}.`,
+      `This confirms your paid registration for ${competitionName} — ${events.length} kata event${events.length === 1 ? "" : "s"}: ${events.map((e) => e.kata_base).join(", ")}.`,
+      `Your reference ID${referenceIds.length > 1 ? "s" : ""}: ${referenceIds.join(", ")}.`,
       "Payment received — your slot is confirmed and your name will appear on the participants list. A Stripe receipt was also sent to the email you entered at checkout.",
       "Keep your reference ID and the IC/passport you registered with — you'll need both to link your account when you're ready to record your kata.",
     ],
   });
 
-  return { status: "paid", referenceId };
+  return { status: "paid", referenceIds };
 }

@@ -40,6 +40,8 @@ export default function RegisterForm({
   const [gender, setGender] = useState("");
   const [beltRank, setBeltRank] = useState("");
   const [kataBase, setKataBase] = useState("");
+  const [kataBase2, setKataBase2] = useState("");
+  const [kataBase3, setKataBase3] = useState("");
 
   // Only shows kata events with a matching, non-full sub-category for the
   // belt rank / date of birth / gender entered so far — resolveCategory()
@@ -63,22 +65,46 @@ export default function RegisterForm({
     return allKataBasesOf(categories).filter((k) => bases.has(k));
   }, [beltRank, dateOfBirth, gender, categories, categoryTaken, competition.event_date]);
 
+  // Each additional event must be a kata not already picked for an earlier
+  // one — a participant can't compete twice in the same kata.
+  const eligibleKataBases2 = useMemo(
+    () => eligibleKataBases.filter((k) => k !== kataBase),
+    [eligibleKataBases, kataBase],
+  );
+  const eligibleKataBases3 = useMemo(
+    () => eligibleKataBases.filter((k) => k !== kataBase && k !== kataBase2),
+    [eligibleKataBases, kataBase, kataBase2],
+  );
+
   const detailsComplete = beltRank.trim() !== "" && dateOfBirth !== "" && gender !== "";
 
   useEffect(() => {
     if (kataBase && !eligibleKataBases.includes(kataBase)) setKataBase("");
   }, [eligibleKataBases, kataBase]);
+  useEffect(() => {
+    if (kataBase2 && !eligibleKataBases2.includes(kataBase2)) setKataBase2("");
+  }, [eligibleKataBases2, kataBase2]);
+  useEffect(() => {
+    if (kataBase3 && !eligibleKataBases3.includes(kataBase3)) setKataBase3("");
+  }, [eligibleKataBases3, kataBase3]);
 
-  if (state.ok && state.referenceId) {
+  const eventsChosen = [kataBase, kataBase2, kataBase3].filter(Boolean);
+  const feePerEvent = Number(competition.registration_fee_usd ?? 0);
+  const totalFee = feePerEvent * Math.max(1, eventsChosen.length);
+
+  if (state.ok && state.referenceIds && state.referenceIds.length > 0) {
     return (
       <div className="rounded-lg border border-green-300 bg-green-50 p-8 text-center">
         <p className="text-3xl">✅</p>
         <h2 className="mt-2 text-xl font-bold text-green-900">Registration received!</h2>
         <p className="mt-2 text-green-800">
-          Your registration reference ID is{" "}
-          <span className="rounded bg-white px-2 py-0.5 font-mono font-bold tracking-wider">
-            {state.referenceId}
-          </span>
+          Your registration reference ID{state.referenceIds.length > 1 ? "s are" : " is"}{" "}
+          {state.referenceIds.map((id, i) => (
+            <span key={id}>
+              {i > 0 && ", "}
+              <span className="rounded bg-white px-2 py-0.5 font-mono font-bold tracking-wider">{id}</span>
+            </span>
+          ))}
         </p>
         <p className="mx-auto mt-3 max-w-md text-sm text-green-800">
           Payment status is <strong>pending</strong>. Transfer the registration fee and send your
@@ -282,6 +308,46 @@ export default function RegisterForm({
           <FieldError message={err.kata_base} />
         </div>
 
+        <div>
+          <label htmlFor="kata_base_2" className={labelCls}>2nd Kata event (optional)</label>
+          <select
+            id="kata_base_2"
+            name="kata_base_2"
+            className={inputCls}
+            value={kataBase2}
+            onChange={(e) => setKataBase2(e.target.value)}
+            disabled={!detailsComplete || !kataBase}
+          >
+            <option value="">— None — register for 1 event only —</option>
+            {eligibleKataBases2.map((k) => (
+              <option key={k} value={k}>{k}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label htmlFor="kata_base_3" className={labelCls}>3rd Kata event (optional)</label>
+          <select
+            id="kata_base_3"
+            name="kata_base_3"
+            className={inputCls}
+            value={kataBase3}
+            onChange={(e) => setKataBase3(e.target.value)}
+            disabled={!detailsComplete || !kataBase2}
+          >
+            <option value="">— None —</option>
+            {eligibleKataBases3.map((k) => (
+              <option key={k} value={k}>{k}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="sm:col-span-2 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+          Registering for {eventsChosen.length || 1} kata event{(eventsChosen.length || 1) === 1 ? "" : "s"} —
+          fee is USD {feePerEvent.toFixed(2)} per event, USD {totalFee.toFixed(2)} total
+          {eventsChosen.length > 0 && ` (${eventsChosen.join(", ")})`}.
+        </div>
+
         <div className="sm:col-span-2 mt-2 rounded-md border border-neutral-200 bg-neutral-50 p-4">
           <p className="text-sm font-bold text-neutral-800">Bank details for prize / reward payout *</p>
           <p className="mt-0.5 text-xs text-neutral-500">
@@ -324,7 +390,7 @@ export default function RegisterForm({
         {pending
           ? payOnline ? "Redirecting to payment…" : "Submitting…"
           : payOnline
-            ? `Proceed to secure payment — USD ${Number(competition.registration_fee_usd ?? 0).toFixed(2)}`
+            ? `Proceed to secure payment — USD ${totalFee.toFixed(2)} (${eventsChosen.length || 1} event${(eventsChosen.length || 1) === 1 ? "" : "s"})`
             : "Submit registration"}
       </button>
       {payOnline && (

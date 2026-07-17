@@ -28,7 +28,7 @@ export default async function PayThanksPage({
             <p className="text-3xl">✅</p>
             <h1 className="mt-2 text-xl font-bold text-green-900">Payment received — thank you!</h1>
             <p className="mt-2 text-green-800">
-              Invoice <span className="rounded bg-white px-2 py-0.5 font-mono font-bold">{result.referenceId}</span>{" "}
+              Invoice <span className="rounded bg-white px-2 py-0.5 font-mono font-bold">{result.referenceIds[0]}</span>{" "}
               is now marked paid. A Stripe receipt has been emailed to you.
             </p>
             <div className="mx-auto max-w-md text-green-900">
