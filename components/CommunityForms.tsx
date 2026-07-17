@@ -7,8 +7,10 @@ import {
   applyStaff,
   type CommunityState,
 } from "@/app/actions/community";
-import { TelegramJoinButton } from "@/components/ui";
+import { TelegramJoinButton, formatUSD } from "@/components/ui";
 import CertificateUploadField from "@/components/CertificateUploadField";
+import { EDUCATION_LEVELS, SPOKEN_LANGUAGES } from "@/lib/reference-data";
+import type { Competition } from "@/lib/types";
 
 const initial: CommunityState = { ok: false };
 const inputCls =
@@ -241,7 +243,13 @@ export function AudienceForm({ telegramLink }: { telegramLink: string | null }) 
   );
 }
 
-export function StaffForm({ telegramLink }: { telegramLink: string | null }) {
+export function StaffForm({
+  telegramLink,
+  competitions,
+}: {
+  telegramLink: string | null;
+  competitions: Competition[];
+}) {
   const [state, formAction, pending] = useActionState(applyStaff, initial);
   if (state.ok && state.referenceId) {
     return (
@@ -370,6 +378,60 @@ export function StaffForm({ telegramLink }: { telegramLink: string | null }) {
           </select>
           <Err m={e.role_requested} />
         </div>
+
+        <div className="sm:col-span-2 rounded-md border border-neutral-200 bg-neutral-50 p-4">
+          <p className="text-sm font-bold text-neutral-800">
+            Kata Competition Tier(s) you&apos;ll support{" "}
+            <span className="font-normal text-neutral-400">(optional, up to 3)</span>
+          </p>
+          <div className="mt-3 grid gap-4 sm:grid-cols-3">
+            {(["support_tier_1_id", "support_tier_2_id", "support_tier_3_id"] as const).map((name, i) => (
+              <div key={name}>
+                <label htmlFor={name} className={labelCls}>Tier {i + 1}</label>
+                <select id={name} name={name} defaultValue="" className={inputCls}>
+                  <option value="">— None —</option>
+                  {competitions.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} ({formatUSD(c.registration_fee_usd)})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label htmlFor="highest_education" className={labelCls}>Highest Education Attended *</label>
+          <select id="highest_education" name="highest_education" required defaultValue="" className={inputCls}>
+            <option value="" disabled>Select level</option>
+            {EDUCATION_LEVELS.map((lvl) => (
+              <option key={lvl} value={lvl}>{lvl}</option>
+            ))}
+          </select>
+          <Err m={e.highest_education} />
+        </div>
+        <div>
+          <label htmlFor="languages_count" className={labelCls}>
+            How many languages can you speak, read, and write? *
+          </label>
+          <input
+            id="languages_count" name="languages_count" type="number" min={0} max={20} required
+            className={inputCls}
+          />
+          <Err m={e.languages_count} />
+        </div>
+        <div className="sm:col-span-2">
+          <label htmlFor="languages" className={labelCls}>
+            Which languages? <span className="font-normal text-neutral-400">(ctrl/cmd-click to select more than one)</span>
+          </label>
+          <select id="languages" name="languages" multiple size={6} className={inputCls}>
+            {SPOKEN_LANGUAGES.map((lang) => (
+              <option key={lang} value={lang}>{lang}</option>
+            ))}
+          </select>
+        </div>
+
         <div className="sm:col-span-2">
           <label htmlFor="message" className={labelCls}>Message / experience</label>
           <textarea id="message" name="message" rows={3} className={inputCls} />

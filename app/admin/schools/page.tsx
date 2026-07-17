@@ -11,12 +11,6 @@ import SignInControlBox from "@/components/SignInControlBox";
 
 export const dynamic = "force-dynamic";
 
-const MALAYSIAN_STATES = [
-  "Johor", "Kedah", "Kelantan", "Kuala Lumpur", "Labuan", "Melaka",
-  "Negeri Sembilan", "Pahang", "Perak", "Perlis", "Pulau Pinang",
-  "Putrajaya", "Sabah", "Sarawak", "Selangor", "Terengganu",
-];
-
 function PaymentButtons({ id, current }: { id: string; current: string }) {
   return (
     <div className="flex flex-wrap gap-1">
@@ -175,13 +169,8 @@ export default async function AdminSchools({
                   <input id="home_address" name="home_address" required defaultValue={editing?.home_address ?? ""} className={adminInput} />
                 </div>
                 <div>
-                  <label htmlFor="state" className={adminLabel}>State</label>
-                  <select id="state" name="state" defaultValue={editing?.state ?? ""} className={adminInput}>
-                    <option value="">— Select —</option>
-                    {MALAYSIAN_STATES.map((s) => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
+                  <label htmlFor="state" className={adminLabel}>State / Province / Region</label>
+                  <input id="state" name="state" defaultValue={editing?.state ?? ""} className={adminInput} placeholder="e.g. Selangor, California, Tokyo" />
                 </div>
                 <div>
                   <label htmlFor="city_town" className={adminLabel}>City / Town *</label>

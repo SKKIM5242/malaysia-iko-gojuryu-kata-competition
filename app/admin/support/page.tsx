@@ -4,10 +4,11 @@ import { getAllCompetitions } from "@/lib/admin-data";
 import { updateCommunityStatus, createStaffAccount, bulkUploadSupport, clockIn, clockOut } from "@/app/actions/admin";
 import { getOpenShift, getAllShifts } from "@/lib/support-shifts";
 import { AdminShell, Card, CertificateField, adminBtn, adminBtnSecondary, adminInput, adminLabel } from "@/components/admin";
-import { EmptyState, SetupNotice } from "@/components/ui";
+import { EmptyState, SetupNotice, formatUSD } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
 import SignInControlBox from "@/components/SignInControlBox";
+import { EDUCATION_LEVELS, SPOKEN_LANGUAGES } from "@/lib/reference-data";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,7 @@ function formatDateTime(iso: string): string {
 interface StaffApp {
   id: string; full_name: string; email: string | null; phone: string | null;
   role_requested: string; message: string | null; status: string; created_at: string;
+  support_tier_1_id: string | null; support_tier_2_id: string | null; support_tier_3_id: string | null;
 }
 
 export default async function AdminSupport({
@@ -51,7 +53,7 @@ export default async function AdminSupport({
     isAdminTier ? getAllShifts() : Promise.resolve([]),
   ]);
 
-  const competitions = canCreate ? await getAllCompetitions() : [];
+  const competitions = await getAllCompetitions();
   const { data: supportProfiles } = canCreate
     ? await supabase
         .from("profiles")
@@ -174,6 +176,52 @@ export default async function AdminSupport({
                   <label htmlFor="cs_invitation_code" className={adminLabel}>Invitation code (optional)</label>
                   <input id="cs_invitation_code" name="invitation_code" className={adminInput} />
                 </div>
+                <div>
+                  <label htmlFor="cs_highest_education" className={adminLabel}>Highest Education Attended *</label>
+                  <select id="cs_highest_education" name="highest_education" required defaultValue="" className={adminInput}>
+                    <option value="" disabled>— Select —</option>
+                    {EDUCATION_LEVELS.map((lvl) => (
+                      <option key={lvl} value={lvl}>{lvl}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="cs_languages_count" className={adminLabel}>
+                    How many languages can they speak, read, and write? *
+                  </label>
+                  <input id="cs_languages_count" name="languages_count" type="number" min={0} max={20} required className={adminInput} />
+                </div>
+                <div className="sm:col-span-2">
+                  <label htmlFor="cs_languages" className={adminLabel}>
+                    Which languages? <span className="font-normal text-neutral-400">(ctrl/cmd-click to select more than one)</span>
+                  </label>
+                  <select id="cs_languages" name="languages" multiple size={6} className={adminInput}>
+                    {SPOKEN_LANGUAGES.map((lang) => (
+                      <option key={lang} value={lang}>{lang}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3">
+                <p className="text-xs font-bold uppercase tracking-wide text-neutral-500">
+                  Kata Competition Tier(s) they&apos;ll support{" "}
+                  <span className="font-normal text-neutral-400 normal-case">(optional, up to 3)</span>
+                </p>
+                <div className="mt-2 grid gap-4 sm:grid-cols-3">
+                  {(["support_tier_1_id", "support_tier_2_id", "support_tier_3_id"] as const).map((name, i) => (
+                    <div key={name}>
+                      <label htmlFor={`cs_${name}`} className={adminLabel}>Tier {i + 1}</label>
+                      <select id={`cs_${name}`} name={name} defaultValue="" className={adminInput}>
+                        <option value="">— None —</option>
+                        {competitions.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name} ({formatUSD(c.registration_fee_usd)})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ))}
+                </div>
               </div>
               <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3">
                 <p className="text-xs font-bold uppercase tracking-wide text-neutral-500">Bank details *</p>
@@ -216,6 +264,7 @@ export default async function AdminSupport({
             { key: "reference_id", label: "Reference ID" },
             { key: "full_name", label: "Name" },
             { key: "contact", label: "Contact" },
+            ...competitions.map((c) => ({ key: `tier_${c.id}`, label: `Tier ${formatUSD(c.registration_fee_usd)}` })),
             { key: "message", label: "Message" },
             { key: "status", label: "Status" },
           ]}
@@ -224,6 +273,7 @@ export default async function AdminSupport({
             { key: "full_name", label: "Name" },
             { key: "email", label: "Email" },
             { key: "phone", label: "Phone" },
+            ...competitions.map((c) => ({ key: `tier_${c.id}`, label: `Tier ${formatUSD(c.registration_fee_usd)}` })),
             { key: "message", label: "Message" },
             { key: "status_text", label: "Status" },
           ]}
@@ -234,6 +284,12 @@ export default async function AdminSupport({
             contact: [s.email, s.phone].filter(Boolean).join(" · "),
             email: s.email ?? "",
             phone: s.phone ?? "",
+            ...Object.fromEntries(
+              competitions.map((c) => [
+                `tier_${c.id}`,
+                [s.support_tier_1_id, s.support_tier_2_id, s.support_tier_3_id].includes(c.id) ? "✓" : "",
+              ]),
+            ),
             message: s.message ?? "",
             status_text: s.status,
             status: (

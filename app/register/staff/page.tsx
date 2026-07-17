@@ -1,12 +1,14 @@
 import { SiteFooter, SiteHeader } from "@/components/ui";
 import { StaffForm } from "@/components/CommunityForms";
 import { getTelegramLink } from "@/lib/telegram";
+import { getAllCompetitions } from "@/lib/admin-data";
 
 export const dynamic = "force-dynamic";
 
 export const metadata = { title: "Admin / Organizer / Customer Support registration" };
 
-export default function RegisterStaffPage() {
+export default async function RegisterStaffPage() {
+  const competitions = await getAllCompetitions();
   return (
     <>
       <SiteHeader />
@@ -19,7 +21,7 @@ export default function RegisterStaffPage() {
           the organiser before any access is granted.
         </p>
         <div className="mt-8">
-          <StaffForm telegramLink={getTelegramLink("staff")} />
+          <StaffForm telegramLink={getTelegramLink("staff")} competitions={competitions} />
         </div>
       </main>
       <SiteFooter />

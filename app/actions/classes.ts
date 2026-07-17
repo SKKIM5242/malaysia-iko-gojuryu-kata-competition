@@ -73,21 +73,29 @@ export async function deleteStudent(formData: FormData) {
 
 // ── Fee plans ────────────────────────────────────────────────────────────────
 
+const FEE_PLAN_KINDS = ["membership_yearly", "training_monthly", "grading", "hourly_charge", "service_charge"];
+const BILLING_INTERVALS = [
+  "yearly", "monthly", "bimonthly", "quarterly",
+  "daily", "transaction", "occurrence", "request", "order", "service",
+];
+
 export async function saveFeePlan(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const amountRaw = String(formData.get("amount_myr") ?? "").trim();
   const values = {
     name: String(formData.get("name") ?? "").trim(),
-    kind: ["membership_yearly", "training_monthly", "grading"].includes(String(formData.get("kind")))
+    kind: FEE_PLAN_KINDS.includes(String(formData.get("kind")))
       ? String(formData.get("kind"))
       : "training_monthly",
     amount_myr: amountRaw ? Number(amountRaw) : null,
-    billing_interval: ["yearly", "monthly", "bimonthly", "quarterly"].includes(String(formData.get("billing_interval")))
+    currency: String(formData.get("currency") ?? "").trim() || "MYR",
+    billing_interval: BILLING_INTERVALS.includes(String(formData.get("billing_interval")))
       ? String(formData.get("billing_interval"))
       : "monthly",
     audience: ["student", "adult", "all"].includes(String(formData.get("audience")))
       ? String(formData.get("audience"))
       : "all",
+    applies_to: formData.getAll("applies_to").map((v) => String(v)).filter(Boolean),
     active: formData.get("active") === "on",
   };
   if (!values.name) backTo("plans", { error: "Plan name is required." });
@@ -149,6 +157,14 @@ export async function updateEnrollmentStatus(formData: FormData) {
 
 function advance(date: string, interval: FeePlan["billing_interval"]): string {
   const d = new Date(date + "T00:00:00");
+  if (interval === "daily") {
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().slice(0, 10);
+  }
+  // Per-transaction/occurrence/request/order/service plans aren't billed on
+  // a calendar cadence — generateDueInvoices() below only advances a plan's
+  // next_billing_date, so it barely matters what this returns for those;
+  // they're expected to be billed via Manual Invoice instead.
   const months = interval === "yearly" ? 12 : interval === "quarterly" ? 3 : interval === "bimonthly" ? 2 : 1;
   d.setMonth(d.getMonth() + months);
   return d.toISOString().slice(0, 10);
@@ -188,6 +204,7 @@ export async function generateDueInvoices() {
       fee_plan_id: e.fee_plan_id,
       description: `${plan.name} (${periodStart} → ${periodEnd})`,
       amount_myr: plan.amount_myr,
+      currency: plan.currency || "MYR",
       period_start: periodStart,
       period_end: periodEnd,
       due_date: dueDate,
@@ -214,13 +231,14 @@ export async function createManualInvoice(formData: FormData) {
   const fee_plan_id = String(formData.get("fee_plan_id") ?? "") || null;
   const description = String(formData.get("description") ?? "").trim();
   const amount = Number(formData.get("amount_myr"));
+  const currency = String(formData.get("currency") ?? "").trim() || "MYR";
   const due_date = String(formData.get("due_date") ?? "") || null;
   if (!student_id || !description) backTo("invoices", { error: "Student and description are required." });
   if (!amount || Number.isNaN(amount) || amount <= 0) backTo("invoices", { error: "Enter a valid amount." });
   const { supabase, actorId } = await getActor();
   const { data, error } = await supabase
     .from("class_invoices")
-    .insert({ student_id, fee_plan_id, description, amount_myr: amount, due_date })
+    .insert({ student_id, fee_plan_id, description, amount_myr: amount, currency, due_date })
     .select("id")
     .single();
   if (error) backTo("invoices", { error: "Could not create invoice." });
@@ -258,7 +276,7 @@ export async function generateInvoicePaymentLink(formData: FormData) {
       line_items: [
         {
           price_data: {
-            currency: "myr",
+            currency: (invoice!.currency || "MYR").toLowerCase(),
             unit_amount: Math.round(Number(invoice!.amount_myr) * 100),
             product_data: {
               name: invoice!.description,

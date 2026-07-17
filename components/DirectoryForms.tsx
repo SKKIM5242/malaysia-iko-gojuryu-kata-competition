@@ -12,12 +12,6 @@ const inputCls =
   "w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm focus:border-red-600 focus:outline-none focus:ring-1 focus:ring-red-600";
 const labelCls = "mb-1 block text-sm font-medium text-neutral-700";
 
-const MALAYSIAN_STATES = [
-  "Johor", "Kedah", "Kelantan", "Kuala Lumpur", "Labuan", "Melaka",
-  "Negeri Sembilan", "Pahang", "Perak", "Perlis", "Pulau Pinang",
-  "Putrajaya", "Sabah", "Sarawak", "Selangor", "Terengganu",
-];
-
 function FieldError({ message }: { message?: string }) {
   if (!message) return null;
   return <p className="mt-1 text-xs text-red-600">{message}</p>;
@@ -99,13 +93,8 @@ export function SchoolForm({ telegramLink }: { telegramLink: string | null }) {
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label htmlFor="state" className={labelCls}>State</label>
-          <select id="state" name="state" defaultValue="" className={inputCls}>
-            <option value="">— Select —</option>
-            {MALAYSIAN_STATES.map((s) => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
+          <label htmlFor="state" className={labelCls}>State / Province / Region</label>
+          <input id="state" name="state" className={inputCls} placeholder="e.g. Selangor, California, Tokyo" />
         </div>
       </div>
 

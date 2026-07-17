@@ -162,10 +162,17 @@ export interface Student {
 export interface FeePlan {
   id: string;
   name: string;
-  kind: "membership_yearly" | "training_monthly" | "grading";
+  kind: "membership_yearly" | "training_monthly" | "grading" | "hourly_charge" | "service_charge";
   amount_myr: number | null;
-  billing_interval: "yearly" | "monthly" | "bimonthly" | "quarterly";
+  currency: string;
+  billing_interval:
+    | "yearly" | "monthly" | "bimonthly" | "quarterly"
+    | "daily" | "transaction" | "occurrence" | "request" | "order" | "service";
   audience: "student" | "adult" | "all";
+  /** Competition-side roles this fee category can also apply to, alongside
+   * the class-only `audience` above — a separate dimension, e.g. a plan can
+   * be tagged for "Competition Referee/Judge" without touching audience. */
+  applies_to: string[];
   active: boolean;
   created_at: string;
 }
@@ -179,7 +186,7 @@ export interface ClassEnrollment {
   status: "active" | "paused" | "cancelled";
   created_at: string;
   student?: Pick<Student, "id" | "full_name" | "category"> | null;
-  fee_plan?: Pick<FeePlan, "id" | "name" | "amount_myr" | "billing_interval"> | null;
+  fee_plan?: Pick<FeePlan, "id" | "name" | "kind" | "amount_myr" | "currency" | "billing_interval"> | null;
 }
 
 export interface ClassInvoice {
@@ -188,6 +195,7 @@ export interface ClassInvoice {
   fee_plan_id: string | null;
   description: string;
   amount_myr: number;
+  currency: string;
   period_start: string | null;
   period_end: string | null;
   due_date: string | null;
@@ -197,7 +205,7 @@ export interface ClassInvoice {
   checkout_url: string | null;
   created_at: string;
   student?: Pick<Student, "id" | "full_name" | "phone"> | null;
-  fee_plan?: Pick<FeePlan, "id" | "name"> | null;
+  fee_plan?: Pick<FeePlan, "id" | "name" | "kind"> | null;
 }
 
 export interface AuditLog {

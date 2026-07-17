@@ -241,6 +241,8 @@ export async function applyStaff(
     ["bank_account_no", "Bank account number"],
     ["bank_account_name", "Bank account holder name"],
     ["role_requested", "Role"],
+    ["highest_education", "Highest Education Attended"],
+    ["languages_count", "Number of languages"],
   ]);
   if (Object.keys(fieldErrors).length > 0) {
     return { ok: false, error: "Please fix the highlighted fields.", fieldErrors };
@@ -249,6 +251,10 @@ export async function applyStaff(
   const school = String(formData.get("school") ?? "").trim();
   const message = String(formData.get("message") ?? "").trim();
   const invitation_code = String(formData.get("invitation_code") ?? "").trim();
+  const languages = formData.getAll("languages").map((l) => String(l)).filter(Boolean);
+  const support_tier_1_id = String(formData.get("support_tier_1_id") ?? "").trim() || null;
+  const support_tier_2_id = String(formData.get("support_tier_2_id") ?? "").trim() || null;
+  const support_tier_3_id = String(formData.get("support_tier_3_id") ?? "").trim() || null;
 
   const supabase = await createClient();
 
@@ -309,6 +315,12 @@ export async function applyStaff(
     invitation_code: invitation_code || null,
     role_requested: values.role_requested,
     message: message || null,
+    highest_education: values.highest_education,
+    languages_count: Number(values.languages_count),
+    languages,
+    support_tier_1_id,
+    support_tier_2_id,
+    support_tier_3_id,
   });
   if (error) return { ok: false, error: "Could not submit your application. Please try again." };
 

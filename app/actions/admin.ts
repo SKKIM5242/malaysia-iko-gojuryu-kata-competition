@@ -1344,6 +1344,12 @@ export async function createStaffAccount(formData: FormData) {
     bank_account_no: String(formData.get("bank_account_no") ?? "").trim() || null,
     bank_account_name: String(formData.get("bank_account_name") ?? "").trim() || null,
     invitation_code: String(formData.get("invitation_code") ?? "").trim() || null,
+    highest_education: String(formData.get("highest_education") ?? "").trim() || null,
+    languages_count: formData.get("languages_count") ? Number(formData.get("languages_count")) : null,
+    languages: formData.getAll("languages").map((l) => String(l)).filter(Boolean),
+    support_tier_1_id: String(formData.get("support_tier_1_id") ?? "").trim() || null,
+    support_tier_2_id: String(formData.get("support_tier_2_id") ?? "").trim() || null,
+    support_tier_3_id: String(formData.get("support_tier_3_id") ?? "").trim() || null,
   };
   if (!extra.ic_passport || !extra.date_of_birth || !extra.gender) {
     backTo(returnTo, { error: "IC / Passport, date of birth, and gender are required." });
@@ -1356,6 +1362,9 @@ export async function createStaffAccount(formData: FormData) {
   }
   if (!extra.bank_name || !extra.bank_account_no || !extra.bank_account_name) {
     backTo(returnTo, { error: "Bank details are required." });
+  }
+  if (role === "customer_support" && (!extra.highest_education || extra.languages_count == null)) {
+    backTo(returnTo, { error: "Highest Education Attended and number of languages are required." });
   }
 
   const { supabase, actorId } = await getActor();

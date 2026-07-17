@@ -11,6 +11,7 @@ import { AdminShell, Card, adminBtn, adminInput, adminLabel } from "@/components
 import { EmptyState, SetupNotice, formatDate } from "@/components/ui";
 import DownloadCsvButton from "@/components/DownloadCsvButton";
 import type { ClassEnrollment, ClassInvoice, FeePlan, Student } from "@/lib/types";
+import { WORLD_CURRENCIES } from "@/lib/reference-data";
 
 export const dynamic = "force-dynamic";
 
@@ -21,8 +22,8 @@ const TABS = [
   ["invoices", "Invoices"],
 ] as const;
 
-function fmtRM(n: number | null | undefined): string {
-  return n == null ? "set per invoice" : `RM ${Number(n).toFixed(2)}`;
+function fmtMoney(n: number | null | undefined, currency: string): string {
+  return n == null ? "set per invoice" : `${currency} ${Number(n).toFixed(2)}`;
 }
 
 const INTERVAL_LABEL: Record<string, string> = {
@@ -30,7 +31,29 @@ const INTERVAL_LABEL: Record<string, string> = {
   monthly: "Monthly",
   bimonthly: "Bi-monthly",
   quarterly: "Quarterly",
+  daily: "Daily",
+  transaction: "Per Transaction",
+  occurrence: "Per Occurrence",
+  request: "Per Request",
+  order: "Per Order",
+  service: "Per Service",
 };
+
+const KIND_LABEL: Record<string, string> = {
+  membership_yearly: "Membership (yearly)",
+  training_monthly: "Training fee",
+  grading: "Grading fee",
+  hourly_charge: "Hourly charge",
+  service_charge: "Service Charge",
+};
+
+const APPLIES_TO_OPTIONS = [
+  "Competition Participant",
+  "Competition School",
+  "Competition Referee/Judge",
+  "Competition Support",
+  "Coach/Sensei/Master",
+] as const;
 
 export default async function AdminClasses({
   searchParams,
@@ -60,7 +83,7 @@ export default async function AdminClasses({
   if (tab === "enrollments") {
     const { data } = await supabase
       .from("class_enrollments")
-      .select("*, student:students(id, full_name, category), fee_plan:fee_plans(id, name, amount_myr, billing_interval)")
+      .select("*, student:students(id, full_name, category), fee_plan:fee_plans(id, name, kind, amount_myr, currency, billing_interval)")
       .order("created_at", { ascending: false });
     enrollments = (data as unknown as ClassEnrollment[]) ?? [];
   }
@@ -70,7 +93,7 @@ export default async function AdminClasses({
   if (tab === "invoices") {
     let q = supabase
       .from("class_invoices")
-      .select("*, student:students(id, full_name, phone), fee_plan:fee_plans(id, name)")
+      .select("*, student:students(id, full_name, phone), fee_plan:fee_plans(id, name, kind)")
       .order("created_at", { ascending: false })
       .limit(300);
     if (invoiceFilter) q = q.eq("status", invoiceFilter);
@@ -80,7 +103,14 @@ export default async function AdminClasses({
 
   const editingStudent = tab === "students" && params.edit ? students.find((s) => s.id === params.edit) : undefined;
   const editingPlan = tab === "plans" && params.edit ? plans.find((p) => p.id === params.edit) : undefined;
-  const unpaidTotal = invoices.filter((i) => i.status === "unpaid").reduce((s, i) => s + Number(i.amount_myr), 0);
+  // Grouped by currency, not summed together — mixing currencies into one
+  // number would be meaningless once plans/invoices can use different ones.
+  const unpaidByCurrency = new Map<string, number>();
+  for (const i of invoices) {
+    if (i.status !== "unpaid") continue;
+    const cur = i.currency || "MYR";
+    unpaidByCurrency.set(cur, (unpaidByCurrency.get(cur) ?? 0) + Number(i.amount_myr));
+  }
 
   return (
     <AdminShell title="Class Billing" active="/admin/classes" flash={{ ok: params.ok, error: params.error }}>
@@ -267,6 +297,8 @@ export default async function AdminClasses({
                       <option value="membership_yearly">Membership (yearly)</option>
                       <option value="training_monthly">Training fee</option>
                       <option value="grading">Grading fee</option>
+                      <option value="hourly_charge">Hourly charge</option>
+                      <option value="service_charge">Service Charge</option>
                     </select>
                   </div>
                   <div>
@@ -276,21 +308,54 @@ export default async function AdminClasses({
                       <option value="monthly">Monthly</option>
                       <option value="bimonthly">Bi-monthly (every 2 months)</option>
                       <option value="quarterly">Quarterly (every 3 months)</option>
+                      <option value="daily">Daily</option>
+                      <option value="transaction">Per Transaction</option>
+                      <option value="occurrence">Per Occurrence</option>
+                      <option value="request">Per Request</option>
+                      <option value="order">Per Order</option>
+                      <option value="service">Per Service</option>
                     </select>
                   </div>
                   <div>
                     <label htmlFor="amount_myr" className={adminLabel}>
-                      Amount (RM) <span className="font-normal text-neutral-400">(blank = set per invoice)</span>
+                      Amount <span className="font-normal text-neutral-400">(blank = set per invoice)</span>
                     </label>
                     <input id="amount_myr" name="amount_myr" type="number" step="0.01" min="0" defaultValue={editingPlan?.amount_myr ?? ""} className={adminInput} />
                   </div>
                   <div>
-                    <label htmlFor="audience" className={adminLabel}>Applies to</label>
+                    <label htmlFor="currency" className={adminLabel}>Currency</label>
+                    <select id="currency" name="currency" defaultValue={editingPlan?.currency ?? "MYR"} className={adminInput}>
+                      {WORLD_CURRENCIES.map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="audience" className={adminLabel}>Class Audience</label>
                     <select id="audience" name="audience" defaultValue={editingPlan?.audience ?? "all"} className={adminInput}>
                       <option value="all">All</option>
                       <option value="student">Students</option>
                       <option value="adult">Adults</option>
                     </select>
+                  </div>
+                </div>
+                <div>
+                  <p className={adminLabel}>
+                    Applies to <span className="font-normal text-neutral-400">(optional — competition-side roles)</span>
+                  </p>
+                  <div className="grid gap-1.5 sm:grid-cols-2">
+                    {APPLIES_TO_OPTIONS.map((opt) => (
+                      <label key={opt} className="flex items-center gap-2 text-sm text-neutral-700">
+                        <input
+                          type="checkbox"
+                          name="applies_to"
+                          value={opt}
+                          defaultChecked={editingPlan?.applies_to?.includes(opt) ?? false}
+                          className="h-4 w-4 rounded border-neutral-300 accent-red-700"
+                        />
+                        {opt}
+                      </label>
+                    ))}
                   </div>
                 </div>
                 <label className="flex items-center gap-2 text-sm font-medium text-neutral-700">
@@ -320,7 +385,10 @@ export default async function AdminClasses({
                         {!p.active && <span className="text-xs font-semibold text-neutral-400">(inactive)</span>}
                       </p>
                       <p className="mt-0.5 text-sm text-neutral-500">
-                        {fmtRM(p.amount_myr)} · {INTERVAL_LABEL[p.billing_interval]} · {p.audience === "all" ? "everyone" : `${p.audience}s`}
+                        {KIND_LABEL[p.kind] ?? p.kind} · {fmtMoney(p.amount_myr, p.currency)} ·{" "}
+                        {INTERVAL_LABEL[p.billing_interval] ?? p.billing_interval} ·{" "}
+                        {p.audience === "all" ? "everyone" : `${p.audience}s`}
+                        {p.applies_to?.length > 0 && <> · {p.applies_to.join(", ")}</>}
                       </p>
                     </div>
                     <Link href={`/admin/classes?tab=plans&edit=${p.id}`} className="rounded border border-neutral-300 px-3 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50">
@@ -355,7 +423,8 @@ export default async function AdminClasses({
                     <option value="" disabled>Select plan</option>
                     {plans.filter((p) => p.active).map((p) => (
                       <option key={p.id} value={p.id}>
-                        {p.name} — {fmtRM(p.amount_myr)} / {INTERVAL_LABEL[p.billing_interval].toLowerCase()}
+                        {p.name} ({KIND_LABEL[p.kind] ?? p.kind}) — {fmtMoney(p.amount_myr, p.currency)} /{" "}
+                        {(INTERVAL_LABEL[p.billing_interval] ?? p.billing_interval).toLowerCase()}
                       </option>
                     ))}
                   </select>
@@ -456,7 +525,12 @@ export default async function AdminClasses({
               ))}
             </div>
             <span className="text-sm text-neutral-500">
-              Unpaid total (shown): <strong>RM {unpaidTotal.toFixed(2)}</strong>
+              Unpaid total (shown):{" "}
+              <strong>
+                {unpaidByCurrency.size === 0
+                  ? "0.00"
+                  : [...unpaidByCurrency.entries()].map(([cur, amt]) => `${cur} ${amt.toFixed(2)}`).join(" + ")}
+              </strong>
             </span>
           </div>
 
@@ -479,7 +553,7 @@ export default async function AdminClasses({
                     <select id="inv_plan" name="fee_plan_id" defaultValue="" className={adminInput}>
                       <option value="">— None (custom) —</option>
                       {plans.map((p) => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
+                        <option key={p.id} value={p.id}>{p.name} ({KIND_LABEL[p.kind] ?? p.kind})</option>
                       ))}
                     </select>
                   </div>
@@ -489,8 +563,16 @@ export default async function AdminClasses({
                   </div>
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div>
-                      <label htmlFor="inv_amount" className={adminLabel}>Amount (RM) *</label>
+                      <label htmlFor="inv_amount" className={adminLabel}>Amount *</label>
                       <input id="inv_amount" name="amount_myr" type="number" step="0.01" min="0.01" required className={adminInput} />
+                    </div>
+                    <div>
+                      <label htmlFor="inv_currency" className={adminLabel}>Currency</label>
+                      <select id="inv_currency" name="currency" defaultValue="MYR" className={adminInput}>
+                        {WORLD_CURRENCIES.map((c) => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
                     </div>
                     <div>
                       <label htmlFor="inv_due" className={adminLabel}>Due date</label>
@@ -530,7 +612,7 @@ export default async function AdminClasses({
                         <tr key={inv.id} className="hover:bg-neutral-50">
                           <td className="px-4 py-3 font-medium">{inv.student?.full_name ?? "—"}</td>
                           <td className="max-w-[260px] truncate px-4 py-3 text-xs" title={inv.description}>{inv.description}</td>
-                          <td className="px-4 py-3 whitespace-nowrap">RM {Number(inv.amount_myr).toFixed(2)}</td>
+                          <td className="px-4 py-3 whitespace-nowrap">{inv.currency || "MYR"} {Number(inv.amount_myr).toFixed(2)}</td>
                           <td className="px-4 py-3 whitespace-nowrap text-xs">{inv.due_date ? formatDate(inv.due_date) : "—"}</td>
                           <td className="px-4 py-3">
                             <span
