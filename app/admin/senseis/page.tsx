@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { getSchools, getSenseis, schemaReady } from "@/lib/data";
+import { getSchoolSenseiTierFees } from "@/lib/admin-data";
 import { createClient } from "@/lib/supabase/server";
 import { saveSensei, deleteSensei, createInvitationCode, generateRecordInvitationCode, updateCommunityStatus, bulkUploadSenseis } from "@/app/actions/admin";
 import { AdminShell, Card, CertificateField, adminBtn, adminBtnSecondary, adminInput, adminLabel } from "@/components/admin";
-import { EmptyState, SetupNotice, formatDate } from "@/components/ui";
+import { EmptyState, SetupNotice, formatDate, formatUSD } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
 
@@ -50,7 +51,7 @@ export default async function AdminSenseis({
     );
   }
 
-  const [senseis, schools] = await Promise.all([getSenseis(), getSchools()]);
+  const [senseis, schools, { senseiFees }] = await Promise.all([getSenseis(), getSchools(), getSchoolSenseiTierFees()]);
   const editing = params.edit ? senseis.find((s) => s.id === params.edit) : undefined;
 
   // Signed links (1h) for certificate photos in the private bucket
@@ -237,7 +238,8 @@ export default async function AdminSenseis({
                 { key: "contact", label: "Contact" },
                 { key: "bank", label: "Payout Bank" },
                 { key: "school", label: "School" },
-                { key: "payment", label: "USD 10 Fee" },
+                { key: "expected_fee", label: "Required Fee" },
+                { key: "payment", label: "Fee Status" },
                 { key: "actions", label: "Actions" },
               ]}
               csvColumns={[
@@ -257,7 +259,8 @@ export default async function AdminSenseis({
                 { key: "bank_account_no", label: "Bank Account No" },
                 { key: "bank_account_name", label: "Bank Account Holder Name" },
                 { key: "school", label: "School" },
-                { key: "payment_status_text", label: "USD 10 Fee Status" },
+                { key: "expected_fee", label: "Required Fee" },
+                { key: "payment_status_text", label: "Fee Status" },
               ]}
               rows={senseis.map((s) => ({
                 id: s.id,
@@ -293,6 +296,7 @@ export default async function AdminSenseis({
                 bank_account_no: s.bank_account_no ?? "",
                 bank_account_name: s.bank_account_name ?? "",
                 school: s.school?.name ?? "",
+                expected_fee: senseiFees.has(s.id) ? formatUSD(senseiFees.get(s.id)) : "— no participants yet",
                 payment_status_text: s.payment_status,
                 payment: <PaymentButtons id={s.id} current={s.payment_status} />,
                 actions: (

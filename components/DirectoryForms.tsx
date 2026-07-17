@@ -47,8 +47,9 @@ function Success({
         <p className="mt-1">
           Ask the organiser for a personal invitation code tied to this exact record, then use it
           to sign in via <Link href="/account?mode=signup" className="underline">Kata Arena Log In</Link>.
-          A USD 10 registration fee unlocks unlimited sign-in to watch your students&apos; kata
-          recordings and judge scores as they come in — no waiting for winners day.
+          A registration fee — matching your students&apos; competition tier fee — unlocks unlimited
+          sign-in to watch your students&apos; kata recordings and judge scores as they come in —
+          no waiting for winners day.
         </p>
         <p className="mt-1">
           Sign up 10 or more participants and you qualify for a 10% share of their registration
@@ -87,10 +88,10 @@ export function SchoolForm({ telegramLink }: { telegramLink: string | null }) {
         </div>
       )}
       <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
-        Registering here is free and just lists your school in the directory. Afterwards, a USD 10
-        registration fee unlocks unlimited sign-in to watch your own students&apos; kata
-        recordings and judge scores — and 10 or more participants qualifies you for a 10% share
-        of their registration fees.
+        Registering here is free and just lists your school in the directory. Afterwards, a
+        registration fee — matching your students&apos; competition tier fee — unlocks unlimited
+        sign-in to watch your own students&apos; kata recordings and judge scores — and 10 or more
+        participants qualifies you for a 10% share of their registration fees.
       </div>
       <div>
         <label htmlFor="name" className={labelCls}>School / Dojo name *</label>
@@ -210,10 +211,10 @@ export function SenseiForm({
         </div>
       )}
       <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
-        Registering here is free and just lists you in the directory. Afterwards, a USD 10
-        registration fee unlocks unlimited sign-in to watch your own students&apos; kata
-        recordings and judge scores — and 10 or more participants qualifies you for a 10% share
-        of their registration fees.
+        Registering here is free and just lists you in the directory. Afterwards, a registration
+        fee — matching your students&apos; competition tier fee — unlocks unlimited sign-in to
+        watch your own students&apos; kata recordings and judge scores — and 10 or more
+        participants qualifies you for a 10% share of their registration fees.
       </div>
       <div>
         <label htmlFor="registered_by" className={labelCls}>Who is registering? *</label>

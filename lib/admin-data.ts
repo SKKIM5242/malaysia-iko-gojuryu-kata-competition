@@ -265,6 +265,43 @@ export async function getSenseiRecords(): Promise<SenseiRecord[]> {
   }));
 }
 
+/**
+ * A School/Sensei's own USD sign-in fee follows "the Competition tier fee
+ * of a single participant" — but a school/sensei can have students spread
+ * across several tiers, so this takes the HIGHEST tier fee among their own
+ * registered participants (regardless of that registration's own payment
+ * status — the tier is what matters, not whether that one participant has
+ * paid yet). Returns 0 for a school/sensei with no participants yet.
+ */
+export async function getSchoolSenseiTierFees(): Promise<{
+  schoolFees: Map<string, number>;
+  senseiFees: Map<string, number>;
+}> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("participants")
+    .select("school_id, sensei_id, registrations(competition:competitions(registration_fee_usd))");
+  const rows =
+    (data as unknown as Array<{
+      school_id: string | null;
+      sensei_id: string | null;
+      registrations: Array<{ competition: { registration_fee_usd: number | null } | null }> | null;
+    }>) ?? [];
+
+  const schoolFees = new Map<string, number>();
+  const senseiFees = new Map<string, number>();
+  for (const r of rows) {
+    const fees = (r.registrations ?? [])
+      .map((reg) => Number(reg.competition?.registration_fee_usd ?? 0))
+      .filter((f) => f > 0);
+    if (fees.length === 0) continue;
+    const maxFee = Math.max(...fees);
+    if (r.school_id) schoolFees.set(r.school_id, Math.max(schoolFees.get(r.school_id) ?? 0, maxFee));
+    if (r.sensei_id) senseiFees.set(r.sensei_id, Math.max(senseiFees.get(r.sensei_id) ?? 0, maxFee));
+  }
+  return { schoolFees, senseiFees };
+}
+
 /** Login accounts for the three roles without their own community
  * registration table — Admin/Organizer and Customer Support are created
  * directly (see app/actions/admin.ts createStaffAccount). */

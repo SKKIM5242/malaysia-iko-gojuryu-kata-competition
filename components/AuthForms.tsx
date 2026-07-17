@@ -112,7 +112,7 @@ export default function AuthForms({ defaultMode = "signin" }: { defaultMode?: "s
         </p>
         <p className="mt-1">
           <strong>Participants</strong> competing in the Kata Competition have unlimited sign-in
-          to view only.
+          to view their own recording only.
         </p>
       </div>
 
@@ -155,10 +155,11 @@ export default function AuthForms({ defaultMode = "signin" }: { defaultMode?: "s
               your students only.
             </p>
             <p className="mt-1">
-              A USD 10 registration fee unlocks unlimited sign-in to watch your own students&apos;
-              kata recordings and judge scores as they come in — no waiting for winners day. Get
-              10 or more participants signed up under your school/sensei and you qualify for a 10%
-              share of their registration fees.
+              A registration fee — matching your students&apos; competition tier fee (e.g. USD 100 if
+              your students are registered in the USD 100 tier) — unlocks unlimited sign-in to watch
+              your own students&apos; kata recordings and judge scores as they come in — no waiting
+              for winners day. Get 10 or more participants signed up under your school/sensei and
+              you qualify for a 10% share of their registration fees.
             </p>
           </div>
         )}

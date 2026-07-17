@@ -180,7 +180,9 @@ export default async function RegisterPage({
                   before registering themself here. The same applies to a Sensei registering on
                   behalf of their students — or use the{" "}
                   <a href="/register/bulk" className="font-semibold underline underline-offset-2">bulk registration table</a>{" "}
-                  for multiple students.
+                  for multiple students. Because your School and Sensei each need their own
+                  registration too, the minimum total cost for this tier — your fee plus your
+                  School's and Sensei's — is <strong>{formatUSD(Number(competition.registration_fee_usd ?? 0) * 3)}</strong>.
                 </p>
                 <p>
                   <strong>Once payment is made, no refund will be given</strong> if a participant does
