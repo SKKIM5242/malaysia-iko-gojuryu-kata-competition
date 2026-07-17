@@ -179,6 +179,26 @@ export default function RegisterForm({
           <FieldError message={err.certificate} />
         </div>
 
+        <div className="sm:col-span-2 rounded-md border border-neutral-200 bg-neutral-50 p-3">
+          <label htmlFor="rank_matches_certificate" className="flex items-start gap-2 text-xs text-neutral-700">
+            <input id="rank_matches_certificate" name="rank_matches_certificate" type="checkbox" required className="mt-0.5" />
+            <span>
+              I confirm the Latest Belt Rank I entered above matches what is stated on my uploaded
+              certificate — if it&apos;s not in English, I&apos;ve translated it first (use the
+              language button in the site header) before confirming. *
+            </span>
+          </label>
+          <p className="mt-1.5 text-xs text-neutral-400">
+            Rank doesn&apos;t match your certificate, or you&apos;re not sure? Ask your Sensei to
+            register you instead via{" "}
+            <a href="/register/bulk" className="font-semibold underline underline-offset-2">
+              Bulk registration
+            </a>{" "}
+            — your Sensei can confirm your rank directly there without needing to individually
+            verify the certificate image.
+          </p>
+        </div>
+
         <div className="sm:col-span-2">
           <label htmlFor="home_address" className={labelCls}>Home address *</label>
           <textarea id="home_address" name="home_address" required rows={2} className={inputCls} placeholder="Street address" />
