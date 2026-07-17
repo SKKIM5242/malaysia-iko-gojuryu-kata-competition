@@ -56,7 +56,13 @@ const OPTIONS: Array<{
   },
 ];
 
-export default function RegisterHub() {
+export default async function RegisterHub({
+  searchParams,
+}: {
+  searchParams: Promise<{ competition?: string }>;
+}) {
+  const { competition: competitionId } = await searchParams;
+  const tierSuffix = competitionId ? `?competition=${competitionId}` : "";
   return (
     <>
       <SiteHeader />
@@ -89,13 +95,13 @@ export default function RegisterHub() {
               </div>
               <div className="flex flex-wrap gap-2">
                 <Link
-                  href="/register/participant"
+                  href={`/register/participant${tierSuffix}`}
                   className="rounded-md bg-red-700 px-5 py-2.5 font-semibold text-white hover:bg-red-600"
                 >
                   Register participant
                 </Link>
                 <Link
-                  href="/register/bulk"
+                  href={`/register/bulk${tierSuffix}`}
                   className="rounded-md border border-red-700 px-5 py-2.5 font-semibold text-red-700 hover:bg-red-50"
                 >
                   Bulk registration (up to 10,000 pax)
