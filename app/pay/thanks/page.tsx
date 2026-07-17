@@ -26,7 +26,7 @@ export default async function PayThanksPage({
         {result?.status === "paid" ? (
           <div className="rounded-lg border border-green-300 bg-green-50 p-8 text-center">
             <p className="text-3xl">✅</p>
-            <h1 className="mt-2 text-xl font-bold text-green-900">Payment received — thank you!</h1>
+            <h1 className="mt-2 text-xl font-bold text-green-900">Payment Received — Thank You!</h1>
             <p className="mt-2 text-green-800">
               Invoice <span className="rounded bg-white px-2 py-0.5 font-mono font-bold">{result.referenceIds[0]}</span>{" "}
               is now marked paid. A Stripe receipt has been emailed to you.
@@ -37,7 +37,7 @@ export default async function PayThanksPage({
           </div>
         ) : result?.status === "unpaid" ? (
           <div className="rounded-lg border border-amber-300 bg-amber-50 p-8 text-center">
-            <h1 className="text-xl font-bold text-amber-900">Payment not completed</h1>
+            <h1 className="text-xl font-bold text-amber-900">Payment Not Completed</h1>
             <p className="mt-2 text-sm text-amber-800">
               The payment was not completed. You can reopen the payment link the organiser sent you
               and try again.
@@ -46,7 +46,7 @@ export default async function PayThanksPage({
         ) : (
           <div className="rounded-lg border border-neutral-300 bg-neutral-100 p-8 text-center">
             <h1 className="text-xl font-bold text-neutral-700">
-              {cancelled ? "Payment cancelled" : "Nothing to show here"}
+              {cancelled ? "Payment Cancelled" : "Nothing To Show Here"}
             </h1>
             <p className="mt-2 text-sm text-neutral-500">
               {cancelled

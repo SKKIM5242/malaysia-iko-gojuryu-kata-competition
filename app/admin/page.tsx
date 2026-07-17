@@ -46,7 +46,7 @@ export default async function AdminDashboard() {
         ))}
       </div>
 
-      <h2 className="mt-10 mb-3 text-lg font-bold">Recent activity</h2>
+      <h2 className="mt-10 mb-3 text-lg font-bold">Recent Activity</h2>
       {logs.length === 0 ? (
         <p className="text-sm text-neutral-500">No audit log entries yet.</p>
       ) : (

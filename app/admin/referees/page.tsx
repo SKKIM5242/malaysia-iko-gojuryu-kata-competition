@@ -267,7 +267,7 @@ export default async function AdminReferees({
         </div>
 
         <div>
-          <h2 className="mb-3 text-lg font-bold">Referees / Judges — USD 100 deposit</h2>
+          <h2 className="mb-3 text-lg font-bold">Referees / Judges — USD 100 Deposit</h2>
           {refereeList.length === 0 ? (
             <EmptyState>No referee registrations yet.</EmptyState>
           ) : (

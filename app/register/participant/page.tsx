@@ -56,7 +56,7 @@ export default async function RegisterPage({
       <>
         <SiteHeader />
         <main className="mx-auto max-w-3xl px-4 py-10">
-          <h1 className="text-2xl font-bold tracking-tight">Choose your registration tier</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Choose Your Registration Tier</h1>
           <p className="mt-1 mb-6 text-sm text-neutral-500">
             This event has more than one registration tier — pick one to continue. Expand a kata to
             see how many slots are left in each sub-category.
@@ -163,7 +163,7 @@ export default async function RegisterPage({
     <>
       <SiteHeader />
       <main className="mx-auto max-w-3xl px-4 py-10">
-        <h1 className="text-2xl font-bold tracking-tight">Participant registration</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Participant Registration</h1>
         {competition && (
           <p className="mt-1 text-sm text-neutral-500">
             {competition.name} · {formatDate(competition.event_date)} · Fee {formatUSD(competition.registration_fee_usd)} per event
@@ -204,10 +204,10 @@ export default async function RegisterPage({
             <>
               <div className="mb-3 space-y-2 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                 <p>
-                  <strong>Note:</strong> participants must 1) register their own{" "}
+                  <strong>Note:</strong> Participants must 1) Register their own{" "}
                   <a href="/register/school" className="font-semibold underline underline-offset-2">School / Dojo</a>{" "}
                   and 2){" "}
-                  <a href="/register/sensei" className="font-semibold underline underline-offset-2">register your Sensei / Coach</a>{" "}
+                  <a href="/register/sensei" className="font-semibold underline underline-offset-2">Register your Sensei / Coach</a>{" "}
                   before registering themself here. The same applies to a Sensei registering on
                   behalf of their students — or use the{" "}
                   <a href="/register/bulk" className="font-semibold underline underline-offset-2">bulk registration table</a>{" "}

@@ -7,7 +7,7 @@ export default function NotFound() {
       <SiteHeader />
       <main className="mx-auto max-w-3xl px-4 py-24 text-center">
         <p className="text-6xl font-black text-neutral-300">404</p>
-        <h1 className="mt-3 text-xl font-bold">Page not found</h1>
+        <h1 className="mt-3 text-xl font-bold">Page Not Found</h1>
         <p className="mt-2 text-neutral-500">The page you are looking for doesn&apos;t exist or has been moved.</p>
         <Link
           href="/"

@@ -9,7 +9,7 @@ export default function ClaimForm() {
   const [state, formAction, pending] = useActionState(claimRegistration, initial);
   return (
     <form action={formAction} className="space-y-4 rounded-lg border border-neutral-200 bg-white p-6 shadow-sm">
-      <h2 className="text-lg font-bold">Link your paid registration</h2>
+      <h2 className="text-lg font-bold">Link Your Paid Registration</h2>
       <p className="text-sm text-neutral-500">
         Enter the <strong>reference ID</strong> you received when you registered (8 characters) and
         the <strong>IC / passport number</strong> you registered with. Only paid registrations can

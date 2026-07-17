@@ -97,7 +97,7 @@ export default async function AdminSenseis({
       </div>
       <div className="grid gap-8 lg:grid-cols-2">
         <div>
-          <h2 className="mb-3 text-lg font-bold">{editing ? "Edit sensei" : "Add sensei"}</h2>
+          <h2 className="mb-3 text-lg font-bold">{editing ? "Edit Sensei" : "Add Sensei"}</h2>
           <Card>
             {!editing && (
               <div className="mb-4 rounded-md border border-neutral-200 bg-neutral-50 p-3">
@@ -239,7 +239,7 @@ export default async function AdminSenseis({
         </div>
 
         <div>
-          <h2 className="mb-3 text-lg font-bold">All senseis</h2>
+          <h2 className="mb-3 text-lg font-bold">All Senseis</h2>
           {senseis.length === 0 ? (
             <EmptyState>No senseis yet — add one on the left.</EmptyState>
           ) : (

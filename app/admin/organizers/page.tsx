@@ -56,7 +56,7 @@ export default async function AdminOrganizers({
               note="Each row creates a real login instantly and emails a temporary password — max 200 rows per upload."
             />
           </div>
-          <h2 className="mb-3 text-lg font-bold">Create an Admin / Organizer account</h2>
+          <h2 className="mb-3 text-lg font-bold">Create An Admin / Organizer Account</h2>
           <Card>
             <form action={createStaffAccount} className="space-y-4">
               <input type="hidden" name="role" value="organizer" />
@@ -151,7 +151,7 @@ export default async function AdminOrganizers({
         </p>
       )}
 
-      <h2 className="mb-3 text-lg font-bold">Admin / Organizer applications</h2>
+      <h2 className="mb-3 text-lg font-bold">Admin / Organizer Applications</h2>
       {applications.length === 0 ? (
         <EmptyState>No applications yet.</EmptyState>
       ) : (

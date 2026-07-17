@@ -10,7 +10,7 @@ export default function ErrorBoundary({
   return (
     <main className="mx-auto max-w-3xl px-4 py-24 text-center">
       <p className="text-6xl font-black text-neutral-300">Oops</p>
-      <h1 className="mt-3 text-xl font-bold">Something went wrong</h1>
+      <h1 className="mt-3 text-xl font-bold">Something Went Wrong</h1>
       <p className="mt-2 text-neutral-500">
         An unexpected error occurred{error.digest ? ` (ref ${error.digest})` : ""}. Please try again.
       </p>

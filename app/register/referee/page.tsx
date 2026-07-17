@@ -11,7 +11,7 @@ export default function RegisterRefereePage() {
     <>
       <SiteHeader />
       <main className="mx-auto max-w-3xl px-4 py-10">
-        <h1 className="text-2xl font-bold tracking-tight">Referee / Judge registration</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Referee / Judge Registration</h1>
         <div className="mt-4 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           <p>
             <strong>Fee: USD 100 deposit</strong>, or <strong>USD 0 with an invitation code</strong>{" "}

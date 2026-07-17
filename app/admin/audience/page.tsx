@@ -147,7 +147,7 @@ export default async function AdminAudience({
         </Card>
       </div>
 
-      <h2 className="mb-3 text-lg font-bold">Audience / Spectators — USD 10 sign-in</h2>
+      <h2 className="mb-3 text-lg font-bold">Audience / Spectators — USD 10 Sign-In</h2>
       {!audiences || audiences.length === 0 ? (
         <EmptyState>No audience registrations yet.</EmptyState>
       ) : (

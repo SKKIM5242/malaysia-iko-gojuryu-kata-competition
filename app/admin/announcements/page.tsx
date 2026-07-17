@@ -38,7 +38,7 @@ export default async function AdminAnnouncements({
     >
       <div className="grid gap-8 lg:grid-cols-2">
         <div>
-          <h2 className="mb-3 text-lg font-bold">{editing ? "Edit announcement" : "New announcement"}</h2>
+          <h2 className="mb-3 text-lg font-bold">{editing ? "Edit Announcement" : "New Announcement"}</h2>
           <Card>
             <form action={saveAnnouncement} className="space-y-4">
               {editing && <input type="hidden" name="id" value={editing.id} />}
@@ -84,7 +84,7 @@ export default async function AdminAnnouncements({
 
         <div>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-lg font-bold">All announcements</h2>
+            <h2 className="text-lg font-bold">All Announcements</h2>
             {announcements.length > 0 && (
               <DownloadCsvButton
                 filename="announcements"

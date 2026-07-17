@@ -42,7 +42,7 @@ export default async function AdminClasses({
   const ready = await schemaReady();
   if (!ready) {
     return (
-      <AdminShell title="Class billing" active="/admin/classes">
+      <AdminShell title="Class Billing" active="/admin/classes">
         <SetupNotice />
       </AdminShell>
     );
@@ -83,7 +83,7 @@ export default async function AdminClasses({
   const unpaidTotal = invoices.filter((i) => i.status === "unpaid").reduce((s, i) => s + Number(i.amount_myr), 0);
 
   return (
-    <AdminShell title="Class billing" active="/admin/classes" flash={{ ok: params.ok, error: params.error }}>
+    <AdminShell title="Class Billing" active="/admin/classes" flash={{ ok: params.ok, error: params.error }}>
       <div className="mb-6 flex flex-wrap gap-2 text-sm">
         {TABS.map(([t, label]) => (
           <Link
@@ -103,7 +103,7 @@ export default async function AdminClasses({
       {tab === "students" && (
         <div className="grid gap-8 lg:grid-cols-2">
           <div>
-            <h2 className="mb-3 text-lg font-bold">{editingStudent ? "Edit student" : "Add student"}</h2>
+            <h2 className="mb-3 text-lg font-bold">{editingStudent ? "Edit Student" : "Add Student"}</h2>
             <Card>
               <form action={saveStudent} className="space-y-4">
                 {editingStudent && <input type="hidden" name="id" value={editingStudent.id} />}
@@ -184,7 +184,7 @@ export default async function AdminClasses({
           </div>
           <div>
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-lg font-bold">All students ({students.length})</h2>
+              <h2 className="text-lg font-bold">All Students ({students.length})</h2>
               {students.length > 0 && (
                 <DownloadCsvButton
                   filename="students"
@@ -252,7 +252,7 @@ export default async function AdminClasses({
       {tab === "plans" && (
         <div className="grid gap-8 lg:grid-cols-2">
           <div>
-            <h2 className="mb-3 text-lg font-bold">{editingPlan ? "Edit fee plan" : "New fee plan"}</h2>
+            <h2 className="mb-3 text-lg font-bold">{editingPlan ? "Edit Fee Plan" : "New Fee Plan"}</h2>
             <Card>
               <form action={saveFeePlan} className="space-y-4">
                 {editingPlan && <input type="hidden" name="id" value={editingPlan.id} />}
@@ -309,7 +309,7 @@ export default async function AdminClasses({
             </Card>
           </div>
           <div>
-            <h2 className="mb-3 text-lg font-bold">All fee plans</h2>
+            <h2 className="mb-3 text-lg font-bold">All Fee Plans</h2>
             <div className="space-y-3">
               {plans.map((p) => (
                 <Card key={p.id}>
@@ -337,7 +337,7 @@ export default async function AdminClasses({
       {tab === "enrollments" && (
         <div className="grid gap-8 lg:grid-cols-2">
           <div>
-            <h2 className="mb-3 text-lg font-bold">Enroll a student</h2>
+            <h2 className="mb-3 text-lg font-bold">Enroll A Student</h2>
             <Card>
               <form action={enrollStudent} className="space-y-4">
                 <div>
@@ -373,7 +373,7 @@ export default async function AdminClasses({
             </Card>
           </div>
           <div>
-            <h2 className="mb-3 text-lg font-bold">All enrollments ({enrollments.length})</h2>
+            <h2 className="mb-3 text-lg font-bold">All Enrollments ({enrollments.length})</h2>
             {enrollments.length === 0 ? (
               <EmptyState>No enrollments yet.</EmptyState>
             ) : (
@@ -462,7 +462,7 @@ export default async function AdminClasses({
 
           <div className="grid gap-8 lg:grid-cols-3">
             <div>
-              <h2 className="mb-3 text-lg font-bold">Manual invoice</h2>
+              <h2 className="mb-3 text-lg font-bold">Manual Invoice</h2>
               <Card>
                 <form action={createManualInvoice} className="space-y-4">
                   <div>

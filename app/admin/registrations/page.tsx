@@ -54,7 +54,7 @@ export default async function AdminRegistrations({
     >
       {isCustomerSupport && (
         <div className="mb-6">
-          <h2 className="mb-3 text-lg font-bold">Generate invitation code</h2>
+          <h2 className="mb-3 text-lg font-bold">Generate Invitation Code</h2>
           <Card>
             <form action={createInvitationCode} className="flex flex-wrap items-end gap-3">
               <div>

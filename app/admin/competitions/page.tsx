@@ -71,7 +71,7 @@ export default async function AdminCompetitions({
         <div>
           {canManageCompetition && (
             <>
-              <h2 className="mb-3 text-lg font-bold">{editing ? "Edit competition" : "Create competition"}</h2>
+              <h2 className="mb-3 text-lg font-bold">{editing ? "Edit Competition" : "Create Competition"}</h2>
               <Card>
                 <form action={saveCompetition} className="space-y-4">
                   {editing && <input type="hidden" name="id" value={editing.id} />}
@@ -128,7 +128,7 @@ export default async function AdminCompetitions({
           {editing && (
             <div className={canManageCompetition ? "mt-6" : ""}>
               <h2 className="mb-3 text-lg font-bold">
-                {editingCategory ? `Edit category “${editingCategory.name}”` : `Add category to “${editing.name}”`}
+                {editingCategory ? `Edit Category “${editingCategory.name}”` : `Add Category To “${editing.name}”`}
               </h2>
               <Card>
                 <form action={saveCategory} className="space-y-4">
@@ -198,7 +198,7 @@ export default async function AdminCompetitions({
 
         <div>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-lg font-bold">All competitions</h2>
+            <h2 className="text-lg font-bold">All Competitions</h2>
             {allCategories.length > 0 && (
               <DownloadCsvButton
                 filename="categories"

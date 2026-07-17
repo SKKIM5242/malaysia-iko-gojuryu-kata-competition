@@ -64,7 +64,7 @@ export default function ResetPasswordPage() {
     <>
       <SiteHeader />
       <main className="mx-auto max-w-md px-4 py-10">
-        <h1 className="text-2xl font-bold tracking-tight">Reset password</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Reset Password</h1>
 
         {status === "checking" && (
           <p className="mt-6 text-sm text-neutral-500">Checking your reset link…</p>

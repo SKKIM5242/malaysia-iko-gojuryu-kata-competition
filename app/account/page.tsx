@@ -141,7 +141,7 @@ export default async function AccountPage({
       <>
         <SiteHeader />
         <main className="mx-auto max-w-2xl px-4 py-10">
-          <h1 className="mb-2 text-2xl font-bold tracking-tight">My account</h1>
+          <h1 className="mb-2 text-2xl font-bold tracking-tight">My Account</h1>
           <p className="mb-8 text-sm text-neutral-500">
             Sign in or create an account to record your kata, judge as a referee, or use your
             organiser/staff access.
@@ -178,7 +178,7 @@ export default async function AccountPage({
       <>
         <SiteHeader />
         <main className="mx-auto max-w-2xl px-4 py-10">
-          <h1 className="text-2xl font-bold">My account</h1>
+          <h1 className="text-2xl font-bold">My Account</h1>
           <p className="mt-2 text-sm text-neutral-500">Setting up your account… please refresh in a moment.</p>
           <div className="mt-4">{SignOutButton}</div>
         </main>
@@ -302,7 +302,7 @@ export default async function AccountPage({
       <>
         <SiteHeader />
         <main className="mx-auto max-w-3xl px-4 py-10">
-          <h1 className="text-2xl font-bold">Referee / Judge scoring</h1>
+          <h1 className="text-2xl font-bold">Referee / Judge Scoring</h1>
           <div className="mt-6 rounded-lg border border-neutral-200 bg-neutral-50 p-4">
             <p className="mb-2 text-sm font-semibold text-neutral-700">
               Full access — every Telegram group:
@@ -378,7 +378,7 @@ export default async function AccountPage({
       <>
         <SiteHeader />
         <main className="mx-auto max-w-2xl px-4 py-10">
-          <h1 className="text-2xl font-bold">Link your registration</h1>
+          <h1 className="text-2xl font-bold">Link Your Registration</h1>
           <p className="mt-1 mb-6 text-sm text-neutral-500">
             Signed in as {profile.full_name ?? user.email}.
           </p>
@@ -444,7 +444,7 @@ export default async function AccountPage({
     <>
       <SiteHeader />
       <main className="mx-auto max-w-3xl px-4 py-10">
-        <h1 className="text-2xl font-bold">{existingVideo ? "Your kata recording" : "Record your kata"}</h1>
+        <h1 className="text-2xl font-bold">{existingVideo ? "Your Kata Recording" : "Record Your Kata"}</h1>
         <p className="mt-1 mb-6 text-sm text-neutral-500">
           Signed in as {profile.full_name ?? user.email}.
         </p>

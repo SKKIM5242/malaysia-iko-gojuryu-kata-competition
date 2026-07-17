@@ -44,7 +44,7 @@ export default async function BulkRegisterPage({
       <>
         <SiteHeader />
         <main className="mx-auto max-w-2xl px-4 py-10">
-          <h1 className="text-2xl font-bold tracking-tight">Choose a registration tier</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Choose A Registration Tier</h1>
           <p className="mt-1 mb-6 text-sm text-neutral-500">
             This event has more than one registration tier — pick one to bulk-register your students.
           </p>
@@ -81,7 +81,7 @@ export default async function BulkRegisterPage({
     <>
       <SiteHeader />
       <main className="mx-auto max-w-6xl px-4 py-10">
-        <h1 className="text-2xl font-bold tracking-tight">Bulk registration — Sensei / Coach</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Bulk Registration — Sensei / Coach</h1>
         {competition && (
           <p className="mt-1 text-sm text-neutral-500">
             {competition.name} · {formatDate(competition.event_date)} · Fee{" "}
@@ -115,7 +115,7 @@ export default async function BulkRegisterPage({
               />
 
               <section className="mb-10 rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
-                <h2 className="text-lg font-bold">Step 2, Option A — Excel / CSV upload (up to 10,000 pax)</h2>
+                <h2 className="text-lg font-bold">Step 2, Option A — Excel / CSV Upload (Up To 10,000 Pax)</h2>
                 <p className="mt-1 text-sm text-neutral-600">
                   1. <a href="/bulk-registration-template.csv" download className="font-semibold text-red-700 underline underline-offset-2">
                     Download the CSV template
@@ -130,7 +130,7 @@ export default async function BulkRegisterPage({
               </section>
 
               <section>
-                <h2 className="text-lg font-bold">Step 2, Option B — fill the table on screen</h2>
+                <h2 className="text-lg font-bold">Step 2, Option B — Fill The Table On Screen</h2>
                 <div className="mt-2 mb-4 rounded-md border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
                   Fill one row per participant — like a spreadsheet. Your{" "}
                   <a href="/register/school" className="font-semibold underline underline-offset-2">School / Dojo</a>{" "}

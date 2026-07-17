@@ -14,7 +14,7 @@ export default function TermsPage() {
         </p>
         <div className="mt-8 space-y-6 text-sm leading-relaxed text-neutral-700">
           <section>
-            <h2 className="mb-1 font-bold text-neutral-900">1. Who this applies to</h2>
+            <h2 className="mb-1 font-bold text-neutral-900">1. Who This Applies To</h2>
             <p>
               These terms apply to anyone creating a Kata Arena account — Participants, Referees /
               Judges, and Admin / Organizer / Customer Support staff — to submit, judge, or manage
@@ -22,7 +22,7 @@ export default function TermsPage() {
             </p>
           </section>
           <section>
-            <h2 className="mb-1 font-bold text-neutral-900">2. Recording &amp; submission</h2>
+            <h2 className="mb-1 font-bold text-neutral-900">2. Recording &amp; Submission</h2>
             <p>
               Participants may record and re-record their kata up to the attempt limit shown in the
               recorder. Once submitted, a recording is final and cannot be replaced. By submitting,

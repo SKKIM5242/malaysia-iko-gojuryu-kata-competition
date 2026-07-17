@@ -26,7 +26,7 @@ export default function BulkUploadGate({
 
   return (
     <section className="mb-10 rounded-xl border-2 border-red-700 bg-white p-5 shadow-sm">
-      <h2 className="text-lg font-bold">Step 1 — Pay for your bulk registration</h2>
+      <h2 className="text-lg font-bold">Step 1 — Pay For Your Bulk Registration</h2>
       <p className="mt-1 text-sm text-neutral-600">
         Bulk registration is paid upfront, before you upload: tell us how many participants you're
         registering, pay the total, and once the organiser confirms it you can upload your CSV or

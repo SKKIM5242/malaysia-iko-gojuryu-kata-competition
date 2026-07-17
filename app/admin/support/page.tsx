@@ -70,7 +70,7 @@ export default async function AdminSupport({
     <AdminShell title="Customer Support" active="/admin/support" flash={{ ok: params.ok, error: params.error }}>
       {isCustomerSupport && (
         <div className="mb-8">
-          <h2 className="mb-3 text-lg font-bold">Your shift</h2>
+          <h2 className="mb-3 text-lg font-bold">Your Shift</h2>
           <Card>
             <p className="mb-3 text-xs text-neutral-400">
               Clock in/out here even when your work was replying via the Telegram assistant or
@@ -113,7 +113,7 @@ export default async function AdminSupport({
               note="Each row creates a real login instantly and emails a temporary password — max 200 rows per upload."
             />
           </div>
-          <h2 className="mb-3 text-lg font-bold">Create a Customer Support account</h2>
+          <h2 className="mb-3 text-lg font-bold">Create A Customer Support Account</h2>
           <Card>
             <form action={createStaffAccount} className="space-y-4">
               <input type="hidden" name="role" value="customer_support" />
@@ -205,7 +205,7 @@ export default async function AdminSupport({
         </div>
       )}
 
-      <h2 className="mb-3 text-lg font-bold">Customer Support applications</h2>
+      <h2 className="mb-3 text-lg font-bold">Customer Support Applications</h2>
       {applications.length === 0 ? (
         <EmptyState>No applications yet.</EmptyState>
       ) : (
@@ -269,7 +269,7 @@ export default async function AdminSupport({
 
       {isAdminTier && (
         <div className="mt-8">
-          <h2 className="mb-3 text-lg font-bold">Shift log — USD 8/hour</h2>
+          <h2 className="mb-3 text-lg font-bold">Shift Log — USD 8/Hour</h2>
           {allShifts.length === 0 ? (
             <EmptyState>No shifts logged yet.</EmptyState>
           ) : (
@@ -300,7 +300,7 @@ export default async function AdminSupport({
 
       {canCreate && (
         <div className="mt-8">
-          <h2 className="mb-3 text-lg font-bold">Sign-in Control (Admin/Organizer only)</h2>
+          <h2 className="mb-3 text-lg font-bold">Sign-In Control (Admin/Organizer Only)</h2>
           {(supportProfiles ?? []).length === 0 ? (
             <EmptyState>No Customer Support logins yet.</EmptyState>
           ) : (

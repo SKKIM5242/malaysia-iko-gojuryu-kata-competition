@@ -26,7 +26,7 @@ export default async function RegisterSuccessPage({
         {result.status === "paid" ? (
           <div className="rounded-lg border border-green-300 bg-green-50 p-8 text-center">
             <p className="text-3xl">✅</p>
-            <h1 className="mt-2 text-xl font-bold text-green-900">Payment successful — registration confirmed!</h1>
+            <h1 className="mt-2 text-xl font-bold text-green-900">Payment Successful — Registration Confirmed!</h1>
             <p className="mt-2 text-green-800">
               Your registration reference ID{result.referenceIds.length > 1 ? "s are" : " is"}{" "}
               {result.referenceIds.map((id, i) => (
@@ -91,7 +91,7 @@ export default async function RegisterSuccessPage({
           </div>
         ) : result.status === "unpaid" ? (
           <div className="rounded-lg border border-amber-300 bg-amber-50 p-8 text-center">
-            <h1 className="text-xl font-bold text-amber-900">Payment not completed</h1>
+            <h1 className="text-xl font-bold text-amber-900">Payment Not Completed</h1>
             <p className="mt-2 text-sm text-amber-800">
               Your payment was not completed, so no registration was submitted.
             </p>
@@ -104,7 +104,7 @@ export default async function RegisterSuccessPage({
           </div>
         ) : (
           <div className="rounded-lg border border-red-300 bg-red-50 p-8 text-center">
-            <h1 className="text-xl font-bold text-red-900">Something went wrong</h1>
+            <h1 className="text-xl font-bold text-red-900">Something Went Wrong</h1>
             <p className="mt-2 text-sm text-red-800">{result.message}</p>
           </div>
         )}

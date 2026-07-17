@@ -14,7 +14,7 @@ export default function ForgotPasswordPage() {
     <>
       <SiteHeader />
       <main className="mx-auto max-w-md px-4 py-10">
-        <h1 className="text-2xl font-bold tracking-tight">Forgot password</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Forgot Password</h1>
         <p className="mt-1 mb-6 text-sm text-neutral-500">
           Enter the IC/Passport number or mobile phone number you registered with — we&apos;ll email
           a password reset link to the address on file.

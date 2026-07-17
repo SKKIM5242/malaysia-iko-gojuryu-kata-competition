@@ -36,7 +36,7 @@ export default async function ParticipantsPage({
       <>
         <SiteHeader />
         <main className="mx-auto max-w-6xl px-4 py-10">
-          <h1 className="mb-6 text-2xl font-bold">Confirmed participants</h1>
+          <h1 className="mb-6 text-2xl font-bold">Confirmed Participants</h1>
           <EmptyState>No competition has been published yet.</EmptyState>
         </main>
         <SiteFooter />
@@ -77,7 +77,7 @@ export default async function ParticipantsPage({
     <>
       <SiteHeader />
       <main className="mx-auto max-w-6xl px-4 py-10">
-        <h1 className="text-2xl font-bold tracking-tight">Confirmed participants</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Confirmed Participants</h1>
         <p className="mt-1 text-sm text-neutral-500">
           {openCompetitions.length > 1 && !selectedTier
             ? "All registration tiers — participants whose payment has been confirmed by the organiser."

@@ -135,7 +135,7 @@ async function ApprovalsTab({ supabase }: { supabase: Awaited<ReturnType<typeof 
   return (
     <div>
       <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-bold">Referee &amp; staff accounts</h2>
+        <h2 className="text-lg font-bold">Referee &amp; Staff Accounts</h2>
         {profiles.length > 0 && (
           <DownloadCsvButton
             filename="staff-accounts"
@@ -230,7 +230,7 @@ async function CodesTab({ supabase }: { supabase: Awaited<ReturnType<typeof crea
   return (
     <div className="grid gap-8 lg:grid-cols-2">
       <div>
-        <h2 className="mb-3 text-lg font-bold">New invitation code</h2>
+        <h2 className="mb-3 text-lg font-bold">New Invitation Code</h2>
         <Card>
           <form action={createInvitationCode} className="space-y-4">
             <div>
@@ -274,7 +274,7 @@ async function CodesTab({ supabase }: { supabase: Awaited<ReturnType<typeof crea
         </Card>
       </div>
       <div>
-        <h2 className="mb-3 text-lg font-bold">All codes</h2>
+        <h2 className="mb-3 text-lg font-bold">All Codes</h2>
         {codes.length === 0 ? (
           <EmptyState>No invitation codes yet.</EmptyState>
         ) : (

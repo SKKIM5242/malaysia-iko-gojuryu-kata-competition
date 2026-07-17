@@ -219,7 +219,7 @@ export default async function AdminJudging({
         />
       </div>
 
-      <h2 className="mb-3 text-lg font-bold">Referee workload</h2>
+      <h2 className="mb-3 text-lg font-bold">Referee Workload</h2>
       {refereeList.length === 0 ? (
         <EmptyState>No approved referees yet — approve some in Accounts → Approvals first.</EmptyState>
       ) : (

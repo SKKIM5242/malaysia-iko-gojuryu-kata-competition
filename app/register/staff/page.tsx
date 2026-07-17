@@ -12,7 +12,7 @@ export default function RegisterStaffPage() {
       <SiteHeader />
       <main className="mx-auto max-w-2xl px-4 py-10">
         <h1 className="text-2xl font-bold tracking-tight">
-          Admin / Organizer / Customer Support registration
+          Admin / Organizer / Customer Support Registration
         </h1>
         <p className="mt-1 text-sm text-neutral-500">
           Apply to join the organising or support team. Applications are reviewed and approved by
