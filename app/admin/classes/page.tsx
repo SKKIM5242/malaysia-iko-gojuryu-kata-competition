@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { schemaReady } from "@/lib/data";
 import {
-  saveStudent, deleteStudent, saveFeePlan, enrollStudent,
+  saveStudent, deleteStudent, saveFeePlan, deleteFeePlan, enrollStudent,
   updateEnrollmentStatus, generateDueInvoices, createManualInvoice, updateInvoiceStatus,
   generateInvoicePaymentLink,
 } from "@/app/actions/classes";
@@ -391,9 +391,17 @@ export default async function AdminClasses({
                         {p.applies_to?.length > 0 && <> · {p.applies_to.join(", ")}</>}
                       </p>
                     </div>
-                    <Link href={`/admin/classes?tab=plans&edit=${p.id}`} className="rounded border border-neutral-300 px-3 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50">
-                      Edit
-                    </Link>
+                    <div className="flex shrink-0 gap-1.5">
+                      <Link href={`/admin/classes?tab=plans&edit=${p.id}`} className="rounded border border-neutral-300 px-3 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50">
+                        Edit
+                      </Link>
+                      <form action={deleteFeePlan}>
+                        <input type="hidden" name="id" value={p.id} />
+                        <button className="rounded border border-red-300 px-3 py-1 text-xs font-semibold text-red-700 hover:bg-red-50">
+                          Delete
+                        </button>
+                      </form>
+                    </div>
                   </div>
                 </Card>
               ))}

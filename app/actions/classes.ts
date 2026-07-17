@@ -73,6 +73,29 @@ export async function deleteStudent(formData: FormData) {
 
 // ── Fee plans ────────────────────────────────────────────────────────────────
 
+/** Fee plans are referenced (not cascaded) by class_enrollments/class_invoices,
+ * so a plan with any history can't be hard-deleted — mark it inactive instead
+ * (the existing soft-delete via the "Active" checkbox on the plan form). */
+export async function deleteFeePlan(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const { supabase, actorId } = await getActor();
+  const [{ count: enrollCount }, { count: invoiceCount }] = await Promise.all([
+    supabase.from("class_enrollments").select("id", { count: "exact", head: true }).eq("fee_plan_id", id),
+    supabase.from("class_invoices").select("id", { count: "exact", head: true }).eq("fee_plan_id", id),
+  ]);
+  if ((enrollCount ?? 0) > 0 || (invoiceCount ?? 0) > 0) {
+    backTo("plans", {
+      error: `Cannot delete — ${enrollCount ?? 0} enrollment(s) and ${invoiceCount ?? 0} invoice(s) reference this plan. Untick "Active" on the plan instead to retire it.`,
+    });
+  }
+  const { error } = await supabase.from("fee_plans").delete().eq("id", id);
+  if (error) backTo("plans", { error: "Could not delete fee plan." });
+  await writeAudit(supabase, {
+    table_name: "fee_plans", record_id: id, action: "fee_plan_deleted", actor_id: actorId,
+  });
+  backTo("plans", { ok: "Fee plan deleted." });
+}
+
 const FEE_PLAN_KINDS = ["membership_yearly", "training_monthly", "grading", "hourly_charge", "service_charge"];
 const BILLING_INTERVALS = [
   "yearly", "monthly", "bimonthly", "quarterly",
