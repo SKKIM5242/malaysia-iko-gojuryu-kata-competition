@@ -244,6 +244,14 @@ export async function submitScore(formData: FormData) {
     revalidatePath("/account");
     return;
   }
+  const { data: myProfile } = await supabase.from("profiles").select("role").eq("user_id", user.id).maybeSingle();
+  if (myProfile?.role && ["admin", "organizer", "staff"].includes(myProfile.role)) {
+    // Admin/Organizer full-access override: they may score any recording,
+    // not just ones formally assigned to them — self-assign first so they
+    // show up correctly everywhere assignment drives display (Judging
+    // Arena, Kata Arena's per-judge chips), same as a regular referee.
+    await supabase.rpc("assign_referee", { p_video: videoId, p_referee: user.id });
+  }
   const { error } = await supabase
     .from("video_scores")
     .upsert(

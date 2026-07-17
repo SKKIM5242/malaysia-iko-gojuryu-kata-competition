@@ -86,14 +86,14 @@ async function blockReferee(
 /** Judging Arena mutations (assign/unassign referees, set judges-required,
  * auto-assign) are Super Admin only — Organizer, Customer Support, and
  * Referee can view the arena but not configure it. */
-async function requireAdmin(
+async function requireJudgingManager(
   supabase: Awaited<ReturnType<typeof createClient>>,
   actorId: string | null,
   returnTo: string,
 ) {
   const role = await getActorRole(supabase, actorId);
-  if (role !== "admin") {
-    backTo(returnTo, { error: "Only the Super Admin can configure judging." });
+  if (!["admin", "organizer", "staff", "referee"].includes(role ?? "")) {
+    backTo(returnTo, { error: "Only Admin / Organizer or a Referee/Judge can configure judging." });
   }
 }
 
@@ -1085,7 +1085,7 @@ export async function assignRefereeToVideo(formData: FormData) {
   const returnTo = String(formData.get("return_to") ?? "/admin/judging");
   if (!videoId || !refereeUserId) backTo(returnTo, { error: "Select a video and a referee." });
   const { supabase, actorId } = await getActor();
-  await requireAdmin(supabase, actorId, returnTo);
+  await requireJudgingManager(supabase, actorId, returnTo);
   const { error } = await supabase.rpc("assign_referee", { p_video: videoId, p_referee: refereeUserId });
   if (error) backTo(returnTo, { error: "Could not assign referee." });
   await writeAudit(supabase, {
@@ -1115,7 +1115,7 @@ export async function unassignRefereeFromVideo(formData: FormData) {
   const refereeUserId = String(formData.get("referee_user_id") ?? "");
   const returnTo = String(formData.get("return_to") ?? "/admin/judging");
   const { supabase, actorId } = await getActor();
-  await requireAdmin(supabase, actorId, returnTo);
+  await requireJudgingManager(supabase, actorId, returnTo);
   const { error } = await supabase.rpc("unassign_referee", { p_video: videoId, p_referee: refereeUserId });
   if (error) backTo(returnTo, { error: "Could not remove referee." });
   await writeAudit(supabase, {
@@ -1133,7 +1133,7 @@ export async function setJudgesRequired(formData: FormData) {
     backTo(returnTo, { error: "Enter a whole number of judges (1 or more)." });
   }
   const { supabase, actorId } = await getActor();
-  await requireAdmin(supabase, actorId, returnTo);
+  await requireJudgingManager(supabase, actorId, returnTo);
   const { error } = await supabase
     .from("competitions")
     .update({ judges_required: judgesRequired })
@@ -1158,7 +1158,7 @@ export async function autoAssignReferees(formData: FormData) {
   const returnTo = "/admin/judging";
   if (!competitionId) backTo(returnTo, { error: "Select a competition." });
   const { supabase, actorId } = await getActor();
-  await requireAdmin(supabase, actorId, returnTo);
+  await requireJudgingManager(supabase, actorId, returnTo);
 
   const { data: competition } = await supabase
     .from("competitions")

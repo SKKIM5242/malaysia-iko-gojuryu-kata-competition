@@ -71,14 +71,14 @@ export const ACCESS_MATRIX: AccessRow[] = [
   },
   {
     resource: "Judging Arena (assign referees, set judges-required)",
-    admin: "Full", organizer: "View only", customerSupport: "View only", referee: "View only",
-    note: "assignRefereeToVideo/unassignRefereeFromVideo/setJudgesRequired/autoAssignReferees all require requireAdmin — Super Admin only. Everyone else can watch recordings and see workload, not configure.",
+    admin: "Full", organizer: "Full", customerSupport: "View only", referee: "Full",
+    note: "assignRefereeToVideo/unassignRefereeFromVideo/setJudgesRequired/autoAssignReferees require requireJudgingManager (admin/organizer/staff/referee). Customer Support can still watch recordings and see workload, not configure.",
   },
   {
     resource: "Kata video scoring",
-    admin: "Blocked (not a referee)", organizer: "Blocked (not a referee)",
+    admin: "Full — any recording", organizer: "Full — any recording",
     customerSupport: "Blocked (not a referee)", referee: "Own assigned videos only",
-    note: "Enforced entirely by DB RLS (scores_referee_upsert) — referee_user_id must match and the referee must be assigned to that video. No admin override.",
+    note: "Referee scoring is unchanged, enforced by DB RLS (scores_referee_upsert). Admin/Organizer/Staff get an additive override policy (scores_manager_upsert) letting them score any recording as themselves, auto-self-assigning via assign_referee() so they show up correctly wherever assignment drives display.",
   },
   {
     resource: "Kata recording playback",

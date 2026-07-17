@@ -5,6 +5,7 @@ import {
   assignRefereeToVideo, unassignRefereeFromVideo, setJudgesRequired, autoAssignReferees,
   resendRefereeNotification,
 } from "@/app/actions/admin";
+import { submitScore } from "@/app/actions/account";
 import { AdminShell, Card, adminBtn, adminInput } from "@/components/admin";
 import { CategoryName, EmptyState, SetupNotice } from "@/components/ui";
 import VideoWatchButton from "@/components/VideoWatchButton";
@@ -43,7 +44,16 @@ export default async function AdminJudging({
   const { data: myProfile } = user
     ? await supabase.from("profiles").select("role").eq("user_id", user.id).maybeSingle()
     : { data: null };
-  const isAdmin = myProfile?.role === "admin";
+  const myRole = myProfile?.role ?? null;
+  // Judging Arena management (assign/unassign referees, judges-required,
+  // auto-assign): Admin, Organizer/Staff, and Referee/Judge all get Full
+  // access. Customer Support stays view only.
+  const canManageJudging = ["admin", "organizer", "staff", "referee"].includes(myRole ?? "");
+  // Kata video scoring override: Admin and Organizer/Staff may score any
+  // recording, not just ones assigned to them. Customer Support stays
+  // blocked (not a referee); Referee/Judge is unchanged — own assigned
+  // videos only, via the separate My Account scoring flow.
+  const canScoreAnyVideo = ["admin", "organizer", "staff"].includes(myRole ?? "");
 
   const [competitions, { data: videos }, { data: referees }, { data: assignments }, { data: scores }] =
     await Promise.all([
@@ -96,6 +106,7 @@ export default async function AdminJudging({
   function renderVideoCard(v: VideoRow, queuePosition: number | null, dq: boolean) {
     const assigned = assignedByVideo.get(v.id) ?? [];
     const available = refereeList.filter((r) => !assigned.includes(r.user_id));
+    const myScore = user ? scoreByKey.get(`${v.id}:${user.id}`) : undefined;
     const submittedScores = assigned
       .map((uid) => scoreByKey.get(`${v.id}:${uid}`))
       .filter((s): s is number => s != null);
@@ -153,7 +164,7 @@ export default async function AdminJudging({
                       </button>
                     </form>
                   )}
-                  {isAdmin && (
+                  {canManageJudging && (
                     <form action={unassignRefereeFromVideo}>
                       <input type="hidden" name="video_id" value={v.id} />
                       <input type="hidden" name="referee_user_id" value={uid} />
@@ -173,7 +184,7 @@ export default async function AdminJudging({
           )}
         </div>
 
-        {isAdmin && available.length > 0 && (
+        {canManageJudging && available.length > 0 && (
           <form action={assignRefereeToVideo} className="mt-3 flex flex-wrap items-center gap-2">
             <input type="hidden" name="video_id" value={v.id} />
             <input type="hidden" name="return_to" value="/admin/judging" />
@@ -195,6 +206,29 @@ export default async function AdminJudging({
             </button>
           </form>
         )}
+
+        {canScoreAnyVideo && (
+          <form action={submitScore} className="mt-3 flex flex-wrap items-center gap-2 border-t border-neutral-100 pt-3">
+            <input type="hidden" name="video_id" value={v.id} />
+            <label htmlFor={`score_${v.id}`} className="text-xs font-semibold text-neutral-500">
+              {myScore != null ? "Update your score" : "Score this recording"} (0–11) — Admin/Organizer override
+            </label>
+            <input
+              id={`score_${v.id}`}
+              name="score"
+              type="number"
+              min={0}
+              max={11}
+              step={0.1}
+              defaultValue={myScore ?? ""}
+              required
+              className="w-20 rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
+            />
+            <button className="rounded-md bg-red-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-600">
+              Submit score
+            </button>
+          </form>
+        )}
       </Card>
     );
   }
@@ -205,6 +239,8 @@ export default async function AdminJudging({
         Every score a Referee/Judge submits is <strong>final — no appeal is available</strong>. A
         judge&apos;s individual score is visible to everyone as soon as they submit it; the
         Average Score and standings stay hidden from the public until winners are announced.
+        Admin and Organizer/Staff can also score any recording directly below, regardless of
+        assignment.
       </div>
 
       <div className="mb-3 flex justify-end">
@@ -267,7 +303,7 @@ export default async function AdminJudging({
                   {compVideos.length} recording{compVideos.length === 1 ? "" : "s"} submitted
                 </p>
               </div>
-              {isAdmin ? (
+              {canManageJudging ? (
                 <div className="flex flex-wrap items-center gap-2">
                   <form action={setJudgesRequired} className="flex items-center gap-1.5">
                     <input type="hidden" name="competition_id" value={c.id} />
