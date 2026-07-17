@@ -211,7 +211,10 @@ export default function RegisterForm({
             <span>
               I confirm the Latest Belt Rank I entered above matches what is stated on my uploaded
               certificate — if it&apos;s not in English, I&apos;ve translated it first (use the
-              language button in the site header) before confirming. *
+              language button in the site header) before confirming.{" "}
+              <strong>A participant may be disqualified from the event they take part in if the
+              Latest Belt Rank does not match the certificate, or is submitted without Sensei
+              confirmation.</strong> *
             </span>
           </label>
           <p className="mt-1.5 text-xs text-neutral-400">
