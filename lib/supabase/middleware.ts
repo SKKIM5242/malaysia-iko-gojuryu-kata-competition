@@ -81,7 +81,7 @@ export async function updateSession(request: NextRequest) {
       if (role === "admin") {
         // full access
       } else if (role === "organizer" || role === "staff" || role === "customer_support" || role === "referee") {
-        if (path.startsWith("/admin/accounts")) {
+        if (path.startsWith("/admin/accounts") || path.startsWith("/admin/email-verifications")) {
           return redirectTo("/admin");
         }
       } else {

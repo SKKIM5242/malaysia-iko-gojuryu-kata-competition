@@ -109,6 +109,21 @@ export async function sendConfirmationEmail(input: ConfirmationEmailInput): Prom
   await sendEmail(input.toEmail, input.subject, lines.join("\n"));
 }
 
+/** Sent once per new account, right after signup — same no-op-until-
+ * RESEND_API_KEY-is-set pattern as every other email in this file. */
+export async function sendVerificationEmail(toEmail: string, verifyUrl: string): Promise<void> {
+  await sendEmail(
+    toEmail,
+    "Please verify your email — Malaysia Open IKO Goju-ryu Kata Championship",
+    `Thanks for creating an account.\n\n` +
+      `Please confirm this is really your email address by clicking the link below. Until you ` +
+      `do, you won't be able to sign in.\n\n` +
+      `Verify my email: ${verifyUrl}\n\n` +
+      `If you didn't create this account, you can ignore this email.\n\n` +
+      `— Malaysia Open IKO Goju-ryu Kata Championship`,
+  );
+}
+
 const ANNOUNCEMENT_TELEGRAM_CATEGORIES: TelegramCategory[] = [
   "participant", "school", "referee", "audience", "staff",
 ];

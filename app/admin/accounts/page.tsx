@@ -254,7 +254,9 @@ async function CodesTab({ supabase }: { supabase: Awaited<ReturnType<typeof crea
                 </select>
               </div>
               <div>
-                <label htmlFor="max_uses" className={adminLabel}>Max uses (blank = unlimited)</label>
+                <label htmlFor="max_uses" className={adminLabel}>
+                  Max uses <span className="font-normal text-neutral-400">(blank = unlimited; forced to 1 if Email below is set)</span>
+                </label>
                 <input id="max_uses" name="max_uses" type="number" min="1" className={adminInput} />
               </div>
             </div>
@@ -262,13 +264,34 @@ async function CodesTab({ supabase }: { supabase: Awaited<ReturnType<typeof crea
               <label htmlFor="note" className={adminLabel}>Note</label>
               <input id="note" name="note" className={adminInput} placeholder="e.g. Panel of 5 judges, July intake" />
             </div>
+            <div>
+              <label htmlFor="code_email" className={adminLabel}>
+                Email <span className="font-normal text-neutral-400">(optional — binds this code to one address, single-use only)</span>
+              </label>
+              <input id="code_email" name="email" type="email" className={adminInput} placeholder="e.g. jane@example.com" />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div>
+                <label htmlFor="valid_from" className={adminLabel}>Valid from (optional)</label>
+                <input id="valid_from" name="valid_from" type="date" className={adminInput} />
+              </div>
+              <div>
+                <label htmlFor="valid_until" className={adminLabel}>Valid until (optional)</label>
+                <input id="valid_until" name="valid_until" type="date" className={adminInput} />
+              </div>
+              <div>
+                <label htmlFor="sign_in_limit" className={adminLabel}>Sign-in limit (optional)</label>
+                <input id="sign_in_limit" name="sign_in_limit" type="number" min="1" className={adminInput} placeholder="blank = unlimited" />
+              </div>
+            </div>
             <button type="submit" className={adminBtn}>Create code</button>
             <p className="text-xs text-neutral-400">
-              Referee/Judge and Audience/Spectator codes waive their fee and activate instantly at
-              public sign-up — no approval step. School and Sensei codes waive the same way from
-              those pages&apos; own invitation-code box. Participant, Organizer, Customer Services
-              Support, and Admin codes are record-keeping only for now — noting which code a
-              manually-added account was given — since those roles have no public self-signup.
+              Every role — School, Sensei, Participant, Referee/Judge, Audience/Spectator,
+              Organizer, Customer Support, and Admin — waives its fee and activates instantly at
+              public sign-up with a valid code, no approval step. School and Sensei codes waive
+              the same way from those pages&apos; own invitation-code box. &quot;Valid from/until&quot;
+              and &quot;Sign-in limit&quot; are copied onto the resulting account as its own sign-in
+              window/cap the moment the code is redeemed — leave blank for unlimited, no expiry.
             </p>
           </form>
         </Card>

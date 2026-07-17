@@ -9,6 +9,8 @@ import ClaimForm from "@/components/ClaimForm";
 import VideoWatchButton from "@/components/VideoWatchButton";
 import { isWithinSignInQuota } from "@/lib/sign-in-quota";
 import SubscriptionBlocked from "@/components/SubscriptionBlocked";
+import EmailVerificationBlocked from "@/components/EmailVerificationBlocked";
+import { isEmailVerified } from "@/lib/email-verification";
 import { signOut } from "@/app/actions/auth";
 import { ensureProfile } from "@/lib/ensure-profile";
 
@@ -230,22 +232,30 @@ export default async function KataArenaPage({
     );
   }
 
+  const signOutButtonForm = (
+    <form action={signOut}>
+      <button className="rounded-md border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-50">
+        Sign out
+      </button>
+    </form>
+  );
+
+  if (!(await isEmailVerified(user.id))) {
+    return (
+      <>
+        <SiteHeader />
+        <EmailVerificationBlocked title="Kata Arena" signOutForm={signOutButtonForm} />
+        <SiteFooter />
+      </>
+    );
+  }
+
   const quota = isWithinSignInQuota(profile);
   if (!quota.ok) {
     return (
       <>
         <SiteHeader />
-        <SubscriptionBlocked
-          title="Kata Arena"
-          reason={quota.reason!}
-          signOutForm={
-            <form action={signOut}>
-              <button className="rounded-md border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-50">
-                Sign out
-              </button>
-            </form>
-          }
-        />
+        <SubscriptionBlocked title="Kata Arena" reason={quota.reason!} signOutForm={signOutButtonForm} />
         <SiteFooter />
       </>
     );

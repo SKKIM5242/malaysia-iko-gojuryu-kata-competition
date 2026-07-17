@@ -106,6 +106,11 @@ export const ACCESS_MATRIX: AccessRow[] = [
     note: "/admin/accounts stays restricted to Admin at the route level — the only page excluded from the otherwise-shared full nav.",
   },
   {
+    resource: "Email Verifications page",
+    admin: "Full", organizer: "Blocked (route)", customerSupport: "Blocked (route)", referee: "Blocked (route)",
+    note: "/admin/email-verifications is Admin-only at the route level, same as Accounts — it can manually mark an account verified, bypassing the sign-in gate.",
+  },
+  {
     resource: "CSV bulk upload — Schools / Senseis / Referees / Audience",
     admin: "Full", organizer: "Full", customerSupport: "Full", referee: "Full",
     note: "Mirrors the single-record actions above (no extra guard).",

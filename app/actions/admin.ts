@@ -958,6 +958,10 @@ export async function createInvitationCode(formData: FormData) {
   const providedCode = String(formData.get("code") ?? "").trim().toUpperCase();
   const note = String(formData.get("note") ?? "").trim() || null;
   const maxUsesRaw = String(formData.get("max_uses") ?? "").trim();
+  const email = String(formData.get("email") ?? "").trim().toLowerCase() || null;
+  const validFrom = String(formData.get("valid_from") ?? "").trim() || null;
+  const validUntil = String(formData.get("valid_until") ?? "").trim() || null;
+  const signInLimitRaw = String(formData.get("sign_in_limit") ?? "").trim();
   const returnTo = String(formData.get("return_to") ?? "/admin/accounts");
   if (!["referee", "staff", "audience", "school", "sensei", "participant", "organizer", "customer_support", "admin", "any"].includes(role)) {
     backTo(returnTo, { error: "A valid role is required." });
@@ -971,9 +975,16 @@ export async function createInvitationCode(formData: FormData) {
     ? await supabase.from("profiles").select("full_name, email").eq("user_id", actorId).maybeSingle()
     : { data: null };
   const generated_by = myProfile?.full_name || myProfile?.email || null;
+  // A code bound to one email is a personal code — always single-use,
+  // regardless of what was typed in Max uses.
+  const max_uses = email ? 1 : maxUsesRaw ? Number(maxUsesRaw) : null;
   const { data, error } = await supabase
     .from("invitation_codes")
-    .insert({ code, role, note, max_uses: maxUsesRaw ? Number(maxUsesRaw) : null, generated_by })
+    .insert({
+      code, role, note, max_uses, generated_by, email,
+      valid_from: validFrom, valid_until: validUntil,
+      sign_in_limit: signInLimitRaw ? Number(signInLimitRaw) : null,
+    })
     .select("id")
     .single();
   if (error) backTo(returnTo, { error: `Could not create code: ${error.message}` });

@@ -24,6 +24,7 @@ const FULL_NAV: Array<[string, string]> = [
   ["Telegram Links", "/admin/telegram"],
   ["Classes", "/admin/classes"],
   ["Accounts", "/admin/accounts"],
+  ["Email Verifications", "/admin/email-verifications"],
   ["Kata Arena Log In", "/account"],
 ];
 
@@ -50,7 +51,7 @@ export async function AdminShell({
   const nav =
     role === "admin"
       ? FULL_NAV
-      : FULL_NAV.filter(([, href]) => href !== "/admin/accounts");
+      : FULL_NAV.filter(([, href]) => href !== "/admin/accounts" && href !== "/admin/email-verifications");
   return (
     <div className="min-h-screen bg-neutral-100">
       <header className="border-b border-neutral-800 bg-neutral-950 text-white">

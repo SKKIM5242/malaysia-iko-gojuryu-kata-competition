@@ -4,30 +4,21 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { triggerEmailVerification } from "@/app/actions/email-verification";
 
 const inputCls =
   "w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm focus:border-red-600 focus:outline-none focus:ring-1 focus:ring-red-600";
 const labelCls = "mb-1 block text-sm font-medium text-neutral-700";
 
-/** Only participant/referee/audience/school/sensei create a login account
- * through this form. Organizer/Customer Support are admin-only accounts
- * with their own dedicated pages — selecting one here just links out to it.
+/** Every role can now self-signup through this form — Organizer, Customer
+ * Support, and Admin require a valid invitation code (same as School/Sensei
+ * below); without one, there's no self-signup path for those three, so a
+ * link to the reviewed /register/staff application is shown instead.
  * School/Sensei directory records (with bank/contact details) are still
  * created separately on their own registration page — this is the *second*
  * step, signing in to view their own students' recordings, which needs a
  * personal invitation code generated from that existing directory record. */
-const REDIRECT_ROLES: Record<string, { label: string; href: string; blurb: string }> = {
-  organizer: {
-    label: "Organizer",
-    href: "/register/staff",
-    blurb: "Admin/Organizer accounts have no self-signup — submit an application for the organiser to review.",
-  },
-  customer_support: {
-    label: "Customer Services Support",
-    href: "/register/staff",
-    blurb: "Customer Support accounts have no self-signup — submit an application for the organiser to review.",
-  },
-};
+const CODE_OPTIONAL_ROLES = new Set(["referee", "audience"]);
 
 export default function AuthForms({ defaultMode = "signin" }: { defaultMode?: "signin" | "signup" }) {
   const router = useRouter();
@@ -52,20 +43,25 @@ export default function AuthForms({ defaultMode = "signin" }: { defaultMode?: "s
         if (form.get("terms_accepted") !== "on") {
           throw new Error("Please accept the Terms & Conditions to create an account.");
         }
-        const { error: err } = await supabase.auth.signUp({
+        const signupRole = String(form.get("role") ?? "participant");
+        const { data: signUpData, error: err } = await supabase.auth.signUp({
           email,
           password,
           options: {
             data: {
               full_name: String(form.get("full_name") ?? "").trim(),
               country: String(form.get("country") ?? "").trim(),
-              role: String(form.get("role") ?? "participant"),
+              role: signupRole,
               invite_code: String(form.get("invite_code") ?? "").trim(),
               terms_accepted: true,
             },
           },
         });
         if (err) throw err;
+        if (signUpData.user) {
+          // Best-effort — never blocks account creation on a slow/failed email.
+          triggerEmailVerification(signUpData.user.id, email, signupRole).catch(() => {});
+        }
         const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
         if (signInErr) throw signInErr;
       } else {
@@ -141,6 +137,7 @@ export default function AuthForms({ defaultMode = "signin" }: { defaultMode?: "s
               <option value="audience">Audience / Spectator (view Kata Arena)</option>
               <option value="customer_support">Customer Services Support</option>
               <option value="organizer">Organizer</option>
+              <option value="admin">Admin</option>
             </select>
             <p className="mt-1 text-xs text-neutral-400">
               Referee/Judge and Audience accounts need the organiser&apos;s approval before they
@@ -166,19 +163,20 @@ export default function AuthForms({ defaultMode = "signin" }: { defaultMode?: "s
             </p>
           </div>
         )}
-        {mode === "signup" && REDIRECT_ROLES[role] ? (
-          <div className="rounded-md border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-600">
-            <p>{REDIRECT_ROLES[role].blurb}</p>
-            <Link
-              href={REDIRECT_ROLES[role].href}
-              className="mt-3 inline-block rounded-md bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-600"
-            >
-              Go to {REDIRECT_ROLES[role].label} registration →
-            </Link>
+        {mode === "signup" && (role === "organizer" || role === "customer_support" || role === "admin") && (
+          <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
+            <p>
+              A valid invitation code is required to self-signup for this role — it activates your
+              account immediately, no approval step. No code?{" "}
+              <Link href="/register/staff" className="font-semibold underline underline-offset-2">
+                Submit an application
+              </Link>{" "}
+              for the organiser to review instead.
+            </p>
           </div>
-        ) : (
-          <>
-            {mode === "signup" && (role === "referee" || role === "audience") && (
+        )}
+        <>
+            {mode === "signup" && CODE_OPTIONAL_ROLES.has(role) && (
               <div>
                 <label htmlFor="auth_invite" className={labelCls}>Invitation code (optional)</label>
                 <input id="auth_invite" name="invite_code" className={inputCls} placeholder="e.g. IKO-JUDGE-2026" />
@@ -187,14 +185,35 @@ export default function AuthForms({ defaultMode = "signin" }: { defaultMode?: "s
                 </p>
               </div>
             )}
-            {mode === "signup" && (role === "school" || role === "sensei") && (
+            {mode === "signup" && role === "school" && (
               <div>
                 <label htmlFor="auth_invite" className={labelCls}>Invitation code *</label>
                 <input id="auth_invite" name="invite_code" required className={inputCls} placeholder="e.g. SCHOOL-4F9A2B" />
                 <p className="mt-1 text-xs text-neutral-400">
-                  Required — get this from your school/sensei&apos;s own record on the admin site
-                  (ask the organiser if you don&apos;t have one yet). It's what links this account
-                  to your students only.
+                  Required — get this from your school&apos;s own record on the admin site (ask the
+                  organiser if you don&apos;t have one yet). It's what links this account to your
+                  students only.
+                </p>
+              </div>
+            )}
+            {mode === "signup" && role === "sensei" && (
+              <div>
+                <label htmlFor="auth_invite" className={labelCls}>Invitation code *</label>
+                <input id="auth_invite" name="invite_code" required className={inputCls} placeholder="e.g. SENSEI-4F9A2B" />
+                <p className="mt-1 text-xs text-neutral-400">
+                  Required — get this from your sensei&apos;s own record on the admin site (ask the
+                  organiser if you don&apos;t have one yet). It's what links this account to your
+                  students only.
+                </p>
+              </div>
+            )}
+            {mode === "signup" && (role === "organizer" || role === "customer_support" || role === "admin") && (
+              <div>
+                <label htmlFor="auth_invite" className={labelCls}>Invitation code *</label>
+                <input id="auth_invite" name="invite_code" required className={inputCls} placeholder="e.g. STAFF-4F9A2B" />
+                <p className="mt-1 text-xs text-neutral-400">
+                  Required — get this from the organiser. A valid code activates your account
+                  immediately with no approval step.
                 </p>
               </div>
             )}
@@ -263,7 +282,6 @@ export default function AuthForms({ defaultMode = "signin" }: { defaultMode?: "s
               {pending ? "Please wait…" : mode === "signup" ? "Create account" : "Sign in"}
             </button>
           </>
-        )}
       </form>
     </div>
   );

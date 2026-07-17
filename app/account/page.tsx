@@ -13,6 +13,8 @@ import RefereeScoring, { type ScoringItem } from "@/components/RefereeScoring";
 import { getAllTelegramLinks, getTelegramBotConnectUrl } from "@/lib/telegram";
 import { isWithinSignInQuota } from "@/lib/sign-in-quota";
 import SubscriptionBlocked from "@/components/SubscriptionBlocked";
+import EmailVerificationBlocked from "@/components/EmailVerificationBlocked";
+import { isEmailVerified } from "@/lib/email-verification";
 
 export const dynamic = "force-dynamic";
 
@@ -187,6 +189,16 @@ export default async function AccountPage({
           </p>
           <div className="mt-4">{SignOutButton}</div>
         </main>
+        <SiteFooter />
+      </>
+    );
+  }
+
+  if (!(await isEmailVerified(user.id))) {
+    return (
+      <>
+        <SiteHeader />
+        <EmailVerificationBlocked title="My Account" signOutForm={SignOutButton} />
         <SiteFooter />
       </>
     );
