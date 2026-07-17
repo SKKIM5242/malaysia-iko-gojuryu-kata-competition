@@ -4,7 +4,7 @@ import { schemaReady } from "@/lib/data";
 import { getAllCompetitions } from "@/lib/admin-data";
 import { updateCommunityStatus, saveReferee, deleteReferee, createInvitationCode, linkRefereeAccount, bulkUploadReferees } from "@/app/actions/admin";
 import { AdminShell, Card, CertificateField, adminBtn, adminBtnSecondary, adminInput, adminLabel } from "@/components/admin";
-import { EmptyState, SetupNotice, formatDate } from "@/components/ui";
+import { EmptyState, SetupNotice, formatDOB } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
 import SignInControlBox from "@/components/SignInControlBox";
@@ -320,7 +320,7 @@ export default async function AdminReferees({
                 reference_id: r.id.slice(0, 8).toUpperCase(),
                 full_name: r.full_name,
                 ic_passport: r.ic_passport,
-                date_of_birth: formatDate(r.date_of_birth),
+                date_of_birth: formatDOB(r.date_of_birth),
                 gender: r.gender ?? "",
                 karate_rank: r.karate_rank ?? "",
                 judging_experience_count: String(r.judging_experience_count ?? 0),

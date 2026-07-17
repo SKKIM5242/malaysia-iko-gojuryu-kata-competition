@@ -9,7 +9,7 @@ import {
   getStaffAccountRecords,
 } from "@/lib/admin-data";
 import { AdminShell, adminBtnSecondary } from "@/components/admin";
-import { EmptyState, SetupNotice, formatDate, formatUSD } from "@/components/ui";
+import { EmptyState, SetupNotice, formatDate, formatDOB, formatUSD } from "@/components/ui";
 import ParticipantRecordsTable, { type ParticipantRecordRow } from "@/components/ParticipantRecordsTable";
 import FilterableTable from "@/components/FilterableTable";
 import { markAttemptPurchasePaid, markBulkUploadPaymentPaid, markSubscriptionRenewalFulfilled } from "@/app/actions/admin";
@@ -135,7 +135,7 @@ export default async function AdminParticipantRecords() {
     category: r.categoryName ?? "—",
     fullName: r.participant.full_name,
     icPassport: r.participant.ic_passport,
-    dateOfBirth: formatDate(r.participant.date_of_birth),
+    dateOfBirth: formatDOB(r.participant.date_of_birth),
     gender: r.participant.gender ?? "—",
     beltRank: r.participant.belt_rank ?? "",
     rankConfirmation: r.participant.rank_confirmation ?? "",
@@ -181,7 +181,7 @@ export default async function AdminParticipantRecords() {
     id: r.id.slice(0, 8).toUpperCase(),
     full_name: r.full_name,
     ic_passport: r.ic_passport,
-    date_of_birth: formatDate(r.date_of_birth),
+    date_of_birth: formatDOB(r.date_of_birth),
     gender: r.gender ?? "",
     karate_rank: r.karate_rank ?? "",
     judging_experience_count: r.judging_experience_count != null ? String(r.judging_experience_count) : "",

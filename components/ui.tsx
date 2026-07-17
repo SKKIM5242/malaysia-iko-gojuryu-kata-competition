@@ -286,6 +286,16 @@ export function formatDate(d: string | null | undefined): string {
   }
 }
 
+/** Date of birth specifically renders as DD/MM/YYYY -- distinct from the
+ * long-form formatDate() used for deadlines/event dates, which stays
+ * unchanged everywhere else. */
+export function formatDOB(d: string | null | undefined): string {
+  if (!d) return "—";
+  const [y, m, day] = d.slice(0, 10).split("-");
+  if (!y || !m || !day) return d;
+  return `${day}/${m}/${y}`;
+}
+
 export function formatUSD(n: number | null | undefined): string {
   if (n == null) return "TBA";
   return `USD ${Number(n).toFixed(2)}`;

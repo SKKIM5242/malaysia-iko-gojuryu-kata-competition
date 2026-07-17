@@ -148,7 +148,7 @@ export default function RegisterForm({
         </div>
 
         <div>
-          <label htmlFor="belt_rank" className={labelCls}>Belt rank *</label>
+          <label htmlFor="belt_rank" className={labelCls}>Latest Belt rank *</label>
           <input
             id="belt_rank"
             name="belt_rank"

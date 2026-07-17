@@ -4,7 +4,7 @@ import { getSchools, getSenseis, schemaReady } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
 import { saveParticipant, deleteParticipant } from "@/app/actions/admin";
 import { AdminShell, Card, CertificateField, adminBtn, adminInput, adminLabel } from "@/components/admin";
-import { EmptyState, SetupNotice, formatDate } from "@/components/ui";
+import { EmptyState, SetupNotice, formatDOB } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
 
 export const dynamic = "force-dynamic";
@@ -87,7 +87,7 @@ export default async function AdminParticipants({
                   </select>
                 </div>
                 <div>
-                  <label htmlFor="belt_rank" className={adminLabel}>Belt rank *</label>
+                  <label htmlFor="belt_rank" className={adminLabel}>Latest Belt rank *</label>
                   <input id="belt_rank" name="belt_rank" required defaultValue={editing?.belt_rank ?? ""} className={adminInput} placeholder="e.g. 3rd Kyu" />
                 </div>
                 <div>
@@ -216,7 +216,7 @@ export default async function AdminParticipants({
                 id: p.id,
                 full_name: p.full_name,
                 ic_passport: p.ic_passport,
-                date_of_birth: formatDate(p.date_of_birth),
+                date_of_birth: formatDOB(p.date_of_birth),
                 belt_rank: p.belt_rank ?? "",
                 rank_status:
                   p.certificate_path && certUrls.get(p.certificate_path) ? (

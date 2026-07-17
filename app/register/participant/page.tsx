@@ -225,11 +225,13 @@ export default async function RegisterPage({
                   kata. Each participant may register up to <strong>3 times</strong> for any qualifying
                   kata categories in their registration list — <strong>each registration covers only 1
                   kata category</strong>. You may log in again another time to record your kata, and
-                  you may log in to this app an <strong>unlimited</strong> number of times.
+                  you may log in to this app an <strong>unlimited</strong> number of times during a
+                  time frame of the competition tier.
                 </p>
                 <p>
                   Registration for this tier closes on{" "}
-                  <strong>{formatDate(competition.registration_deadline)}</strong>.
+                  <strong>{formatDate(competition.registration_deadline)}</strong> or when all slots
+                  available are taken up — whichever comes first.
                 </p>
               </div>
               <div className="mb-6 rounded-md border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600">

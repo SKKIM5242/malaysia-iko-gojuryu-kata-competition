@@ -4,7 +4,7 @@ import { getSchoolSenseiTierFees, getAllCompetitions } from "@/lib/admin-data";
 import { createClient } from "@/lib/supabase/server";
 import { saveSensei, deleteSensei, createInvitationCode, generateRecordInvitationCode, updateCommunityStatus, bulkUploadSenseis } from "@/app/actions/admin";
 import { AdminShell, Card, CertificateField, adminBtn, adminBtnSecondary, adminInput, adminLabel } from "@/components/admin";
-import { EmptyState, SetupNotice, formatDate, formatUSD } from "@/components/ui";
+import { EmptyState, SetupNotice, formatDOB, formatUSD } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
 import SignInControlBox from "@/components/SignInControlBox";
@@ -288,7 +288,7 @@ export default async function AdminSenseis({
                 reference_id: s.id.slice(0, 8).toUpperCase(),
                 name: s.name,
                 ic_passport: s.ic_passport ?? "",
-                date_of_birth: formatDate(s.date_of_birth),
+                date_of_birth: formatDOB(s.date_of_birth),
                 rank: s.rank ?? "",
                 gender: s.gender ?? "",
                 certificate:

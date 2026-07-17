@@ -130,7 +130,7 @@ export default function BulkRegisterForm({
               <th className="px-2 py-2">IC / Passport *</th>
               <th className="px-2 py-2">Date of birth *</th>
               <th className="px-2 py-2">Gender *</th>
-              <th className="px-2 py-2">Belt rank *</th>
+              <th className="px-2 py-2">Latest Belt rank *</th>
               <th className="px-2 py-2">Rank confirmation *</th>
               <th className="px-2 py-2">Email *</th>
               <th className="px-2 py-2">Mobile phone *</th>
