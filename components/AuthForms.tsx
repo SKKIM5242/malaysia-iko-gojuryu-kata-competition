@@ -72,6 +72,9 @@ export default function AuthForms({ defaultMode = "signin" }: { defaultMode?: "s
         const { error: err } = await supabase.auth.signInWithPassword({ email, password });
         if (err) throw err;
       }
+      // Best-effort counter — the actual access gate lives on the
+      // protected pages themselves (see lib/sign-in-quota.ts), not here.
+      await supabase.rpc("record_sign_in");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong — please try again.");

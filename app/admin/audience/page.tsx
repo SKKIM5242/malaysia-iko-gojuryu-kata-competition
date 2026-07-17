@@ -1,10 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import { schemaReady } from "@/lib/data";
+import { getAllCompetitions } from "@/lib/admin-data";
 import { updateCommunityStatus, createInvitationCode, createAudienceMember, bulkUploadAudience } from "@/app/actions/admin";
 import { AdminShell, Card, adminBtn, adminBtnSecondary, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
+import SignInControlBox from "@/components/SignInControlBox";
 import { getTelegramLink } from "@/lib/telegram";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +14,7 @@ export const dynamic = "force-dynamic";
 interface Audience {
   id: string; full_name: string; email: string | null; phone: string | null;
   home_country: string | null; invitation_code: string | null;
+  user_id: string | null;
   payment_status: string; created_at: string;
 }
 
@@ -63,6 +66,25 @@ export default async function AdminAudience({
   const supabase = await createClient();
   const { data: audiences } = await supabase.from("audiences").select("*").order("created_at", { ascending: false });
   const telegramLink = getTelegramLink("audience");
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { data: myProfile } = user
+    ? await supabase.from("profiles").select("role").eq("user_id", user.id).maybeSingle()
+    : { data: null };
+  const isAdminTier = ["admin", "organizer", "staff"].includes(myProfile?.role ?? "");
+
+  const competitions = await getAllCompetitions();
+  const audienceUserIds = ((audiences as Audience[]) ?? []).map((a) => a.user_id).filter((id): id is string => !!id);
+  const { data: audienceLogins } =
+    audienceUserIds.length > 0
+      ? await supabase
+          .from("profiles")
+          .select("user_id, sign_in_count, sign_in_limit, sign_in_competition_id, sign_in_valid_from, sign_in_valid_until")
+          .in("user_id", audienceUserIds)
+      : { data: [] };
+  const loginByUserId = new Map((audienceLogins ?? []).map((p) => [p.user_id as string, p]));
 
   return (
     <AdminShell title="Audience / Spectators" active="/admin/audience" flash={{ ok: params.ok, error: params.error }}>
@@ -140,6 +162,7 @@ export default async function AdminAudience({
             { key: "invitation_code", label: "Code" },
             { key: "payment", label: "Payment" },
             { key: "telegram", label: "Telegram" },
+            ...(isAdminTier ? [{ key: "sign_in_control", label: "Sign-in Control" }] : []),
           ]}
           csvColumns={[
             { key: "reference_id", label: "Reference ID" },
@@ -176,6 +199,22 @@ export default async function AdminAudience({
             ) : (
               <span className="text-neutral-400">—</span>
             ),
+            ...(isAdminTier
+              ? {
+                  sign_in_control: (
+                    <SignInControlBox
+                      userId={a.user_id}
+                      signInCount={loginByUserId.get(a.user_id ?? "")?.sign_in_count ?? 0}
+                      signInLimit={loginByUserId.get(a.user_id ?? "")?.sign_in_limit ?? null}
+                      signInCompetitionId={loginByUserId.get(a.user_id ?? "")?.sign_in_competition_id ?? null}
+                      signInValidFrom={loginByUserId.get(a.user_id ?? "")?.sign_in_valid_from ?? null}
+                      signInValidUntil={loginByUserId.get(a.user_id ?? "")?.sign_in_valid_until ?? null}
+                      competitions={competitions}
+                      returnTo="/admin/audience"
+                    />
+                  ),
+                }
+              : {}),
           }))}
         />
       )}

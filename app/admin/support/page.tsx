@@ -1,11 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
 import { schemaReady } from "@/lib/data";
+import { getAllCompetitions } from "@/lib/admin-data";
 import { updateCommunityStatus, createStaffAccount, bulkUploadSupport, clockIn, clockOut } from "@/app/actions/admin";
 import { getOpenShift, getAllShifts } from "@/lib/support-shifts";
 import { AdminShell, Card, CertificateField, adminBtn, adminBtnSecondary, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
+import SignInControlBox from "@/components/SignInControlBox";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +50,14 @@ export default async function AdminSupport({
     isCustomerSupport && user ? getOpenShift(user.id) : Promise.resolve(null),
     isAdminTier ? getAllShifts() : Promise.resolve([]),
   ]);
+
+  const competitions = canCreate ? await getAllCompetitions() : [];
+  const { data: supportProfiles } = canCreate
+    ? await supabase
+        .from("profiles")
+        .select("user_id, full_name, email, sign_in_count, sign_in_limit, sign_in_competition_id, sign_in_valid_from, sign_in_valid_until")
+        .eq("role", "customer_support")
+    : { data: [] };
 
   const { data: apps } = await supabase
     .from("staff_applications")
@@ -284,6 +294,33 @@ export default async function AdminSupport({
                 task_summary: s.taskSummary ?? "",
               }))}
             />
+          )}
+        </div>
+      )}
+
+      {canCreate && (
+        <div className="mt-8">
+          <h2 className="mb-3 text-lg font-bold">Sign-in Control (Admin/Organizer only)</h2>
+          {(supportProfiles ?? []).length === 0 ? (
+            <EmptyState>No Customer Support logins yet.</EmptyState>
+          ) : (
+            <div className="space-y-2">
+              {(supportProfiles ?? []).map((p) => (
+                <div key={p.user_id} className="rounded-md border border-neutral-200 p-3">
+                  <p className="mb-2 font-semibold text-neutral-900">{p.full_name ?? p.email ?? p.user_id}</p>
+                  <SignInControlBox
+                    userId={p.user_id}
+                    signInCount={p.sign_in_count ?? 0}
+                    signInLimit={p.sign_in_limit ?? null}
+                    signInCompetitionId={p.sign_in_competition_id ?? null}
+                    signInValidFrom={p.sign_in_valid_from ?? null}
+                    signInValidUntil={p.sign_in_valid_until ?? null}
+                    competitions={competitions}
+                    returnTo="/admin/support"
+                  />
+                </div>
+              ))}
+            </div>
           )}
         </div>
       )}

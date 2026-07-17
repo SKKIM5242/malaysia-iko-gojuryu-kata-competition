@@ -8,6 +8,9 @@ import { CategoryName, NoTranslate, SetupNotice, SiteFooter, SiteHeader } from "
 import AuthForms from "@/components/AuthForms";
 import ClaimForm from "@/components/ClaimForm";
 import VideoWatchButton from "@/components/VideoWatchButton";
+import { isWithinSignInQuota } from "@/lib/sign-in-quota";
+import SubscriptionBlocked from "@/components/SubscriptionBlocked";
+import { signOut } from "@/app/actions/auth";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Kata Arena" };
@@ -24,6 +27,10 @@ interface ProfileRow {
   bonus_record_attempts: number;
   school_id: string | null;
   sensei_id: string | null;
+  sign_in_limit: number | null;
+  sign_in_count: number;
+  sign_in_valid_from: string | null;
+  sign_in_valid_until: string | null;
 }
 
 function RecordingCard({
@@ -124,7 +131,9 @@ export default async function KataArenaPage({
 
   const { data: profileData } = await supabase
     .from("profiles")
-    .select("role, full_name, approved, participant_id, registration_id, record_attempts, bonus_record_attempts, school_id, sensei_id")
+    .select(
+      "role, full_name, approved, participant_id, registration_id, record_attempts, bonus_record_attempts, school_id, sensei_id, sign_in_limit, sign_in_count, sign_in_valid_from, sign_in_valid_until",
+    )
     .eq("user_id", user.id)
     .maybeSingle();
   const profile = profileData as ProfileRow | null;
@@ -137,6 +146,27 @@ export default async function KataArenaPage({
           <h1 className="text-2xl font-bold tracking-tight">Kata Arena</h1>
           <p className="mt-2 text-sm text-neutral-500">Setting up your account… please refresh in a moment.</p>
         </main>
+        <SiteFooter />
+      </>
+    );
+  }
+
+  const quota = isWithinSignInQuota(profile);
+  if (!quota.ok) {
+    return (
+      <>
+        <SiteHeader />
+        <SubscriptionBlocked
+          title="Kata Arena"
+          reason={quota.reason!}
+          signOutForm={
+            <form action={signOut}>
+              <button className="rounded-md border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-50">
+                Sign out
+              </button>
+            </form>
+          }
+        />
         <SiteFooter />
       </>
     );

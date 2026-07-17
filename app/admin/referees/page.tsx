@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { schemaReady } from "@/lib/data";
+import { getAllCompetitions } from "@/lib/admin-data";
 import { updateCommunityStatus, saveReferee, deleteReferee, createInvitationCode, linkRefereeAccount, bulkUploadReferees } from "@/app/actions/admin";
 import { AdminShell, Card, CertificateField, adminBtn, adminBtnSecondary, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice, formatDate } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
+import SignInControlBox from "@/components/SignInControlBox";
 
 export const dynamic = "force-dynamic";
 
@@ -71,6 +73,25 @@ export default async function AdminReferees({
   const { data: referees } = await supabase.from("referees").select("*").order("created_at", { ascending: false });
   const refereeList = (referees as Referee[]) ?? [];
   const editing = params.editref ? refereeList.find((r) => r.id === params.editref) : undefined;
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { data: myProfile } = user
+    ? await supabase.from("profiles").select("role").eq("user_id", user.id).maybeSingle()
+    : { data: null };
+  const isAdminTier = ["admin", "organizer", "staff"].includes(myProfile?.role ?? "");
+
+  const competitions = await getAllCompetitions();
+  const refereeUserIds = refereeList.map((r) => r.user_id).filter((id): id is string => !!id);
+  const { data: refereeLogins } =
+    refereeUserIds.length > 0
+      ? await supabase
+          .from("profiles")
+          .select("user_id, sign_in_count, sign_in_limit, sign_in_competition_id, sign_in_valid_from, sign_in_valid_until")
+          .in("user_id", refereeUserIds)
+      : { data: [] };
+  const loginByUserId = new Map((refereeLogins ?? []).map((p) => [p.user_id as string, p]));
 
   const certPaths = [
     ...refereeList.map((r) => r.certificate_path),
@@ -269,6 +290,7 @@ export default async function AdminReferees({
                 { key: "invitation_code", label: "Invitation Code" },
                 { key: "deposit", label: "Deposit" },
                 { key: "approval", label: "Approval" },
+                ...(isAdminTier ? [{ key: "sign_in_control", label: "Sign-in Control" }] : []),
                 { key: "actions", label: "Actions" },
               ]}
               csvColumns={[
@@ -344,6 +366,22 @@ export default async function AdminReferees({
                   <StatusButtons table="referees" id={r.id} field="status" current={r.status}
                     options={["pending", "approved", "rejected"]} />
                 ),
+                ...(isAdminTier
+                  ? {
+                      sign_in_control: (
+                        <SignInControlBox
+                          userId={r.user_id}
+                          signInCount={loginByUserId.get(r.user_id ?? "")?.sign_in_count ?? 0}
+                          signInLimit={loginByUserId.get(r.user_id ?? "")?.sign_in_limit ?? null}
+                          signInCompetitionId={loginByUserId.get(r.user_id ?? "")?.sign_in_competition_id ?? null}
+                          signInValidFrom={loginByUserId.get(r.user_id ?? "")?.sign_in_valid_from ?? null}
+                          signInValidUntil={loginByUserId.get(r.user_id ?? "")?.sign_in_valid_until ?? null}
+                          competitions={competitions}
+                          returnTo="/admin/referees"
+                        />
+                      ),
+                    }
+                  : {}),
                 actions: (
                   <div className="flex gap-1.5">
                     <Link

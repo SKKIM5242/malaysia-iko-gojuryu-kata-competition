@@ -158,6 +158,34 @@ export async function requestExtraAttempts(
   return { ok: true };
 }
 
+/** Requests a new subscription once someone's sign-in quota (count and/or
+ * valid date range, set by Admin/Organizer — see lib/sign-in-quota.ts) runs
+ * out. The organiser fulfils it by updating that person's Sign-in Control
+ * fields directly on their respective admin page, then marks this request
+ * paid. Refuses a second request while one is already pending. */
+export async function requestNewSubscription(
+  _prev: AccountActionState,
+  _formData: FormData,
+): Promise<AccountActionState> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sign in first." };
+
+  const { data: existing } = await supabase
+    .from("subscription_renewals")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("status", "pending")
+    .maybeSingle();
+  if (existing) return { ok: false, error: "You already have a renewal request awaiting confirmation." };
+
+  const { error } = await supabase.from("subscription_renewals").insert({ user_id: user.id });
+  if (error) return { ok: false, error: "Could not submit the request — please try again." };
+  return { ok: true };
+}
+
 /** Register the uploaded recording as the participant's competition entry. */
 export async function submitKataVideo(
   _prev: AccountActionState,

@@ -2018,3 +2018,43 @@ export async function markBulkUploadPaymentPaid(formData: FormData) {
   }
   backTo(returnTo, { ok: "Payment confirmed — sensei can now upload." });
 }
+
+// ── Sign-in quota control (Admin/Organizer only) ────────────────────────────
+
+/** Sets how many times a registrant may sign in, which competition tier
+ * that allowance is tied to, and the date range it's valid for — read by
+ * lib/sign-in-quota.ts on every protected-page load. Admin/Organizer only;
+ * never touches admin/organizer/staff accounts themselves (see
+ * record_sign_in()'s exemption in the same migration). */
+export async function updateSignInControl(formData: FormData) {
+  const userId = String(formData.get("user_id") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "/admin");
+  const { supabase, actorId } = await getActor();
+  const actorRole = await getActorRole(supabase, actorId);
+  if (!["admin", "organizer", "staff"].includes(actorRole ?? "")) {
+    backTo(returnTo, { error: "Only Admin/Organizer can manage sign-in control." });
+  }
+  if (!userId) backTo(returnTo, { error: "This record has no linked login yet." });
+
+  const limitRaw = String(formData.get("sign_in_limit") ?? "").trim();
+  const competitionId = String(formData.get("sign_in_competition_id") ?? "").trim();
+  const validFrom = String(formData.get("sign_in_valid_from") ?? "").trim();
+  const validUntil = String(formData.get("sign_in_valid_until") ?? "").trim();
+  const resetCount = formData.get("reset_count") === "on";
+
+  const update: Record<string, unknown> = {
+    sign_in_limit: limitRaw ? Number(limitRaw) : null,
+    sign_in_competition_id: competitionId || null,
+    sign_in_valid_from: validFrom || null,
+    sign_in_valid_until: validUntil || null,
+  };
+  if (resetCount) update.sign_in_count = 0;
+
+  const { error } = await supabase.from("profiles").update(update).eq("user_id", userId);
+  if (error) backTo(returnTo, { error: "Could not update sign-in control — please try again." });
+  await writeAudit(supabase, {
+    table_name: "profiles", record_id: userId, action: "sign_in_control_updated",
+    new_value: update, actor_id: actorId,
+  });
+  backTo(returnTo, { ok: "Sign-in control updated." });
+}

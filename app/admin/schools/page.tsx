@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { getSchools, schemaReady } from "@/lib/data";
-import { getSchoolSenseiTierFees } from "@/lib/admin-data";
+import { getSchoolSenseiTierFees, getAllCompetitions } from "@/lib/admin-data";
+import { createClient } from "@/lib/supabase/server";
 import { saveSchool, deleteSchool, createInvitationCode, generateRecordInvitationCode, updateCommunityStatus, bulkUploadSchools } from "@/app/actions/admin";
 import { AdminShell, Card, adminBtn, adminBtnSecondary, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice, formatUSD } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
+import SignInControlBox from "@/components/SignInControlBox";
 
 export const dynamic = "force-dynamic";
 
@@ -56,8 +58,27 @@ export default async function AdminSchools({
     );
   }
 
-  const [schools, { schoolFees }] = await Promise.all([getSchools(), getSchoolSenseiTierFees()]);
+  const [schools, { schoolFees }, competitions] = await Promise.all([
+    getSchools(),
+    getSchoolSenseiTierFees(),
+    getAllCompetitions(),
+  ]);
   const editing = params.edit ? schools.find((s) => s.id === params.edit) : undefined;
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { data: myProfile } = user
+    ? await supabase.from("profiles").select("role").eq("user_id", user.id).maybeSingle()
+    : { data: null };
+  const isAdminTier = ["admin", "organizer", "staff"].includes(myProfile?.role ?? "");
+
+  const { data: schoolLogins } = await supabase
+    .from("profiles")
+    .select("user_id, school_id, sign_in_count, sign_in_limit, sign_in_competition_id, sign_in_valid_from, sign_in_valid_until")
+    .eq("role", "school");
+  const loginBySchoolId = new Map((schoolLogins ?? []).map((p) => [p.school_id as string, p]));
 
   return (
     <AdminShell title="Schools" active="/admin/schools" flash={{ ok: params.ok, error: params.error }}>
@@ -234,6 +255,7 @@ export default async function AdminSchools({
                 { key: "bank", label: "Bank" },
                 { key: "expected_fee", label: "Required Fee" },
                 { key: "payment", label: "Fee Status" },
+                ...(isAdminTier ? [{ key: "sign_in_control", label: "Sign-in Control" }] : []),
                 { key: "actions", label: "Actions" },
               ]}
               csvColumns={[
@@ -282,6 +304,22 @@ export default async function AdminSchools({
                 expected_fee: schoolFees.has(s.id) ? formatUSD(schoolFees.get(s.id)) : "— no participants yet",
                 payment_status_text: s.payment_status,
                 payment: <PaymentButtons id={s.id} current={s.payment_status} />,
+                ...(isAdminTier
+                  ? {
+                      sign_in_control: (
+                        <SignInControlBox
+                          userId={loginBySchoolId.get(s.id)?.user_id ?? null}
+                          signInCount={loginBySchoolId.get(s.id)?.sign_in_count ?? 0}
+                          signInLimit={loginBySchoolId.get(s.id)?.sign_in_limit ?? null}
+                          signInCompetitionId={loginBySchoolId.get(s.id)?.sign_in_competition_id ?? null}
+                          signInValidFrom={loginBySchoolId.get(s.id)?.sign_in_valid_from ?? null}
+                          signInValidUntil={loginBySchoolId.get(s.id)?.sign_in_valid_until ?? null}
+                          competitions={competitions}
+                          returnTo="/admin/schools"
+                        />
+                      ),
+                    }
+                  : {}),
                 actions: (
                   <div className="flex gap-1.5">
                     <Link

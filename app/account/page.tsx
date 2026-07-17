@@ -10,6 +10,8 @@ import KataRecorder from "@/components/KataRecorder";
 import VideoWatchButton from "@/components/VideoWatchButton";
 import RefereeScoring, { type ScoringItem } from "@/components/RefereeScoring";
 import { getAllTelegramLinks, getTelegramBotConnectUrl } from "@/lib/telegram";
+import { isWithinSignInQuota } from "@/lib/sign-in-quota";
+import SubscriptionBlocked from "@/components/SubscriptionBlocked";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +29,10 @@ interface ProfileRow {
   record_attempts: number;
   bonus_record_attempts: number;
   telegram_chat_id: string | null;
+  sign_in_limit: number | null;
+  sign_in_count: number;
+  sign_in_valid_from: string | null;
+  sign_in_valid_until: string | null;
 }
 
 interface PendingRegistration {
@@ -176,6 +182,17 @@ export default async function AccountPage({
           <p className="mt-2 text-sm text-neutral-500">Setting up your account… please refresh in a moment.</p>
           <div className="mt-4">{SignOutButton}</div>
         </main>
+        <SiteFooter />
+      </>
+    );
+  }
+
+  const quota = isWithinSignInQuota(profile);
+  if (!quota.ok) {
+    return (
+      <>
+        <SiteHeader />
+        <SubscriptionBlocked title="My account" reason={quota.reason!} signOutForm={SignOutButton} />
         <SiteFooter />
       </>
     );

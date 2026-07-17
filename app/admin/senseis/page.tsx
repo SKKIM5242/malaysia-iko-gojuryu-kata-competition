@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { getSchools, getSenseis, schemaReady } from "@/lib/data";
-import { getSchoolSenseiTierFees } from "@/lib/admin-data";
+import { getSchoolSenseiTierFees, getAllCompetitions } from "@/lib/admin-data";
 import { createClient } from "@/lib/supabase/server";
 import { saveSensei, deleteSensei, createInvitationCode, generateRecordInvitationCode, updateCommunityStatus, bulkUploadSenseis } from "@/app/actions/admin";
 import { AdminShell, Card, CertificateField, adminBtn, adminBtnSecondary, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice, formatDate, formatUSD } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
+import SignInControlBox from "@/components/SignInControlBox";
 
 export const dynamic = "force-dynamic";
 
@@ -51,14 +52,33 @@ export default async function AdminSenseis({
     );
   }
 
-  const [senseis, schools, { senseiFees }] = await Promise.all([getSenseis(), getSchools(), getSchoolSenseiTierFees()]);
+  const [senseis, schools, { senseiFees }, competitions] = await Promise.all([
+    getSenseis(),
+    getSchools(),
+    getSchoolSenseiTierFees(),
+    getAllCompetitions(),
+  ]);
   const editing = params.edit ? senseis.find((s) => s.id === params.edit) : undefined;
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { data: myProfile } = user
+    ? await supabase.from("profiles").select("role").eq("user_id", user.id).maybeSingle()
+    : { data: null };
+  const isAdminTier = ["admin", "organizer", "staff"].includes(myProfile?.role ?? "");
+
+  const { data: senseiLogins } = await supabase
+    .from("profiles")
+    .select("user_id, sensei_id, sign_in_count, sign_in_limit, sign_in_competition_id, sign_in_valid_from, sign_in_valid_until")
+    .eq("role", "sensei");
+  const loginBySenseiId = new Map((senseiLogins ?? []).map((p) => [p.sensei_id as string, p]));
 
   // Signed links (1h) for certificate photos in the private bucket
   const certPaths = senseis.map((s) => s.certificate_path).filter(Boolean) as string[];
   const certUrls = new Map<string, string>();
   if (certPaths.length > 0) {
-    const supabase = await createClient();
     const { data: signed } = await supabase.storage.from("certificates").createSignedUrls(certPaths, 3600);
     for (const s of signed ?? []) {
       if (s.path && s.signedUrl) certUrls.set(s.path, s.signedUrl);
@@ -240,6 +260,7 @@ export default async function AdminSenseis({
                 { key: "school", label: "School" },
                 { key: "expected_fee", label: "Required Fee" },
                 { key: "payment", label: "Fee Status" },
+                ...(isAdminTier ? [{ key: "sign_in_control", label: "Sign-in Control" }] : []),
                 { key: "actions", label: "Actions" },
               ]}
               csvColumns={[
@@ -299,6 +320,22 @@ export default async function AdminSenseis({
                 expected_fee: senseiFees.has(s.id) ? formatUSD(senseiFees.get(s.id)) : "— no participants yet",
                 payment_status_text: s.payment_status,
                 payment: <PaymentButtons id={s.id} current={s.payment_status} />,
+                ...(isAdminTier
+                  ? {
+                      sign_in_control: (
+                        <SignInControlBox
+                          userId={loginBySenseiId.get(s.id)?.user_id ?? null}
+                          signInCount={loginBySenseiId.get(s.id)?.sign_in_count ?? 0}
+                          signInLimit={loginBySenseiId.get(s.id)?.sign_in_limit ?? null}
+                          signInCompetitionId={loginBySenseiId.get(s.id)?.sign_in_competition_id ?? null}
+                          signInValidFrom={loginBySenseiId.get(s.id)?.sign_in_valid_from ?? null}
+                          signInValidUntil={loginBySenseiId.get(s.id)?.sign_in_valid_until ?? null}
+                          competitions={competitions}
+                          returnTo="/admin/senseis"
+                        />
+                      ),
+                    }
+                  : {}),
                 actions: (
                   <div className="flex gap-1.5">
                     <Link
