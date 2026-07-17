@@ -65,6 +65,20 @@ export default function RegisterHub() {
         <p className="mt-1 text-sm text-neutral-500">Choose what you are registering.</p>
 
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
+          <div className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:col-span-2">
+            <strong>Note:</strong> Participants must 1) Register their own{" "}
+            <Link href="/register/school" className="font-semibold underline underline-offset-2">School / Dojo</Link>{" "}
+            and 2){" "}
+            <Link href="/register/sensei" className="font-semibold underline underline-offset-2">Register your Sensei / Coach</Link>{" "}
+            before registering themself here. The same applies to a Sensei registering on behalf of
+            their students, or use the{" "}
+            <Link href="/register/bulk" className="font-semibold underline underline-offset-2">bulk registration table</Link>{" "}
+            for multiple students. This is because your School and Sensei are required fields, so
+            each needs their own registration too — the minimum total cost is 3× your chosen
+            tier's participant fee (your fee plus your School's and Sensei's), and up to 5× if you
+            participate in 3 Kata events.
+          </div>
+
           <div className="rounded-xl border-2 border-red-700 bg-white p-5 shadow-sm sm:col-span-2">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>

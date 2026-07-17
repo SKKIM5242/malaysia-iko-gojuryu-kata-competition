@@ -100,7 +100,7 @@ export default async function Home() {
                     <div className="border-t border-neutral-100 px-6 py-4">
                       {open ? (
                         <Link
-                          href={`/register/participant?competition=${competition.id}`}
+                          href="/register"
                           className="block rounded-md bg-red-700 px-4 py-2.5 text-center font-semibold text-white hover:bg-red-600"
                         >
                           Register — {formatUSD(competition.registration_fee_usd)}

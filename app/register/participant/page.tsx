@@ -209,13 +209,15 @@ export default async function RegisterPage({
                   and 2){" "}
                   <a href="/register/sensei" className="font-semibold underline underline-offset-2">Register your Sensei / Coach</a>{" "}
                   before registering themself here. The same applies to a Sensei registering on
-                  behalf of their students — or use the{" "}
+                  behalf of their students, or use the{" "}
                   <a href="/register/bulk" className="font-semibold underline underline-offset-2">bulk registration table</a>{" "}
-                  for multiple students. Because your School and Sensei each need their own
-                  registration too, the minimum total cost for this tier — your fee plus your
-                  School's and Sensei's — is{" "}
+                  for multiple students. This is because your School and Sensei are required
+                  fields, so each needs their own registration too. The minimum total cost for
+                  this tier registration — your Participant fee plus your School's and Sensei's —
+                  is{" "}
                   <strong>{formatUSD(Number(competition.registration_fee_usd ?? 0) * 3)}</strong>.
-                  Maximum is <strong>{formatUSD(Number(competition.registration_fee_usd ?? 0) * 5)}</strong>{" "}
+                  The maximum cost is{" "}
+                  <strong>{formatUSD(Number(competition.registration_fee_usd ?? 0) * 5)}</strong>{" "}
                   if you participate in 3 Kata events.
                 </p>
                 <p>
