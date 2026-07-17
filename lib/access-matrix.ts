@@ -75,10 +75,15 @@ export const ACCESS_MATRIX: AccessRow[] = [
     note: "assignRefereeToVideo/unassignRefereeFromVideo/setJudgesRequired/autoAssignReferees require requireJudgingManager (admin/organizer/staff/referee). Customer Support can still watch recordings and see workload, not configure.",
   },
   {
-    resource: "Kata video scoring",
+    resource: "Kata video scoring — submit/edit a score",
     admin: "Full — any recording", organizer: "Full — any recording",
-    customerSupport: "Blocked (not a referee)", referee: "Own assigned videos only",
-    note: "Referee scoring is unchanged, enforced by DB RLS (scores_referee_upsert). Admin/Organizer/Staff get an additive override policy (scores_manager_upsert) letting them score any recording as themselves, auto-self-assigning via assign_referee() so they show up correctly wherever assignment drives display.",
+    customerSupport: "Blocked (cannot submit a score)", referee: "Own assigned videos only",
+    note: "This row is about SUBMITTING a score, not viewing one — see \"Kata video scoring — view scores\" below for that. Referee scoring is unchanged, enforced by DB RLS (scores_referee_upsert). Admin/Organizer/Staff get an additive override policy (scores_manager_upsert) letting them score any recording as themselves, auto-self-assigning via assign_referee() so they show up correctly wherever assignment drives display.",
+  },
+  {
+    resource: "Kata video scoring — view scores",
+    admin: "Full", organizer: "Full", customerSupport: "Full", referee: "Full",
+    note: "Every role can see every recording's individual judge scores and round status (green/red + total once fully judged) on both Kata Arena and this Judging Arena page — opened to everyone in migration 0044 (scores_select_all_authenticated). Customer Support has always had this; only submitting a score is restricted (see the row above).",
   },
   {
     resource: "Kata recording playback",
