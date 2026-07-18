@@ -5,6 +5,7 @@ import { AdminShell, Card, CertificateField, adminBtn, adminInput, adminLabel } 
 import { EmptyState, SetupNotice } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
+import InvitationCodeForm from "@/components/InvitationCodeForm";
 
 export const dynamic = "force-dynamic";
 
@@ -215,6 +216,16 @@ export default async function AdminOrganizers({
         Approving an application here does not create a login by itself — use the &quot;Create an Admin /
         Organizer account&quot; form above (Super Admin only) to actually grant access.
       </p>
+      {isSuperAdmin && (
+        <div className="mt-8">
+          <InvitationCodeForm
+            role="organizer"
+            returnTo="/admin/organizers"
+            title="Admin / Organizer Invitation Code"
+            idPrefix="org_code"
+          />
+        </div>
+      )}
     </AdminShell>
   );
 }

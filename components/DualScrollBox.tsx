@@ -4,7 +4,10 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 
 /** Wraps a wide table with a second horizontal scrollbar ABOVE it (synced
  * to the real one below), so you don't have to scroll all the way down
- * first to scroll sideways on a long list. */
+ * first to scroll sideways on a long list. The bottom box also caps its own
+ * height and scrolls vertically internally — required so `position: sticky`
+ * on the header row and first column has this box (not the page) as its
+ * scrolling ancestor, so they actually stick as the list scrolls. */
 export default function DualScrollBox({ children }: { children: ReactNode }) {
   const topRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -37,7 +40,11 @@ export default function DualScrollBox({ children }: { children: ReactNode }) {
       <div ref={topRef} onScroll={handleTopScroll} className="overflow-x-auto overflow-y-hidden" style={{ height: 14 }}>
         <div style={{ width: contentWidth, height: 1 }} />
       </div>
-      <div ref={bottomRef} onScroll={handleBottomScroll} className="overflow-x-auto rounded-lg border border-neutral-200 bg-white shadow-sm">
+      <div
+        ref={bottomRef}
+        onScroll={handleBottomScroll}
+        className="max-h-[70vh] overflow-auto rounded-lg border border-neutral-200 bg-white shadow-sm"
+      >
         {children}
       </div>
     </div>

@@ -2,12 +2,13 @@ import Link from "next/link";
 import { getSchools, getSenseis, schemaReady } from "@/lib/data";
 import { getSchoolSenseiTierFees, getAllCompetitions } from "@/lib/admin-data";
 import { createClient } from "@/lib/supabase/server";
-import { saveSensei, deleteSensei, createInvitationCode, generateRecordInvitationCode, updateCommunityStatus, bulkUploadSenseis } from "@/app/actions/admin";
+import { saveSensei, deleteSensei, generateRecordInvitationCode, updateCommunityStatus, bulkUploadSenseis } from "@/app/actions/admin";
 import { AdminShell, Card, CertificateField, adminBtn, adminBtnSecondary, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice, formatDOB, formatUSD } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
 import SignInControlBox from "@/components/SignInControlBox";
+import InvitationCodeForm from "@/components/InvitationCodeForm";
 
 export const dynamic = "force-dynamic";
 
@@ -68,6 +69,7 @@ export default async function AdminSenseis({
     ? await supabase.from("profiles").select("role").eq("user_id", user.id).maybeSingle()
     : { data: null };
   const isAdminTier = ["admin", "organizer", "staff"].includes(myProfile?.role ?? "");
+  const canBulkUpload = ["admin", "organizer"].includes(myProfile?.role ?? "");
 
   const { data: senseiLogins } = await supabase
     .from("profiles")
@@ -87,37 +89,20 @@ export default async function AdminSenseis({
 
   return (
     <AdminShell title="Senseis" active="/admin/senseis" flash={{ ok: params.ok, error: params.error }}>
-      <div className="mb-8">
-        <CsvUploadForm
-          action={bulkUploadSenseis}
-          templateHref="/senseis-template.csv"
-          entityLabel="sensei"
-          note="School name must match an existing school exactly. Certificates can't be uploaded via CSV — add one later via Edit."
-        />
-      </div>
+      {canBulkUpload && (
+        <div className="mb-8">
+          <CsvUploadForm
+            action={bulkUploadSenseis}
+            templateHref="/senseis-template.csv"
+            entityLabel="sensei"
+            note="School name must match an existing school exactly. Certificates can't be uploaded via CSV — add one later via Edit."
+          />
+        </div>
+      )}
       <div className="grid gap-8 lg:grid-cols-2">
         <div>
           <h2 className="mb-3 text-lg font-bold">{editing ? "Edit Sensei" : "Add Sensei"}</h2>
           <Card>
-            {!editing && (
-              <div className="mb-4 rounded-md border border-neutral-200 bg-neutral-50 p-3">
-                <p className="text-xs font-bold uppercase tracking-wide text-neutral-500">
-                  Sensei / Coach invitation code
-                </p>
-                <form action={createInvitationCode} className="mt-2 flex flex-wrap items-end gap-3">
-                  <input type="hidden" name="role" value="school" />
-                  <input type="hidden" name="return_to" value="/admin/senseis" />
-                  <div>
-                    <label htmlFor="sensei_code_note" className={adminLabel}>Note (optional)</label>
-                    <input id="sensei_code_note" name="note" className={adminInput} placeholder="e.g. Visiting instructors" />
-                  </div>
-                  <button type="submit" className={adminBtnSecondary}>Generate unlimited-use code</button>
-                </form>
-                <p className="mt-1 text-xs text-neutral-400">
-                  Shared with Schools / Dojos too. Manage or revoke codes in Admin → Accounts → Invitation codes.
-                </p>
-              </div>
-            )}
             {editing && (
               <div className="mb-4 rounded-md border border-neutral-200 bg-neutral-50 p-3">
                 <p className="text-xs font-bold uppercase tracking-wide text-neutral-500">
@@ -356,6 +341,14 @@ export default async function AdminSenseis({
             />
           )}
         </div>
+      </div>
+      <div className="mt-8">
+        <InvitationCodeForm
+          role="school"
+          returnTo="/admin/senseis"
+          title="Sensei / Coach Invitation Code"
+          idPrefix="sensei_code"
+        />
       </div>
     </AdminShell>
   );

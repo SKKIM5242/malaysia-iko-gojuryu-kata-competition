@@ -1,12 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
 import { schemaReady } from "@/lib/data";
 import { getAllCompetitions } from "@/lib/admin-data";
-import { updateCommunityStatus, createInvitationCode, createAudienceMember, bulkUploadAudience } from "@/app/actions/admin";
-import { AdminShell, Card, adminBtn, adminBtnSecondary, adminInput, adminLabel } from "@/components/admin";
+import { updateCommunityStatus, createAudienceMember, bulkUploadAudience } from "@/app/actions/admin";
+import { AdminShell, Card, adminBtn, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
 import SignInControlBox from "@/components/SignInControlBox";
+import InvitationCodeForm from "@/components/InvitationCodeForm";
 import { getTelegramLink } from "@/lib/telegram";
 
 export const dynamic = "force-dynamic";
@@ -74,6 +75,7 @@ export default async function AdminAudience({
     ? await supabase.from("profiles").select("role").eq("user_id", user.id).maybeSingle()
     : { data: null };
   const isAdminTier = ["admin", "organizer", "staff"].includes(myProfile?.role ?? "");
+  const canBulkUpload = ["admin", "organizer"].includes(myProfile?.role ?? "");
 
   const competitions = await getAllCompetitions();
   const audienceUserIds = ((audiences as Audience[]) ?? []).map((a) => a.user_id).filter((id): id is string => !!id);
@@ -88,37 +90,19 @@ export default async function AdminAudience({
 
   return (
     <AdminShell title="Audience / Spectators" active="/admin/audience" flash={{ ok: params.ok, error: params.error }}>
-      <div className="mb-8">
-        <CsvUploadForm
-          action={bulkUploadAudience}
-          templateHref="/audience-template.csv"
-          entityLabel="audience member"
-        />
-      </div>
+      {canBulkUpload && (
+        <div className="mb-8">
+          <CsvUploadForm
+            action={bulkUploadAudience}
+            templateHref="/audience-template.csv"
+            entityLabel="audience member"
+          />
+        </div>
+      )}
 
       <div className="mb-8">
         <h2 className="mb-3 text-lg font-bold">Add Audience / Spectator</h2>
         <Card>
-          <div className="mb-4 rounded-md border border-neutral-200 bg-neutral-50 p-3">
-            <p className="text-xs font-bold uppercase tracking-wide text-neutral-500">Audience invitation code</p>
-            <form action={createInvitationCode} className="mt-2 flex flex-wrap items-end gap-3">
-              <input type="hidden" name="role" value="audience" />
-              <input type="hidden" name="return_to" value="/admin/audience" />
-              <div>
-                <label htmlFor="aud_max_uses" className={adminLabel}>Max uses (blank = unlimited)</label>
-                <input id="aud_max_uses" name="max_uses" type="number" min="1" className={`${adminInput} w-40`} />
-              </div>
-              <div>
-                <label htmlFor="aud_code_note" className={adminLabel}>Note (optional)</label>
-                <input id="aud_code_note" name="note" className={adminInput} placeholder="e.g. VIP guests" />
-              </div>
-              <button type="submit" className={adminBtnSecondary}>Generate code</button>
-            </form>
-            <p className="mt-1 text-xs text-neutral-400">
-              Waives the USD 10 sign-in fee for anyone who registers (or is added below) with the code.
-              Manage or revoke codes in Admin → Accounts → Invitation codes.
-            </p>
-          </div>
           <form action={createAudienceMember} className="space-y-4">
             <div>
               <label htmlFor="aud_full_name" className={adminLabel}>Full name *</label>
@@ -218,6 +202,14 @@ export default async function AdminAudience({
           }))}
         />
       )}
+      <div className="mt-8">
+        <InvitationCodeForm
+          role="audience"
+          returnTo="/admin/audience"
+          title="Audience / Spectator Invitation Code"
+          idPrefix="aud_code"
+        />
+      </div>
     </AdminShell>
   );
 }

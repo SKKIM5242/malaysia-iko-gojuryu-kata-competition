@@ -11,10 +11,13 @@ const ACTIVITY_EVENTS = ["mousemove", "keydown", "click", "scroll", "touchstart"
 /** Signed-in users only: after 30 minutes with no activity, warns with a
  * 20-second countdown before auto sign-out. Only the Continue button — not
  * background activity — cancels the countdown, matching a standard
- * session-timeout pattern. */
+ * session-timeout pattern. Admin/owner accounts are exempt — the organiser
+ * often leaves the admin panel open for long stretches while running the
+ * competition and shouldn't get logged out mid-task. */
 export default function InactivityGuard() {
   const router = useRouter();
   const [signedIn, setSignedIn] = useState(false);
+  const [exempt, setExempt] = useState(false);
   const [warning, setWarning] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(COUNTDOWN_SECONDS);
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -61,23 +64,36 @@ export default function InactivityGuard() {
     resetIdleTimer();
   }, [resetIdleTimer]);
 
+  const checkExempt = useCallback(async (userId: string | undefined) => {
+    if (!userId) {
+      setExempt(false);
+      return;
+    }
+    const supabase = createClient();
+    const { data } = await supabase.from("profiles").select("role").eq("user_id", userId).maybeSingle();
+    setExempt(data?.role === "admin");
+  }, []);
+
   useEffect(() => {
     const supabase = createClient();
     let mounted = true;
     supabase.auth.getSession().then(({ data }) => {
-      if (mounted) setSignedIn(!!data.session);
+      if (!mounted) return;
+      setSignedIn(!!data.session);
+      void checkExempt(data.session?.user.id);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       setSignedIn(!!session);
+      void checkExempt(session?.user.id);
     });
     return () => {
       mounted = false;
       sub.subscription.unsubscribe();
     };
-  }, []);
+  }, [checkExempt]);
 
   useEffect(() => {
-    if (!signedIn) {
+    if (!signedIn || exempt) {
       clearTimers();
       setWarning(false);
       return;
@@ -88,7 +104,7 @@ export default function InactivityGuard() {
       ACTIVITY_EVENTS.forEach((e) => window.removeEventListener(e, resetIdleTimer));
       clearTimers();
     };
-  }, [signedIn, resetIdleTimer, clearTimers]);
+  }, [signedIn, exempt, resetIdleTimer, clearTimers]);
 
   if (!warning) return null;
 

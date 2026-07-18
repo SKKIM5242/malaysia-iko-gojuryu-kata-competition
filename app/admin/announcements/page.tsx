@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { getAllAnnouncements, getAllCompetitions } from "@/lib/admin-data";
 import { schemaReady } from "@/lib/data";
-import { saveAnnouncement, toggleAnnouncement, deleteAnnouncement, moveAnnouncement } from "@/app/actions/admin";
+import { createClient } from "@/lib/supabase/server";
+import { saveAnnouncement, toggleAnnouncement, deleteAnnouncement, moveAnnouncement, bulkUploadAnnouncements } from "@/app/actions/admin";
 import { AdminShell, Card, adminBtn, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice, formatDate } from "@/components/ui";
 import DownloadCsvButton from "@/components/DownloadCsvButton";
+import CsvUploadForm from "@/components/CsvUploadForm";
 import { Markdown } from "@/lib/markdown";
 
 export const dynamic = "force-dynamic";
@@ -30,12 +32,31 @@ export default async function AdminAnnouncements({
   ]);
   const editing = params.edit ? announcements.find((a) => a.id === params.edit) : undefined;
 
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { data: myProfile } = user
+    ? await supabase.from("profiles").select("role").eq("user_id", user.id).maybeSingle()
+    : { data: null };
+  const canBulkUpload = ["admin", "organizer"].includes(myProfile?.role ?? "");
+
   return (
     <AdminShell
       title="Announcements"
       active="/admin/announcements"
       flash={{ ok: params.ok, error: params.error }}
     >
+      {canBulkUpload && (
+        <div className="mb-8">
+          <CsvUploadForm
+            action={bulkUploadAnnouncements}
+            templateHref="/announcements-template.csv"
+            entityLabel="announcement"
+            note="competition_name (optional) must match an existing competition exactly. published: yes/no."
+          />
+        </div>
+      )}
       <div className="grid gap-8 lg:grid-cols-2">
         <div>
           <h2 className="mb-3 text-lg font-bold">{editing ? "Edit Announcement" : "New Announcement"}</h2>

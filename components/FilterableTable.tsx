@@ -95,17 +95,25 @@ export default function FilterableTable({
       </div>
       <DualScrollBox>
         <table className="w-full text-left text-sm" style={{ minWidth: `${columns.length * 150}px` }}>
-          <thead className="border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
+          <thead className="sticky top-0 z-20 border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
             <tr>
-              {columns.map((c) => (
-                <th key={c.key} className="px-3 py-2.5 whitespace-nowrap">
+              {columns.map((c, i) => (
+                <th
+                  key={c.key}
+                  className={`px-3 py-2.5 whitespace-nowrap ${
+                    i === 0 ? "sticky left-0 z-10 border-r border-neutral-200 bg-neutral-50" : ""
+                  }`}
+                >
                   {c.label}
                 </th>
               ))}
             </tr>
             <tr className="border-t border-neutral-200 bg-white normal-case">
-              {columns.map((c) => (
-                <th key={c.key} className="px-2 py-1.5">
+              {columns.map((c, i) => (
+                <th
+                  key={c.key}
+                  className={`px-2 py-1.5 ${i === 0 ? "sticky left-0 z-10 border-r border-neutral-200 bg-white" : ""}`}
+                >
                   <ColumnFilterDropdown
                     values={uniqueValues[c.key] ?? []}
                     selected={filters[c.key] ?? new Set()}
@@ -124,14 +132,18 @@ export default function FilterableTable({
               </tr>
             ) : (
               filtered.map((row) => (
-                <tr key={String(row[rowKey])} className="hover:bg-neutral-50">
-                  {columns.map((c) => {
+                <tr key={String(row[rowKey])} className="group hover:bg-neutral-50">
+                  {columns.map((c, i) => {
                     const cell = row[c.key];
                     const isText = typeof cell === "string";
                     return (
                       <td
                         key={c.key}
-                        className="max-w-[220px] truncate px-3 py-2"
+                        className={`max-w-[220px] truncate px-3 py-2 ${
+                          i === 0
+                            ? "sticky left-0 z-10 border-r border-neutral-200 bg-white group-hover:bg-neutral-50"
+                            : ""
+                        }`}
                         title={isText ? cell : undefined}
                       >
                         {isText ? cell || "—" : cell}

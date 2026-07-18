@@ -2,10 +2,12 @@ import Link from "next/link";
 import { getAllParticipants } from "@/lib/admin-data";
 import { getSchools, getSenseis, schemaReady } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
-import { saveParticipant, deleteParticipant } from "@/app/actions/admin";
+import { saveParticipant, deleteParticipant, bulkUploadParticipants } from "@/app/actions/admin";
 import { AdminShell, Card, CertificateField, adminBtn, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice, formatDOB } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
+import CsvUploadForm from "@/components/CsvUploadForm";
+import InvitationCodeForm from "@/components/InvitationCodeForm";
 
 export const dynamic = "force-dynamic";
 
@@ -52,6 +54,7 @@ export default async function AdminParticipants({
   const isCustomerSupport = myProfile?.role === "customer_support";
   const isReferee = myProfile?.role === "referee";
   const canDelete = !isCustomerSupport && !isReferee;
+  const canBulkUpload = ["admin", "organizer"].includes(myProfile?.role ?? "");
 
   return (
     <AdminShell
@@ -59,6 +62,16 @@ export default async function AdminParticipants({
       active="/admin/participants"
       flash={{ ok: params.ok, error: params.error }}
     >
+      {canBulkUpload && (
+        <div className="mb-8">
+          <CsvUploadForm
+            action={bulkUploadParticipants}
+            templateHref="/participants-template.csv"
+            entityLabel="participant"
+            note="School and sensei names must match existing records exactly. Certificates can't be uploaded via CSV — add one later via Edit."
+          />
+        </div>
+      )}
       <div className="grid gap-8 lg:grid-cols-5">
         <div className="lg:col-span-2">
           <h2 className="mb-3 text-lg font-bold">{editing ? "Edit Participant" : "Add Participant"}</h2>
@@ -263,6 +276,14 @@ export default async function AdminParticipants({
             />
           )}
         </div>
+      </div>
+      <div className="mt-8">
+        <InvitationCodeForm
+          role="participant"
+          returnTo="/admin/participants"
+          title="Participant Invitation Code"
+          idPrefix="participant_code"
+        />
       </div>
     </AdminShell>
   );

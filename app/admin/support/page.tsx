@@ -8,6 +8,7 @@ import { EmptyState, SetupNotice, formatUSD } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
 import SignInControlBox from "@/components/SignInControlBox";
+import InvitationCodeForm from "@/components/InvitationCodeForm";
 import { EDUCATION_LEVELS, SPOKEN_LANGUAGES } from "@/lib/reference-data";
 
 export const dynamic = "force-dynamic";
@@ -45,6 +46,7 @@ export default async function AdminSupport({
     ? await supabase.from("profiles").select("role").eq("user_id", user.id).maybeSingle()
     : { data: null };
   const canCreate = ["admin", "organizer", "staff"].includes(myProfile?.role ?? "");
+  const canBulkUpload = ["admin", "organizer"].includes(myProfile?.role ?? "");
   const isCustomerSupport = myProfile?.role === "customer_support";
   const isAdminTier = ["admin", "organizer", "staff", "customer_support"].includes(myProfile?.role ?? "");
 
@@ -107,14 +109,16 @@ export default async function AdminSupport({
 
       {canCreate && (
         <div className="mb-8">
-          <div className="mb-6">
-            <CsvUploadForm
-              action={bulkUploadSupport}
-              templateHref="/support-template.csv"
-              entityLabel="account"
-              note="Each row creates a real login instantly and emails a temporary password — max 200 rows per upload."
-            />
-          </div>
+          {canBulkUpload && (
+            <div className="mb-6">
+              <CsvUploadForm
+                action={bulkUploadSupport}
+                templateHref="/support-template.csv"
+                entityLabel="account"
+                note="Each row creates a real login instantly and emails a temporary password — max 200 rows per upload."
+              />
+            </div>
+          )}
           <h2 className="mb-3 text-lg font-bold">Create A Customer Support Account</h2>
           <Card>
             <form action={createStaffAccount} className="space-y-4">
@@ -378,6 +382,16 @@ export default async function AdminSupport({
               ))}
             </div>
           )}
+        </div>
+      )}
+      {canCreate && (
+        <div className="mt-8">
+          <InvitationCodeForm
+            role="customer_support"
+            returnTo="/admin/support"
+            title="Customer Support Invitation Code"
+            idPrefix="support_code"
+          />
         </div>
       )}
     </AdminShell>

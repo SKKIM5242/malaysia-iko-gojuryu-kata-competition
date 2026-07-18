@@ -2,12 +2,13 @@ import Link from "next/link";
 import { getSchools, schemaReady } from "@/lib/data";
 import { getSchoolSenseiTierFees, getAllCompetitions } from "@/lib/admin-data";
 import { createClient } from "@/lib/supabase/server";
-import { saveSchool, deleteSchool, createInvitationCode, generateRecordInvitationCode, updateCommunityStatus, bulkUploadSchools } from "@/app/actions/admin";
+import { saveSchool, deleteSchool, generateRecordInvitationCode, updateCommunityStatus, bulkUploadSchools } from "@/app/actions/admin";
 import { AdminShell, Card, adminBtn, adminBtnSecondary, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice, formatUSD } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
 import SignInControlBox from "@/components/SignInControlBox";
+import InvitationCodeForm from "@/components/InvitationCodeForm";
 
 export const dynamic = "force-dynamic";
 
@@ -67,6 +68,7 @@ export default async function AdminSchools({
     ? await supabase.from("profiles").select("role").eq("user_id", user.id).maybeSingle()
     : { data: null };
   const isAdminTier = ["admin", "organizer", "staff"].includes(myProfile?.role ?? "");
+  const canBulkUpload = ["admin", "organizer"].includes(myProfile?.role ?? "");
 
   const { data: schoolLogins } = await supabase
     .from("profiles")
@@ -76,36 +78,19 @@ export default async function AdminSchools({
 
   return (
     <AdminShell title="Schools" active="/admin/schools" flash={{ ok: params.ok, error: params.error }}>
-      <div className="mb-8">
-        <CsvUploadForm
-          action={bulkUploadSchools}
-          templateHref="/schools-template.csv"
-          entityLabel="school"
-        />
-      </div>
+      {canBulkUpload && (
+        <div className="mb-8">
+          <CsvUploadForm
+            action={bulkUploadSchools}
+            templateHref="/schools-template.csv"
+            entityLabel="school"
+          />
+        </div>
+      )}
       <div className="grid gap-8 lg:grid-cols-2">
         <div>
           <h2 className="mb-3 text-lg font-bold">{editing ? "Edit School" : "Add School"}</h2>
           <Card>
-            {!editing && (
-              <div className="mb-4 rounded-md border border-neutral-200 bg-neutral-50 p-3">
-                <p className="text-xs font-bold uppercase tracking-wide text-neutral-500">
-                  School / Dojo invitation code
-                </p>
-                <form action={createInvitationCode} className="mt-2 flex flex-wrap items-end gap-3">
-                  <input type="hidden" name="role" value="school" />
-                  <input type="hidden" name="return_to" value="/admin/schools" />
-                  <div>
-                    <label htmlFor="school_code_note" className={adminLabel}>Note (optional)</label>
-                    <input id="school_code_note" name="note" className={adminInput} placeholder="e.g. Regional dojos" />
-                  </div>
-                  <button type="submit" className={adminBtnSecondary}>Generate unlimited-use code</button>
-                </form>
-                <p className="mt-1 text-xs text-neutral-400">
-                  Shared with Senseis / Coaches too. Manage or revoke codes in Admin → Accounts → Invitation codes.
-                </p>
-              </div>
-            )}
             {editing && (
               <div className="mb-4 rounded-md border border-neutral-200 bg-neutral-50 p-3">
                 <p className="text-xs font-bold uppercase tracking-wide text-neutral-500">
@@ -329,6 +314,14 @@ export default async function AdminSchools({
             />
           )}
         </div>
+      </div>
+      <div className="mt-8">
+        <InvitationCodeForm
+          role="school"
+          returnTo="/admin/schools"
+          title="School / Dojo Invitation Code"
+          idPrefix="school_code"
+        />
       </div>
     </AdminShell>
   );
