@@ -1,14 +1,73 @@
 "use server";
 
+import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { writeAudit } from "@/lib/audit";
 import { sendConfirmationEmail } from "@/lib/notify";
+import { getStripe, paymentsEnabled } from "@/lib/payments";
 
 export interface DirectoryState {
   ok: boolean;
   error?: string;
   name?: string;
   fieldErrors?: Record<string, string>;
+  /** When Stripe is configured, the tier registration fee checkout to
+   * redirect to right after the record is created. */
+  checkoutUrl?: string;
+}
+
+/** Validates the chosen competition tier and returns it with its fee —
+ * School/Sensei directory registration costs the tier's own registration
+ * fee (USD 10 / 100 / 200), paid once per record. */
+async function loadTier(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  competitionId: string,
+): Promise<{ id: string; name: string; fee: number } | null> {
+  if (!competitionId) return null;
+  const { data } = await supabase
+    .from("competitions")
+    .select("id, name, registration_fee_usd, status")
+    .eq("id", competitionId)
+    .maybeSingle();
+  if (!data || data.status !== "open") return null;
+  return { id: data.id, name: data.name, fee: Number(data.registration_fee_usd ?? 0) };
+}
+
+/** Best-effort Stripe checkout for the tier fee; null when payments are
+ * not configured (record stays pending for a manual payment instead). */
+async function directoryCheckout(
+  kind: "school" | "sensei",
+  recordId: string,
+  displayName: string,
+  tier: { id: string; name: string; fee: number },
+): Promise<string | null> {
+  if (!paymentsEnabled() || tier.fee <= 0) return null;
+  const origin =
+    (await headers()).get("origin") ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  try {
+    const session = await getStripe().checkout.sessions.create({
+      mode: "payment",
+      line_items: [
+        {
+          price_data: {
+            currency: "usd",
+            unit_amount: Math.round(tier.fee * 100),
+            product_data: {
+              name: `${kind === "school" ? "School / Dojo" : "Sensei / Coach"} registration — ${tier.name}`,
+              description: `${displayName} — IKO GOJU-RYU KARATE-DO MALAYSIA SDN BHD`,
+            },
+          },
+          quantity: 1,
+        },
+      ],
+      metadata: kind === "school" ? { school_id: recordId } : { sensei_id: recordId },
+      success_url: `${origin}/pay/thanks?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/register?cancelled=1`,
+    });
+    return session.url;
+  } catch {
+    return null;
+  }
 }
 
 /** Public School / Dojo self-registration (anonymous insert allowed by RLS). */
@@ -28,6 +87,7 @@ export async function registerSchool(
   const city_town = String(formData.get("city_town") ?? "").trim();
   const postcode = String(formData.get("postcode") ?? "").trim();
   const home_country = String(formData.get("home_country") ?? "").trim();
+  const competition_id = String(formData.get("competition_id") ?? "").trim();
   if (!name) return { ok: false, error: "School / dojo name is required." };
   if (!contact_title || !["Mr.", "Ms."].includes(contact_title)) {
     return { ok: false, error: "Person in-charge's title is required." };
@@ -44,6 +104,8 @@ export async function registerSchool(
   const gender = contact_title === "Mr." ? "male" : "female";
 
   const supabase = await createClient();
+  const tier = await loadTier(supabase, competition_id);
+  if (!tier) return { ok: false, error: "Select the competition tier you are registering under." };
   const { data: existing } = await supabase
     .from("schools")
     .select("id")
@@ -69,6 +131,7 @@ export async function registerSchool(
     city_town,
     postcode,
     home_country,
+    registration_competition_id: tier.id,
   });
   if (error) return { ok: false, error: "Could not register the school. Please try again." };
 
@@ -76,8 +139,9 @@ export async function registerSchool(
     table_name: "schools",
     record_id: id,
     action: "school_self_registered",
-    new_value: { name, state, contact_title, contact_name, contact_karate_title, contact_rank },
+    new_value: { name, state, contact_title, contact_name, contact_karate_title, contact_rank, tier: tier.name },
   });
+  const checkoutUrl = await directoryCheckout("school", id, name, tier);
   await sendConfirmationEmail({
     toEmail: email,
     recipientName: name,
@@ -85,15 +149,16 @@ export async function registerSchool(
     telegramCategory: "school",
     bodyLines: [
       `"${name}" is now in the directory and can be selected on registration forms.`,
+      `Registration tier: ${tier.name} — one-time registration fee USD ${tier.fee.toFixed(2)}.`,
       "Next: register your Sensei / Coach, then register participants.",
       "",
-      "One more step: ask the organiser for a personal invitation code for this record, then " +
-        "sign in via Kata Arena Log In. A USD 10 registration fee unlocks unlimited sign-in to " +
-        "watch your own students' kata recordings and judge scores any time — 10 or more " +
-        "participants qualifies you for a 10% share of their registration fees.",
+      "One more step: ask the organizer for a personal invitation code for this record, then " +
+        "sign in via Kata Arena Log In. Your paid tier registration fee unlocks unlimited " +
+        "sign-in to watch your own students' kata recordings and judge scores any time — 10 or " +
+        "more participants qualifies you for a 10% share of their registration fees.",
     ],
   });
-  return { ok: true, name };
+  return { ok: true, name, checkoutUrl: checkoutUrl ?? undefined };
 }
 
 /** Public Sensei / Coach self-registration (anonymous insert allowed by RLS). */
@@ -114,6 +179,7 @@ export async function registerSensei(
   const city_town = String(formData.get("city_town") ?? "").trim();
   const postcode = String(formData.get("postcode") ?? "").trim();
   const home_country = String(formData.get("home_country") ?? "").trim();
+  const competition_id = String(formData.get("competition_id") ?? "").trim();
   if (!name) return { ok: false, error: "Sensei / coach name is required." };
   if (!rank) {
     return {
@@ -178,6 +244,8 @@ export async function registerSensei(
   }
 
   const supabase = await createClient();
+  const tier = await loadTier(supabase, competition_id);
+  if (!tier) return { ok: false, error: "Select the competition tier you are registering under." };
   const { data: existing } = await supabase
     .from("senseis")
     .select("id")
@@ -210,6 +278,7 @@ export async function registerSensei(
     city_town,
     postcode,
     home_country,
+    registration_competition_id: tier.id,
   });
   if (error) return { ok: false, error: "Could not register the sensei. Please try again." };
 
@@ -217,8 +286,9 @@ export async function registerSensei(
     table_name: "senseis",
     record_id: id,
     action: "sensei_self_registered",
-    new_value: { name, rank, school_id },
+    new_value: { name, rank, school_id, tier: tier.name },
   });
+  const checkoutUrl = await directoryCheckout("sensei", id, name, tier);
   await sendConfirmationEmail({
     toEmail: email,
     recipientName: name,
@@ -226,13 +296,14 @@ export async function registerSensei(
     telegramCategory: "school",
     bodyLines: [
       `"${name}" is now in the directory.`,
+      `Registration tier: ${tier.name} — one-time registration fee USD ${tier.fee.toFixed(2)}.`,
       "Next: register participants or bulk-register your students.",
       "",
-      "One more step: ask the organiser for a personal invitation code for this record, then " +
-        "sign in via Kata Arena Log In. A USD 10 registration fee unlocks unlimited sign-in to " +
-        "watch your own students' kata recordings and judge scores any time — 10 or more " +
-        "participants qualifies you for a 10% share of their registration fees.",
+      "One more step: ask the organizer for a personal invitation code for this record, then " +
+        "sign in via Kata Arena Log In. Your paid tier registration fee unlocks unlimited " +
+        "sign-in to watch your own students' kata recordings and judge scores any time — 10 or " +
+        "more participants qualifies you for a 10% share of their registration fees.",
     ],
   });
-  return { ok: true, name };
+  return { ok: true, name, checkoutUrl: checkoutUrl ?? undefined };
 }

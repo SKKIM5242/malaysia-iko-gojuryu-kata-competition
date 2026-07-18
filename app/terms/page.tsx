@@ -17,7 +17,7 @@ export default function TermsPage() {
             <h2 className="mb-1 font-bold text-neutral-900">1. Who This Applies To</h2>
             <p>
               These terms apply to anyone creating a Kata Arena account — Participants, Referees /
-              Judges, and Admin / Organizer / Customer Support staff — to submit, judge, or manage
+              Judges, and Admin / Organizer / Participant Support staff — to submit, judge, or manage
               kata recordings for this competition.
             </p>
           </section>
@@ -27,14 +27,14 @@ export default function TermsPage() {
               Participants may record and re-record their kata up to the attempt limit shown in the
               recorder. Once submitted, a recording is final and cannot be replaced. By submitting,
               you confirm the recording is your own performance, filmed by you or someone you
-              authorised, and you grant the organiser the right to store, play back, and judge it
+              authorized, and you grant the organizer the right to store, play back, and judge it
               within Kata Arena.
             </p>
           </section>
           <section>
             <h2 className="mb-1 font-bold text-neutral-900">3. Judging</h2>
             <p>
-              Each recording is scored by a panel of Referees / Judges assigned by the organiser
+              Each recording is scored by a panel of Referees / Judges assigned by the organizer
               (typically 3, 5, or 7 per recording). Where 5 or more judges score a recording, the
               highest and lowest scores are dropped and the remaining scores are averaged for the
               final result. Referees may only view and score recordings assigned to them, and
@@ -49,7 +49,7 @@ export default function TermsPage() {
               status with its total score once every assigned judge has scored it, or a red
               &quot;Disqualified&quot; status if any one judge gave a Total Score of 0 — no score is
               shown for a disqualified entry. Referees / Judges see only their own individual score
-              per recording; Admin / Organizer / Customer Support see every judge&apos;s individual
+              per recording; Admin / Organizer / Participant Support see every judge&apos;s individual
               score. Official winners and standings are announced separately — see{" "}
               <a href="/winners" className="font-semibold text-red-700 underline underline-offset-2">
                 Winners
@@ -67,7 +67,7 @@ export default function TermsPage() {
           <section>
             <h2 className="mb-1 font-bold text-neutral-900">6. Conduct</h2>
             <p>
-              Accounts are personal and may not be shared. The organiser may suspend or remove any
+              Accounts are personal and may not be shared. The organizer may suspend or remove any
               account for abusive conduct, attempted score manipulation, or submission of
               recordings that are not a genuine, unedited performance.
             </p>
@@ -75,7 +75,7 @@ export default function TermsPage() {
           <section>
             <h2 className="mb-1 font-bold text-neutral-900">7. Contact</h2>
             <p>
-              Questions about these terms can be sent to the organiser at{" "}
+              Questions about these terms can be sent to the organizer at{" "}
               <a href="mailto:kimsiewkiew@gmail.com" className="font-semibold text-red-700 underline underline-offset-2">
                 kimsiewkiew@gmail.com
               </a>.

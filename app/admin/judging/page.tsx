@@ -9,6 +9,7 @@ import { submitScore } from "@/app/actions/account";
 import { AdminShell, Card, adminBtn, adminInput } from "@/components/admin";
 import { CategoryName, EmptyState, SetupNotice } from "@/components/ui";
 import VideoWatchButton from "@/components/VideoWatchButton";
+import FullViewButton from "@/components/FullViewButton";
 import DownloadCsvButton from "@/components/DownloadCsvButton";
 import FilterableTable from "@/components/FilterableTable";
 import ScoreDetailButton from "@/components/ScoreDetailButton";
@@ -50,13 +51,16 @@ export default async function AdminJudging({
   const myRole = myProfile?.role ?? null;
   // Judging Arena management (assign/unassign referees, judges-required,
   // auto-assign): Admin, Organizer/Staff, and Referee/Judge all get Full
-  // access. Customer Support stays view only.
+  // access. Participant Support stays view only.
   const canManageJudging = ["admin", "organizer", "staff", "referee"].includes(myRole ?? "");
   // Kata video scoring override: Admin and Organizer/Staff may score any
-  // recording, not just ones assigned to them. Customer Support stays
+  // recording, not just ones assigned to them. Participant Support stays
   // blocked (not a referee); Referee/Judge is unchanged — own assigned
   // videos only, via the separate My Account scoring flow.
   const canScoreAnyVideo = ["admin", "organizer", "staff"].includes(myRole ?? "");
+  // The browser video player's three-dot menu (download / picture-in-picture)
+  // is exposed to Admin/Organizer only, per the organizer's instruction.
+  const allowAdvancedControls = ["admin", "organizer", "staff"].includes(myRole ?? "");
 
   const [competitions, { data: videos }, { data: directory }, { data: refereeProfiles }, { data: assignments }, { data: scores }] =
     await Promise.all([
@@ -134,7 +138,7 @@ export default async function AdminJudging({
     videosByCompetition.set(compId, list);
   }
 
-  function renderVideoCard(v: VideoRow, queuePosition: number | null, dq: boolean) {
+  function renderVideoCard(v: VideoRow, queuePosition: number | null, dq: boolean, judgesRequired: number) {
     const assigned = assignedByVideo.get(v.id) ?? [];
     const available = refereeList.filter((r) => !assigned.includes(r.user_id));
     const myScore = user ? scoreByKey.get(`${v.id}:${user.id}`) : undefined;
@@ -161,7 +165,32 @@ export default async function AdminJudging({
                 Queue #{queuePosition}
               </span>
             ) : null}
-            <VideoWatchButton url={playbackUrl ?? null} label="Watch recording" />
+            <FullViewButton
+              url={playbackUrl ?? null}
+              participantName={v.participant?.full_name ?? "Unknown participant"}
+              categoryName={v.registration?.category?.name ?? null}
+              competitionName={competitions.find((c) => c.id === v.registration?.competition_id)?.name ?? null}
+              judges={assigned.map((uid) => ({
+                judgeName: refereeName.get(uid) ?? uid.slice(0, 8),
+                country: refereeCountry.get(uid) ?? null,
+                total: scoreByKey.get(`${v.id}:${uid}`) ?? null,
+                criteria: criteriaByKey.get(`${v.id}:${uid}`) ?? null,
+              }))}
+              judgesRequired={judgesRequired}
+              queuePosition={queuePosition}
+              averageText={
+                final != null
+                  ? `Average ${final.toFixed(1)} (${submittedScores.length}/${assigned.length} scored${trimmed ? ", high/low dropped" : ""})`
+                  : null
+              }
+              disqualified={dq}
+              allowAdvancedControls={allowAdvancedControls}
+            />
+            <VideoWatchButton
+              url={playbackUrl ?? null}
+              label="Watch recording"
+              allowAdvancedControls={allowAdvancedControls}
+            />
           </div>
         </div>
 
@@ -446,7 +475,9 @@ export default async function AdminJudging({
                     .filter((r) => !r.dq && r.final != null)
                     .sort((a, b) => (b.final ?? 0) - (a.final ?? 0))
                     .forEach((r, i) => queueByVideoId.set(r.v.id, i + 1));
-                  return ranked.map(({ v, dq }) => renderVideoCard(v, queueByVideoId.get(v.id) ?? null, dq));
+                  return ranked.map(({ v, dq }) =>
+                    renderVideoCard(v, queueByVideoId.get(v.id) ?? null, dq, c.judges_required),
+                  );
                 })()}
               </div>
             )}

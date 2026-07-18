@@ -1,16 +1,52 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 import Link from "next/link";
 import { registerSchool, registerSensei, type DirectoryState } from "@/app/actions/directory";
 import { TelegramJoinButton } from "@/components/ui";
 import CertificateUploadField from "@/components/CertificateUploadField";
 import type { School } from "@/lib/types";
 
+export interface TierOption {
+  id: string;
+  name: string;
+  fee: number;
+}
+
 const initial: DirectoryState = { ok: false };
 const inputCls =
   "w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm focus:border-red-600 focus:outline-none focus:ring-1 focus:ring-red-600";
 const labelCls = "mb-1 block text-sm font-medium text-neutral-700";
+
+/** Straight to Stripe Checkout the moment the record is created — the
+ * Success screen below still shows a manual pay link as fallback. */
+function useCheckoutRedirect(state: DirectoryState) {
+  useEffect(() => {
+    if (state.ok && state.checkoutUrl) window.location.href = state.checkoutUrl;
+  }, [state]);
+}
+
+function TierSelect({ tiers, idPrefix }: { tiers: TierOption[]; idPrefix: string }) {
+  return (
+    <div>
+      <label htmlFor={`${idPrefix}_competition_id`} className={labelCls}>
+        Competition tier — one-time registration fee *
+      </label>
+      <select id={`${idPrefix}_competition_id`} name="competition_id" required defaultValue="" className={inputCls}>
+        <option value="" disabled>Select tier</option>
+        {tiers.map((t) => (
+          <option key={t.id} value={t.id}>
+            {t.name} — USD {t.fee.toFixed(0)}
+          </option>
+        ))}
+      </select>
+      <p className="mt-1 text-xs text-neutral-400">
+        The fee follows the competition tier (USD 10 / USD 100 / USD 200) and is paid once per
+        registration.
+      </p>
+    </div>
+  );
+}
 
 function FieldError({ message }: { message?: string }) {
   if (!message) return null;
@@ -22,11 +58,13 @@ function Success({
   name,
   next,
   telegramLink,
+  payUrl,
 }: {
   what: string;
   name: string;
   next: React.ReactNode;
   telegramLink: string | null;
+  payUrl?: string;
 }) {
   return (
     <div className="rounded-lg border border-green-300 bg-green-50 p-8 text-center">
@@ -35,11 +73,19 @@ function Success({
       <p className="mt-2 text-green-800">
         <strong>{name}</strong> is now in the directory and can be selected on registration forms.
       </p>
+      {payUrl && (
+        <a
+          href={payUrl}
+          className="mt-4 inline-block rounded-md bg-red-700 px-6 py-2.5 font-semibold text-white hover:bg-red-600"
+        >
+          Pay the tier registration fee now →
+        </a>
+      )}
       <div className="mt-4 text-sm text-green-800">{next}</div>
       <div className="mx-auto mt-6 max-w-md rounded-md border border-amber-200 bg-amber-50 p-4 text-left text-xs text-amber-900">
         <p className="font-bold">One more step — sign in to watch your students&apos; recordings</p>
         <p className="mt-1">
-          Ask the organiser for a personal invitation code tied to this exact record, then use it
+          Ask the organizer for a personal invitation code tied to this exact record, then use it
           to sign in via <Link href="/account?mode=signup" className="underline">Kata Arena Log In</Link>.
           A registration fee — matching your students&apos; competition tier fee — unlocks unlimited
           sign-in to watch your students&apos; kata recordings and judge scores as they come in —
@@ -57,14 +103,16 @@ function Success({
   );
 }
 
-export function SchoolForm({ telegramLink }: { telegramLink: string | null }) {
+export function SchoolForm({ telegramLink, tiers }: { telegramLink: string | null; tiers: TierOption[] }) {
   const [state, formAction, pending] = useActionState(registerSchool, initial);
+  useCheckoutRedirect(state);
   if (state.ok && state.name) {
     return (
       <Success
         what="School / Dojo"
         name={state.name}
         telegramLink={telegramLink}
+        payUrl={state.checkoutUrl}
         next={
           <>
             Next: <Link href="/register/sensei" className="underline">register your Sensei / Coach</Link>,
@@ -82,11 +130,14 @@ export function SchoolForm({ telegramLink }: { telegramLink: string | null }) {
         </div>
       )}
       <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
-        Registering here is free and just lists your school in the directory. Afterwards, a
-        registration fee — matching your students&apos; competition tier fee — unlocks unlimited
-        sign-in to watch your own students&apos; kata recordings and judge scores — and 10 or more
-        participants qualifies you for a 10% share of their registration fees.
+        Registering here is <strong>not free</strong> — the one-time registration fee follows the
+        competition tier you register under: <strong>USD 10 / USD 100 / USD 200 per tier</strong>,
+        whether the school registers itself or someone registers on its behalf. The paid fee
+        unlocks unlimited sign-in to watch your own students&apos; kata recordings and judge
+        scores — and 10 or more participants qualifies you for a 10% share of their registration
+        fees.
       </div>
+      <TierSelect tiers={tiers} idPrefix="school" />
       <div>
         <label htmlFor="name" className={labelCls}>School / Dojo name *</label>
         <input id="name" name="name" required className={inputCls} placeholder="e.g. Dojo Goju-ryu Johor Bahru" />
@@ -170,12 +221,15 @@ export function SenseiForm({
   schools,
   defaultBy,
   telegramLink,
+  tiers,
 }: {
   schools: School[];
   defaultBy?: string;
   telegramLink: string | null;
+  tiers: TierOption[];
 }) {
   const [state, formAction, pending] = useActionState(registerSensei, initial);
+  useCheckoutRedirect(state);
   const err = state.fieldErrors ?? {};
   if (state.ok && state.name) {
     return (
@@ -183,6 +237,7 @@ export function SenseiForm({
         what="Sensei / Coach"
         name={state.name}
         telegramLink={telegramLink}
+        payUrl={state.checkoutUrl}
         next={
           <>
             Next: <Link href="/register" className="underline">register participants</Link> or{" "}
@@ -200,11 +255,14 @@ export function SenseiForm({
         </div>
       )}
       <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
-        Registering here is free and just lists you in the directory. Afterwards, a registration
-        fee — matching your students&apos; competition tier fee — unlocks unlimited sign-in to
-        watch your own students&apos; kata recordings and judge scores — and 10 or more
-        participants qualifies you for a 10% share of their registration fees.
+        Registering here is <strong>not free</strong> — the one-time registration fee follows the
+        competition tier you register under: <strong>USD 10 / USD 100 / USD 200 per tier</strong>,
+        whether the sensei registers themselves or someone registers on their behalf. The paid fee
+        unlocks unlimited sign-in to watch your own students&apos; kata recordings and judge
+        scores — and 10 or more participants qualifies you for a 10% share of their registration
+        fees.
       </div>
+      <TierSelect tiers={tiers} idPrefix="sensei" />
       <div>
         <label htmlFor="registered_by" className={labelCls}>Who is registering? *</label>
         <select

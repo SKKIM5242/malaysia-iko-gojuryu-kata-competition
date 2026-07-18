@@ -10,11 +10,11 @@ export const metadata: Metadata = {
     template: "%s — Malaysia Open Karate-do Kata Competition - Goju-ryu or IKO Goju-ryu Version Only",
   },
   description:
-    "Malaysia Open Karate-do Kata Competition - Goju-ryu or IKO Goju-ryu Version Only. Specially for all Goju-ryu Karateka to compete globally without leaving their beloved Country. Organiser: IKO GOJU-RYU KARATE-DO MALAYSIA SDN BHD.",
+    "Malaysia Open Karate-do Kata Competition - Goju-ryu or IKO Goju-ryu Version Only. Specially for all Goju-ryu Karateka to compete globally without leaving their beloved Country. Organizer: IKO GOJU-RYU KARATE-DO MALAYSIA SDN BHD.",
   openGraph: {
     title: "Malaysia Open Karate-do Kata Competition - Goju-ryu or IKO Goju-ryu Version Only",
     description:
-      "Specially for all Goju-ryu Karateka to compete globally without leaving their beloved Country. Organiser: IKO GOJU-RYU KARATE-DO MALAYSIA SDN BHD.",
+      "Specially for all Goju-ryu Karateka to compete globally without leaving their beloved Country. Organizer: IKO GOJU-RYU KARATE-DO MALAYSIA SDN BHD.",
     type: "website",
   },
 };

@@ -82,6 +82,8 @@ export default function KataRecorder({
   const [seconds, setSeconds] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [agreementOpen, setAgreementOpen] = useState(false);
+  const [agreed, setAgreed] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -327,7 +329,13 @@ export default function KataRecorder({
             >
               Delete &amp; re-record ({attemptsLeft} left)
             </button>
-            <button onClick={handleSubmit} className="rounded-md bg-red-700 px-6 py-2.5 font-semibold text-white hover:bg-red-600">
+            <button
+              onClick={() => {
+                setAgreed(false);
+                setAgreementOpen(true);
+              }}
+              className="rounded-md bg-red-700 px-6 py-2.5 font-semibold text-white hover:bg-red-600"
+            >
               Submit this recording
             </button>
           </>
@@ -338,6 +346,48 @@ export default function KataRecorder({
           </button>
         )}
       </div>
+
+      {agreementOpen && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+            <p className="font-bold text-neutral-900">Publication &amp; Advertising Agreement</p>
+            <p className="mt-2 text-sm text-neutral-600">
+              By submitting this recording, you grant the organizer the rights to publish it and to
+              use it in any advertising or promotion of the competition and the organizer&apos;s
+              activities, in any media, provided nothing illegal is involved. You confirm the
+              recording is your own performance.
+            </p>
+            <label className="mt-4 flex items-start gap-2 text-sm text-neutral-700">
+              <input
+                type="checkbox"
+                checked={agreed}
+                onChange={(e) => setAgreed(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-neutral-300 accent-red-700"
+              />
+              <span>I have read and agree to the above. *</span>
+            </label>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <button
+                onClick={() => {
+                  if (!agreed) return;
+                  setAgreementOpen(false);
+                  void handleSubmit();
+                }}
+                disabled={!agreed}
+                className="rounded-md bg-red-700 px-5 py-2.5 font-semibold text-white hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                I agree — submit my recording
+              </button>
+              <button
+                onClick={() => setAgreementOpen(false)}
+                className="rounded-md border border-neutral-300 px-5 py-2.5 font-semibold text-neutral-600 hover:bg-neutral-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

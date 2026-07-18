@@ -36,7 +36,7 @@ export async function getOpenShift(userId: string): Promise<SupportShift | null>
   };
 }
 
-/** Every Customer Support member's full shift history, most recent first —
+/** Every Participant Support member's full shift history, most recent first —
  * RLS already restricts this query to admin-tier viewers only. */
 export async function getAllShifts(): Promise<SupportShift[]> {
   const supabase = await createClient();

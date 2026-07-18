@@ -254,7 +254,7 @@ export default async function RegisterPage({
                     Fields marked * are required. The fee is{" "}
                     <strong>{formatUSD(competition.registration_fee_usd)} per kata event</strong> —
                     choose up to 3 events below. After submitting you will receive a reference ID per
-                    event — transfer the total fee and send your receipt to the organiser to confirm
+                    event — transfer the total fee and send your receipt to the organizer to confirm
                     your slot. Deadline: <strong>{formatDate(competition.registration_deadline)}</strong>.
                   </>
                 )}

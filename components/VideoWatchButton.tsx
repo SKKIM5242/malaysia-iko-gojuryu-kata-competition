@@ -4,25 +4,31 @@ import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { deleteSubmittedVideo, type DeleteVideoState } from "@/app/actions/account";
 import BuyExtraAttemptsButton from "@/components/BuyExtraAttemptsButton";
+import FloatingWindow from "@/components/FloatingWindow";
+import LockedVideo from "@/components/LockedVideo";
 
 const initialDeleteState: DeleteVideoState = { ok: false };
 
-/** Opens the recording in an in-page modal instead of a new tab — used on
- * Kata Arena, Judging, and the admin Participant Records table so watching
- * a submission never navigates away from the list you're working through.
- * Pass `deletable` (only for the signed-in participant's own, not-yet-scored
- * recording) to add a Delete button + "X of 3 deletions used" counter next
- * to Close — deleting frees them to record again. */
+/** Opens the recording in a floating window (movable by dragging anywhere,
+ * resizable from every border line, minimize / maximize / snap-to-half /
+ * close buttons at the top right) — used on Kata Arena, Judging, and the
+ * admin Participant Records table. The browser's three-dot video menu is
+ * Admin/Organizer only via `allowAdvancedControls`. Pass `deletable` (only
+ * for the signed-in participant's own, not-yet-scored recording) to add a
+ * Delete button + "X of 3 deletions used" counter — deleting frees them to
+ * record again. */
 export default function VideoWatchButton({
   url,
   label = "Watch",
   className,
   deletable,
+  allowAdvancedControls = false,
 }: {
   url: string | null;
   label?: string;
   className?: string;
   deletable?: { registrationId: string; attemptsUsed: number; maxAttempts: number; hasPendingPurchase: boolean };
+  allowAdvancedControls?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -56,35 +62,17 @@ export default function VideoWatchButton({
         {label}
       </button>
       {open && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4"
-          onClick={() => setOpen(false)}
-        >
-          <div className="relative w-full max-w-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="absolute -top-10 right-0 flex items-center gap-3">
-              {deletable && (
-                <span className="text-xs font-semibold text-white">
-                  {attemptsUsed} of {maxAttempts} deletions used
-                </span>
-              )}
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                aria-label="Close video"
-                title="Close"
-                className="text-sm font-semibold text-white hover:text-neutral-300"
-              >
-                ✕ Close
-              </button>
+        <FloatingWindow title="Watch Recording" onClose={() => setOpen(false)} defaultWidth={760} defaultHeight={560}>
+          <div className="flex h-full flex-col">
+            <div className="min-h-0 flex-1 bg-black">
+              <LockedVideo src={url} autoPlay allowAdvancedControls={allowAdvancedControls} />
             </div>
-            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-            <video src={url} controls autoPlay className="w-full rounded-lg bg-black shadow-2xl" />
-
             {deletable && (
-              <div className="mt-3 rounded-lg bg-white p-3">
-                {state.error && (
-                  <p className="mb-2 text-xs font-semibold text-red-600">{state.error}</p>
-                )}
+              <div className="shrink-0 border-t border-neutral-200 bg-white p-3">
+                <p className="mb-2 text-xs font-semibold text-neutral-500">
+                  {attemptsUsed} of {maxAttempts} deletions used
+                </p>
+                {state.error && <p className="mb-2 text-xs font-semibold text-red-600">{state.error}</p>}
                 {attemptsLeft <= 0 && (
                   <div className="mb-2">
                     <BuyExtraAttemptsButton hasPendingPurchase={deletable.hasPendingPurchase} />
@@ -125,7 +113,7 @@ export default function VideoWatchButton({
               </div>
             )}
           </div>
-        </div>
+        </FloatingWindow>
       )}
     </>
   );

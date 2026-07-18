@@ -33,7 +33,7 @@ export default async function AdminSupport({
   const ready = await schemaReady();
   if (!ready) {
     return (
-      <AdminShell title="Customer Support" active="/admin/support">
+      <AdminShell title="Participant Support" active="/admin/support">
         <SetupNotice />
       </AdminShell>
     );
@@ -72,14 +72,15 @@ export default async function AdminSupport({
   const applications = (apps as StaffApp[]) ?? [];
 
   return (
-    <AdminShell title="Customer Support" active="/admin/support" flash={{ ok: params.ok, error: params.error }}>
+    <AdminShell title="Participant Support" active="/admin/support" flash={{ ok: params.ok, error: params.error }}>
       {isCustomerSupport && (
         <div className="mb-8">
           <h2 className="mb-3 text-lg font-bold">Your Shift</h2>
           <Card>
             <p className="mb-3 text-xs text-neutral-400">
               Clock in/out here even when your work was replying via the Telegram assistant or
-              community groups — there's no other way to log that time. Paid at USD 8/hour.
+              community groups — there's no other way to log that time. The organizer's reward
+              scheme for support work will be announced separately.
             </p>
             {openShift ? (
               <form action={clockOut} className="space-y-3">
@@ -120,7 +121,7 @@ export default async function AdminSupport({
               />
             </div>
           )}
-          <h2 className="mb-3 text-lg font-bold">Create A Customer Support Account</h2>
+          <h2 className="mb-3 text-lg font-bold">Create A Participant Support Account</h2>
           <Card>
             <form action={createStaffAccount} className="space-y-4">
               <input type="hidden" name="role" value="customer_support" />
@@ -246,9 +247,9 @@ export default async function AdminSupport({
                 </div>
               </div>
               <div>
-                <button type="submit" className={adminBtn}>Create Customer Support account</button>
+                <button type="submit" className={adminBtn}>Create Participant Support account</button>
                 <p className="mt-2 text-xs text-neutral-400">
-                  Creates a real login instantly and emails them a temporary password. Customer Support
+                  Creates a real login instantly and emails them a temporary password. Participant Support
                   accounts can view/edit Registrations and Participants (no delete), generate invitation
                   codes, and merge categories on Competitions — nothing else.
                 </p>
@@ -258,7 +259,7 @@ export default async function AdminSupport({
         </div>
       )}
 
-      <h2 className="mb-3 text-lg font-bold">Customer Support Applications</h2>
+      <h2 className="mb-3 text-lg font-bold">Participant Support Applications</h2>
       {applications.length === 0 ? (
         <EmptyState>No applications yet.</EmptyState>
       ) : (
@@ -330,7 +331,7 @@ export default async function AdminSupport({
 
       {isAdminTier && (
         <div className="mt-8">
-          <h2 className="mb-3 text-lg font-bold">Shift Log — USD 8/Hour</h2>
+          <h2 className="mb-3 text-lg font-bold">Shift Log</h2>
           {allShifts.length === 0 ? (
             <EmptyState>No shifts logged yet.</EmptyState>
           ) : (
@@ -342,7 +343,6 @@ export default async function AdminSupport({
                 { key: "clock_in", label: "Clock In" },
                 { key: "clock_out", label: "Clock Out" },
                 { key: "hours", label: "Hours" },
-                { key: "pay", label: "Pay (USD)" },
                 { key: "task_summary", label: "Task Summary" },
               ]}
               rows={allShifts.map((s) => ({
@@ -351,7 +351,6 @@ export default async function AdminSupport({
                 clock_in: formatDateTime(s.clockInAt),
                 clock_out: s.clockOutAt ? formatDateTime(s.clockOutAt) : "— still clocked in —",
                 hours: s.hours != null ? s.hours.toFixed(2) : "",
-                pay: s.payUsd != null ? `$${s.payUsd.toFixed(2)}` : "",
                 task_summary: s.taskSummary ?? "",
               }))}
             />
@@ -363,7 +362,7 @@ export default async function AdminSupport({
         <div className="mt-8">
           <h2 className="mb-3 text-lg font-bold">Sign-In Control (Admin/Organizer Only)</h2>
           {(supportProfiles ?? []).length === 0 ? (
-            <EmptyState>No Customer Support logins yet.</EmptyState>
+            <EmptyState>No Participant Support logins yet.</EmptyState>
           ) : (
             <div className="space-y-2">
               {(supportProfiles ?? []).map((p) => (
@@ -390,7 +389,7 @@ export default async function AdminSupport({
           <InvitationCodeForm
             role="customer_support"
             returnTo="/admin/support"
-            title="Customer Support Invitation Code"
+            title="Participant Support Invitation Code"
             idPrefix="support_code"
             codeExample="IKO-SUPPORT-2026"
             competitions={competitions}

@@ -47,7 +47,7 @@ export async function POST(request: Request) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             chat_id: chatId,
-            text: "✅ Telegram connected — you'll get a message here whenever the organiser assigns you a new kata recording to judge.",
+            text: "✅ Telegram connected — you'll get a message here whenever the organizer assigns you a new kata recording to judge.",
           }),
         });
       } catch {

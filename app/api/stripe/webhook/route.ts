@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { getStripe, paymentsEnabled } from "@/lib/payments";
-import { finalizeInvoiceSession, finalizeStripeSession } from "@/lib/finalize";
+import { finalizeDirectorySession, finalizeInvoiceSession, finalizeStripeSession } from "@/lib/finalize";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +38,8 @@ export async function POST(request: Request) {
     const session = event.data.object as Stripe.Checkout.Session;
     if (session.metadata?.invoice_id) {
       await finalizeInvoiceSession(session.id);
+    } else if (session.metadata?.school_id || session.metadata?.sensei_id) {
+      await finalizeDirectorySession(session.id);
     } else {
       await finalizeStripeSession(session.id);
     }

@@ -11,7 +11,7 @@ const ACTIVITY_EVENTS = ["mousemove", "keydown", "click", "scroll", "touchstart"
 /** Signed-in users only: after 30 minutes with no activity, warns with a
  * 20-second countdown before auto sign-out. Only the Continue button — not
  * background activity — cancels the countdown, matching a standard
- * session-timeout pattern. Admin/owner accounts are exempt — the organiser
+ * session-timeout pattern. Admin/owner accounts are exempt — the organizer
  * often leaves the admin panel open for long stretches while running the
  * competition and shouldn't get logged out mid-task. */
 export default function InactivityGuard() {

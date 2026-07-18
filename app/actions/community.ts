@@ -149,7 +149,7 @@ export async function registerReferee(
       "This confirms your Referee / Judge registration.",
       paymentStatus === "waived"
         ? "Your invitation code waived the USD 100 deposit — you're all set."
-        : "The organiser will review your registration and contact you about the USD 100 deposit (or confirm your invitation code). Remember: the USD 100 is a deposit for participants — for non-participants it will be forfeited.",
+        : "The organizer will review your registration and contact you about the USD 100 deposit (or confirm your invitation code). Remember: the USD 100 is a deposit for participants — for non-participants it will be forfeited.",
     ],
   });
   return { ok: true, referenceId };
@@ -212,7 +212,7 @@ export async function registerAudience(
       "This confirms your Audience / Spectator registration.",
       paymentStatus === "waived"
         ? "Your invitation code waived the USD 10 fee — you're all set."
-        : "The organiser will confirm your USD 10 sign-in (or your invitation code) and share viewing access details.",
+        : "The organizer will confirm your USD 10 sign-in (or your invitation code) and share viewing access details.",
     ],
   });
   return { ok: true, referenceId };
@@ -246,6 +246,9 @@ export async function applyStaff(
   ]);
   if (Object.keys(fieldErrors).length > 0) {
     return { ok: false, error: "Please fix the highlighted fields.", fieldErrors };
+  }
+  if (!["organizer", "customer_support"].includes(values.role_requested)) {
+    return { ok: false, error: "Role must be Organizer or Participant Support." };
   }
   const karate_rank = String(formData.get("karate_rank") ?? "").trim();
   const school = String(formData.get("school") ?? "").trim();
@@ -334,12 +337,12 @@ export async function applyStaff(
   await sendConfirmationEmail({
     toEmail: values.email,
     recipientName: values.full_name,
-    subject: "Admin / Organizer / Customer Support application received",
+    subject: "Admin / Organizer / Participant Support application received",
     referenceId,
     telegramCategory: "staff",
     bodyLines: [
-      `This confirms your application to join as Admin / Organizer / Customer Support (requested role: ${values.role_requested}).`,
-      "The organiser will review your application and contact you.",
+      `This confirms your application to join as Organizer / Participant Support (requested role: ${values.role_requested === "customer_support" ? "Participant Support" : "Organizer"}).`,
+      "The organizer will review your application and contact you.",
     ],
   });
   return { ok: true, referenceId };

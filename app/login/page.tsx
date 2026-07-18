@@ -66,7 +66,7 @@ export default function LoginPage() {
             {pending ? "Signing in…" : "Sign in"}
           </button>
           <p className="text-center text-xs text-neutral-400">
-            Owner account only — created by the organiser in the Supabase dashboard.
+            Owner account only — created by the organizer in the Supabase dashboard.
           </p>
         </form>
         <p className="mt-4 text-center text-sm">

@@ -21,7 +21,7 @@ export default function BuyExtraAttemptsButton({ hasPendingPurchase }: { hasPend
   if (hasPendingPurchase || state.ok) {
     return (
       <p className="text-xs font-semibold text-amber-700">
-        Payment pending — the organiser will confirm your USD 10 payment and add 3 more attempts.
+        Payment pending — the organizer will confirm your USD 10 payment and add 3 more attempts.
       </p>
     );
   }
@@ -39,7 +39,7 @@ export default function BuyExtraAttemptsButton({ hasPendingPurchase }: { hasPend
         </button>
       </form>
       <p className="mt-1 text-xs text-neutral-400">
-        The organiser confirms your payment, then adds 3 more delete-and-re-record chances to your account.
+        The organizer confirms your payment, then adds 3 more delete-and-re-record chances to your account.
       </p>
     </div>
   );

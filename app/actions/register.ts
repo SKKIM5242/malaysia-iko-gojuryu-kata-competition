@@ -339,8 +339,8 @@ export async function submitRegistration(
     bodyLines: [
       `This confirms your registration for ${competition.name} — ${resolvedEvents.length} kata event${resolvedEvents.length === 1 ? "" : "s"}: ${resolvedEvents.map((e) => e.kataBase).join(", ")}.`,
       `Your reference ID${referenceIds.length > 1 ? "s" : ""}: ${referenceIds.join(", ")}.`,
-      "Payment status: pending — transfer the registration fee and send your receipt to the organiser (see the announcement for bank details). The organiser will confirm your payment, after which your name appears on the participants list.",
-      "Organiser contact: WhatsApp +60 12-453 2831 / kimsiewkiew@gmail.com",
+      "Payment status: pending — transfer the registration fee and send your receipt to the organizer (see the announcement for bank details). The organizer will confirm your payment, after which your name appears on the participants list.",
+      "Organizer contact: WhatsApp +60 12-453 2831 / kimsiewkiew@gmail.com",
     ],
   });
 

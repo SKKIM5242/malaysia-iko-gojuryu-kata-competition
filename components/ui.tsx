@@ -148,7 +148,7 @@ export function SiteFooter() {
             <span aria-hidden>·</span>
             <Link href="/register/referee" className="underline underline-offset-2 hover:text-white">Register Referee/Judge</Link>
             <span aria-hidden>·</span>
-            <Link href="/register/staff" className="underline underline-offset-2 hover:text-white">Register Customer Support</Link>
+            <Link href="/register/staff" className="underline underline-offset-2 hover:text-white">Register Participant Support</Link>
             <span aria-hidden>·</span>
             <Link href="/register/audience" className="underline underline-offset-2 hover:text-white">Register Audience</Link>
           </div>
@@ -165,10 +165,10 @@ export function SiteFooter() {
 }
 
 /** Shown to registered users only (success screens, admin) — not on public pages. */
-export function OrganiserContact() {
+export function OrganizerContact() {
   return (
     <p className="mt-3 text-sm">
-      Questions? Contact the organiser — Mobile / WhatsApp:{" "}
+      Questions? Contact the organizer — Mobile / WhatsApp:{" "}
       <a href="https://wa.me/60124532831" className="font-semibold underline underline-offset-2">+60 12-453 2831</a>{" "}
       · Email:{" "}
       <a href="mailto:kimsiewkiew@gmail.com" className="font-semibold underline underline-offset-2">kimsiewkiew@gmail.com</a>
@@ -192,7 +192,7 @@ export function TelegramJoinButton({ href, label = "Join Telegram Group" }: { hr
     return (
       <div className="mt-3">
         <p className="text-sm text-neutral-500">Telegram community group launching soon.</p>
-        <OrganiserContact />
+        <OrganizerContact />
       </div>
     );
   }
@@ -209,7 +209,7 @@ export function TelegramJoinButton({ href, label = "Join Telegram Group" }: { hr
       </a>
       <p className="mx-auto mt-2 max-w-sm text-xs text-neutral-500">
         MY Open Kata Competition by IKO GOJU-RYU KARATE-DO MALAYSIA SDN BHD — ask questions and get
-        updates from the organiser.
+        updates from the organizer.
       </p>
     </div>
   );

@@ -4,6 +4,8 @@ import { schemaReady } from "@/lib/data";
 import { getAllCompetitions } from "@/lib/admin-data";
 import { groupArenaByKata, loadKataArena, type ArenaEntry } from "@/lib/arena";
 import { CategoryName, NoTranslate, SetupNotice, SiteFooter, SiteHeader } from "@/components/ui";
+import ArenaFilterBar from "@/components/ArenaFilterBar";
+import { splitCategoryName } from "@/lib/division";
 import AuthForms from "@/components/AuthForms";
 import ClaimForm from "@/components/ClaimForm";
 import VideoWatchButton from "@/components/VideoWatchButton";
@@ -164,12 +166,45 @@ function KataGroups({
   );
 }
 
+/** Builds the dropdown option lists from whatever recordings are actually
+ * loaded, and applies the URL-selected filters to the entries. */
+function arenaFilterTools(entries: ArenaEntry[], f: { kata?: string; belt?: string; age?: string; sex?: string }) {
+  const katas = new Set<string>();
+  const belts = new Set<string>();
+  const ages = new Set<string>();
+  const sexes = new Set<string>();
+  for (const e of entries) {
+    const p = splitCategoryName(e.categoryName);
+    if (p.kata) katas.add(p.kata);
+    if (p.belt) belts.add(p.belt);
+    if (p.age) ages.add(p.age);
+    if (p.sex) sexes.add(p.sex);
+  }
+  const apply = (list: ArenaEntry[]) =>
+    list.filter((e) => {
+      const p = splitCategoryName(e.categoryName);
+      if (f.kata && p.kata !== f.kata) return false;
+      if (f.belt && p.belt !== f.belt) return false;
+      if (f.age && p.age !== f.age) return false;
+      if (f.sex && p.sex !== f.sex) return false;
+      return true;
+    });
+  return {
+    katas: [...katas].sort(),
+    belts: [...belts].sort(),
+    ages: [...ages].sort(),
+    sexes: [...sexes].sort(),
+    apply,
+  };
+}
+
 export default async function KataArenaPage({
   searchParams,
 }: {
-  searchParams: Promise<{ mode?: string }>;
+  searchParams: Promise<{ mode?: string; tier?: string; kata?: string; belt?: string; age?: string; sex?: string }>;
 }) {
-  const { mode } = await searchParams;
+  const { mode, tier, kata, belt, age, sex } = await searchParams;
+  const filterParams = { kata, belt, age, sex };
   const ready = await schemaReady();
   if (!ready) {
     return (
@@ -224,7 +259,7 @@ export default async function KataArenaPage({
           <h1 className="text-2xl font-bold tracking-tight">Kata Arena</h1>
           <p className="mt-2 text-sm text-neutral-500">
             We couldn&apos;t set up your account automatically. Please sign out and sign in again
-            — if this keeps happening, contact the organiser with the email you signed up with.
+            — if this keeps happening, contact the organizer with the email you signed up with.
           </p>
         </main>
         <SiteFooter />
@@ -263,7 +298,7 @@ export default async function KataArenaPage({
 
   // ── Participant: link registration first if not done yet. A participant's
   // "approved" flag is just a byproduct of claiming (see ClaimForm), not an
-  // organiser-approval concept like the other roles below, so it's checked
+  // organizer-approval concept like the other roles below, so it's checked
   // here instead of the general !approved gate. ──────────────────────────
   if (profile.role === "participant" && !profile.registration_id) {
     return (
@@ -288,7 +323,7 @@ export default async function KataArenaPage({
         <main className="mx-auto max-w-2xl px-4 py-10">
           <h1 className="text-2xl font-bold tracking-tight">Kata Arena</h1>
           <p className="mt-2 text-sm text-neutral-500">
-            Your account is awaiting the organiser&apos;s approval.{" "}
+            Your account is awaiting the organizer&apos;s approval.{" "}
             <Link href="/account" className="underline">
               Check your account status
             </Link>
@@ -308,6 +343,14 @@ export default async function KataArenaPage({
   if (profile.role !== "participant") {
     const competitions = await getAllCompetitions();
     const showJudgeScores = PRIVILEGED_ROLES.includes(profile.role);
+    const shownCompetitions = tier ? competitions.filter((c) => c.id === tier) : competitions;
+    const arenas = await Promise.all(
+      shownCompetitions.map(async (c) => ({ competition: c, arena: await loadKataArena(supabase, c.id) })),
+    );
+    const tools = arenaFilterTools(
+      arenas.flatMap((a) => a.arena),
+      filterParams,
+    );
     return (
       <>
         <SiteHeader />
@@ -324,30 +367,32 @@ export default async function KataArenaPage({
               A Referee/Judge&apos;s score is final once submitted — no appeal is available.
             </p>
           )}
-          <p className="mb-8 text-sm">
+          <p className="mb-4 text-sm">
             <Link href="/kata-categories" className="font-semibold text-red-700 underline underline-offset-2">
               Browse recordings by kata category →
             </Link>
           </p>
-          {competitions.length === 0 ? (
+          <ArenaFilterBar
+            tiers={competitions.map((c) => ({ id: c.id, name: c.name }))}
+            katas={tools.katas}
+            belts={tools.belts}
+            ages={tools.ages}
+            sexes={tools.sexes}
+          />
+          {arenas.length === 0 ? (
             <p className="text-sm text-neutral-400">No competitions yet.</p>
           ) : (
-            await Promise.all(
-              competitions.map(async (c) => {
-                const arena = await loadKataArena(supabase, c.id);
-                return (
-                  <div key={c.id} className="mb-10">
-                    <h2 className="mb-3 text-lg font-bold">{c.name}</h2>
-                    <KataGroups
-                      arena={arena}
-                      judgesRequired={c.judges_required}
-                      showJudgeScores={showJudgeScores}
-                      emptyMessage="No recordings submitted yet."
-                    />
-                  </div>
-                );
-              }),
-            )
+            arenas.map(({ competition: c, arena }) => (
+              <div key={c.id} className="mb-10">
+                <h2 className="mb-3 text-lg font-bold">{c.name}</h2>
+                <KataGroups
+                  arena={tools.apply(arena)}
+                  judgesRequired={c.judges_required}
+                  showJudgeScores={showJudgeScores}
+                  emptyMessage="No recordings match — clear the filters above or check back later."
+                />
+              </div>
+            ))
           )}
         </main>
         <SiteFooter />
@@ -382,6 +427,7 @@ export default async function KataArenaPage({
   }
 
   const arena = await loadKataArena(supabase, competition.id);
+  const participantTools = arenaFilterTools(arena, filterParams);
   const maxAttempts = 3 + (profile.bonus_record_attempts ?? 0);
   const { data: pendingPurchase } = await supabase
     .from("attempt_purchases")
@@ -416,8 +462,16 @@ export default async function KataArenaPage({
             </Link>
           </div>
         )}
+        <ArenaFilterBar
+          tiers={[]}
+          showTier={false}
+          katas={participantTools.katas}
+          belts={participantTools.belts}
+          ages={participantTools.ages}
+          sexes={participantTools.sexes}
+        />
         <KataGroups
-          arena={arena}
+          arena={participantTools.apply(arena)}
           judgesRequired={competition.judges_required}
           showJudgeScores={false}
           ownParticipantId={profile.participant_id}

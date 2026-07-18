@@ -1,9 +1,13 @@
 import Link from "next/link";
 import { SiteFooter, SiteHeader } from "@/components/ui";
+import AccessComparisonTable from "@/components/AccessComparisonTable";
 
 export const dynamic = "force-dynamic";
 
 export const metadata = { title: "Register" };
+
+const TIER_FEE_NOTE =
+  "Registering here is not free — the one-time registration fee follows the competition tier (USD 10 / USD 100 / USD 200 per tier), whether registering yourself or on someone's behalf. Payment is taken at registration.";
 
 const OPTIONS: Array<{
   n: number;
@@ -15,42 +19,42 @@ const OPTIONS: Array<{
   {
     n: 1,
     title: "School / Dojo",
-    desc: "Register your school or dojo so senseis and participants can select it.",
+    desc: `Register your school or dojo so senseis and participants can select it. ${TIER_FEE_NOTE}`,
     href: "/register/school",
     cta: "Register school / dojo",
   },
   {
     n: 2,
     title: "My Sensei / Coach",
-    desc: "Students or club representatives register their sensei / coach.",
+    desc: `Students or club representatives register their sensei / coach. ${TIER_FEE_NOTE}`,
     href: "/register/sensei?by=student",
     cta: "Register my sensei",
   },
   {
     n: 3,
     title: "Sensei / Coach self-registration",
-    desc: "Senseis and coaches register themselves.",
+    desc: `Senseis and coaches register themselves. ${TIER_FEE_NOTE}`,
     href: "/register/sensei?by=self",
     cta: "Self-register as sensei",
   },
   {
     n: 4,
     title: "Referee / Judges",
-    desc: "Register as a kata referee or judge. USD 100 deposit or USD 0 with an invitation code.",
+    desc: "Register as a kata referee or judge. USD 100 deposit.",
     href: "/register/referee",
     cta: "Register as referee / judge",
   },
   {
     n: 5,
     title: "Audience / Onlooker / Visitor / Spectator",
-    desc: "Sign in to watch the competition. USD 10, or USD 0 with an invitation code.",
+    desc: "Sign in to watch the competition. USD 10.",
     href: "/register/audience",
     cta: "Register as audience",
   },
   {
     n: 6,
-    title: "Admin / Organizer / Customer Support",
-    desc: "Apply to join the organising or support team. Reviewed by the organiser.",
+    title: "Organizer / Participant Support",
+    desc: "Apply to join the organizing or support team. Reviewed by the organizer.",
     href: "/register/staff",
     cta: "Apply to the team",
   },
@@ -133,6 +137,10 @@ export default async function RegisterHub({
               </Link>
             </div>
           ))}
+        </div>
+
+        <div className="mt-8">
+          <AccessComparisonTable />
         </div>
       </main>
       <SiteFooter />

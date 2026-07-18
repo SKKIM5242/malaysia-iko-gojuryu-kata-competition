@@ -131,7 +131,7 @@ export async function useRecordAttempt(): Promise<number> {
 }
 
 /** Requests 3 more delete-and-re-record chances for USD 10 — creates a
- * pending request the organiser confirms manually (same pattern as every
+ * pending request the organizer confirms manually (same pattern as every
  * other payment here, since there's no real payment gateway). Refuses a
  * second request while one is already pending. */
 export async function requestExtraAttempts(
@@ -160,7 +160,7 @@ export async function requestExtraAttempts(
 
 /** Requests a new subscription once someone's sign-in quota (count and/or
  * valid date range, set by Admin/Organizer — see lib/sign-in-quota.ts) runs
- * out. The organiser fulfils it by updating that person's Sign-in Control
+ * out. The organizer fulfils it by updating that person's Sign-in Control
  * fields directly on their respective admin page, then marks this request
  * paid. Refuses a second request while one is already pending. */
 export async function requestNewSubscription(

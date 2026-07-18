@@ -7,7 +7,7 @@ import { SCORING_CRITERIA, splitEvenly } from "@/lib/scoring-rubric";
 /**
  * Admin/Organizer view-only detail: clicking a judge's "Total X.X" chip
  * opens the same rubric layout as the referee's own scoring popup, but with
- * every field disabled — no edit access, per the organiser's explicit
+ * every field disabled — no edit access, per the organizer's explicit
  * request. Falls back to an even split across criteria for scores
  * submitted before per-criterion storage existed (labelled as such).
  */

@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { submitRegistration, type RegisterState } from "@/app/actions/register";
-import { OrganiserContact } from "@/components/ui";
+import { OrganizerContact } from "@/components/ui";
 import CertificateUploadField from "@/components/CertificateUploadField";
 import { ageAt, beltGroup, genderCode, kataBaseOf, kataBases as allKataBasesOf } from "@/lib/division";
 import type { Category, Competition, School, Sensei } from "@/lib/types";
@@ -108,11 +108,11 @@ export default function RegisterForm({
         </p>
         <p className="mx-auto mt-3 max-w-md text-sm text-green-800">
           Payment status is <strong>pending</strong>. Transfer the registration fee and send your
-          receipt to the organiser (see the announcement for bank details). The organiser will
+          receipt to the organizer (see the announcement for bank details). The organizer will
           confirm your payment, after which your name appears on the{" "}
           <Link href="/participants" className="underline">participants list</Link>.
         </p>
-        <div className="mx-auto max-w-md text-green-900"><OrganiserContact /></div>
+        <div className="mx-auto max-w-md text-green-900"><OrganizerContact /></div>
       </div>
     );
   }
@@ -305,7 +305,7 @@ export default function RegisterForm({
             <p className="mt-1 text-xs text-amber-600">
               No open kata matches your belt rank, age and gender right now — every matching
               sub-category may be full, or none exists for this combination yet. Contact the
-              organiser if this seems wrong.
+              organizer if this seems wrong.
             </p>
           )}
           <FieldError message={err.kata_base} />
@@ -354,7 +354,7 @@ export default function RegisterForm({
         <div className="sm:col-span-2 mt-2 rounded-md border border-neutral-200 bg-neutral-50 p-4">
           <p className="text-sm font-bold text-neutral-800">Bank details for prize / reward payout *</p>
           <p className="mt-0.5 text-xs text-neutral-500">
-            Winnings are transferred to this account. Kept private — visible to the organiser only.
+            Winnings are transferred to this account. Kept private — visible to the organizer only.
           </p>
           <div className="mt-3 grid gap-4 sm:grid-cols-2">
             <div>

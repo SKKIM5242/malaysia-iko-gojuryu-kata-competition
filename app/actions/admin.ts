@@ -55,7 +55,7 @@ async function bulkUploadRoleError(
   return null;
 }
 
-/** Customer Support has edit access to registrations/participants and can
+/** Participant Support has edit access to registrations/participants and can
  * merge/edit/delete categories, but never delete registrations/participants
  * and never manages competitions — called at the top of every action that
  * should reject them specifically. */
@@ -66,12 +66,12 @@ async function blockCustomerSupport(
 ) {
   const role = await getActorRole(supabase, actorId);
   if (role === "customer_support") {
-    backTo(returnTo, { error: "Customer Support accounts cannot perform this action." });
+    backTo(returnTo, { error: "Participant Support accounts cannot perform this action." });
   }
 }
 
 /** Only Admin/Organizer (and legacy "staff") may create or edit competitions
- * — Referee and Customer Support get category-level access but not this. */
+ * — Referee and Participant Support get category-level access but not this. */
 async function requireCompetitionManager(
   supabase: Awaited<ReturnType<typeof createClient>>,
   actorId: string | null,
@@ -98,7 +98,7 @@ async function blockReferee(
 }
 
 /** Judging Arena mutations (assign/unassign referees, set judges-required,
- * auto-assign) are Super Admin only — Organizer, Customer Support, and
+ * auto-assign) are Super Admin only — Organizer, Participant Support, and
  * Referee can view the arena but not configure it. */
 async function requireJudgingManager(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -725,7 +725,7 @@ export async function updateCommunityStatus(formData: FormData) {
   backTo(returnTo, { ok: "Updated." });
 }
 
-/** Admin/Organizer/Customer Support/Referee directly adds an Audience /
+/** Admin/Organizer/Participant Support/Referee directly adds an Audience /
  * Spectator (rather than the person self-registering) — e.g. someone paid
  * or was invited in person. An invitation code here waives the USD 10 fee
  * exactly like self-registration does. */
@@ -795,7 +795,7 @@ export async function saveReferee(formData: FormData) {
     backTo(returnTo, { error: "Date of birth, gender, karate rank, and judging experience are required." });
   }
   if (!values.school || !values.email || !values.phone) {
-    backTo(returnTo, { error: "School/organisation, email, and mobile phone are required." });
+    backTo(returnTo, { error: "School/organization, email, and mobile phone are required." });
   }
   if (!values.home_address || !values.city_town || !values.postcode || !values.home_country) {
     backTo(returnTo, { error: "Home address, city/town, postcode, and home country are required." });
@@ -969,7 +969,7 @@ export async function setProfileApproval(formData: FormData) {
 
 const INVITATION_CODE_ROLES = ["referee", "staff", "audience", "school", "sensei", "participant", "organizer", "customer_support", "admin", "any"];
 
-/** Every field is required except Note, per the organiser's explicit
+/** Every field is required except Note, per the organizer's explicit
  * instruction — including Code (no more auto-generation), Email, and Max
  * uses (no more "unlimited shared code" — every code is now a deliberate,
  * fully-specified grant). Returns the parsed values, or redirects back with
@@ -1484,7 +1484,7 @@ export interface AdminVideoUploadState {
 /**
  * Admin-only backup path: attaches a recording to a registration on the
  * participant's behalf (e.g. their live-camera submission failed, or they
- * sent the organiser a video another way) — the file itself is uploaded
+ * sent the organizer a video another way) — the file itself is uploaded
  * client-side straight to the kata-videos bucket (see migration 0030's
  * admin storage policy) before this is called with just the resulting
  * path. Replaces any existing recording for that registration rather than
@@ -1543,19 +1543,19 @@ export async function adminAttachVideo(
   return { ok: true };
 }
 
-// ── Organizer / Customer Support account creation ───────────────────────────
+// ── Organizer / Participant Support account creation ───────────────────────────
 
 const ROLE_LABEL: Record<string, string> = {
   organizer: "Admin / Organizer",
-  customer_support: "Customer Support",
+  customer_support: "Participant Support",
 };
 
 /**
  * Directly creates a real login (auth user + approved profile) for an
- * Organizer or Customer Support account — no self-signup or invitation code
+ * Organizer or Participant Support account — no self-signup or invitation code
  * involved. Gated server-side on the CALLER's own role (never on anything
  * the client submits): only Super Admin may create Organizer accounts;
- * Super Admin or an existing Organizer may create Customer Support accounts.
+ * Super Admin or an existing Organizer may create Participant Support accounts.
  */
 export async function createStaffAccount(formData: FormData) {
   const role = String(formData.get("role") ?? "");
@@ -1611,7 +1611,7 @@ export async function createStaffAccount(formData: FormData) {
     backTo(returnTo, { error: "Only the Super Admin can create Admin / Organizer accounts." });
   }
   if (role === "customer_support" && !["admin", "organizer", "staff"].includes(actorRole ?? "")) {
-    backTo(returnTo, { error: "Only Super Admin or Admin / Organizer can create Customer Support accounts." });
+    backTo(returnTo, { error: "Only Super Admin or Admin / Organizer can create Participant Support accounts." });
   }
 
   const certificatePath = await uploadCertificateIfPresent(supabase, formData, "staff", returnTo);
@@ -1649,7 +1649,7 @@ export async function createStaffAccount(formData: FormData) {
     bodyLines: [
       `An account has been created for you as ${ROLE_LABEL[role]}.`,
       `Temporary password: ${tempPassword}`,
-      "Sign in and keep this password safe — there is currently no self-service password reset, contact the organiser if you need it changed.",
+      "Sign in and keep this password safe — there is currently no self-service password reset, contact the organizer if you need it changed.",
     ],
   });
 
@@ -2160,7 +2160,7 @@ async function bulkCreateStaffAccounts(formData: FormData, role: "organizer" | "
     return { done: false, error: "Only the Super Admin can bulk-create Admin / Organizer accounts." };
   }
   if (role === "customer_support" && !["admin", "organizer"].includes(actorRole ?? "")) {
-    return { done: false, error: "Only Admin / Organizer can bulk-create Customer Support accounts." };
+    return { done: false, error: "Only Admin / Organizer can bulk-create Participant Support accounts." };
   }
 
   const admin = createAdminClient();
@@ -2232,7 +2232,7 @@ async function bulkCreateStaffAccounts(formData: FormData, role: "organizer" | "
       bodyLines: [
         `An account has been created for you as ${ROLE_LABEL[role]}.`,
         `Temporary password: ${tempPassword}`,
-        "Sign in and keep this password safe — there is currently no self-service password reset, contact the organiser if you need it changed.",
+        "Sign in and keep this password safe — there is currently no self-service password reset, contact the organizer if you need it changed.",
       ],
     });
     succeeded++;
@@ -2286,10 +2286,10 @@ export async function setCommissionPayoutStatus(formData: FormData) {
   backTo(returnTo, { ok: "Payout status updated." });
 }
 
-// ── Customer Support shift log (USD 8/hour) ─────────────────────────────────
+// ── Participant Support shift log ────────────────────────────────────────────
 
 /** Manual clock-in — deliberately not tied to page-session timestamps,
- * since Customer Support also works via the Telegram assistant/community
+ * since Participant Support also works via the Telegram assistant/community
  * groups where there's no page session to derive a sign-in time from. */
 export async function clockIn(formData: FormData) {
   const returnTo = "/admin/support";

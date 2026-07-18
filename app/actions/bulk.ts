@@ -68,8 +68,8 @@ export interface BulkPaymentState {
 
 /** Looks up whether this sensei already has enough paid bulk-upload balance
  * for the requested headcount; if not, returns (or creates) a pending
- * request. The sensei pays the organiser manually — bank transfer, same
- * as every other payment in this app — and the organiser confirms it via
+ * request. The sensei pays the organizer manually — bank transfer, same
+ * as every other payment in this app — and the organizer confirms it via
  * markBulkUploadPaymentPaid in app/actions/admin.ts. */
 export async function requestOrCheckBulkUploadPayment(
   _prev: BulkPaymentState,
@@ -325,7 +325,7 @@ export async function bulkRegister(_prev: BulkState, formData: FormData): Promis
       division: row.gender.toLowerCase() === "female" ? "Female" : "Male",
       // Already paid upfront via the bulk-upload payment gate — unlike
       // single registration, there's no separate per-participant payment
-      // step for the organiser to confirm later.
+      // step for the organizer to confirm later.
       payment_status: "paid",
     });
     if (rErr) {

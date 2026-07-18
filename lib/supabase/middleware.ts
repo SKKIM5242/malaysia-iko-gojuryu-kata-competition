@@ -58,7 +58,7 @@ export async function updateSession(request: NextRequest) {
 
     // Admin routes require an approved admin-tier session — a signed-in
     // participant must NOT reach /admin just by being logged in. Per the
-    // organiser's explicit instruction, every approved staff-tier role
+    // organizer's explicit instruction, every approved staff-tier role
     // (admin, organizer/staff, customer_support, referee) gets full access
     // to every /admin listing page, including bank/IC details on Schools,
     // Senseis, Organizers, and Support — only /admin/accounts (staff

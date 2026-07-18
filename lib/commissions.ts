@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 
 const COMMISSION_RATE = 0.1;
 /** Schools/Senseis need MORE than this many participants to qualify for
- * any revenue share at all -- 10 or fewer gets 0%, per the organiser's
+ * any revenue share at all -- 10 or fewer gets 0%, per the organizer's
  * explicit "no revenue share for less than 10" rule. Referees have no such
  * threshold: they earn 10% of every judged student's fee regardless of count. */
 const SCHOOL_SENSEI_THRESHOLD = 10;
@@ -24,7 +24,7 @@ export interface CommissionRow {
  * Computes School/Sensei/Referee commissions fresh from live registration
  * data every time -- nothing here is stored, so it can never drift out of
  * sync with actual paid registrations. commission_payouts only tracks
- * whether the organiser has actually paid out what this computed.
+ * whether the organizer has actually paid out what this computed.
  */
 export async function computeCommissions(): Promise<CommissionRow[]> {
   const supabase = await createClient();
@@ -57,7 +57,7 @@ export async function computeCommissions(): Promise<CommissionRow[]> {
     (competitions ?? []).map((c) => [c.id as string, Number(c.registration_fee_usd ?? 0)]),
   );
   // Only paid registrations count -- there's no commission on money the
-  // organiser hasn't actually collected yet.
+  // organizer hasn't actually collected yet.
   const feeByRegistration = new Map<string, number>();
   for (const r of registrations ?? []) {
     if (r.payment_status !== "paid") continue;

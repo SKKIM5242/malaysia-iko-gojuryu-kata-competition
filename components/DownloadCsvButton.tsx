@@ -13,7 +13,7 @@ function toCsv(rows: Array<Record<string, string>>): string {
 
 /** Exports the given rows as a downloaded CSV file — client-side only, no
  * server round-trip. Used on every admin listing table so Admin/Organizer,
- * Referee/Judge, and Customer Support can pull a spreadsheet copy of
+ * Referee/Judge, and Participant Support can pull a spreadsheet copy of
  * whatever they're looking at (respects any active filters, since callers
  * pass the already-filtered rows). */
 export default function DownloadCsvButton({

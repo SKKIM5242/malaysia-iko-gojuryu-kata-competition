@@ -5,7 +5,7 @@ const LABELS: Record<TelegramCategory, string> = {
   school: "School / Dojo & Sensei / Coach",
   referee: "Referees / Judges",
   audience: "Audience / Spectators",
-  staff: "Admin / Organizer / Customer Support",
+  staff: "Admin / Organizer / Participant Support",
   class: "Dojo Class Students",
 };
 
@@ -34,7 +34,7 @@ export function getAllTelegramLinks(): Array<{ category: TelegramCategory; label
 
 /** Deep link that starts a chat with the assignment-notification bot and
  * links it to this user's account (see app/api/telegram-webhook/route.ts).
- * Returns null until the organiser sets TELEGRAM_BOT_USERNAME. */
+ * Returns null until the organizer sets TELEGRAM_BOT_USERNAME. */
 export function getTelegramBotConnectUrl(userId: string): string | null {
   const username = process.env.TELEGRAM_BOT_USERNAME?.trim();
   if (!username) return null;

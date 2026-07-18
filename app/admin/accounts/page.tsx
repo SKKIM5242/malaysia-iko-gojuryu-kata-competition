@@ -97,7 +97,7 @@ function AccessMatrixTab() {
           { key: "resource", label: "Resource" },
           { key: "admin", label: "Admin" },
           { key: "organizer", label: "Organizer / Staff" },
-          { key: "customerSupport", label: "Customer Support" },
+          { key: "customerSupport", label: "Participant Support" },
           { key: "referee", label: "Referee / Judge" },
         ]}
         rows={ACCESS_MATRIX.map((row) => ({
@@ -119,7 +119,7 @@ function AccessMatrixTab() {
           { key: "resource_text", label: "Resource" },
           { key: "admin", label: "Admin" },
           { key: "organizer", label: "Organizer / Staff" },
-          { key: "customerSupport", label: "Customer Support" },
+          { key: "customerSupport", label: "Participant Support" },
           { key: "referee", label: "Referee / Judge" },
         ]}
       />
@@ -137,7 +137,7 @@ async function ApprovalsTab({ supabase }: { supabase: Awaited<ReturnType<typeof 
   const profiles = (data as ProfileRow[]) ?? [];
   const roleLabel: Record<string, string> = {
     referee: "Referee / Judge",
-    staff: "Admin / Organizer / Customer Support",
+    staff: "Admin / Organizer / Participant Support",
     admin: "Admin (owner)",
   };
 

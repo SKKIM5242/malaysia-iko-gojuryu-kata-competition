@@ -20,7 +20,7 @@ const ROLE_LABEL: Record<string, string> = {
   admin: "Admin (owner)",
   organizer: "Organizer",
   staff: "Admin / Organizer",
-  customer_support: "Customer Support",
+  customer_support: "Participant Support",
 };
 
 function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
@@ -299,7 +299,7 @@ export default async function AdminParticipantRecords() {
     <AdminShell title="Participant Records" active="/admin/records">
       <p className="mb-6 text-sm text-neutral-500">
         Every registrant type in one place, each with its own filterable table. Recordings and
-        certificates play/open in-page for Admin/Organizer, Referee/Judge, and Customer Support here, on{" "}
+        certificates play/open in-page for Admin/Organizer, Referee/Judge, and Participant Support here, on{" "}
         <a href="/kata-arena" className="underline">Kata Arena</a>, and on{" "}
         <a href="/admin/judging" className="underline">Judging</a>. Participants and Audience accounts
         continue watching recordings only via Kata Arena, per its existing access rules.
@@ -466,7 +466,7 @@ export default async function AdminParticipantRecords() {
         )}
       </Section>
 
-      <Section id="staff" title="Admin / Organizer / Customer Support">
+      <Section id="staff" title="Admin / Organizer / Participant Support">
         {staffRows.length === 0 ? (
           <EmptyState>No staff accounts yet.</EmptyState>
         ) : (

@@ -25,7 +25,7 @@ export default function CsvBulkForm({
             {state.registered ?? 0} participants registered, {state.failed ?? 0} failed
           </h3>
           <p className="mt-1 text-sm text-neutral-600">
-            Registered participants are pending payment confirmation by the organiser.
+            Registered participants are pending payment confirmation by the organizer.
           </p>
         </div>
         {state.failures && state.failures.length > 0 && (

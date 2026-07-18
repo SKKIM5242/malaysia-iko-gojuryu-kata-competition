@@ -7,10 +7,10 @@ export const ROLE_LABELS: Record<string, string> = {
   participant: "Participant",
   referee: "Referee / Judge",
   audience: "Audience / Spectator",
-  customer_support: "Customer Services Support",
+  customer_support: "Participant Support",
   organizer: "Organizer",
   admin: "Admin",
-  staff: "Admin / Organizer / Customer Support (legacy)",
+  staff: "Admin / Organizer / Participant Support (legacy)",
   any: "Either",
 };
 
@@ -29,7 +29,7 @@ export interface InvitationCodeRow {
 
 /** Full-featured invitation-code creator/editor, shared by every admin
  * listing page and the central Admin → Accounts → Invitation codes tab.
- * Every field is required except Note — the organiser's explicit
+ * Every field is required except Note — the organizer's explicit
  * instruction after being told this removes the old "unlimited shared
  * code" shortcut; every code is now a deliberate, fully-specified,
  * single-purpose, competition-scoped grant. Pass a fixed `role` to lock

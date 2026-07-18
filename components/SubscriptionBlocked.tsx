@@ -2,14 +2,14 @@
 
 import { useActionState, useEffect, useState } from "react";
 import { requestNewSubscription, type AccountActionState } from "@/app/actions/account";
-import { OrganiserContact } from "@/components/ui";
+import { OrganizerContact } from "@/components/ui";
 
 const initial: AccountActionState = { ok: false };
 
 /** Shown instead of the normal page content once Admin/Organizer's
  * sign-in quota (count and/or valid date range) for this account has run
  * out — see lib/sign-in-quota.ts. Lets them request a new subscription;
- * the organiser fulfils it by updating their Sign-in Control fields on
+ * the organizer fulfils it by updating their Sign-in Control fields on
  * the relevant admin page. */
 export default function SubscriptionBlocked({
   title,
@@ -33,11 +33,11 @@ export default function SubscriptionBlocked({
       <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-6">
         <p className="font-semibold text-amber-900">{reason}</p>
         <p className="mt-1 text-sm text-amber-800">
-          Request a new subscription below and the organiser will renew your sign-in access.
+          Request a new subscription below and the organizer will renew your sign-in access.
         </p>
         {requested || state.ok ? (
           <p className="mt-3 text-sm font-semibold text-green-700">
-            Request submitted — the organiser will renew your access shortly.
+            Request submitted — the organizer will renew your access shortly.
           </p>
         ) : (
           <form action={formAction} className="mt-3">
@@ -51,7 +51,7 @@ export default function SubscriptionBlocked({
             </button>
           </form>
         )}
-        <div className="mt-3 text-amber-900"><OrganiserContact /></div>
+        <div className="mt-3 text-amber-900"><OrganizerContact /></div>
       </div>
       <div className="mt-4">{signOutForm}</div>
     </main>

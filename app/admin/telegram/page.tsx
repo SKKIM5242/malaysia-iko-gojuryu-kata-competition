@@ -21,7 +21,7 @@ export default async function AdminTelegramLinks() {
     <AdminShell title="Telegram Links" active="/admin/telegram">
       <p className="mb-6 text-sm text-neutral-500">
         Every registration category&apos;s dedicated Telegram group in one place. Admin/Organizer,
-        Referee/Judge, and Customer Support accounts get full access here since they moderate or judge
+        Referee/Judge, and Participant Support accounts get full access here since they moderate or judge
         across the whole competition — participants only see their own category&apos;s group, from their{" "}
         <code className="rounded bg-neutral-100 px-1">/account</code> page.
       </p>

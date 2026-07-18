@@ -38,7 +38,7 @@ export default async function AdminCompetitions({
   const { data: myProfile } = user
     ? await supabaseAdmin.from("profiles").select("role").eq("user_id", user.id).maybeSingle()
     : { data: null };
-  // Admin/Organizer/Referee/Customer Support can all merge-to-Mix and
+  // Admin/Organizer/Referee/Participant Support can all merge-to-Mix and
   // edit/delete categories here; only Admin/Organizer (and legacy "staff")
   // may create or edit the competition itself.
   const canManageCompetition = ["admin", "organizer", "staff"].includes(myProfile?.role ?? "");

@@ -44,7 +44,7 @@ export default async function KataCategoriesPage() {
         <main className="mx-auto max-w-2xl px-4 py-10">
           <h1 className="mb-2 text-2xl font-bold tracking-tight">Kata Categories</h1>
           <p className="mb-8 text-sm text-neutral-500">
-            Sign in as Admin/Organizer, Referee/Judge, Audience, or Customer Support to browse every
+            Sign in as Admin/Organizer, Referee/Judge, Audience, or Participant Support to browse every
             submitted recording sorted by kata category, with live slot counts. View only.
           </p>
           <AuthForms />
@@ -68,7 +68,7 @@ export default async function KataCategoriesPage() {
         <main className="mx-auto max-w-2xl px-4 py-10">
           <h1 className="text-2xl font-bold tracking-tight">Kata Categories</h1>
           <p className="mt-2 text-sm text-neutral-500">
-            This page is for Admin/Organizer, Referee/Judge, Audience, and Customer Support accounts
+            This page is for Admin/Organizer, Referee/Judge, Audience, and Participant Support accounts
             only.{" "}
             <Link href="/kata-arena" className="underline">
               Go to Kata Arena

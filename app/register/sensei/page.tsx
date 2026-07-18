@@ -1,4 +1,4 @@
-import { getSchools, schemaReady } from "@/lib/data";
+import { getOpenCompetitions, getSchools, schemaReady } from "@/lib/data";
 import { SetupNotice, SiteFooter, SiteHeader } from "@/components/ui";
 import { SenseiForm } from "@/components/DirectoryForms";
 import { getTelegramLink } from "@/lib/telegram";
@@ -15,6 +15,13 @@ export default async function RegisterSenseiPage({
   const { by } = await searchParams;
   const ready = await schemaReady();
   const schools = ready ? await getSchools() : [];
+  const tiers = ready
+    ? (await getOpenCompetitions()).map((c) => ({
+        id: c.id,
+        name: c.name,
+        fee: Number(c.registration_fee_usd ?? 0),
+      }))
+    : [];
   return (
     <>
       <SiteHeader />
@@ -29,7 +36,7 @@ export default async function RegisterSenseiPage({
         </p>
         <div className="mt-8">
           {ready ? (
-            <SenseiForm schools={schools} defaultBy={by} telegramLink={getTelegramLink("school")} />
+            <SenseiForm schools={schools} defaultBy={by} telegramLink={getTelegramLink("school")} tiers={tiers} />
           ) : (
             <SetupNotice />
           )}

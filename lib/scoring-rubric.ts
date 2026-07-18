@@ -1,4 +1,4 @@
-/** The organiser's official scoring rubric — copied exactly from
+/** The organizer's official scoring rubric — copied exactly from
  * "SCORE TABLE 2 WITH FORMULA.xlsx": 7 criteria summing to 11 max
  * (1+1+1+1+1+3+3). Shared by the referee's own scoring popup and the
  * Admin/Organizer read-only detail view, so both render the identical

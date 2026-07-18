@@ -54,7 +54,7 @@ export default function BulkRegisterForm({
             {okCount} of {state.results.length} participants registered
           </h2>
           <p className="mt-1 text-sm text-neutral-600">
-            Registered participants are <strong>pending payment</strong> — the organiser confirms
+            Registered participants are <strong>pending payment</strong> — the organizer confirms
             each one once the fee is received. Failed rows are listed below; fix and resubmit them
             via <Link href="/register/bulk" className="underline">a new bulk form</Link>.
           </p>

@@ -47,6 +47,41 @@ export async function finalizeInvoiceSession(sessionId: string): Promise<Finaliz
 }
 
 /**
+ * Marks a School/Dojo or Sensei/Coach directory record paid after its
+ * tier-fee Stripe Checkout session succeeds. Idempotent — safe to call
+ * from both the webhook and the thank-you page.
+ */
+export async function finalizeDirectorySession(sessionId: string): Promise<FinalizeResult> {
+  const stripe = getStripe();
+  let session;
+  try {
+    session = await stripe.checkout.sessions.retrieve(sessionId);
+  } catch {
+    return { status: "error", message: "Payment session not found." };
+  }
+  if (session.payment_status !== "paid") return { status: "unpaid" };
+  const schoolId = session.metadata?.school_id;
+  const senseiId = session.metadata?.sensei_id;
+  const table = schoolId ? "schools" : senseiId ? "senseis" : null;
+  const recordId = schoolId ?? senseiId;
+  if (!table || !recordId) return { status: "error", message: "No record reference on this payment." };
+
+  const admin = createAdminClient();
+  const { data: record } = await admin.from(table).select("id, payment_status").eq("id", recordId).maybeSingle();
+  if (!record) return { status: "error", message: "Registration record not found." };
+  if (record.payment_status !== "paid") {
+    await admin.from(table).update({ payment_status: "paid" }).eq("id", recordId);
+    await writeAudit(admin, {
+      table_name: table,
+      record_id: recordId,
+      action: "tier_fee_paid_online",
+      new_value: { stripe_session: sessionId },
+    });
+  }
+  return { status: "paid", referenceIds: [recordId.slice(0, 8).toUpperCase()] };
+}
+
+/**
  * Turn a paid Stripe Checkout session into real participant + bank-details +
  * registration rows. Idempotent: called by both the webhook and the success
  * page, whichever wins; the loser finds the existing registration by
@@ -76,7 +111,7 @@ export async function finalizeStripeSession(sessionId: string): Promise<Finalize
   }
 
   const draftId = session.metadata?.draft_id;
-  if (!draftId) return { status: "error", message: "Payment received but no draft reference — contact the organiser with your Stripe receipt." };
+  if (!draftId) return { status: "error", message: "Payment received but no draft reference — contact the organizer with your Stripe receipt." };
 
   const { data: draft } = await admin
     .from("registration_drafts")
@@ -93,7 +128,7 @@ export async function finalizeStripeSession(sessionId: string): Promise<Finalize
     if (again && again.length > 0) {
       return { status: "paid", referenceIds: again.map((r) => r.id.slice(0, 8).toUpperCase()) };
     }
-    return { status: "error", message: "Payment received but registration data expired — contact the organiser with your Stripe receipt." };
+    return { status: "error", message: "Payment received but registration data expired — contact the organizer with your Stripe receipt." };
   }
 
   const v = draft.payload as Record<string, string>;
@@ -125,7 +160,7 @@ export async function finalizeStripeSession(sessionId: string): Promise<Finalize
     school_id: v.school_id,
     sensei_id: v.sensei_id,
   });
-  if (pErr) return { status: "error", message: "Payment received but saving failed — contact the organiser with your Stripe receipt." };
+  if (pErr) return { status: "error", message: "Payment received but saving failed — contact the organizer with your Stripe receipt." };
 
   if (v.bank_name && v.bank_account_no && v.bank_account_name) {
     await admin.from("participant_bank_details").insert({
@@ -152,7 +187,7 @@ export async function finalizeStripeSession(sessionId: string): Promise<Finalize
     if (rErr) {
       await admin.from("registrations").delete().eq("participant_id", participantId);
       await admin.from("participants").delete().eq("id", participantId);
-      return { status: "error", message: "Payment received but saving failed — contact the organiser with your Stripe receipt." };
+      return { status: "error", message: "Payment received but saving failed — contact the organizer with your Stripe receipt." };
     }
     await writeAudit(admin, {
       table_name: "registrations",

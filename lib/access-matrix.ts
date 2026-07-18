@@ -46,13 +46,13 @@ export const ACCESS_MATRIX: AccessRow[] = [
     resource: "Participants",
     admin: "Full", organizer: "Full",
     customerSupport: "Edit — cannot delete", referee: "Edit — cannot delete",
-    note: "deleteParticipant blocks Customer Support and Referee (blockCustomerSupport/blockReferee). saveParticipant (edit) has no guard, so Referee can currently edit participant records — narrower than the \"view only\" intent noted in its own code comment.",
+    note: "deleteParticipant blocks Participant Support and Referee (blockCustomerSupport/blockReferee). saveParticipant (edit) has no guard, so Referee can currently edit participant records — narrower than the \"view only\" intent noted in its own code comment.",
   },
   {
     resource: "Registrations (payment status)",
     admin: "Full", organizer: "Full",
     customerSupport: "Edit — cannot delete", referee: "View only",
-    note: "updatePaymentStatus blocks Referee; deleteRegistration blocks Customer Support and Referee.",
+    note: "updatePaymentStatus blocks Referee; deleteRegistration blocks Participant Support and Referee.",
   },
   {
     resource: "Competitions",
@@ -72,7 +72,7 @@ export const ACCESS_MATRIX: AccessRow[] = [
   {
     resource: "Judging Arena (assign referees, set judges-required)",
     admin: "Full", organizer: "Full", customerSupport: "View only", referee: "Full",
-    note: "assignRefereeToVideo/unassignRefereeFromVideo/setJudgesRequired/autoAssignReferees require requireJudgingManager (admin/organizer/staff/referee). Customer Support can still watch recordings and see workload, not configure.",
+    note: "assignRefereeToVideo/unassignRefereeFromVideo/setJudgesRequired/autoAssignReferees require requireJudgingManager (admin/organizer/staff/referee). Participant Support can still watch recordings and see workload, not configure.",
   },
   {
     resource: "Kata video scoring — submit/edit a score",
@@ -83,7 +83,7 @@ export const ACCESS_MATRIX: AccessRow[] = [
   {
     resource: "Kata video scoring — view scores",
     admin: "Full", organizer: "Full", customerSupport: "Full", referee: "Full",
-    note: "Every role can see every recording's individual judge scores and round status (green/red + total once fully judged) on both Kata Arena and this Judging Arena page — opened to everyone in migration 0044 (scores_select_all_authenticated). Customer Support has always had this; only submitting a score is restricted (see the row above).",
+    note: "Every role can see every recording's individual judge scores and round status (green/red + total once fully judged) on both Kata Arena and this Judging Arena page — opened to everyone in migration 0044 (scores_select_all_authenticated). Participant Support has always had this; only submitting a score is restricted (see the row above).",
   },
   {
     resource: "Kata recording playback",
@@ -96,7 +96,7 @@ export const ACCESS_MATRIX: AccessRow[] = [
     note: "createStaffAccount(role=organizer) requires actorRole === admin.",
   },
   {
-    resource: "Customer Support account creation",
+    resource: "Participant Support account creation",
     admin: "Full", organizer: "Full", customerSupport: "Blocked", referee: "Blocked",
     note: "createStaffAccount(role=customer_support) allows admin, organizer, or staff.",
   },
@@ -124,7 +124,7 @@ export const ACCESS_MATRIX: AccessRow[] = [
 
 /** Renders the matrix as a Markdown table for the Announcements body. */
 export function accessMatrixToMarkdown(generatedAt: string): string {
-  const header = "| Resource | Admin | Organizer / Staff | Customer Support | Referee / Judge |\n" +
+  const header = "| Resource | Admin | Organizer / Staff | Participant Support | Referee / Judge |\n" +
     "|---|---|---|---|---|";
   const rows = ACCESS_MATRIX.map(
     (r) => `| ${r.resource} | ${r.admin} | ${r.organizer} | ${r.customerSupport} | ${r.referee} |`,

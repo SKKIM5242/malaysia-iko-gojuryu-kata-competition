@@ -147,7 +147,7 @@ export default async function AccountPage({
           <h1 className="mb-2 text-2xl font-bold tracking-tight">My Account</h1>
           <p className="mb-8 text-sm text-neutral-500">
             Sign in or create an account to record your kata, judge as a referee, or use your
-            organiser/staff access.
+            organizer/staff access.
           </p>
           <AuthForms defaultMode={mode === "signup" ? "signup" : "signin"} />
         </main>
@@ -184,7 +184,7 @@ export default async function AccountPage({
           <h1 className="text-2xl font-bold">My Account</h1>
           <p className="mt-2 text-sm text-neutral-500">
             We couldn&apos;t set up your account automatically. Please sign out and sign in again —
-            if this keeps happening, contact the organiser with the email you signed up with. This
+            if this keeps happening, contact the organizer with the email you signed up with. This
             is not related to any competition deadline; it does not affect your own recording.
           </p>
           <div className="mt-4">{SignOutButton}</div>
@@ -215,13 +215,13 @@ export default async function AccountPage({
     );
   }
 
-  // ── Staff / Admin / Organizer / Customer Support ────────────────────────
+  // ── Staff / Admin / Organizer / Participant Support ────────────────────────
   if (["staff", "admin", "organizer", "customer_support"].includes(profile.role)) {
     return (
       <>
         <SiteHeader />
         <main className="mx-auto max-w-2xl px-4 py-10">
-          <h1 className="text-2xl font-bold">Admin / Organizer / Customer Support</h1>
+          <h1 className="text-2xl font-bold">Admin / Organizer / Participant Support</h1>
           {profile.approved ? (
             <div className="mt-4 rounded-lg border border-green-300 bg-green-50 p-6">
               <p className="font-semibold text-green-900">Your account is approved.</p>
@@ -238,10 +238,10 @@ export default async function AccountPage({
             </div>
           ) : (
             <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-6">
-              <p className="font-semibold text-amber-900">Waiting for organiser approval.</p>
+              <p className="font-semibold text-amber-900">Waiting for organizer approval.</p>
               <p className="mt-1 text-sm text-amber-800">
-                Your Admin / Organizer / Customer Support account needs approval, or a valid
-                invitation code at sign-up, before it activates. Contact the organiser.
+                Your Admin / Organizer / Participant Support account needs approval, or a valid
+                invitation code at sign-up, before it activates. Contact the organizer.
               </p>
             </div>
           )}
@@ -263,7 +263,7 @@ export default async function AccountPage({
             <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-6">
               <p className="font-semibold text-amber-900">Waiting for approval.</p>
               <p className="mt-1 text-sm text-amber-800">
-                Your Referee / Judge account activates once the organiser confirms your USD 100
+                Your Referee / Judge account activates once the organizer confirms your USD 100
                 deposit (or your invitation code — enter it at sign-up next time).
               </p>
             </div>
@@ -284,7 +284,9 @@ export default async function AccountPage({
     if (videoIds.length > 0) {
       const { data: videos } = await supabase
         .from("kata_videos")
-        .select("id, storage_path, participant:participants(full_name, home_country), registration:registrations(category:categories(name))")
+        .select(
+          "id, storage_path, participant:participants(full_name, home_country), registration:registrations(category:categories(name), competition:competitions(name))",
+        )
         .in("id", videoIds);
       const { data: myScores } = await supabase
         .from("video_scores")
@@ -298,7 +300,7 @@ export default async function AccountPage({
           id: string;
           storage_path: string;
           participant: { full_name: string; home_country: string | null } | null;
-          registration: { category: { name: string } | null } | null;
+          registration: { category: { name: string } | null; competition: { name: string } | null } | null;
         }>) ?? []).map(async (v) => {
           const { data: signed } = await supabase.storage
             .from("kata-videos")
@@ -308,6 +310,7 @@ export default async function AccountPage({
             participantName: v.participant?.full_name ?? "Unknown participant",
             participantCountry: v.participant?.home_country ?? null,
             categoryName: v.registration?.category?.name ?? null,
+            competitionName: v.registration?.competition?.name ?? null,
             playbackUrl: signed?.signedUrl ?? null,
             existingScore: scoreMap.get(v.id) ?? null,
           };
@@ -376,7 +379,7 @@ export default async function AccountPage({
             <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-6">
               <p className="font-semibold text-amber-900">Waiting for approval.</p>
               <p className="mt-1 text-sm text-amber-800">
-                Your Audience / Spectator account activates once the organiser confirms your USD 10
+                Your Audience / Spectator account activates once the organizer confirms your USD 10
                 sign-in (or your invitation code — enter it at sign-up next time).
               </p>
             </div>

@@ -56,7 +56,7 @@ export function RefereeForm({ telegramLink }: { telegramLink: string | null }) {
         what="Referee / judge registration"
         refId={state.referenceId}
         telegramLink={telegramLink}
-        note="The organiser will review your registration and contact you about the USD 100 deposit (or confirm your invitation code). Remember: the USD 100 is a deposit for participants — for non-participants it will be forfeited."
+        note="The organizer will review your registration and contact you about the USD 100 deposit (or confirm your invitation code). Remember: the USD 100 is a deposit for participants — for non-participants it will be forfeited."
       />
     );
   }
@@ -104,7 +104,7 @@ export function RefereeForm({ telegramLink }: { telegramLink: string | null }) {
           <Err m={e.judging_experience_count} />
         </div>
         <div>
-          <label htmlFor="school" className={labelCls}>School / organisation</label>
+          <label htmlFor="school" className={labelCls}>School / organization</label>
           <input id="school" name="school" className={inputCls} />
         </div>
         <div>
@@ -198,7 +198,7 @@ export function AudienceForm({ telegramLink }: { telegramLink: string | null }) 
         what="Audience registration"
         refId={state.referenceId}
         telegramLink={telegramLink}
-        note="The organiser will confirm your USD 10 sign-in (or your invitation code) and share viewing access details."
+        note="The organizer will confirm your USD 10 sign-in (or your invitation code) and share viewing access details."
       />
     );
   }
@@ -257,7 +257,7 @@ export function StaffForm({
         what="Application"
         refId={state.referenceId}
         telegramLink={telegramLink}
-        note="The organiser will review your application and contact you."
+        note="The organizer will review your application and contact you."
       />
     );
   }
@@ -299,7 +299,7 @@ export function StaffForm({
           <input id="karate_rank" name="karate_rank" className={inputCls} placeholder="e.g. Godan" />
         </div>
         <div>
-          <label htmlFor="school" className={labelCls}>School / organisation</label>
+          <label htmlFor="school" className={labelCls}>School / organization</label>
           <input id="school" name="school" className={inputCls} />
         </div>
         <div>
@@ -372,9 +372,8 @@ export function StaffForm({
           <label htmlFor="role_requested" className={labelCls}>Role *</label>
           <select id="role_requested" name="role_requested" required defaultValue="" className={inputCls}>
             <option value="" disabled>Select role</option>
-            <option value="admin">Admin</option>
             <option value="organizer">Organizer</option>
-            <option value="customer_support">Customer Support</option>
+            <option value="customer_support">Participant Support</option>
           </select>
           <Err m={e.role_requested} />
         </div>

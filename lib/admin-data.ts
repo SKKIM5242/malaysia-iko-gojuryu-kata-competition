@@ -303,7 +303,7 @@ export async function getSchoolSenseiTierFees(): Promise<{
 }
 
 /** Login accounts for the three roles without their own community
- * registration table — Admin/Organizer and Customer Support are created
+ * registration table — Admin/Organizer and Participant Support are created
  * directly (see app/actions/admin.ts createStaffAccount). */
 export async function getStaffAccountRecords(): Promise<StaffAccountRecord[]> {
   const supabase = await createClient();

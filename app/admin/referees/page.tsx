@@ -170,7 +170,7 @@ export default async function AdminReferees({
                   />
                 </div>
                 <div>
-                  <label htmlFor="school" className={adminLabel}>School / organisation *</label>
+                  <label htmlFor="school" className={adminLabel}>School / organization *</label>
                   <input id="school" name="school" required defaultValue={editing?.school ?? ""} className={adminInput} />
                 </div>
                 <div>

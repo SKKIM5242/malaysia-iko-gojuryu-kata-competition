@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import { requestOrCheckBulkUploadPayment, type BulkPaymentState } from "@/app/actions/bulk";
-import { OrganiserContact, formatUSD } from "@/components/ui";
+import { OrganizerContact, formatUSD } from "@/components/ui";
 import type { School, Sensei } from "@/lib/types";
 
 const initial: BulkPaymentState = { done: false };
@@ -29,7 +29,7 @@ export default function BulkUploadGate({
       <h2 className="text-lg font-bold">Step 1 — Pay For Your Bulk Registration</h2>
       <p className="mt-1 text-sm text-neutral-600">
         Bulk registration is paid upfront, before you upload: tell us how many participants you're
-        registering, pay the total, and once the organiser confirms it you can upload your CSV or
+        registering, pay the total, and once the organizer confirms it you can upload your CSV or
         table below — <strong>using this same School and Sensei</strong>.
       </p>
 
@@ -95,12 +95,12 @@ export default function BulkUploadGate({
           <p className="font-bold text-amber-900">Payment pending</p>
           <p className="mt-1 text-sm text-amber-800">
             Amount due: <strong>{formatUSD(state.amountUsd ?? 0)}</strong>. Transfer this amount and
-            send your receipt to the organiser (see below), quoting payment reference{" "}
+            send your receipt to the organizer (see below), quoting payment reference{" "}
             <span className="rounded bg-white px-1.5 py-0.5 font-mono text-xs font-bold">{state.paymentId?.slice(0, 8).toUpperCase()}</span>.
             Once confirmed, come back and click &quot;Request / check payment&quot; again with the
             same School, Sensei, and participant count to unlock the upload.
           </p>
-          <div className="mt-2 text-amber-900"><OrganiserContact /></div>
+          <div className="mt-2 text-amber-900"><OrganizerContact /></div>
         </div>
       )}
 

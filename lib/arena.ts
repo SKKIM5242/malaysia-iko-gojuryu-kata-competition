@@ -31,7 +31,7 @@ export interface ArenaEntry {
    * judging is complete for this recording. */
   scoresSubmitted: number;
   /** One entry per assigned referee, individual (not aggregated) — this is
-   * what Referee/Admin/Organizer/Customer Support/Audience see on Kata
+   * what Referee/Admin/Organizer/Participant Support/Audience see on Kata
    * Arena instead of the final score. */
   judgeScores: JudgeScoreEntry[];
 }

@@ -57,6 +57,24 @@ export function groupByKata(categories: Category[]): Array<[string, Category[]]>
   return [...groups.entries()];
 }
 
+/** Splits a full hierarchical category name into its filterable parts —
+ * "«kata» — «belt label» — Age «lo»–«hi» — «Male|Female|Mix…»". Missing
+ * parts (older or hand-made categories) come back as "". */
+export function splitCategoryName(name: string | null | undefined): {
+  kata: string;
+  belt: string;
+  age: string;
+  sex: string;
+} {
+  const parts = (name ?? "").split(" — ");
+  return {
+    kata: parts[0] ?? "",
+    belt: parts[1] ?? "",
+    age: parts[2] ?? "",
+    sex: parts[3] ?? "",
+  };
+}
+
 export function genderCode(gender: string): "male" | "female" {
   return gender.toLowerCase() === "female" ? "female" : "male";
 }

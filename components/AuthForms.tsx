@@ -135,12 +135,12 @@ export default function AuthForms({ defaultMode = "signin" }: { defaultMode?: "s
               <option value="participant">Participant (record my kata)</option>
               <option value="referee">Referee / Judge</option>
               <option value="audience">Audience / Spectator (view Kata Arena)</option>
-              <option value="customer_support">Customer Services Support</option>
+              <option value="customer_support">Participant Support</option>
               <option value="organizer">Organizer</option>
               <option value="admin">Admin</option>
             </select>
             <p className="mt-1 text-xs text-neutral-400">
-              Referee/Judge and Audience accounts need the organiser&apos;s approval before they
+              Referee/Judge and Audience accounts need the organizer&apos;s approval before they
               activate — unless you have an invitation code below. Once approved, sign-in is
               unlimited and free.
             </p>
@@ -171,7 +171,7 @@ export default function AuthForms({ defaultMode = "signin" }: { defaultMode?: "s
               <Link href="/register/staff" className="font-semibold underline underline-offset-2">
                 Submit an application
               </Link>{" "}
-              for the organiser to review instead.
+              for the organizer to review instead.
             </p>
           </div>
         )}
@@ -191,7 +191,7 @@ export default function AuthForms({ defaultMode = "signin" }: { defaultMode?: "s
                 <input id="auth_invite" name="invite_code" required className={inputCls} placeholder="e.g. SCHOOL-4F9A2B" />
                 <p className="mt-1 text-xs text-neutral-400">
                   Required — get this from your school&apos;s own record on the admin site (ask the
-                  organiser if you don&apos;t have one yet). It's what links this account to your
+                  organizer if you don&apos;t have one yet). It's what links this account to your
                   students only.
                 </p>
               </div>
@@ -202,7 +202,7 @@ export default function AuthForms({ defaultMode = "signin" }: { defaultMode?: "s
                 <input id="auth_invite" name="invite_code" required className={inputCls} placeholder="e.g. SENSEI-4F9A2B" />
                 <p className="mt-1 text-xs text-neutral-400">
                   Required — get this from your sensei&apos;s own record on the admin site (ask the
-                  organiser if you don&apos;t have one yet). It's what links this account to your
+                  organizer if you don&apos;t have one yet). It's what links this account to your
                   students only.
                 </p>
               </div>
@@ -212,7 +212,7 @@ export default function AuthForms({ defaultMode = "signin" }: { defaultMode?: "s
                 <label htmlFor="auth_invite" className={labelCls}>Invitation code *</label>
                 <input id="auth_invite" name="invite_code" required className={inputCls} placeholder="e.g. STAFF-4F9A2B" />
                 <p className="mt-1 text-xs text-neutral-400">
-                  Required — get this from the organiser. A valid code activates your account
+                  Required — get this from the organizer. A valid code activates your account
                   immediately with no approval step.
                 </p>
               </div>
