@@ -10,6 +10,7 @@ import { AdminShell, Card, adminBtn, adminInput } from "@/components/admin";
 import { CategoryName, EmptyState, SetupNotice } from "@/components/ui";
 import VideoWatchButton from "@/components/VideoWatchButton";
 import DownloadCsvButton from "@/components/DownloadCsvButton";
+import ScoreDetailButton from "@/components/ScoreDetailButton";
 import { finalScore, isDisqualified } from "@/lib/scoring";
 
 export const dynamic = "force-dynamic";
@@ -64,14 +65,17 @@ export default async function AdminJudging({
           "id, created_at, storage_path, participant:participants(full_name), registration:registrations(competition_id, category:categories(name))",
         )
         .order("created_at", { ascending: false }),
-      supabase.from("profiles").select("user_id, full_name, country").eq("role", "referee").eq("approved", true),
+      supabase.from("profiles").select("user_id, full_name, email, country").eq("role", "referee").eq("approved", true),
       supabase.from("referee_assignments").select("video_id, referee_user_id"),
-      supabase.from("video_scores").select("video_id, referee_user_id, score"),
+      supabase.from("video_scores").select("video_id, referee_user_id, score, criteria"),
     ]);
 
   const videoList = (videos as unknown as VideoRow[]) ?? [];
   const refereeList = referees ?? [];
-  const refereeName = new Map(refereeList.map((r) => [r.user_id, r.full_name ?? r.user_id.slice(0, 8)]));
+  // Name display falls back to email (not a bare user-id fragment) when a
+  // referee never set a display name — so "who scored this" is always
+  // legible, never a raw ID like "917ed647".
+  const refereeName = new Map(refereeList.map((r) => [r.user_id, r.full_name || r.email || r.user_id.slice(0, 8)]));
   const refereeCountry = new Map(refereeList.map((r) => [r.user_id, r.country ?? null]));
 
   const assignedByVideo = new Map<string, string[]>();
@@ -81,8 +85,10 @@ export default async function AdminJudging({
     assignedByVideo.set(a.video_id, list);
   }
   const scoreByKey = new Map<string, number>();
+  const criteriaByKey = new Map<string, number[] | null>();
   for (const s of scores ?? []) {
     scoreByKey.set(`${s.video_id}:${s.referee_user_id}`, Number(s.score));
+    criteriaByKey.set(`${s.video_id}:${s.referee_user_id}`, (s.criteria as number[] | null) ?? null);
   }
 
   // Signed playback URLs (1hr) for the private kata-videos bucket.
@@ -141,16 +147,25 @@ export default async function AdminJudging({
             assigned.map((uid) => {
               const score = scoreByKey.get(`${v.id}:${uid}`);
               const country = refereeCountry.get(uid);
+              const judgeName = refereeName.get(uid) ?? uid.slice(0, 8);
               return (
                 <span
                   key={uid}
                   className="flex items-center gap-1.5 rounded-full border border-neutral-300 bg-neutral-50 px-2.5 py-1 text-xs font-semibold text-neutral-700"
                 >
-                  {refereeName.get(uid) ?? uid.slice(0, 8)}
+                  {judgeName}
                   {country && <span className="font-normal text-neutral-400">({country})</span>}
-                  <span className={score != null && score === 0 ? "font-bold text-red-700" : score != null ? "text-green-700" : "text-amber-600"}>
-                    {score != null ? `Total ${score.toFixed(1)}` : "pending"}
-                  </span>
+                  {score != null ? (
+                    canScoreAnyVideo ? (
+                      <ScoreDetailButton judgeName={judgeName} total={score} criteria={criteriaByKey.get(`${v.id}:${uid}`) ?? null} />
+                    ) : (
+                      <span className={score === 0 ? "font-bold text-red-700" : "text-green-700"}>
+                        Total {score.toFixed(1)}
+                      </span>
+                    )
+                  ) : (
+                    <span className="text-amber-600">pending</span>
+                  )}
                   {score == null && (
                     <form action={resendRefereeNotification}>
                       <input type="hidden" name="video_id" value={v.id} />
@@ -185,26 +200,35 @@ export default async function AdminJudging({
         </div>
 
         {canManageJudging && available.length > 0 && (
-          <form action={assignRefereeToVideo} className="mt-3 flex flex-wrap items-center gap-2">
-            <input type="hidden" name="video_id" value={v.id} />
-            <input type="hidden" name="return_to" value="/admin/judging" />
-            <select
-              name="referee_user_id"
-              required
-              defaultValue=""
-              className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm"
-            >
-              <option value="" disabled>Add referee…</option>
-              {available.map((r) => (
-                <option key={r.user_id} value={r.user_id}>
-                  {r.full_name ?? r.user_id.slice(0, 8)}{r.country ? ` (${r.country})` : ""}
-                </option>
-              ))}
-            </select>
-            <button className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-neutral-700">
-              Assign
-            </button>
-          </form>
+          <div className="mt-3 space-y-1.5">
+            {/* 3 independent slots so an admin can manually assign up to 3
+                judges at once (e.g. when auto-assign has run out of
+                eligible referees) without the dropdown resetting between
+                picks. Each is its own form/submit — same underlying
+                assignRefereeToVideo action as before. */}
+            {[0, 1, 2].map((slot) => (
+              <form key={slot} action={assignRefereeToVideo} className="flex flex-wrap items-center gap-2">
+                <input type="hidden" name="video_id" value={v.id} />
+                <input type="hidden" name="return_to" value="/admin/judging" />
+                <select
+                  name="referee_user_id"
+                  required
+                  defaultValue=""
+                  className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm"
+                >
+                  <option value="" disabled>Add referee… (slot {slot + 1})</option>
+                  {available.map((r) => (
+                    <option key={r.user_id} value={r.user_id}>
+                      {r.full_name || r.email || r.user_id.slice(0, 8)}{r.country ? ` (${r.country})` : ""}
+                    </option>
+                  ))}
+                </select>
+                <button className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-neutral-700">
+                  Assign
+                </button>
+              </form>
+            ))}
+          </div>
         )}
 
         {canScoreAnyVideo && (
@@ -275,7 +299,7 @@ export default async function AdminJudging({
                 const scoredCount = (scores ?? []).filter((s) => s.referee_user_id === r.user_id).length;
                 return (
                   <tr key={r.user_id} className="hover:bg-neutral-50">
-                    <td className="px-4 py-3 font-medium">{r.full_name ?? r.user_id.slice(0, 8)}</td>
+                    <td className="px-4 py-3 font-medium">{r.full_name || r.email || r.user_id.slice(0, 8)}</td>
                     <td className="px-4 py-3">{r.country ?? "—"}</td>
                     <td className="px-4 py-3">{assignedCount}</td>
                     <td className="px-4 py-3">
