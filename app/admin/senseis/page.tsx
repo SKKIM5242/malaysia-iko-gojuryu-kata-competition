@@ -42,7 +42,7 @@ function PaymentButtons({ id, current }: { id: string; current: string }) {
 export default async function AdminSenseis({
   searchParams,
 }: {
-  searchParams: Promise<{ edit?: string; ok?: string; error?: string }>;
+  searchParams: Promise<{ edit?: string; editcode?: string; ok?: string; error?: string }>;
 }) {
   const params = await searchParams;
   const ready = await schemaReady();
@@ -357,6 +357,7 @@ export default async function AdminSenseis({
           returnTo="/admin/senseis"
           codeExample="IKO-SENSEI-2026"
           competitions={competitions}
+          editingId={params.editcode}
         />
       </div>
     </AdminShell>

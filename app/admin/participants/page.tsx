@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 export default async function AdminParticipants({
   searchParams,
 }: {
-  searchParams: Promise<{ edit?: string; ok?: string; error?: string }>;
+  searchParams: Promise<{ edit?: string; editcode?: string; ok?: string; error?: string }>;
 }) {
   const params = await searchParams;
   const ready = await schemaReady();
@@ -293,6 +293,7 @@ export default async function AdminParticipants({
           returnTo="/admin/participants"
           codeExample="IKO-PARTICIPANT-2026"
           competitions={competitions}
+          editingId={params.editcode}
         />
       </div>
     </AdminShell>

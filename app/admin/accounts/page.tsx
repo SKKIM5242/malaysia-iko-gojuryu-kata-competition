@@ -31,7 +31,7 @@ interface ProfileRow {
 export default async function AdminAccounts({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; ok?: string; error?: string }>;
+  searchParams: Promise<{ tab?: string; editcode?: string; ok?: string; error?: string }>;
 }) {
   const params = await searchParams;
   const tab = TABS.some(([t]) => t === params.tab) ? params.tab! : "approvals";
@@ -65,7 +65,7 @@ export default async function AdminAccounts({
       </div>
 
       {tab === "approvals" && <ApprovalsTab supabase={supabase} />}
-      {tab === "codes" && <CodesTab />}
+      {tab === "codes" && <CodesTab editingId={params.editcode} />}
       {tab === "access" && <AccessMatrixTab />}
     </AdminShell>
   );
@@ -207,10 +207,10 @@ async function ApprovalsTab({ supabase }: { supabase: Awaited<ReturnType<typeof 
   );
 }
 
-async function CodesTab() {
+async function CodesTab({ editingId }: { editingId?: string }) {
   const competitions = await getAllCompetitions();
   return (
-    <div className="grid gap-8 lg:grid-cols-2">
+    <div className="space-y-8">
       <InvitationCodeForm
         returnTo="/admin/accounts?tab=codes"
         idPrefix="central_code"
@@ -221,6 +221,7 @@ async function CodesTab() {
         returnTo="/admin/accounts?tab=codes"
         codeExample="IKO-JUDGE-2026"
         competitions={competitions}
+        editingId={editingId}
       />
     </div>
   );

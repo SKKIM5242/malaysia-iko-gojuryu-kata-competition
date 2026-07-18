@@ -55,8 +55,8 @@ export default async function AdminDashboard() {
           rowKey="id"
           downloadName="recent-activity"
           columns={[
-            { key: "action", label: "Action" },
             { key: "when", label: "When" },
+            { key: "action", label: "Action" },
             { key: "table", label: "Table" },
             { key: "record", label: "Record" },
           ]}

@@ -13,6 +13,7 @@ import DownloadCsvButton from "@/components/DownloadCsvButton";
 import FilterableTable from "@/components/FilterableTable";
 import ScoreDetailButton from "@/components/ScoreDetailButton";
 import { finalScore, isDisqualified } from "@/lib/scoring";
+import { getTelegramLink } from "@/lib/telegram";
 
 export const dynamic = "force-dynamic";
 
@@ -57,7 +58,7 @@ export default async function AdminJudging({
   // videos only, via the separate My Account scoring flow.
   const canScoreAnyVideo = ["admin", "organizer", "staff"].includes(myRole ?? "");
 
-  const [competitions, { data: videos }, { data: referees }, { data: assignments }, { data: scores }] =
+  const [competitions, { data: videos }, { data: directory }, { data: refereeProfiles }, { data: assignments }, { data: scores }] =
     await Promise.all([
       getAllCompetitions(),
       supabase
@@ -66,18 +67,41 @@ export default async function AdminJudging({
           "id, created_at, storage_path, participant:participants(full_name), registration:registrations(competition_id, category:categories(name))",
         )
         .order("created_at", { ascending: false }),
+      supabase
+        .from("referees")
+        .select("id, full_name, karate_rank, email, phone, home_country, user_id")
+        .eq("status", "approved")
+        .order("full_name"),
       supabase.from("profiles").select("user_id, full_name, email, country").eq("role", "referee").eq("approved", true),
       supabase.from("referee_assignments").select("video_id, referee_user_id"),
       supabase.from("video_scores").select("video_id, referee_user_id, score, criteria"),
     ]);
 
   const videoList = (videos as unknown as VideoRow[]) ?? [];
-  const refereeList = referees ?? [];
+  // The workload panel is the Referee page's directory: every APPROVED
+  // referee record, whether or not their login is linked yet. Assignments
+  // and the dropdowns need a login (user_id) to key on, so those use the
+  // linked subset.
+  const directoryList = directory ?? [];
+  const refereeList = directoryList
+    .filter((r): r is typeof r & { user_id: string } => !!r.user_id)
+    .map((r) => ({ user_id: r.user_id, full_name: r.full_name, email: r.email, country: r.home_country }));
   // Name display falls back to email (not a bare user-id fragment) when a
   // referee never set a display name — so "who scored this" is always
-  // legible, never a raw ID like "917ed647".
-  const refereeName = new Map(refereeList.map((r) => [r.user_id, r.full_name || r.email || r.user_id.slice(0, 8)]));
-  const refereeCountry = new Map(refereeList.map((r) => [r.user_id, r.country ?? null]));
+  // legible, never a raw ID like "917ed647". Login-only referees (profiles
+  // without a directory record, e.g. older test accounts) still resolve
+  // for existing assignments via the profiles fallback below.
+  const refereeName = new Map<string, string>();
+  const refereeCountry = new Map<string, string | null>();
+  for (const p of refereeProfiles ?? []) {
+    refereeName.set(p.user_id, p.full_name || p.email || p.user_id.slice(0, 8));
+    refereeCountry.set(p.user_id, p.country ?? null);
+  }
+  for (const r of refereeList) {
+    refereeName.set(r.user_id, r.full_name || r.email || r.user_id.slice(0, 8));
+    refereeCountry.set(r.user_id, r.country ?? null);
+  }
+  const refereeTelegramLink = getTelegramLink("referee");
 
   const assignedByVideo = new Map<string, string[]>();
   for (const a of assignments ?? []) {
@@ -280,30 +304,71 @@ export default async function AdminJudging({
         />
       </div>
 
-      <h2 className="mb-3 text-lg font-bold">Referee Workload</h2>
-      {refereeList.length === 0 ? (
-        <EmptyState>No approved referees yet — approve some in Accounts → Approvals first.</EmptyState>
+      <h2 className="mb-1 text-lg font-bold">Referee Workload</h2>
+      <p className="mb-3 text-sm text-neutral-500">
+        Every <strong>Approved</strong> referee from the{" "}
+        <a href="/admin/referees" className="font-semibold text-red-700 underline underline-offset-2">
+          Referees page
+        </a>{" "}
+        is listed here — this same list is the pool Auto-assign draws from, always picking the
+        least-loaded referee first. A referee whose login isn&apos;t linked yet shows &quot;No
+        login yet&quot; and can&apos;t be assigned until linked (Referees page → Link account).
+      </p>
+      {directoryList.length === 0 ? (
+        <EmptyState>No approved referees yet — approve some on the Referees page first.</EmptyState>
       ) : (
         <div className="mb-8">
           <FilterableTable
-            rowKey="user_id"
+            rowKey="id"
             downloadName="referee-workload"
             columns={[
               { key: "referee", label: "Referee" },
+              { key: "rank", label: "Rank" },
+              { key: "email", label: "Email" },
+              { key: "phone", label: "Mobile Phone" },
+              { key: "telegram", label: "Telegram" },
               { key: "country", label: "Country" },
               { key: "assigned", label: "Assigned" },
               { key: "scored", label: "Scored" },
             ]}
-            rows={refereeList.map((r) => {
-              const assignedCount = (assignments ?? []).filter((a) => a.referee_user_id === r.user_id).length;
-              const scoredCount = (scores ?? []).filter((s) => s.referee_user_id === r.user_id).length;
+            csvColumns={[
+              { key: "referee", label: "Referee" },
+              { key: "rank", label: "Rank" },
+              { key: "email", label: "Email" },
+              { key: "phone", label: "Mobile Phone" },
+              { key: "country", label: "Country" },
+              { key: "assigned", label: "Assigned" },
+              { key: "scored_text", label: "Scored" },
+            ]}
+            rows={directoryList.map((r) => {
+              const assignedCount = r.user_id
+                ? (assignments ?? []).filter((a) => a.referee_user_id === r.user_id).length
+                : 0;
+              const scoredCount = r.user_id
+                ? (scores ?? []).filter((s) => s.referee_user_id === r.user_id).length
+                : 0;
               return {
-                user_id: r.user_id,
-                referee: r.full_name || r.email || r.user_id.slice(0, 8),
-                country: r.country ?? "",
-                assigned: String(assignedCount),
+                id: r.id,
+                referee: r.full_name || r.email || "",
+                rank: r.karate_rank ?? "",
+                email: r.email ?? "",
+                phone: r.phone ?? "",
+                telegram: refereeTelegramLink ? (
+                  <a
+                    href={refereeTelegramLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-semibold text-[#1c7fb5] underline underline-offset-2"
+                  >
+                    Referee group
+                  </a>
+                ) : (
+                  ""
+                ),
+                country: r.home_country ?? "",
+                assigned: r.user_id ? String(assignedCount) : "No login yet",
                 scored:
-                  assignedCount > scoredCount ? (
+                  r.user_id && assignedCount > scoredCount ? (
                     <>
                       {scoredCount}{" "}
                       <span className="ml-1.5 text-xs text-amber-600">({assignedCount - scoredCount} pending)</span>
@@ -311,6 +376,7 @@ export default async function AdminJudging({
                   ) : (
                     String(scoredCount)
                   ),
+                scored_text: String(scoredCount),
               };
             })}
           />

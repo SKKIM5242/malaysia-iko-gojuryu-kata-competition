@@ -2,7 +2,10 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { schemaReady } from "@/lib/data";
 import { getAllCompetitions } from "@/lib/admin-data";
-import { updateCommunityStatus, saveReferee, deleteReferee, linkRefereeAccount, bulkUploadReferees } from "@/app/actions/admin";
+import {
+  updateCommunityStatus, saveReferee, deleteReferee, linkRefereeAccount, bulkUploadReferees,
+  saveAutoAssignTerm, deleteAutoAssignTerm, bulkUploadAutoAssignTerms,
+} from "@/app/actions/admin";
 import { AdminShell, Card, CertificateField, adminBtn, adminBtnSecondary, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice, formatDOB } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
@@ -59,7 +62,7 @@ function StatusButtons({
 export default async function AdminReferees({
   searchParams,
 }: {
-  searchParams: Promise<{ editref?: string; ok?: string; error?: string }>;
+  searchParams: Promise<{ editref?: string; editcode?: string; editterm?: string; ok?: string; error?: string }>;
 }) {
   const params = await searchParams;
   const ready = await schemaReady();
@@ -95,6 +98,10 @@ export default async function AdminReferees({
           .in("user_id", refereeUserIds)
       : { data: [] };
   const loginByUserId = new Map((refereeLogins ?? []).map((p) => [p.user_id as string, p]));
+
+  const { data: termsData } = await supabase.from("auto_assign_terms").select("*").order("position");
+  const autoAssignTerms = termsData ?? [];
+  const editingTerm = params.editterm ? autoAssignTerms.find((t) => t.id === params.editterm) : undefined;
 
   const certPaths = [
     ...refereeList.map((r) => r.certificate_path),
@@ -388,6 +395,97 @@ export default async function AdminReferees({
           )}
         </div>
       </div>
+      {isAdminTier && (
+        <div className="mt-8 space-y-4">
+          <h2 className="text-lg font-bold">Auto-Assign Referee Terms &amp; Conditions</h2>
+          <Card>
+            <form action={saveAutoAssignTerm} className="flex flex-wrap items-end gap-3">
+              {editingTerm && <input type="hidden" name="id" value={editingTerm.id} />}
+              <div>
+                <label htmlFor="term_position" className={adminLabel}>No. *</label>
+                <input
+                  id="term_position"
+                  name="position"
+                  type="number"
+                  min="1"
+                  required
+                  defaultValue={editingTerm?.position ?? autoAssignTerms.length + 1}
+                  className={`${adminInput} w-20`}
+                />
+              </div>
+              <div className="min-w-[280px] flex-1">
+                <label htmlFor="term_content" className={adminLabel}>
+                  {editingTerm ? `Edit Term No. ${editingTerm.position}` : "New Term"} *
+                </label>
+                <input
+                  id="term_content"
+                  name="content"
+                  required
+                  defaultValue={editingTerm?.content ?? ""}
+                  className={adminInput}
+                  placeholder="e.g. Referees must declare a conflict of interest before judging their own student."
+                />
+              </div>
+              <button type="submit" className={adminBtn}>{editingTerm ? "Save changes" : "Add term"}</button>
+              {editingTerm && (
+                <Link
+                  href="/admin/referees"
+                  className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-semibold text-neutral-600 hover:bg-neutral-50"
+                >
+                  Cancel
+                </Link>
+              )}
+            </form>
+          </Card>
+          {canBulkUpload && (
+            <CsvUploadForm
+              action={bulkUploadAutoAssignTerms}
+              templateHref="/auto-assign-terms-template.csv"
+              entityLabel="term"
+            />
+          )}
+          {autoAssignTerms.length === 0 ? (
+            <EmptyState>No terms yet — add the first one above.</EmptyState>
+          ) : (
+            <FilterableTable
+              rowKey="id"
+              downloadName="auto-assign-terms"
+              stickyColumns={2}
+              firstColumnWidth={56}
+              columns={[
+                { key: "no", label: "No." },
+                { key: "content", label: "Terms & Conditions" },
+                { key: "actions", label: "Actions" },
+              ]}
+              csvColumns={[
+                { key: "no", label: "Position" },
+                { key: "content", label: "Content" },
+              ]}
+              rows={autoAssignTerms.map((t) => ({
+                id: t.id,
+                no: String(t.position),
+                content: t.content,
+                actions: (
+                  <div className="flex gap-1.5">
+                    <Link
+                      href={`/admin/referees?editterm=${t.id}`}
+                      className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
+                    >
+                      Edit
+                    </Link>
+                    <form action={deleteAutoAssignTerm}>
+                      <input type="hidden" name="id" value={t.id} />
+                      <button className="rounded border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50">
+                        Delete
+                      </button>
+                    </form>
+                  </div>
+                ),
+              }))}
+            />
+          )}
+        </div>
+      )}
       <div className="mt-8 space-y-6">
         <InvitationCodeForm
           role="referee"
@@ -402,6 +500,7 @@ export default async function AdminReferees({
           returnTo="/admin/referees"
           codeExample="IKO-JUDGE-2026"
           competitions={competitions}
+          editingId={params.editcode}
         />
       </div>
     </AdminShell>

@@ -19,7 +19,7 @@ interface StaffApp {
 export default async function AdminOrganizers({
   searchParams,
 }: {
-  searchParams: Promise<{ ok?: string; error?: string }>;
+  searchParams: Promise<{ editcode?: string; ok?: string; error?: string }>;
 }) {
   const params = await searchParams;
   const ready = await schemaReady();
@@ -234,6 +234,7 @@ export default async function AdminOrganizers({
             returnTo="/admin/organizers"
             codeExample="IKO-ORG-2026"
             competitions={competitions}
+            editingId={params.editcode}
           />
         </div>
       )}

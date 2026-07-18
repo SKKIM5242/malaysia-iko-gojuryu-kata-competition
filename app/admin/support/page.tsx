@@ -27,7 +27,7 @@ interface StaffApp {
 export default async function AdminSupport({
   searchParams,
 }: {
-  searchParams: Promise<{ ok?: string; error?: string }>;
+  searchParams: Promise<{ editcode?: string; ok?: string; error?: string }>;
 }) {
   const params = await searchParams;
   const ready = await schemaReady();
@@ -400,6 +400,7 @@ export default async function AdminSupport({
             returnTo="/admin/support"
             codeExample="IKO-SUPPORT-2026"
             competitions={competitions}
+            editingId={params.editcode}
           />
         </div>
       )}

@@ -53,7 +53,7 @@ function StatusButtons({
 export default async function AdminAudience({
   searchParams,
 }: {
-  searchParams: Promise<{ ok?: string; error?: string }>;
+  searchParams: Promise<{ editcode?: string; ok?: string; error?: string }>;
 }) {
   const params = await searchParams;
   const ready = await schemaReady();
@@ -217,6 +217,7 @@ export default async function AdminAudience({
           returnTo="/admin/audience"
           codeExample="IKO-AUD-2026"
           competitions={competitions}
+          editingId={params.editcode}
         />
       </div>
     </AdminShell>

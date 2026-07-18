@@ -1041,6 +1041,75 @@ export async function updateInvitationCode(formData: FormData) {
   backTo(returnTo, { ok: `Invitation code updated: ${fields.code}` });
 }
 
+const INVITATION_CODE_CSV_COLUMNS = [
+  "code", "role", "email", "max_uses", "valid_from", "valid_until", "sign_in_limit", "competition_name", "note",
+] as const;
+
+export async function bulkUploadInvitationCodes(_prev: CsvUploadResult, formData: FormData): Promise<CsvUploadResult> {
+  const file = formData.get("csv_file");
+  if (!(file instanceof File) || file.size === 0) return { done: false, error: "Choose a CSV file to upload." };
+  if (file.size > 5 * 1024 * 1024) return { done: false, error: "CSV file too large (max 5 MB)." };
+
+  const parsed = parseCsvWithHeader(await file.text(), INVITATION_CODE_CSV_COLUMNS);
+  if ("error" in parsed) return { done: false, error: parsed.error };
+  const { dataRows, get } = parsed;
+  if (dataRows.length === 0) return { done: false, error: "The CSV has no data rows." };
+  if (dataRows.length > 1000) return { done: false, error: "Maximum 1000 rows per upload." };
+
+  const { supabase, actorId } = await getActor();
+  const roleError = await bulkUploadRoleError(supabase, actorId);
+  if (roleError) return { done: false, error: roleError };
+
+  const { data: myProfile } = actorId
+    ? await supabase.from("profiles").select("full_name, email").eq("user_id", actorId).maybeSingle()
+    : { data: null };
+  const generated_by = myProfile?.full_name || myProfile?.email || null;
+
+  const { data: competitions } = await supabase.from("competitions").select("id, name");
+  const competitionIdByName = new Map((competitions ?? []).map((c) => [c.name.trim().toLowerCase(), c.id]));
+
+  const failures: Array<{ row: number; name: string; error: string }> = [];
+  let succeeded = 0;
+
+  for (let i = 0; i < dataRows.length; i++) {
+    const r = dataRows[i];
+    const rowNo = i + 2;
+    const code = get(r, "code").toUpperCase() || `Row ${rowNo}`;
+    const role = get(r, "role").toLowerCase();
+    if (!get(r, "code")) { failures.push({ row: rowNo, name: code, error: "code is required" }); continue; }
+    if (!INVITATION_CODE_ROLES.includes(role)) { failures.push({ row: rowNo, name: code, error: "role is not a valid role key" }); continue; }
+    const email = get(r, "email").toLowerCase();
+    const maxUses = Number(get(r, "max_uses"));
+    const validFrom = get(r, "valid_from");
+    const validUntil = get(r, "valid_until");
+    const signInLimit = Number(get(r, "sign_in_limit"));
+    const competitionId = competitionIdByName.get(get(r, "competition_name").trim().toLowerCase());
+    if (!email || !maxUses || maxUses < 1 || !validFrom || !validUntil || !signInLimit || signInLimit < 1) {
+      failures.push({ row: rowNo, name: code, error: "email, max_uses, valid_from, valid_until, and sign_in_limit are all required" });
+      continue;
+    }
+    if (!competitionId) { failures.push({ row: rowNo, name: code, error: "competition_name does not match an existing competition" }); continue; }
+
+    const record = {
+      code, role, email, max_uses: maxUses, valid_from: validFrom, valid_until: validUntil,
+      sign_in_limit: signInLimit, competition_id: competitionId,
+      note: get(r, "note") || null, generated_by,
+    };
+    const { data, error } = await supabase.from("invitation_codes").insert(record).select("id").single();
+    if (error) { failures.push({ row: rowNo, name: code, error: error.message.includes("duplicate") ? "This code already exists" : "Could not save" }); continue; }
+    await writeAudit(supabase, {
+      table_name: "invitation_codes", record_id: data!.id, action: "invitation_code_created", new_value: record, actor_id: actorId,
+    });
+    succeeded++;
+  }
+
+  await writeAudit(supabase, {
+    table_name: "invitation_codes", record_id: null, action: "bulk_csv_invitation_codes",
+    new_value: { rows: dataRows.length, succeeded, failed: failures.length }, actor_id: actorId,
+  });
+  return { done: true, succeeded, failed: failures.length, failures: failures.slice(0, 50) };
+}
+
 export async function deleteInvitationCode(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const returnTo = String(formData.get("return_to") ?? "/admin/accounts");
@@ -1051,6 +1120,100 @@ export async function deleteInvitationCode(formData: FormData) {
     table_name: "invitation_codes", record_id: id, action: "invitation_code_deleted", actor_id: actorId,
   });
   backTo(returnTo, { ok: "Invitation code deleted." });
+}
+
+// ── Auto-assign Referee Terms & Conditions ──────────────────────────────────
+
+export async function saveAutoAssignTerm(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const position = Number(formData.get("position") ?? 0);
+  const content = String(formData.get("content") ?? "").trim();
+  const returnTo = "/admin/referees";
+  if (!content) backTo(returnTo, { error: "The term's text is required." });
+  if (!position || position < 1) backTo(returnTo, { error: "No. must be 1 or higher." });
+  const { supabase, actorId } = await getActor();
+  const role = await getActorRole(supabase, actorId);
+  if (!["admin", "organizer", "staff"].includes(role ?? "")) {
+    backTo(returnTo, { error: "Only Admin / Organizer can edit the auto-assign terms." });
+  }
+  if (id) {
+    const { data: before } = await supabase.from("auto_assign_terms").select("*").eq("id", id).maybeSingle();
+    const { error } = await supabase
+      .from("auto_assign_terms")
+      .update({ position, content, updated_at: new Date().toISOString() })
+      .eq("id", id);
+    if (error) backTo(returnTo, { error: "Could not update the term." });
+    await writeAudit(supabase, {
+      table_name: "auto_assign_terms", record_id: id, action: "auto_assign_term_updated",
+      old_value: before, new_value: { position, content }, actor_id: actorId,
+    });
+  } else {
+    const { data, error } = await supabase
+      .from("auto_assign_terms").insert({ position, content }).select("id").single();
+    if (error) backTo(returnTo, { error: "Could not add the term." });
+    await writeAudit(supabase, {
+      table_name: "auto_assign_terms", record_id: data!.id, action: "auto_assign_term_created",
+      new_value: { position, content }, actor_id: actorId,
+    });
+  }
+  backTo(returnTo, { ok: "Auto-assign term saved." });
+}
+
+export async function deleteAutoAssignTerm(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const returnTo = "/admin/referees";
+  const { supabase, actorId } = await getActor();
+  const role = await getActorRole(supabase, actorId);
+  if (!["admin", "organizer", "staff"].includes(role ?? "")) {
+    backTo(returnTo, { error: "Only Admin / Organizer can edit the auto-assign terms." });
+  }
+  const { error } = await supabase.from("auto_assign_terms").delete().eq("id", id);
+  if (error) backTo(returnTo, { error: "Could not delete the term." });
+  await writeAudit(supabase, {
+    table_name: "auto_assign_terms", record_id: id, action: "auto_assign_term_deleted", actor_id: actorId,
+  });
+  backTo(returnTo, { ok: "Auto-assign term deleted." });
+}
+
+const AUTO_ASSIGN_TERMS_CSV_COLUMNS = ["position", "content"] as const;
+
+export async function bulkUploadAutoAssignTerms(_prev: CsvUploadResult, formData: FormData): Promise<CsvUploadResult> {
+  const file = formData.get("csv_file");
+  if (!(file instanceof File) || file.size === 0) return { done: false, error: "Choose a CSV file to upload." };
+  if (file.size > 5 * 1024 * 1024) return { done: false, error: "CSV file too large (max 5 MB)." };
+
+  const parsed = parseCsvWithHeader(await file.text(), AUTO_ASSIGN_TERMS_CSV_COLUMNS);
+  if ("error" in parsed) return { done: false, error: parsed.error };
+  const { dataRows, get } = parsed;
+  if (dataRows.length === 0) return { done: false, error: "The CSV has no data rows." };
+  if (dataRows.length > 500) return { done: false, error: "Maximum 500 rows per upload." };
+
+  const { supabase, actorId } = await getActor();
+  const roleError = await bulkUploadRoleError(supabase, actorId);
+  if (roleError) return { done: false, error: roleError };
+
+  const failures: Array<{ row: number; name: string; error: string }> = [];
+  let succeeded = 0;
+  for (let i = 0; i < dataRows.length; i++) {
+    const r = dataRows[i];
+    const rowNo = i + 2;
+    const position = Number(get(r, "position"));
+    const content = get(r, "content");
+    const name = content.slice(0, 40) || `Row ${rowNo}`;
+    if (!content || !position || position < 1) {
+      failures.push({ row: rowNo, name, error: "position (1+) and content are both required" });
+      continue;
+    }
+    const { data, error } = await supabase.from("auto_assign_terms").insert({ position, content }).select("id").single();
+    if (error) { failures.push({ row: rowNo, name, error: "Could not save" }); continue; }
+    await writeAudit(supabase, {
+      table_name: "auto_assign_terms", record_id: data!.id, action: "auto_assign_term_created",
+      new_value: { position, content }, actor_id: actorId,
+    });
+    succeeded++;
+  }
+  revalidatePath("/admin/referees");
+  return { done: true, succeeded, failed: failures.length, failures: failures.slice(0, 50) };
 }
 
 const RECORD_CODE_TABLES: Record<string, string> = { school: "schools", sensei: "senseis" };
@@ -1246,13 +1409,19 @@ export async function autoAssignReferees(formData: FormData) {
   const videoIds = (videos ?? []).map((v) => v.id as string);
   if (videoIds.length === 0) backTo(returnTo, { ok: "No recordings submitted yet for this competition." });
 
+  // Eligible pool = the Referee page's directory (approved records) that
+  // have a linked login — the same list the Referee Workload table shows —
+  // so auto-assign and the workload view can never disagree about who is
+  // assignable.
   const { data: referees } = await supabase
-    .from("profiles")
+    .from("referees")
     .select("user_id")
-    .eq("role", "referee")
-    .eq("approved", true);
-  const refereeIds = (referees ?? []).map((r) => r.user_id as string);
-  if (refereeIds.length === 0) backTo(returnTo, { error: "No approved referees available yet." });
+    .eq("status", "approved")
+    .not("user_id", "is", null);
+  const refereeIds = [...new Set((referees ?? []).map((r) => r.user_id as string))];
+  if (refereeIds.length === 0) {
+    backTo(returnTo, { error: "No approved referees with a linked login yet — link accounts on the Referees page first." });
+  }
 
   const { data: existing } = await supabase
     .from("referee_assignments")

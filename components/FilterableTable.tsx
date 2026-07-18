@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import DownloadCsvButton from "@/components/DownloadCsvButton";
 import ColumnFilterDropdown from "@/components/ColumnFilterDropdown";
 import DualScrollBox from "@/components/DualScrollBox";
@@ -26,6 +26,8 @@ export default function FilterableTable({
   rowKey,
   downloadName,
   csvColumns,
+  stickyColumns = 1,
+  firstColumnWidth = 64,
 }: {
   columns: FilterableColumn[];
   rows: Array<Record<string, CellValue>>;
@@ -39,8 +41,24 @@ export default function FilterableTable({
    * a single value per cell. Callers must include the raw field values as
    * extra keys on each row alongside the display keys `columns` reads. */
   csvColumns?: FilterableColumn[];
+  /** How many leading columns stay pinned during horizontal scroll (1 or 2).
+   * With 2, the first column gets a fixed width so the second column's
+   * sticky offset is known — meant for a narrow "No." column. */
+  stickyColumns?: 1 | 2;
+  /** Fixed pixel width of column 0 when stickyColumns is 2. */
+  firstColumnWidth?: number;
 }) {
   const [filters, setFilters] = useState<Record<string, Set<string>>>({});
+  const stickyCellClass = (i: number, bg: string) =>
+    i < stickyColumns
+      ? `sticky z-10 border-r border-neutral-200 ${bg} ${i === 0 ? "left-0" : ""}`
+      : "";
+  const stickyCellStyle = (i: number): CSSProperties | undefined => {
+    if (stickyColumns < 2) return undefined;
+    if (i === 0) return { width: firstColumnWidth, minWidth: firstColumnWidth, maxWidth: firstColumnWidth };
+    if (i === 1) return { left: firstColumnWidth };
+    return undefined;
+  };
 
   const uniqueValues = useMemo(() => {
     const map: Record<string, string[]> = {};
@@ -100,9 +118,8 @@ export default function FilterableTable({
               {columns.map((c, i) => (
                 <th
                   key={c.key}
-                  className={`px-3 py-2.5 whitespace-nowrap ${
-                    i === 0 ? "sticky left-0 z-10 border-r border-neutral-200 bg-neutral-50" : ""
-                  }`}
+                  className={`px-3 py-2.5 whitespace-nowrap ${stickyCellClass(i, "bg-neutral-50")}`}
+                  style={stickyCellStyle(i)}
                 >
                   {c.label}
                 </th>
@@ -112,7 +129,8 @@ export default function FilterableTable({
               {columns.map((c, i) => (
                 <th
                   key={c.key}
-                  className={`px-2 py-1.5 ${i === 0 ? "sticky left-0 z-10 border-r border-neutral-200 bg-white" : ""}`}
+                  className={`px-2 py-1.5 ${stickyCellClass(i, "bg-white")}`}
+                  style={stickyCellStyle(i)}
                 >
                   <ColumnFilterDropdown
                     values={uniqueValues[c.key] ?? []}
@@ -139,11 +157,8 @@ export default function FilterableTable({
                     return (
                       <td
                         key={c.key}
-                        className={`max-w-[220px] truncate px-3 py-2 ${
-                          i === 0
-                            ? "sticky left-0 z-10 border-r border-neutral-200 bg-white group-hover:bg-neutral-50"
-                            : ""
-                        }`}
+                        className={`max-w-[220px] truncate px-3 py-2 ${stickyCellClass(i, "bg-white group-hover:bg-neutral-50")}`}
+                        style={stickyCellStyle(i)}
                         title={isText ? cell : undefined}
                       >
                         {isText ? cell || "—" : cell}
