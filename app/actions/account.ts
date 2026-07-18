@@ -230,7 +230,7 @@ export async function submitKataVideo(
   return { ok: true };
 }
 
-/** Referee: save a 0.0–11.0 score for an assigned video — the sum of the
+/** Referee: save a 0.0–10.0 score for an assigned video — the sum of the
  * official rubric's 7 criteria (1+1+1+1+1+3+3 = 11 max). */
 export async function submitScore(formData: FormData) {
   const videoId = String(formData.get("video_id") ?? "");
@@ -246,7 +246,7 @@ export async function submitScore(formData: FormData) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user || !videoId || Number.isNaN(score) || score < 0 || score > 11) {
+  if (!user || !videoId || Number.isNaN(score) || score < 0 || score > 10) {
     revalidatePath("/account");
     return;
   }

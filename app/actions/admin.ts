@@ -205,7 +205,7 @@ export async function deleteRegistration(formData: FormData) {
 
 export async function saveCompetition(formData: FormData) {
   const id = String(formData.get("id") ?? "");
-  const returnTo = "/admin/competitions";
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/competitions";
   const values = {
     name: String(formData.get("name") ?? "").trim(),
     venue: String(formData.get("venue") ?? "").trim() || null,
@@ -250,7 +250,7 @@ export async function saveCompetition(formData: FormData) {
 
 export async function saveCategory(formData: FormData) {
   const id = String(formData.get("id") ?? "");
-  const returnTo = "/admin/competitions";
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/competitions";
   const values = {
     competition_id: String(formData.get("competition_id") ?? "") || null,
     name: String(formData.get("name") ?? "").trim(),
@@ -288,7 +288,7 @@ export async function saveCategory(formData: FormData) {
 
 export async function deleteCategory(formData: FormData) {
   const id = String(formData.get("id") ?? "");
-  const returnTo = "/admin/competitions";
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/competitions";
   const { supabase, actorId } = await getActor();
   const { error } = await supabase.from("categories").delete().eq("id", id);
   if (error) backTo(returnTo, { error: "Cannot delete — registrations reference this category." });
@@ -308,7 +308,7 @@ export async function deleteCategory(formData: FormData) {
  */
 export async function mergeCategoryToMix(formData: FormData) {
   const categoryId = String(formData.get("category_id") ?? "");
-  const returnTo = "/admin/competitions";
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/competitions";
   const { supabase, actorId } = await getActor();
 
   const { data: source } = await supabase
@@ -386,7 +386,7 @@ export async function mergeCategoryToMix(formData: FormData) {
 
 export async function saveAnnouncement(formData: FormData) {
   const id = String(formData.get("id") ?? "");
-  const returnTo = "/admin/announcements";
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/announcements";
   const values = {
     competition_id: String(formData.get("competition_id") ?? "") || null,
     title: String(formData.get("title") ?? "").trim(),
@@ -425,7 +425,7 @@ export async function saveAnnouncement(formData: FormData) {
 export async function toggleAnnouncement(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const publish = formData.get("publish") === "true";
-  const returnTo = "/admin/announcements";
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/announcements";
   const { supabase, actorId } = await getActor();
   const { data: before } = await supabase
     .from("announcements").select("title, body, published").eq("id", id).maybeSingle();
@@ -448,7 +448,7 @@ export async function toggleAnnouncement(formData: FormData) {
 export async function moveAnnouncement(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const direction = String(formData.get("direction") ?? "");
-  const returnTo = "/admin/announcements";
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/announcements";
   const { supabase, actorId } = await getActor();
 
   const { data } = await supabase
@@ -482,7 +482,7 @@ export async function moveAnnouncement(formData: FormData) {
 
 export async function deleteAnnouncement(formData: FormData) {
   const id = String(formData.get("id") ?? "");
-  const returnTo = "/admin/announcements";
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/announcements";
   const { supabase, actorId } = await getActor();
   const { data: before } = await supabase
     .from("announcements").select("*").eq("id", id).maybeSingle();

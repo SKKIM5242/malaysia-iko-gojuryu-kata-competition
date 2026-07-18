@@ -23,10 +23,16 @@ const FULL_NAV: Array<[string, string]> = [
   ["Commissions", "/admin/commissions"],
   ["Telegram Links", "/admin/telegram"],
   ["Classes", "/admin/classes"],
+  ["Content", "/admin/content"],
   ["Accounts", "/admin/accounts"],
   ["Email Verifications", "/admin/email-verifications"],
   ["Kata Arena Log In", "/account"],
 ];
+
+/** Pages hidden from the nav per role: Accounts/Email Verifications are the
+ * owner's alone; the Content studio is Admin & Organizer only. */
+const ADMIN_ONLY_NAV = ["/admin/accounts", "/admin/email-verifications"];
+const ADMIN_ORGANIZER_NAV = ["/admin/content"];
 
 export async function AdminShell({
   title,
@@ -48,10 +54,11 @@ export async function AdminShell({
     : { data: null };
   const role = profile?.role ?? null;
 
-  const nav =
-    role === "admin"
-      ? FULL_NAV
-      : FULL_NAV.filter(([, href]) => href !== "/admin/accounts" && href !== "/admin/email-verifications");
+  const nav = FULL_NAV.filter(([, href]) => {
+    if (ADMIN_ONLY_NAV.includes(href)) return role === "admin";
+    if (ADMIN_ORGANIZER_NAV.includes(href)) return ["admin", "organizer", "staff"].includes(role ?? "");
+    return true;
+  });
   return (
     <div className="min-h-screen bg-neutral-100">
       <header className="border-b border-neutral-800 bg-neutral-950 text-white">

@@ -289,14 +289,14 @@ export default async function AdminJudging({
           <form action={submitScore} className="mt-3 flex flex-wrap items-center gap-2 border-t border-neutral-100 pt-3">
             <input type="hidden" name="video_id" value={v.id} />
             <label htmlFor={`score_${v.id}`} className="text-xs font-semibold text-neutral-500">
-              {myScore != null ? "Update your score" : "Score this recording"} (0–11) — Admin/Organizer override
+              {myScore != null ? "Update your score" : "Score this recording"} (0–10) — Admin/Organizer override
             </label>
             <input
               id={`score_${v.id}`}
               name="score"
               type="number"
               min={0}
-              max={11}
+              max={10}
               step={0.1}
               defaultValue={myScore ?? ""}
               required

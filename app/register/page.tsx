@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { SiteFooter, SiteHeader } from "@/components/ui";
 import AccessComparisonTable from "@/components/AccessComparisonTable";
+import { getOpenCompetitions, schemaReady } from "@/lib/data";
+import { winnersRevealDate } from "@/lib/winners";
 
 export const dynamic = "force-dynamic";
 
@@ -26,28 +28,30 @@ const OPTIONS: Array<{
   {
     n: 2,
     title: "My Sensei / Coach",
-    desc: `Students or club representatives register their sensei / coach. ${TIER_FEE_NOTE}`,
+    desc: `Students or club representatives register their sensei / coach. ${TIER_FEE_NOTE} Senseis are also warmly encouraged to join as Participant Support — help fellow karateka while staying close to the action.`,
     href: "/register/sensei?by=student",
     cta: "Register my sensei",
   },
   {
     n: 3,
     title: "Sensei / Coach self-registration",
-    desc: `Senseis and coaches register themselves. ${TIER_FEE_NOTE}`,
+    desc: `Senseis and coaches register themselves. ${TIER_FEE_NOTE} Senseis holding 3rd Dan and above are encouraged to also register as Referee/Judge to earn extra commission, and every sensei is warmly encouraged to join as Participant Support too.`,
     href: "/register/sensei?by=self",
     cta: "Self-register as sensei",
   },
   {
     n: 4,
     title: "Referee / Judges",
-    desc: "Register as a kata referee or judge. USD 100 deposit.",
+    desc:
+      "Register as a kata referee or judge. USD 100 deposit per competition tier. Referee/judge work starts after the event deadline: you have 2 weeks after the deadline to submit your scores — after the 2nd week, unscored recordings are re-assigned, and the re-assigned referee/judge gets 1 week. If a score is still missing, the organizer takes over in the 4th week, before the winner announcement date. Senseis holding 3rd Dan and above are encouraged to register as Referee/Judge.",
     href: "/register/referee",
     cta: "Register as referee / judge",
   },
   {
     n: 5,
     title: "Audience / Onlooker / Visitor / Spectator",
-    desc: "Sign in to watch the competition. USD 10.",
+    desc:
+      "Sign in to watch — USD 10 / USD 100 / USD 200 per competition tier, per sign-in. Don't stay idle for more than 25 minutes: after 30 idle minutes the site automatically signs you out. We encourage signing in once Winners are announced, so one sign-in shows you every recording AND the judges' scores. Signing in during the competition shows only what has been submitted so far, with no judge scores — judge scores become available only after Winners are finalized.",
     href: "/register/audience",
     cta: "Register as audience",
   },
@@ -60,6 +64,16 @@ const OPTIONS: Array<{
   },
 ];
 
+function formatAnnounceDate(deadline: string): string {
+  return winnersRevealDate(deadline).toLocaleDateString("en-MY", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
 export default async function RegisterHub({
   searchParams,
 }: {
@@ -67,6 +81,7 @@ export default async function RegisterHub({
 }) {
   const { competition: competitionId } = await searchParams;
   const tierSuffix = competitionId ? `?competition=${competitionId}` : "";
+  const competitions = (await schemaReady()) ? await getOpenCompetitions() : [];
   return (
     <>
       <SiteHeader />
@@ -138,6 +153,30 @@ export default async function RegisterHub({
             </div>
           ))}
         </div>
+
+        {competitions.length > 0 && (
+          <div className="mt-8 rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
+            <h2 className="text-lg font-bold text-neutral-900">Winners</h2>
+            <p className="mt-1 text-sm text-neutral-500">
+              Winners for each competition are announced 30 days after its registration deadline,
+              on the next working day (Monday–Friday) in Malaysia, at 00:00 Malaysia time.
+            </p>
+            <ul className="mt-3 space-y-2">
+              {competitions
+                .filter((c) => c.registration_deadline)
+                .map((c) => (
+                  <li key={c.id} className="rounded-md border border-neutral-100 bg-neutral-50 px-4 py-2.5 text-sm">
+                    <span className="font-semibold text-neutral-800">{c.name}</span>
+                    <span className="block text-neutral-600">
+                      Winners will be announced on{" "}
+                      <strong>{formatAnnounceDate(c.registration_deadline!)}</strong>, 00:00 Malaysia
+                      time.
+                    </span>
+                  </li>
+                ))}
+            </ul>
+          </div>
+        )}
 
         <div className="mt-8">
           <AccessComparisonTable />

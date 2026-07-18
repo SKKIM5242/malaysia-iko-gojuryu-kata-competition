@@ -127,7 +127,7 @@ function ScoreSession({ item, onExit }: { item: ScoringItem; onExit: () => void 
               className="rounded-lg border-2 border-neutral-300 p-4 text-left hover:border-red-700 hover:bg-red-50"
             >
               <p className="font-bold text-neutral-900">Score Sheet 1</p>
-              <p className="mt-1 text-xs text-neutral-500">Quick entry — one Total Score box (0–11).</p>
+              <p className="mt-1 text-xs text-neutral-500">Quick entry — one Total Score box (0–10).</p>
             </button>
             <button
               type="button"
@@ -174,14 +174,14 @@ function ScoreSession({ item, onExit }: { item: ScoringItem; onExit: () => void 
       ) : (
         <div className="rounded-md border border-neutral-200 p-4">
           <label htmlFor={`quick_${item.videoId}`} className="mb-1 block text-sm font-semibold text-neutral-700">
-            Total Score (0–11)
+            Total Score (0–10)
           </label>
           <input
             id={`quick_${item.videoId}`}
             name="score"
             type="number"
             min={0}
-            max={11}
+            max={10}
             step={0.1}
             required
             value={quickTotal}

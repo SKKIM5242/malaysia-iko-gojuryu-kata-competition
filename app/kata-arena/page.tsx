@@ -6,6 +6,7 @@ import { groupArenaByKata, loadKataArena, type ArenaEntry } from "@/lib/arena";
 import { CategoryName, NoTranslate, SetupNotice, SiteFooter, SiteHeader } from "@/components/ui";
 import ArenaFilterBar from "@/components/ArenaFilterBar";
 import { splitCategoryName } from "@/lib/division";
+import { winnersRevealed } from "@/lib/winners";
 import AuthForms from "@/components/AuthForms";
 import ClaimForm from "@/components/ClaimForm";
 import VideoWatchButton from "@/components/VideoWatchButton";
@@ -343,10 +344,27 @@ export default async function KataArenaPage({
   if (profile.role !== "participant") {
     const competitions = await getAllCompetitions();
     const showJudgeScores = PRIVILEGED_ROLES.includes(profile.role);
+    // Audience sees judge-by-judge scores only once a competition's Winners
+    // are finalized; before that they see submitted recordings with round
+    // status only. Every other privileged role sees scores live.
+    const isAudience = profile.role === "audience";
     const shownCompetitions = tier ? competitions.filter((c) => c.id === tier) : competitions;
-    const arenas = await Promise.all(
+    const loaded = await Promise.all(
       shownCompetitions.map(async (c) => ({ competition: c, arena: await loadKataArena(supabase, c.id) })),
     );
+    // School/Sensei logins are scoped to their own students — their own
+    // competition tier and kata events only, never the whole arena.
+    const arenas = loaded
+      .map(({ competition, arena }) => ({
+        competition,
+        arena:
+          profile.role === "school"
+            ? arena.filter((e) => e.schoolId != null && e.schoolId === profile.school_id)
+            : profile.role === "sensei"
+              ? arena.filter((e) => e.senseiId != null && e.senseiId === profile.sensei_id)
+              : arena,
+      }))
+      .filter(({ arena }) => !["school", "sensei"].includes(profile.role) || arena.length > 0);
     const tools = arenaFilterTools(
       arenas.flatMap((a) => a.arena),
       filterParams,
@@ -385,10 +403,16 @@ export default async function KataArenaPage({
             arenas.map(({ competition: c, arena }) => (
               <div key={c.id} className="mb-10">
                 <h2 className="mb-3 text-lg font-bold">{c.name}</h2>
+                {isAudience && !winnersRevealed(c.registration_deadline) && (
+                  <p className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                    Judge scores for this competition appear after Winners are finalized — until
+                    then you can watch every submitted recording with its round status.
+                  </p>
+                )}
                 <KataGroups
                   arena={tools.apply(arena)}
                   judgesRequired={c.judges_required}
-                  showJudgeScores={showJudgeScores}
+                  showJudgeScores={isAudience ? winnersRevealed(c.registration_deadline) : showJudgeScores}
                   emptyMessage="No recordings match — clear the filters above or check back later."
                 />
               </div>
