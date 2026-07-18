@@ -1,11 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
 import { schemaReady } from "@/lib/data";
+import { getAllCompetitions } from "@/lib/admin-data";
 import { updateCommunityStatus, createStaffAccount, bulkUploadOrganizers } from "@/app/actions/admin";
 import { AdminShell, Card, CertificateField, adminBtn, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
 import InvitationCodeForm from "@/components/InvitationCodeForm";
+import InvitationCodeList from "@/components/InvitationCodeList";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +46,7 @@ export default async function AdminOrganizers({
     .in("role_requested", ["admin", "organizer"])
     .order("created_at", { ascending: false });
   const applications = (apps as StaffApp[]) ?? [];
+  const competitions = await getAllCompetitions();
 
   return (
     <AdminShell title="Admin / Organizer" active="/admin/organizers" flash={{ ok: params.ok, error: params.error }}>
@@ -160,16 +163,16 @@ export default async function AdminOrganizers({
           rowKey="id"
           downloadName="organizer-applications"
           columns={[
-            { key: "reference_id", label: "Reference ID" },
             { key: "full_name", label: "Name" },
+            { key: "reference_id", label: "Reference ID" },
             { key: "contact", label: "Contact" },
             { key: "role_requested", label: "Role requested" },
             { key: "message", label: "Message" },
             { key: "status", label: "Status" },
           ]}
           csvColumns={[
-            { key: "reference_id", label: "Reference ID" },
             { key: "full_name", label: "Name" },
+            { key: "reference_id", label: "Reference ID" },
             { key: "email", label: "Email" },
             { key: "phone", label: "Phone" },
             { key: "role_requested", label: "Role requested" },
@@ -217,12 +220,20 @@ export default async function AdminOrganizers({
         Organizer account&quot; form above (Super Admin only) to actually grant access.
       </p>
       {isSuperAdmin && (
-        <div className="mt-8">
+        <div className="mt-8 space-y-6">
           <InvitationCodeForm
             role="organizer"
             returnTo="/admin/organizers"
             title="Admin / Organizer Invitation Code"
             idPrefix="org_code"
+            codeExample="IKO-ORG-2026"
+            competitions={competitions}
+          />
+          <InvitationCodeList
+            role="organizer"
+            returnTo="/admin/organizers"
+            codeExample="IKO-ORG-2026"
+            competitions={competitions}
           />
         </div>
       )}

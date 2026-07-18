@@ -3,6 +3,7 @@ import { getAdminCounts, getRecentAuditLogs } from "@/lib/admin-data";
 import { schemaReady } from "@/lib/data";
 import { AdminShell, Card } from "@/components/admin";
 import { SetupNotice } from "@/components/ui";
+import FilterableTable from "@/components/FilterableTable";
 
 export const dynamic = "force-dynamic";
 
@@ -50,32 +51,23 @@ export default async function AdminDashboard() {
       {logs.length === 0 ? (
         <p className="text-sm text-neutral-500">No audit log entries yet.</p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white shadow-sm">
-          <table className="w-full min-w-[560px] text-left text-sm">
-            <thead className="border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
-              <tr>
-                <th className="px-4 py-2.5">When</th>
-                <th className="px-4 py-2.5">Action</th>
-                <th className="px-4 py-2.5">Table</th>
-                <th className="px-4 py-2.5">Record</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-100">
-              {logs.map((l) => (
-                <tr key={l.id}>
-                  <td className="px-4 py-2.5 whitespace-nowrap text-neutral-500">
-                    {new Date(l.created_at).toLocaleString("en-MY")}
-                  </td>
-                  <td className="px-4 py-2.5 font-medium">{l.action}</td>
-                  <td className="px-4 py-2.5">{l.table_name}</td>
-                  <td className="px-4 py-2.5 font-mono text-xs text-neutral-400">
-                    {l.record_id?.slice(0, 8) ?? "—"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <FilterableTable
+          rowKey="id"
+          downloadName="recent-activity"
+          columns={[
+            { key: "action", label: "Action" },
+            { key: "when", label: "When" },
+            { key: "table", label: "Table" },
+            { key: "record", label: "Record" },
+          ]}
+          rows={logs.map((l) => ({
+            id: l.id,
+            action: l.action,
+            when: new Date(l.created_at).toLocaleString("en-MY"),
+            table: l.table_name,
+            record: l.record_id?.slice(0, 8) ?? "—",
+          }))}
+        />
       )}
     </AdminShell>
   );

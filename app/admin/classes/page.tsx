@@ -2,14 +2,15 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { schemaReady } from "@/lib/data";
 import {
-  saveStudent, deleteStudent, saveFeePlan, deleteFeePlan, enrollStudent,
+  saveStudent, deleteStudent, bulkUploadStudents, saveFeePlan, deleteFeePlan, enrollStudent,
   updateEnrollmentStatus, generateDueInvoices, createManualInvoice, updateInvoiceStatus,
   generateInvoicePaymentLink,
 } from "@/app/actions/classes";
 import { paymentsEnabled } from "@/lib/payments";
 import { AdminShell, Card, adminBtn, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice, formatDate } from "@/components/ui";
-import DownloadCsvButton from "@/components/DownloadCsvButton";
+import FilterableTable from "@/components/FilterableTable";
+import CsvUploadForm from "@/components/CsvUploadForm";
 import type { ClassEnrollment, ClassInvoice, FeePlan, Student } from "@/lib/types";
 import { WORLD_CURRENCIES } from "@/lib/reference-data";
 
@@ -72,6 +73,14 @@ export default async function AdminClasses({
   }
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { data: myProfile } = user
+    ? await supabase.from("profiles").select("role").eq("user_id", user.id).maybeSingle()
+    : { data: null };
+  const canBulkUpload = ["admin", "organizer"].includes(myProfile?.role ?? "");
+
   const [{ data: studentsData }, { data: plansData }] = await Promise.all([
     supabase.from("students").select("*").order("full_name"),
     supabase.from("fee_plans").select("*").order("created_at"),
@@ -130,6 +139,15 @@ export default async function AdminClasses({
         ))}
       </div>
 
+      {tab === "students" && canBulkUpload && (
+        <div className="mb-8">
+          <CsvUploadForm
+            action={bulkUploadStudents}
+            templateHref="/students-template.csv"
+            entityLabel="student"
+          />
+        </div>
+      )}
       {tab === "students" && (
         <div className="grid gap-8 lg:grid-cols-2">
           <div>
@@ -213,67 +231,60 @@ export default async function AdminClasses({
             </Card>
           </div>
           <div>
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-lg font-bold">All Students ({students.length})</h2>
-              {students.length > 0 && (
-                <DownloadCsvButton
-                  filename="students"
-                  rows={students.map((s) => ({
-                    Name: s.full_name,
-                    Category: s.category,
-                    Email: s.email ?? "",
-                    Phone: s.phone ?? "",
-                    Status: s.status,
-                  }))}
-                />
-              )}
-            </div>
+            <h2 className="mb-3 text-lg font-bold">All Students ({students.length})</h2>
             {students.length === 0 ? (
               <EmptyState>No students yet — add your first student on the left.</EmptyState>
             ) : (
-              <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white shadow-sm">
-                <table className="w-full min-w-[520px] text-left text-sm">
-                  <thead className="border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
-                    <tr>
-                      <th className="px-4 py-3">Name</th>
-                      <th className="px-4 py-3">Category</th>
-                      <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3">Contact</th>
-                      <th className="px-4 py-3">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-neutral-100">
-                    {students.map((s) => (
-                      <tr key={s.id} className="hover:bg-neutral-50">
-                        <td className="px-4 py-3 font-medium">{s.full_name}</td>
-                        <td className="px-4 py-3 capitalize">{s.category}</td>
-                        <td className="px-4 py-3">
-                          <span className={s.status === "active" ? "font-semibold text-green-700" : "text-neutral-400"}>
-                            {s.status}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-xs">
-                          {s.email ?? "—"}
-                          {s.phone && <span className="block text-neutral-500">{s.phone}</span>}
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex gap-1.5">
-                            <Link href={`/admin/classes?tab=students&edit=${s.id}`} className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50">
-                              Edit
-                            </Link>
-                            <form action={deleteStudent}>
-                              <input type="hidden" name="id" value={s.id} />
-                              <button className="rounded border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50">
-                                Delete
-                              </button>
-                            </form>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <FilterableTable
+                rowKey="id"
+                downloadName="students"
+                columns={[
+                  { key: "name", label: "Name" },
+                  { key: "category", label: "Category" },
+                  { key: "status", label: "Status" },
+                  { key: "contact", label: "Contact" },
+                  { key: "actions", label: "Actions" },
+                ]}
+                csvColumns={[
+                  { key: "name", label: "Name" },
+                  { key: "category", label: "Category" },
+                  { key: "status_text", label: "Status" },
+                  { key: "email", label: "Email" },
+                  { key: "phone", label: "Phone" },
+                ]}
+                rows={students.map((s) => ({
+                  id: s.id,
+                  name: s.full_name,
+                  category: s.category,
+                  status: (
+                    <span className={s.status === "active" ? "font-semibold text-green-700" : "text-neutral-400"}>
+                      {s.status}
+                    </span>
+                  ),
+                  status_text: s.status,
+                  contact: (
+                    <>
+                      {s.email ?? "—"}
+                      {s.phone && <span className="block text-neutral-500">{s.phone}</span>}
+                    </>
+                  ),
+                  email: s.email ?? "",
+                  phone: s.phone ?? "",
+                  actions: (
+                    <div className="flex gap-1.5">
+                      <Link href={`/admin/classes?tab=students&edit=${s.id}`} className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50">
+                        Edit
+                      </Link>
+                      <form action={deleteStudent}>
+                        <input type="hidden" name="id" value={s.id} />
+                        <button className="rounded border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50">
+                          Delete
+                        </button>
+                      </form>
+                    </div>
+                  ),
+                }))}
+              />
             )}
           </div>
         </div>
@@ -454,58 +465,60 @@ export default async function AdminClasses({
             {enrollments.length === 0 ? (
               <EmptyState>No enrollments yet.</EmptyState>
             ) : (
-              <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white shadow-sm">
-                <table className="w-full min-w-[560px] text-left text-sm">
-                  <thead className="border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
-                    <tr>
-                      <th className="px-4 py-3">Student</th>
-                      <th className="px-4 py-3">Plan</th>
-                      <th className="px-4 py-3">Next billing</th>
-                      <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-neutral-100">
-                    {enrollments.map((e) => (
-                      <tr key={e.id} className="hover:bg-neutral-50">
-                        <td className="px-4 py-3 font-medium">{e.student?.full_name ?? "—"}</td>
-                        <td className="px-4 py-3 text-xs">{e.fee_plan?.name ?? "—"}</td>
-                        <td className="px-4 py-3 whitespace-nowrap">{formatDate(e.next_billing_date)}</td>
-                        <td className="px-4 py-3">
-                          <span className={e.status === "active" ? "font-semibold text-green-700" : e.status === "paused" ? "text-amber-600" : "text-neutral-400"}>
-                            {e.status}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex flex-wrap gap-1.5">
-                            {e.status !== "active" && (
-                              <form action={updateEnrollmentStatus}>
-                                <input type="hidden" name="id" value={e.id} />
-                                <input type="hidden" name="status" value="active" />
-                                <button className="rounded bg-green-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-green-500">Activate</button>
-                              </form>
-                            )}
-                            {e.status === "active" && (
-                              <form action={updateEnrollmentStatus}>
-                                <input type="hidden" name="id" value={e.id} />
-                                <input type="hidden" name="status" value="paused" />
-                                <button className="rounded bg-amber-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-amber-500">Pause</button>
-                              </form>
-                            )}
-                            {e.status !== "cancelled" && (
-                              <form action={updateEnrollmentStatus}>
-                                <input type="hidden" name="id" value={e.id} />
-                                <input type="hidden" name="status" value="cancelled" />
-                                <button className="rounded border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50">Cancel</button>
-                              </form>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <FilterableTable
+                rowKey="id"
+                downloadName="enrollments"
+                columns={[
+                  { key: "student", label: "Student" },
+                  { key: "plan", label: "Plan" },
+                  { key: "next_billing", label: "Next billing" },
+                  { key: "status", label: "Status" },
+                  { key: "actions", label: "Actions" },
+                ]}
+                csvColumns={[
+                  { key: "student", label: "Student" },
+                  { key: "plan", label: "Plan" },
+                  { key: "next_billing", label: "Next Billing" },
+                  { key: "status_text", label: "Status" },
+                ]}
+                rows={enrollments.map((e) => ({
+                  id: e.id,
+                  student: e.student?.full_name ?? "—",
+                  plan: e.fee_plan?.name ?? "—",
+                  next_billing: formatDate(e.next_billing_date),
+                  status: (
+                    <span className={e.status === "active" ? "font-semibold text-green-700" : e.status === "paused" ? "text-amber-600" : "text-neutral-400"}>
+                      {e.status}
+                    </span>
+                  ),
+                  status_text: e.status,
+                  actions: (
+                    <div className="flex flex-wrap gap-1.5">
+                      {e.status !== "active" && (
+                        <form action={updateEnrollmentStatus}>
+                          <input type="hidden" name="id" value={e.id} />
+                          <input type="hidden" name="status" value="active" />
+                          <button className="rounded bg-green-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-green-500">Activate</button>
+                        </form>
+                      )}
+                      {e.status === "active" && (
+                        <form action={updateEnrollmentStatus}>
+                          <input type="hidden" name="id" value={e.id} />
+                          <input type="hidden" name="status" value="paused" />
+                          <button className="rounded bg-amber-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-amber-500">Pause</button>
+                        </form>
+                      )}
+                      {e.status !== "cancelled" && (
+                        <form action={updateEnrollmentStatus}>
+                          <input type="hidden" name="id" value={e.id} />
+                          <input type="hidden" name="status" value="cancelled" />
+                          <button className="rounded border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50">Cancel</button>
+                        </form>
+                      )}
+                    </div>
+                  ),
+                }))}
+              />
             )}
           </div>
         </div>
@@ -603,94 +616,97 @@ export default async function AdminClasses({
                   then click “Generate due invoices”.
                 </EmptyState>
               ) : (
-                <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white shadow-sm">
-                  <table className="w-full min-w-[720px] text-left text-sm">
-                    <thead className="border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
-                      <tr>
-                        <th className="px-4 py-3">Student</th>
-                        <th className="px-4 py-3">Description</th>
-                        <th className="px-4 py-3">Amount</th>
-                        <th className="px-4 py-3">Due</th>
-                        <th className="px-4 py-3">Status</th>
-                        <th className="px-4 py-3">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-neutral-100">
-                      {invoices.map((inv) => (
-                        <tr key={inv.id} className="hover:bg-neutral-50">
-                          <td className="px-4 py-3 font-medium">{inv.student?.full_name ?? "—"}</td>
-                          <td className="max-w-[260px] truncate px-4 py-3 text-xs" title={inv.description}>{inv.description}</td>
-                          <td className="px-4 py-3 whitespace-nowrap">{inv.currency || "MYR"} {Number(inv.amount_myr).toFixed(2)}</td>
-                          <td className="px-4 py-3 whitespace-nowrap text-xs">{inv.due_date ? formatDate(inv.due_date) : "—"}</td>
-                          <td className="px-4 py-3">
-                            <span
-                              className={`inline-block rounded-full border px-2.5 py-0.5 text-xs font-semibold capitalize ${
-                                inv.status === "paid"
-                                  ? "border-green-300 bg-green-100 text-green-800"
-                                  : inv.status === "void"
-                                    ? "border-neutral-300 bg-neutral-100 text-neutral-500"
-                                    : "border-amber-300 bg-amber-100 text-amber-800"
-                              }`}
+                <FilterableTable
+                  rowKey="id"
+                  downloadName="invoices"
+                  columns={[
+                    { key: "student", label: "Student" },
+                    { key: "description", label: "Description" },
+                    { key: "amount", label: "Amount" },
+                    { key: "due", label: "Due" },
+                    { key: "status", label: "Status" },
+                    { key: "actions", label: "Actions" },
+                  ]}
+                  csvColumns={[
+                    { key: "student", label: "Student" },
+                    { key: "description", label: "Description" },
+                    { key: "amount", label: "Amount" },
+                    { key: "due", label: "Due" },
+                    { key: "status_text", label: "Status" },
+                  ]}
+                  rows={invoices.map((inv) => ({
+                    id: inv.id,
+                    student: inv.student?.full_name ?? "—",
+                    description: inv.description,
+                    amount: `${inv.currency || "MYR"} ${Number(inv.amount_myr).toFixed(2)}`,
+                    due: inv.due_date ? formatDate(inv.due_date) : "—",
+                    status: (
+                      <span
+                        className={`inline-block rounded-full border px-2.5 py-0.5 text-xs font-semibold capitalize ${
+                          inv.status === "paid"
+                            ? "border-green-300 bg-green-100 text-green-800"
+                            : inv.status === "void"
+                              ? "border-neutral-300 bg-neutral-100 text-neutral-500"
+                              : "border-amber-300 bg-amber-100 text-amber-800"
+                        }`}
+                      >
+                        {inv.status}
+                      </span>
+                    ),
+                    status_text: inv.status,
+                    actions: (
+                      <div className="flex flex-wrap gap-1.5">
+                        {inv.status === "unpaid" && paymentsEnabled() && (
+                          inv.checkout_url ? (
+                            <a
+                              href={inv.checkout_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="rounded bg-neutral-900 px-2.5 py-1 text-xs font-semibold text-white hover:bg-neutral-700"
+                              title="Open the Stripe payment page — copy this link and send it to the payer"
                             >
-                              {inv.status}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex flex-wrap gap-1.5">
-                              {inv.status === "unpaid" && paymentsEnabled() && (
-                                inv.checkout_url ? (
-                                  <a
-                                    href={inv.checkout_url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="rounded bg-neutral-900 px-2.5 py-1 text-xs font-semibold text-white hover:bg-neutral-700"
-                                    title="Open the Stripe payment page — copy this link and send it to the payer"
-                                  >
-                                    Payment link ↗
-                                  </a>
-                                ) : (
-                                  <form action={generateInvoicePaymentLink}>
-                                    <input type="hidden" name="id" value={inv.id} />
-                                    <button className="rounded bg-neutral-900 px-2.5 py-1 text-xs font-semibold text-white hover:bg-neutral-700">
-                                      Get payment link
-                                    </button>
-                                  </form>
-                                )
-                              )}
-                              {inv.status !== "paid" && (
-                                <form action={updateInvoiceStatus}>
-                                  <input type="hidden" name="id" value={inv.id} />
-                                  <input type="hidden" name="status" value="paid" />
-                                  <button className="rounded bg-green-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-green-500">
-                                    Mark Paid
-                                  </button>
-                                </form>
-                              )}
-                              {inv.status === "paid" && (
-                                <form action={updateInvoiceStatus}>
-                                  <input type="hidden" name="id" value={inv.id} />
-                                  <input type="hidden" name="status" value="unpaid" />
-                                  <button className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50">
-                                    Set Unpaid
-                                  </button>
-                                </form>
-                              )}
-                              {inv.status !== "void" && (
-                                <form action={updateInvoiceStatus}>
-                                  <input type="hidden" name="id" value={inv.id} />
-                                  <input type="hidden" name="status" value="void" />
-                                  <button className="rounded border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50">
-                                    Void
-                                  </button>
-                                </form>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                              Payment link ↗
+                            </a>
+                          ) : (
+                            <form action={generateInvoicePaymentLink}>
+                              <input type="hidden" name="id" value={inv.id} />
+                              <button className="rounded bg-neutral-900 px-2.5 py-1 text-xs font-semibold text-white hover:bg-neutral-700">
+                                Get payment link
+                              </button>
+                            </form>
+                          )
+                        )}
+                        {inv.status !== "paid" && (
+                          <form action={updateInvoiceStatus}>
+                            <input type="hidden" name="id" value={inv.id} />
+                            <input type="hidden" name="status" value="paid" />
+                            <button className="rounded bg-green-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-green-500">
+                              Mark Paid
+                            </button>
+                          </form>
+                        )}
+                        {inv.status === "paid" && (
+                          <form action={updateInvoiceStatus}>
+                            <input type="hidden" name="id" value={inv.id} />
+                            <input type="hidden" name="status" value="unpaid" />
+                            <button className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50">
+                              Set Unpaid
+                            </button>
+                          </form>
+                        )}
+                        {inv.status !== "void" && (
+                          <form action={updateInvoiceStatus}>
+                            <input type="hidden" name="id" value={inv.id} />
+                            <input type="hidden" name="status" value="void" />
+                            <button className="rounded border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50">
+                              Void
+                            </button>
+                          </form>
+                        )}
+                      </div>
+                    ),
+                  }))}
+                />
               )}
               <p className="mt-3 text-xs text-neutral-400">
                 “Generate due invoices” bills every active enrollment whose billing date has arrived and

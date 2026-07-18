@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getAllParticipants } from "@/lib/admin-data";
+import { getAllParticipants, getAllCompetitions } from "@/lib/admin-data";
 import { getSchools, getSenseis, schemaReady } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
 import { saveParticipant, deleteParticipant, bulkUploadParticipants } from "@/app/actions/admin";
@@ -8,6 +8,7 @@ import { EmptyState, SetupNotice, formatDOB } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
 import InvitationCodeForm from "@/components/InvitationCodeForm";
+import InvitationCodeList from "@/components/InvitationCodeList";
 
 export const dynamic = "force-dynamic";
 
@@ -26,10 +27,11 @@ export default async function AdminParticipants({
     );
   }
 
-  const [participants, schools, senseis] = await Promise.all([
+  const [participants, schools, senseis, competitions] = await Promise.all([
     getAllParticipants(),
     getSchools(),
     getSenseis(),
+    getAllCompetitions(),
   ]);
   const editing = params.edit ? participants.find((p) => p.id === params.edit) : undefined;
 
@@ -277,12 +279,20 @@ export default async function AdminParticipants({
           )}
         </div>
       </div>
-      <div className="mt-8">
+      <div className="mt-8 space-y-6">
         <InvitationCodeForm
           role="participant"
           returnTo="/admin/participants"
           title="Participant Invitation Code"
           idPrefix="participant_code"
+          codeExample="IKO-PARTICIPANT-2026"
+          competitions={competitions}
+        />
+        <InvitationCodeList
+          role="participant"
+          returnTo="/admin/participants"
+          codeExample="IKO-PARTICIPANT-2026"
+          competitions={competitions}
         />
       </div>
     </AdminShell>

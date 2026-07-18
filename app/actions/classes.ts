@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { writeAudit } from "@/lib/audit";
 import { getStripe, paymentsEnabled } from "@/lib/payments";
+import { parseCsvWithHeader, type CsvUploadResult } from "@/lib/csv-bulk";
 import type { ClassEnrollment, ClassInvoice, FeePlan } from "@/lib/types";
 
 /** Dojo class billing actions — admin only (RLS: authenticated). */
@@ -69,6 +70,68 @@ export async function deleteStudent(formData: FormData) {
     table_name: "students", record_id: id, action: "student_deleted", actor_id: actorId,
   });
   backTo("students", { ok: "Student deleted (their enrollments and invoices were removed)." });
+}
+
+const STUDENT_CSV_COLUMNS = [
+  "full_name", "ic_passport", "date_of_birth", "gender", "category",
+  "email", "phone", "home_address", "city_town", "home_country", "join_date", "notes",
+] as const;
+
+export async function bulkUploadStudents(_prev: CsvUploadResult, formData: FormData): Promise<CsvUploadResult> {
+  const file = formData.get("csv_file");
+  if (!(file instanceof File) || file.size === 0) return { done: false, error: "Choose a CSV file to upload." };
+  if (file.size > 5 * 1024 * 1024) return { done: false, error: "CSV file too large (max 5 MB)." };
+
+  const parsed = parseCsvWithHeader(await file.text(), STUDENT_CSV_COLUMNS);
+  if ("error" in parsed) return { done: false, error: parsed.error };
+  const { dataRows, get } = parsed;
+  if (dataRows.length === 0) return { done: false, error: "The CSV has no data rows." };
+  if (dataRows.length > 2000) return { done: false, error: "Maximum 2000 rows per upload." };
+
+  const { supabase, actorId } = await getActor();
+  const { data: myProfile } = actorId
+    ? await supabase.from("profiles").select("role").eq("user_id", actorId).maybeSingle()
+    : { data: null };
+  if (!["admin", "organizer"].includes(myProfile?.role ?? "")) {
+    return { done: false, error: "Only Admin or Organizer accounts can bulk-upload records." };
+  }
+
+  const failures: Array<{ row: number; name: string; error: string }> = [];
+  let succeeded = 0;
+
+  for (let i = 0; i < dataRows.length; i++) {
+    const r = dataRows[i];
+    const rowNo = i + 2;
+    const full_name = get(r, "full_name") || `Row ${rowNo}`;
+    if (!get(r, "full_name")) { failures.push({ row: rowNo, name: full_name, error: "Full name is required" }); continue; }
+    const record = {
+      full_name: get(r, "full_name"),
+      ic_passport: get(r, "ic_passport") || null,
+      date_of_birth: get(r, "date_of_birth") || null,
+      gender: get(r, "gender") || null,
+      category: get(r, "category").toLowerCase() === "adult" ? "adult" : "student",
+      email: get(r, "email") || null,
+      phone: get(r, "phone") || null,
+      home_address: get(r, "home_address") || null,
+      city_town: get(r, "city_town") || null,
+      home_country: get(r, "home_country") || null,
+      join_date: get(r, "join_date") || null,
+      status: "active",
+      notes: get(r, "notes") || null,
+    };
+    const { data, error } = await supabase.from("students").insert(record).select("id").single();
+    if (error) { failures.push({ row: rowNo, name: full_name, error: "Could not save" }); continue; }
+    await writeAudit(supabase, {
+      table_name: "students", record_id: data!.id, action: "student_created", new_value: record, actor_id: actorId,
+    });
+    succeeded++;
+  }
+
+  await writeAudit(supabase, {
+    table_name: "students", record_id: null, action: "bulk_csv_students",
+    new_value: { rows: dataRows.length, succeeded, failed: failures.length }, actor_id: actorId,
+  });
+  return { done: true, succeeded, failed: failures.length, failures: failures.slice(0, 50) };
 }
 
 // ── Fee plans ────────────────────────────────────────────────────────────────

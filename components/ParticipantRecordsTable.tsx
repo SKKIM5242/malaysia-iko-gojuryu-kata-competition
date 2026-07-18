@@ -36,10 +36,10 @@ export interface ParticipantRecordRow {
 }
 
 const COLUMNS: Array<{ key: keyof ParticipantRecordRow; label: string }> = [
+  { key: "fullName", label: "Full Name" },
   { key: "registrationId", label: "Reference ID" },
   { key: "competition", label: "Tier" },
   { key: "category", label: "Category" },
-  { key: "fullName", label: "Full Name" },
   { key: "icPassport", label: "IC / Passport" },
   { key: "dateOfBirth", label: "DOB" },
   { key: "gender", label: "Gender" },
@@ -117,10 +117,15 @@ export default function ParticipantRecordsTable({
       </div>
       <DualScrollBox>
         <table className="w-full min-w-[2200px] text-left text-sm">
-          <thead className="border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
+          <thead className="sticky top-0 z-20 border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
             <tr>
-              {COLUMNS.map((c) => (
-                <th key={c.key} className="px-3 py-2.5 whitespace-nowrap">
+              {COLUMNS.map((c, i) => (
+                <th
+                  key={c.key}
+                  className={`px-3 py-2.5 whitespace-nowrap ${
+                    i === 0 ? "sticky left-0 z-10 border-r border-neutral-200 bg-neutral-50" : ""
+                  }`}
+                >
                   {c.label}
                 </th>
               ))}
@@ -128,8 +133,11 @@ export default function ParticipantRecordsTable({
               <th className="px-3 py-2.5 whitespace-nowrap">Recording</th>
             </tr>
             <tr className="border-t border-neutral-200 bg-white normal-case">
-              {COLUMNS.map((c) => (
-                <th key={c.key} className="px-2 py-1.5">
+              {COLUMNS.map((c, i) => (
+                <th
+                  key={c.key}
+                  className={`px-2 py-1.5 ${i === 0 ? "sticky left-0 z-10 border-r border-neutral-200 bg-white" : ""}`}
+                >
                   <ColumnFilterDropdown
                     values={uniqueValues[c.key] ?? []}
                     selected={filters[c.key] ?? new Set()}
@@ -150,7 +158,10 @@ export default function ParticipantRecordsTable({
               </tr>
             ) : (
               filtered.map((row) => (
-                <tr key={row.registrationId} className="hover:bg-neutral-50">
+                <tr key={row.registrationId} className="group hover:bg-neutral-50">
+                  <td className="sticky left-0 z-10 whitespace-nowrap border-r border-neutral-200 bg-white px-3 py-2 font-medium group-hover:bg-neutral-50">
+                    {row.fullName}
+                  </td>
                   <td className="px-3 py-2 font-mono text-xs" title={row.registrationId}>
                     {row.registrationId.slice(0, 8).toUpperCase()}
                   </td>
@@ -160,7 +171,6 @@ export default function ParticipantRecordsTable({
                   <td className="max-w-[240px] truncate px-3 py-2" title={row.category}>
                     <CategoryName name={row.category} />
                   </td>
-                  <td className="whitespace-nowrap px-3 py-2 font-medium">{row.fullName}</td>
                   <td className="whitespace-nowrap px-3 py-2 font-mono text-xs">{row.icPassport}</td>
                   <td className="whitespace-nowrap px-3 py-2">{row.dateOfBirth}</td>
                   <td className="whitespace-nowrap px-3 py-2 capitalize">{row.gender}</td>

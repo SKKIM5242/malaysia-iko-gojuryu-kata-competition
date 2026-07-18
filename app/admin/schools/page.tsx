@@ -9,6 +9,7 @@ import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
 import SignInControlBox from "@/components/SignInControlBox";
 import InvitationCodeForm from "@/components/InvitationCodeForm";
+import InvitationCodeList from "@/components/InvitationCodeList";
 
 export const dynamic = "force-dynamic";
 
@@ -220,8 +221,8 @@ export default async function AdminSchools({
               rowKey="id"
               downloadName="schools"
               columns={[
-                { key: "reference_id", label: "Reference ID" },
                 { key: "name", label: "Name" },
+                { key: "reference_id", label: "Reference ID" },
                 { key: "state", label: "State" },
                 { key: "person_in_charge", label: "Person in-charge" },
                 { key: "location", label: "Location" },
@@ -233,8 +234,8 @@ export default async function AdminSchools({
                 { key: "actions", label: "Actions" },
               ]}
               csvColumns={[
-                { key: "reference_id", label: "Reference ID" },
                 { key: "name", label: "Name" },
+                { key: "reference_id", label: "Reference ID" },
                 { key: "state", label: "State" },
                 { key: "contact_title", label: "Contact Title" },
                 { key: "contact_name", label: "Contact Name" },
@@ -315,12 +316,20 @@ export default async function AdminSchools({
           )}
         </div>
       </div>
-      <div className="mt-8">
+      <div className="mt-8 space-y-6">
         <InvitationCodeForm
           role="school"
           returnTo="/admin/schools"
           title="School / Dojo Invitation Code"
           idPrefix="school_code"
+          codeExample="IKO-SCHOOL-2026"
+          competitions={competitions}
+        />
+        <InvitationCodeList
+          role="school"
+          returnTo="/admin/schools"
+          codeExample="IKO-SCHOOL-2026"
+          competitions={competitions}
         />
       </div>
     </AdminShell>

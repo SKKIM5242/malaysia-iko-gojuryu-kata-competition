@@ -10,6 +10,7 @@ import { AdminShell, Card, adminBtn, adminInput } from "@/components/admin";
 import { CategoryName, EmptyState, SetupNotice } from "@/components/ui";
 import VideoWatchButton from "@/components/VideoWatchButton";
 import DownloadCsvButton from "@/components/DownloadCsvButton";
+import FilterableTable from "@/components/FilterableTable";
 import ScoreDetailButton from "@/components/ScoreDetailButton";
 import { finalScore, isDisqualified } from "@/lib/scoring";
 
@@ -283,36 +284,36 @@ export default async function AdminJudging({
       {refereeList.length === 0 ? (
         <EmptyState>No approved referees yet — approve some in Accounts → Approvals first.</EmptyState>
       ) : (
-        <div className="mb-8 overflow-x-auto rounded-lg border border-neutral-200 bg-white shadow-sm">
-          <table className="w-full min-w-[480px] text-left text-sm">
-            <thead className="border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
-              <tr>
-                <th className="px-4 py-3">Referee</th>
-                <th className="px-4 py-3">Country</th>
-                <th className="px-4 py-3">Assigned</th>
-                <th className="px-4 py-3">Scored</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-100">
-              {refereeList.map((r) => {
-                const assignedCount = (assignments ?? []).filter((a) => a.referee_user_id === r.user_id).length;
-                const scoredCount = (scores ?? []).filter((s) => s.referee_user_id === r.user_id).length;
-                return (
-                  <tr key={r.user_id} className="hover:bg-neutral-50">
-                    <td className="px-4 py-3 font-medium">{r.full_name || r.email || r.user_id.slice(0, 8)}</td>
-                    <td className="px-4 py-3">{r.country ?? "—"}</td>
-                    <td className="px-4 py-3">{assignedCount}</td>
-                    <td className="px-4 py-3">
-                      {scoredCount}
-                      {assignedCount > scoredCount && (
-                        <span className="ml-1.5 text-xs text-amber-600">({assignedCount - scoredCount} pending)</span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div className="mb-8">
+          <FilterableTable
+            rowKey="user_id"
+            downloadName="referee-workload"
+            columns={[
+              { key: "referee", label: "Referee" },
+              { key: "country", label: "Country" },
+              { key: "assigned", label: "Assigned" },
+              { key: "scored", label: "Scored" },
+            ]}
+            rows={refereeList.map((r) => {
+              const assignedCount = (assignments ?? []).filter((a) => a.referee_user_id === r.user_id).length;
+              const scoredCount = (scores ?? []).filter((s) => s.referee_user_id === r.user_id).length;
+              return {
+                user_id: r.user_id,
+                referee: r.full_name || r.email || r.user_id.slice(0, 8),
+                country: r.country ?? "",
+                assigned: String(assignedCount),
+                scored:
+                  assignedCount > scoredCount ? (
+                    <>
+                      {scoredCount}{" "}
+                      <span className="ml-1.5 text-xs text-amber-600">({assignedCount - scoredCount} pending)</span>
+                    </>
+                  ) : (
+                    String(scoredCount)
+                  ),
+              };
+            })}
+          />
         </div>
       )}
 

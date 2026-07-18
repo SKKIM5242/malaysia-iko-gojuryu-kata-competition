@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { getAllRegistrations } from "@/lib/admin-data";
+import { getAllRegistrations, getAllCompetitions } from "@/lib/admin-data";
 import { schemaReady } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
-import { updatePaymentStatus, deleteRegistration, createInvitationCode } from "@/app/actions/admin";
-import { AdminShell, Card, adminBtn, adminBtnSecondary, adminInput, adminLabel } from "@/components/admin";
+import { updatePaymentStatus, deleteRegistration } from "@/app/actions/admin";
+import { AdminShell, adminBtnSecondary } from "@/components/admin";
 import { CategoryName, EmptyState, SetupNotice, StatusBadge } from "@/components/ui";
-import DownloadCsvButton from "@/components/DownloadCsvButton";
+import FilterableTable from "@/components/FilterableTable";
+import InvitationCodeForm from "@/components/InvitationCodeForm";
 import type { PaymentStatus } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -31,7 +32,7 @@ export default async function AdminRegistrations({
     params.status && ["pending", "paid", "rejected"].includes(params.status)
       ? (params.status as PaymentStatus)
       : undefined;
-  const rows = await getAllRegistrations(filter);
+  const [rows, competitions] = await Promise.all([getAllRegistrations(filter), getAllCompetitions()]);
   const returnTo = `/admin/registrations${filter ? `?status=${filter}` : ""}`;
 
   const supabase = await createClient();
@@ -54,25 +55,14 @@ export default async function AdminRegistrations({
     >
       {isCustomerSupport && (
         <div className="mb-6">
-          <h2 className="mb-3 text-lg font-bold">Generate Invitation Code</h2>
-          <Card>
-            <form action={createInvitationCode} className="flex flex-wrap items-end gap-3">
-              <div>
-                <label htmlFor="cs_code_role" className={adminLabel}>For</label>
-                <select id="cs_code_role" name="role" defaultValue="audience" className={adminInput}>
-                  <option value="audience">Audience / Spectator</option>
-                  <option value="referee">Referee / Judge</option>
-                  <option value="school">School / Dojo &amp; Sensei</option>
-                </select>
-              </div>
-              <div>
-                <label htmlFor="cs_max_uses" className={adminLabel}>Max uses (blank = unlimited)</label>
-                <input id="cs_max_uses" name="max_uses" type="number" min="1" className={`${adminInput} w-40`} />
-              </div>
-              <input type="hidden" name="return_to" value={returnTo} />
-              <button type="submit" className={adminBtn}>Generate code</button>
-            </form>
-          </Card>
+          <InvitationCodeForm
+            title="Generate Invitation Code"
+            roleOptions={["audience", "referee", "school"]}
+            returnTo={returnTo}
+            idPrefix="cs_code"
+            codeExample="IKO-AUD-2026"
+            competitions={competitions}
+          />
         </div>
       )}
       <div className="mb-4 flex flex-wrap gap-2 text-sm">
@@ -98,105 +88,89 @@ export default async function AdminRegistrations({
       {rows.length === 0 ? (
         <EmptyState>No registrations{filter ? ` with status "${filter}"` : ""} yet.</EmptyState>
       ) : (
-        <>
-        <div className="mb-2 flex justify-end">
-          <DownloadCsvButton
-            filename="registrations"
-            rows={rows.map((r) => ({
-              "Reference ID": r.id.slice(0, 8).toUpperCase(),
-              Participant: r.participant?.full_name ?? "",
-              "IC / Passport": r.participant?.ic_passport ?? "",
-              Category: r.category?.name ?? "",
-              Division: r.division ?? "",
-              School: r.participant?.school?.name ?? "",
-              "Payment Reference": r.payment_reference ?? "",
-              Status: r.payment_status,
-            }))}
-          />
-        </div>
-        <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white shadow-sm">
-          <table className="w-full min-w-[900px] text-left text-sm">
-            <thead className="border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
-              <tr>
-                <th className="px-4 py-3">Ref</th>
-                <th className="px-4 py-3">Participant</th>
-                <th className="px-4 py-3">IC / Passport</th>
-                <th className="px-4 py-3">Category</th>
-                <th className="px-4 py-3">Division</th>
-                <th className="px-4 py-3">School</th>
-                <th className="px-4 py-3">Payment ref</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-100">
-              {rows.map((r) => (
-                <tr key={r.id} className="align-middle hover:bg-neutral-50">
-                  <td className="px-4 py-3 font-mono text-xs">{r.id.slice(0, 8).toUpperCase()}</td>
-                  <td className="px-4 py-3 font-medium">{r.participant?.full_name ?? "—"}</td>
-                  <td className="px-4 py-3 font-mono text-xs">{r.participant?.ic_passport ?? "—"}</td>
-                  <td className="max-w-[200px] truncate px-4 py-3" title={r.category?.name ?? undefined}>
-                    <CategoryName name={r.category?.name} />
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-xs">{r.division ?? "—"}</td>
-                  <td className="max-w-[180px] truncate px-4 py-3" title={r.participant?.school?.name ?? undefined}>
-                    {r.participant?.school?.name ?? "—"}
-                  </td>
-                  <td className="px-4 py-3 font-mono text-xs">{r.payment_reference ?? "—"}</td>
-                  <td className="px-4 py-3"><StatusBadge status={r.payment_status} /></td>
-                  <td className="px-4 py-3">
-                    {canChangePayment ? (
-                      <div className="flex flex-wrap gap-1.5">
-                        {r.payment_status !== "paid" && (
-                          <form action={updatePaymentStatus}>
-                            <input type="hidden" name="id" value={r.id} />
-                            <input type="hidden" name="status" value="paid" />
-                            <input type="hidden" name="return_to" value={returnTo} />
-                            <button className="rounded bg-green-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-green-500">
-                              Mark Paid
-                            </button>
-                          </form>
-                        )}
-                        {r.payment_status !== "rejected" && (
-                          <form action={updatePaymentStatus}>
-                            <input type="hidden" name="id" value={r.id} />
-                            <input type="hidden" name="status" value="rejected" />
-                            <input type="hidden" name="return_to" value={returnTo} />
-                            <button className="rounded bg-red-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-500">
-                              Reject
-                            </button>
-                          </form>
-                        )}
-                        {r.payment_status !== "pending" && (
-                          <form action={updatePaymentStatus}>
-                            <input type="hidden" name="id" value={r.id} />
-                            <input type="hidden" name="status" value="pending" />
-                            <input type="hidden" name="return_to" value={returnTo} />
-                            <button className="rounded border border-neutral-300 bg-white px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50">
-                              Set Pending
-                            </button>
-                          </form>
-                        )}
-                        {canDelete && (
-                          <form action={deleteRegistration}>
-                            <input type="hidden" name="id" value={r.id} />
-                            <input type="hidden" name="return_to" value={returnTo} />
-                            <button className="rounded border border-red-200 bg-white px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50">
-                              Delete
-                            </button>
-                          </form>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-xs text-neutral-400">View only</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        </>
+        <FilterableTable
+          rowKey="id"
+          downloadName="registrations"
+          columns={[
+            { key: "participant", label: "Participant" },
+            { key: "ref", label: "Ref" },
+            { key: "ic_passport", label: "IC / Passport" },
+            { key: "category", label: "Category" },
+            { key: "division", label: "Division" },
+            { key: "school", label: "School" },
+            { key: "payment_ref", label: "Payment ref" },
+            { key: "status", label: "Status" },
+            { key: "actions", label: "Actions" },
+          ]}
+          csvColumns={[
+            { key: "participant", label: "Participant" },
+            { key: "ref", label: "Reference ID" },
+            { key: "ic_passport", label: "IC / Passport" },
+            { key: "category_text", label: "Category" },
+            { key: "division", label: "Division" },
+            { key: "school", label: "School" },
+            { key: "payment_ref", label: "Payment Reference" },
+            { key: "status_text", label: "Status" },
+          ]}
+          rows={rows.map((r) => ({
+            id: r.id,
+            participant: r.participant?.full_name ?? "",
+            ref: r.id.slice(0, 8).toUpperCase(),
+            ic_passport: r.participant?.ic_passport ?? "",
+            category: <CategoryName name={r.category?.name} />,
+            category_text: r.category?.name ?? "",
+            division: r.division ?? "",
+            school: r.participant?.school?.name ?? "",
+            payment_ref: r.payment_reference ?? "",
+            status: <StatusBadge status={r.payment_status} />,
+            status_text: r.payment_status,
+            actions: canChangePayment ? (
+              <div className="flex flex-wrap gap-1.5">
+                {r.payment_status !== "paid" && (
+                  <form action={updatePaymentStatus}>
+                    <input type="hidden" name="id" value={r.id} />
+                    <input type="hidden" name="status" value="paid" />
+                    <input type="hidden" name="return_to" value={returnTo} />
+                    <button className="rounded bg-green-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-green-500">
+                      Mark Paid
+                    </button>
+                  </form>
+                )}
+                {r.payment_status !== "rejected" && (
+                  <form action={updatePaymentStatus}>
+                    <input type="hidden" name="id" value={r.id} />
+                    <input type="hidden" name="status" value="rejected" />
+                    <input type="hidden" name="return_to" value={returnTo} />
+                    <button className="rounded bg-red-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-500">
+                      Reject
+                    </button>
+                  </form>
+                )}
+                {r.payment_status !== "pending" && (
+                  <form action={updatePaymentStatus}>
+                    <input type="hidden" name="id" value={r.id} />
+                    <input type="hidden" name="status" value="pending" />
+                    <input type="hidden" name="return_to" value={returnTo} />
+                    <button className="rounded border border-neutral-300 bg-white px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50">
+                      Set Pending
+                    </button>
+                  </form>
+                )}
+                {canDelete && (
+                  <form action={deleteRegistration}>
+                    <input type="hidden" name="id" value={r.id} />
+                    <input type="hidden" name="return_to" value={returnTo} />
+                    <button className="rounded border border-red-200 bg-white px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50">
+                      Delete
+                    </button>
+                  </form>
+                )}
+              </div>
+            ) : (
+              <span className="text-xs text-neutral-400">View only</span>
+            ),
+          }))}
+        />
       )}
       <p className="mt-4 text-xs text-neutral-400">
         Mark Paid only after sighting the bank transfer confirmation. Every change is written to the audit log.

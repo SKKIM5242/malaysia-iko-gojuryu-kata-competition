@@ -967,21 +967,44 @@ export async function setProfileApproval(formData: FormData) {
   backTo(returnTo, { ok: approve ? "Account approved." : "Approval revoked." });
 }
 
-export async function createInvitationCode(formData: FormData) {
+const INVITATION_CODE_ROLES = ["referee", "staff", "audience", "school", "sensei", "participant", "organizer", "customer_support", "admin", "any"];
+
+/** Every field is required except Note, per the organiser's explicit
+ * instruction — including Code (no more auto-generation), Email, and Max
+ * uses (no more "unlimited shared code" — every code is now a deliberate,
+ * fully-specified grant). Returns the parsed values, or redirects back with
+ * an error via backTo if anything required is missing/invalid. */
+function requireInvitationCodeFields(formData: FormData, returnTo: string) {
   const role = String(formData.get("role") ?? "");
-  const providedCode = String(formData.get("code") ?? "").trim().toUpperCase();
+  const code = String(formData.get("code") ?? "").trim().toUpperCase();
   const note = String(formData.get("note") ?? "").trim() || null;
   const maxUsesRaw = String(formData.get("max_uses") ?? "").trim();
-  const email = String(formData.get("email") ?? "").trim().toLowerCase() || null;
-  const validFrom = String(formData.get("valid_from") ?? "").trim() || null;
-  const validUntil = String(formData.get("valid_until") ?? "").trim() || null;
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const validFrom = String(formData.get("valid_from") ?? "").trim();
+  const validUntil = String(formData.get("valid_until") ?? "").trim();
   const signInLimitRaw = String(formData.get("sign_in_limit") ?? "").trim();
+  const competitionId = String(formData.get("competition_id") ?? "").trim();
+  if (!INVITATION_CODE_ROLES.includes(role)) backTo(returnTo, { error: "A valid role is required." });
+  if (!code) backTo(returnTo, { error: "Code is required." });
+  if (!maxUsesRaw || Number(maxUsesRaw) < 1) backTo(returnTo, { error: "Max uses is required." });
+  if (!email) backTo(returnTo, { error: "Email is required." });
+  if (!validFrom) backTo(returnTo, { error: "Valid from is required." });
+  if (!validUntil) backTo(returnTo, { error: "Valid until is required." });
+  if (!signInLimitRaw || Number(signInLimitRaw) < 1) backTo(returnTo, { error: "Sign-in limit is required." });
+  if (!competitionId) backTo(returnTo, { error: "Competition is required." });
+  return {
+    role, code, note, email,
+    max_uses: Number(maxUsesRaw),
+    valid_from: validFrom,
+    valid_until: validUntil,
+    sign_in_limit: Number(signInLimitRaw),
+    competition_id: competitionId,
+  };
+}
+
+export async function createInvitationCode(formData: FormData) {
   const returnTo = String(formData.get("return_to") ?? "/admin/accounts");
-  if (!["referee", "staff", "audience", "school", "sensei", "participant", "organizer", "customer_support", "admin", "any"].includes(role)) {
-    backTo(returnTo, { error: "A valid role is required." });
-  }
-  // "Generate" buttons don't ask for a custom code — mint a short random one.
-  const code = providedCode || `${role.toUpperCase()}-${crypto.randomUUID().slice(0, 6).toUpperCase()}`;
+  const fields = requireInvitationCodeFields(formData, returnTo);
   const { supabase, actorId } = await getActor();
   // Who generated it is read from the signer's own session, never typed in —
   // falls back to their account email when they haven't set a display name.
@@ -989,24 +1012,45 @@ export async function createInvitationCode(formData: FormData) {
     ? await supabase.from("profiles").select("full_name, email").eq("user_id", actorId).maybeSingle()
     : { data: null };
   const generated_by = myProfile?.full_name || myProfile?.email || null;
-  // A code bound to one email is a personal code — always single-use,
-  // regardless of what was typed in Max uses.
-  const max_uses = email ? 1 : maxUsesRaw ? Number(maxUsesRaw) : null;
   const { data, error } = await supabase
     .from("invitation_codes")
-    .insert({
-      code, role, note, max_uses, generated_by, email,
-      valid_from: validFrom, valid_until: validUntil,
-      sign_in_limit: signInLimitRaw ? Number(signInLimitRaw) : null,
-    })
+    .insert({ ...fields, generated_by })
     .select("id")
     .single();
   if (error) backTo(returnTo, { error: `Could not create code: ${error.message}` });
   await writeAudit(supabase, {
     table_name: "invitation_codes", record_id: data!.id, action: "invitation_code_created",
-    new_value: { code, role }, actor_id: actorId,
+    new_value: fields, actor_id: actorId,
   });
-  backTo(returnTo, { ok: `Invitation code created: ${code}` });
+  backTo(returnTo, { ok: `Invitation code created: ${fields.code}` });
+}
+
+export async function updateInvitationCode(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "/admin/accounts");
+  if (!id) backTo(returnTo, { error: "Invalid request." });
+  const fields = requireInvitationCodeFields(formData, returnTo);
+  const { supabase, actorId } = await getActor();
+  const { data: before } = await supabase.from("invitation_codes").select("*").eq("id", id).maybeSingle();
+  const { error } = await supabase.from("invitation_codes").update(fields).eq("id", id);
+  if (error) backTo(returnTo, { error: `Could not update code: ${error.message}` });
+  await writeAudit(supabase, {
+    table_name: "invitation_codes", record_id: id, action: "invitation_code_updated",
+    old_value: before, new_value: fields, actor_id: actorId,
+  });
+  backTo(returnTo, { ok: `Invitation code updated: ${fields.code}` });
+}
+
+export async function deleteInvitationCode(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "/admin/accounts");
+  const { supabase, actorId } = await getActor();
+  const { error } = await supabase.from("invitation_codes").delete().eq("id", id);
+  if (error) backTo(returnTo, { error: "Could not delete code." });
+  await writeAudit(supabase, {
+    table_name: "invitation_codes", record_id: id, action: "invitation_code_deleted", actor_id: actorId,
+  });
+  backTo(returnTo, { ok: "Invitation code deleted." });
 }
 
 const RECORD_CODE_TABLES: Record<string, string> = { school: "schools", sensei: "senseis" };
@@ -1057,7 +1101,7 @@ export async function generateRecordInvitationCode(formData: FormData) {
 export async function toggleInvitationCode(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const active = formData.get("active") === "true";
-  const returnTo = "/admin/accounts";
+  const returnTo = String(formData.get("return_to") ?? "/admin/accounts");
   const { supabase, actorId } = await getActor();
   const { error } = await supabase.from("invitation_codes").update({ active }).eq("id", id);
   if (error) backTo(returnTo, { error: "Could not update code." });

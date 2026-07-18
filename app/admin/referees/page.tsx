@@ -9,6 +9,7 @@ import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
 import SignInControlBox from "@/components/SignInControlBox";
 import InvitationCodeForm from "@/components/InvitationCodeForm";
+import InvitationCodeList from "@/components/InvitationCodeList";
 
 export const dynamic = "force-dynamic";
 
@@ -259,8 +260,8 @@ export default async function AdminReferees({
               rowKey="id"
               downloadName="referees"
               columns={[
-                { key: "reference_id", label: "Reference ID" },
                 { key: "full_name", label: "Name" },
+                { key: "reference_id", label: "Reference ID" },
                 { key: "ic_passport", label: "IC / Passport" },
                 { key: "date_of_birth", label: "DOB" },
                 { key: "gender", label: "Gender" },
@@ -278,8 +279,8 @@ export default async function AdminReferees({
                 { key: "actions", label: "Actions" },
               ]}
               csvColumns={[
-                { key: "reference_id", label: "Reference ID" },
                 { key: "full_name", label: "Name" },
+                { key: "reference_id", label: "Reference ID" },
                 { key: "ic_passport", label: "IC / Passport" },
                 { key: "date_of_birth", label: "DOB" },
                 { key: "gender", label: "Gender" },
@@ -387,12 +388,20 @@ export default async function AdminReferees({
           )}
         </div>
       </div>
-      <div className="mt-8">
+      <div className="mt-8 space-y-6">
         <InvitationCodeForm
           role="referee"
           returnTo="/admin/referees"
           title="Referee / Judge Invitation Code"
           idPrefix="ref_code"
+          codeExample="IKO-JUDGE-2026"
+          competitions={competitions}
+        />
+        <InvitationCodeList
+          role="referee"
+          returnTo="/admin/referees"
+          codeExample="IKO-JUDGE-2026"
+          competitions={competitions}
         />
       </div>
     </AdminShell>

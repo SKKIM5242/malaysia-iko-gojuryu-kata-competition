@@ -9,6 +9,7 @@ import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
 import SignInControlBox from "@/components/SignInControlBox";
 import InvitationCodeForm from "@/components/InvitationCodeForm";
+import InvitationCodeList from "@/components/InvitationCodeList";
 import { EDUCATION_LEVELS, SPOKEN_LANGUAGES } from "@/lib/reference-data";
 
 export const dynamic = "force-dynamic";
@@ -265,16 +266,16 @@ export default async function AdminSupport({
           rowKey="id"
           downloadName="customer-support-applications"
           columns={[
-            { key: "reference_id", label: "Reference ID" },
             { key: "full_name", label: "Name" },
+            { key: "reference_id", label: "Reference ID" },
             { key: "contact", label: "Contact" },
             ...competitions.map((c) => ({ key: `tier_${c.id}`, label: `Tier ${formatUSD(c.registration_fee_usd)}` })),
             { key: "message", label: "Message" },
             { key: "status", label: "Status" },
           ]}
           csvColumns={[
-            { key: "reference_id", label: "Reference ID" },
             { key: "full_name", label: "Name" },
+            { key: "reference_id", label: "Reference ID" },
             { key: "email", label: "Email" },
             { key: "phone", label: "Phone" },
             ...competitions.map((c) => ({ key: `tier_${c.id}`, label: `Tier ${formatUSD(c.registration_fee_usd)}` })),
@@ -385,12 +386,20 @@ export default async function AdminSupport({
         </div>
       )}
       {canCreate && (
-        <div className="mt-8">
+        <div className="mt-8 space-y-6">
           <InvitationCodeForm
             role="customer_support"
             returnTo="/admin/support"
             title="Customer Support Invitation Code"
             idPrefix="support_code"
+            codeExample="IKO-SUPPORT-2026"
+            competitions={competitions}
+          />
+          <InvitationCodeList
+            role="customer_support"
+            returnTo="/admin/support"
+            codeExample="IKO-SUPPORT-2026"
+            competitions={competitions}
           />
         </div>
       )}

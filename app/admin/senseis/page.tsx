@@ -9,6 +9,7 @@ import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
 import SignInControlBox from "@/components/SignInControlBox";
 import InvitationCodeForm from "@/components/InvitationCodeForm";
+import InvitationCodeList from "@/components/InvitationCodeList";
 
 export const dynamic = "force-dynamic";
 
@@ -232,8 +233,8 @@ export default async function AdminSenseis({
               rowKey="id"
               downloadName="senseis"
               columns={[
-                { key: "reference_id", label: "Reference ID" },
                 { key: "name", label: "Name" },
+                { key: "reference_id", label: "Reference ID" },
                 { key: "ic_passport", label: "IC / Passport" },
                 { key: "date_of_birth", label: "DOB" },
                 { key: "rank", label: "Rank" },
@@ -249,8 +250,8 @@ export default async function AdminSenseis({
                 { key: "actions", label: "Actions" },
               ]}
               csvColumns={[
-                { key: "reference_id", label: "Reference ID" },
                 { key: "name", label: "Name" },
+                { key: "reference_id", label: "Reference ID" },
                 { key: "ic_passport", label: "IC / Passport" },
                 { key: "date_of_birth", label: "DOB" },
                 { key: "rank", label: "Rank" },
@@ -342,12 +343,20 @@ export default async function AdminSenseis({
           )}
         </div>
       </div>
-      <div className="mt-8">
+      <div className="mt-8 space-y-6">
         <InvitationCodeForm
           role="school"
           returnTo="/admin/senseis"
           title="Sensei / Coach Invitation Code"
           idPrefix="sensei_code"
+          codeExample="IKO-SENSEI-2026"
+          competitions={competitions}
+        />
+        <InvitationCodeList
+          role="school"
+          returnTo="/admin/senseis"
+          codeExample="IKO-SENSEI-2026"
+          competitions={competitions}
         />
       </div>
     </AdminShell>

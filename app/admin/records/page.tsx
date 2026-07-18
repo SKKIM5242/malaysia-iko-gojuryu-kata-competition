@@ -157,8 +157,8 @@ export default async function AdminParticipantRecords() {
   }));
 
   const refereeColumns = [
-    { key: "id", label: "Reference ID" },
     { key: "full_name", label: "Full Name" },
+    { key: "id", label: "Reference ID" },
     { key: "ic_passport", label: "IC / Passport" },
     { key: "date_of_birth", label: "DOB" },
     { key: "gender", label: "Gender" },
@@ -200,8 +200,8 @@ export default async function AdminParticipantRecords() {
   }));
 
   const audienceColumns = [
-    { key: "id", label: "Reference ID" },
     { key: "full_name", label: "Full Name" },
+    { key: "id", label: "Reference ID" },
     { key: "email", label: "Email" },
     { key: "phone", label: "Phone" },
     { key: "home_country", label: "Country" },
@@ -219,8 +219,8 @@ export default async function AdminParticipantRecords() {
   }));
 
   const schoolColumns = [
-    { key: "id", label: "Reference ID" },
     { key: "name", label: "School Name" },
+    { key: "id", label: "Reference ID" },
     { key: "state", label: "State" },
     { key: "contact_title", label: "Contact Title" },
     { key: "contact_name", label: "Contact Name" },
@@ -250,8 +250,8 @@ export default async function AdminParticipantRecords() {
   }));
 
   const senseiColumns = [
-    { key: "id", label: "Reference ID" },
     { key: "name", label: "Full Name" },
+    { key: "id", label: "Reference ID" },
     { key: "rank", label: "Rank" },
     { key: "gender", label: "Gender" },
     { key: "school", label: "School" },
@@ -279,8 +279,8 @@ export default async function AdminParticipantRecords() {
   }));
 
   const staffColumns = [
-    { key: "user_id", label: "Reference ID" },
     { key: "full_name", label: "Full Name" },
+    { key: "user_id", label: "Reference ID" },
     { key: "role", label: "Role" },
     { key: "country", label: "Country" },
     { key: "email", label: "Email" },
