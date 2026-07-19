@@ -21,22 +21,53 @@ export default function ResetPasswordPage() {
 
   useEffect(() => {
     const supabase = createClient();
+    let settled = false;
+    const markReady = () => {
+      if (settled) return;
+      settled = true;
+      setStatus("ready");
+    };
+
+    // The implicit flow (#access_token=...&type=recovery) is auto-detected by
+    // the client SDK, but that detection runs asynchronously — calling
+    // getSession() immediately can race it and see nothing yet even though
+    // the link was perfectly valid. onAuthStateChange is the documented way
+    // to reliably catch the resulting PASSWORD_RECOVERY session whenever it
+    // actually resolves, however long that takes.
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) markReady();
+    });
+
     (async () => {
       const code = new URL(window.location.href).searchParams.get("code");
       if (code) {
         const { error: exchangeErr } = await supabase.auth.exchangeCodeForSession(code);
         if (exchangeErr) {
-          setStatus("invalid");
+          if (!settled) { settled = true; setStatus("invalid"); }
           return;
         }
+        markReady();
+        return;
       }
-      // The implicit flow (#access_token=...&type=recovery) is auto-detected
-      // by the client SDK on load — give it a moment, then check the session.
+      // Covers the case where detection already finished before we
+      // subscribed above.
       const {
         data: { session },
       } = await supabase.auth.getSession();
-      setStatus(session ? "ready" : "invalid");
+      if (session) {
+        markReady();
+        return;
+      }
+      // Still nothing — give the listener a real grace period (detection can
+      // take a beat) before concluding the link is genuinely invalid.
+      setTimeout(() => {
+        if (!settled) { settled = true; setStatus("invalid"); }
+      }, 3000);
     })();
+
+    return () => subscription.unsubscribe();
   }, []);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
