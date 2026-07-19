@@ -80,7 +80,12 @@ function buildEmail(user: HookUser, data: HookEmailData): { subject: string; tex
       return "/account";
     }
   })();
-  const link = `${data.site_url}/auth/confirm?token_hash=${data.token_hash}&type=${data.email_action_type}&next=${encodeURIComponent(next)}`;
+  // NOT data.site_url — despite its name, that payload field is Supabase's
+  // own internal GoTrue base URL (https://<ref>.supabase.co/auth/v1), not
+  // this app's URL. Confirmed by an actual sent link resolving to
+  // .supabase.co/auth/v1/auth/confirm instead of our own /auth/confirm.
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const link = `${appUrl}/auth/confirm?token_hash=${data.token_hash}&type=${data.email_action_type}&next=${encodeURIComponent(next)}`;
 
   switch (data.email_action_type) {
     case "recovery":
