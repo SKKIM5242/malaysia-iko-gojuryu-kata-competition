@@ -41,7 +41,18 @@ export default function ResetPasswordPage() {
     });
 
     (async () => {
-      const code = new URL(window.location.href).searchParams.get("code");
+      const url = new URL(window.location.href);
+      // Set by app/auth/confirm/route.ts when its server-side verifyOtp()
+      // call fails — a genuinely dead/expired link, no need to wait further.
+      if (url.searchParams.get("error")) {
+        if (!settled) { settled = true; setStatus("invalid"); }
+        return;
+      }
+      // /auth/confirm already verified the link and wrote the session into
+      // cookies server-side before this page ever loaded — the cookie-based
+      // client picks that up immediately via getSession() below, no
+      // client-side token parsing needed.
+      const code = url.searchParams.get("code");
       if (code) {
         const { error: exchangeErr } = await supabase.auth.exchangeCodeForSession(code);
         if (exchangeErr) {
