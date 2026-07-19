@@ -353,18 +353,21 @@ export default async function KataArenaPage({
       shownCompetitions.map(async (c) => ({ competition: c, arena: await loadKataArena(supabase, c.id) })),
     );
     // School/Sensei logins are scoped to their own students — their own
-    // competition tier and kata events only, never the whole arena.
+    // competition tier and kata events only, never the whole arena. Once a
+    // competition's Winners are announced, that scoping lifts for it and
+    // they can view every participant's recording, same as everyone else.
     const arenas = loaded
-      .map(({ competition, arena }) => ({
-        competition,
-        arena:
-          profile.role === "school"
+      .map(({ competition, arena }) => {
+        const revealed = winnersRevealed(competition.registration_deadline, competition.winners_announce_date);
+        const scoped =
+          profile.role === "school" && !revealed
             ? arena.filter((e) => e.schoolId != null && e.schoolId === profile.school_id)
-            : profile.role === "sensei"
+            : profile.role === "sensei" && !revealed
               ? arena.filter((e) => e.senseiId != null && e.senseiId === profile.sensei_id)
-              : arena,
-      }))
-      .filter(({ arena }) => !["school", "sensei"].includes(profile.role) || arena.length > 0);
+              : arena;
+        return { competition, arena: scoped, revealed };
+      })
+      .filter(({ arena, revealed }) => !["school", "sensei"].includes(profile.role) || revealed || arena.length > 0);
     const tools = arenaFilterTools(
       arenas.flatMap((a) => a.arena),
       filterParams,
@@ -400,13 +403,19 @@ export default async function KataArenaPage({
           {arenas.length === 0 ? (
             <p className="text-sm text-neutral-400">No competitions yet.</p>
           ) : (
-            arenas.map(({ competition: c, arena }) => (
+            arenas.map(({ competition: c, arena, revealed }) => (
               <div key={c.id} className="mb-10">
                 <h2 className="mb-3 text-lg font-bold">{c.name}</h2>
-                {isAudience && !winnersRevealed(c.registration_deadline, c.winners_announce_date) && (
+                {isAudience && !revealed && (
                   <p className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
                     Judge scores for this competition appear after Winners are finalized — until
                     then you can watch every submitted recording with its round status.
+                  </p>
+                )}
+                {["school", "sensei"].includes(profile.role) && revealed && (
+                  <p className="mb-3 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-900">
+                    Winners are announced for this competition — you can now view every
+                    participant&apos;s recording, not just your own {profile.role === "school" ? "school" : "students"}.
                   </p>
                 )}
                 <KataGroups

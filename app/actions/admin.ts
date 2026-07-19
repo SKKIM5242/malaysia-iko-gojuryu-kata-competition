@@ -84,6 +84,21 @@ async function requireCompetitionManager(
   }
 }
 
+/** Only Admin/Organizer (and legacy "staff") may create, edit, reorder, or
+ * delete announcements/notes/messages — every other admin-panel role
+ * (Referee/Judge, Participant Support) has read-only access to the Content
+ * page's listing. */
+async function requireContentManager(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  actorId: string | null,
+  returnTo: string,
+) {
+  const role = await getActorRole(supabase, actorId);
+  if (!["admin", "organizer", "staff"].includes(role ?? "")) {
+    backTo(returnTo, { error: "Only Admin / Organizer can manage announcements." });
+  }
+}
+
 /** Referee accounts can view registrations/participants but never change
  * payment status or delete anything — called at the top of the actions that
  * should reject them specifically. */
@@ -464,6 +479,7 @@ export async function saveAnnouncement(formData: FormData) {
   };
   if (!values.title) backTo(returnTo, { error: "Title is required." });
   const { supabase, actorId } = await getActor();
+  await requireContentManager(supabase, actorId, returnTo);
   let justPublished = false;
   if (id) {
     const { data: before } = await supabase
@@ -496,6 +512,7 @@ export async function toggleAnnouncement(formData: FormData) {
   const publish = formData.get("publish") === "true";
   const returnTo = String(formData.get("return_to") ?? "") || "/admin/announcements";
   const { supabase, actorId } = await getActor();
+  await requireContentManager(supabase, actorId, returnTo);
   const { data: before } = await supabase
     .from("announcements").select("title, body, published").eq("id", id).maybeSingle();
   const { error } = await supabase
@@ -519,6 +536,7 @@ export async function moveAnnouncement(formData: FormData) {
   const direction = String(formData.get("direction") ?? "");
   const returnTo = String(formData.get("return_to") ?? "") || "/admin/announcements";
   const { supabase, actorId } = await getActor();
+  await requireContentManager(supabase, actorId, returnTo);
 
   const { data } = await supabase
     .from("announcements")
@@ -553,6 +571,7 @@ export async function deleteAnnouncement(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const returnTo = String(formData.get("return_to") ?? "") || "/admin/announcements";
   const { supabase, actorId } = await getActor();
+  await requireContentManager(supabase, actorId, returnTo);
   const { data: before } = await supabase
     .from("announcements").select("*").eq("id", id).maybeSingle();
   const { error } = await supabase.from("announcements").delete().eq("id", id);

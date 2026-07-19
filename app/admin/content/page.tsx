@@ -69,6 +69,14 @@ export default async function AdminContent({
     "Paid per sign-in, per competition tier (USD 10 / 100 / 200)",
   ];
   const cellInput = "w-full rounded-md border border-neutral-300 px-2 py-1 text-xs";
+  // Shared column templates so the header row and every data row line up
+  // pixel-for-pixel — the previous plain `grid-cols-N` had no header at all,
+  // so once a cell was filled in there was no way to tell which role it
+  // belonged to (e.g. Participant Support was easy to lose track of).
+  const MATRIX_TEMPLATE = "56px minmax(160px,1.4fr) minmax(90px,1fr) minmax(90px,1fr) minmax(120px,1fr) minmax(90px,1fr) minmax(160px,1.6fr) 128px";
+  const COMPARISON_TEMPLATE =
+    "56px minmax(170px,1.3fr) repeat(7, minmax(110px,1fr)) 128px";
+  const gridHeaderCell = "px-2 py-1.5 text-[11px] font-bold uppercase tracking-wide text-neutral-500";
 
   return (
     <AdminShell title="Content" active="/admin/content" flash={{ ok: params.ok, error: params.error }}>
@@ -256,122 +264,175 @@ export default async function AdminContent({
         ))}
       </datalist>
 
-      <div className="mt-10 space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
+      <details className="mt-10 rounded-lg border border-neutral-200 bg-white" open>
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3">
           <div>
             <h2 className="text-lg font-bold">Access Matrix (Editable)</h2>
-            <p className="text-sm text-neutral-500">
+            <p className="text-sm font-normal text-neutral-500">
               Add, edit, or delete resources and each role&apos;s access — every cell offers a
               drop-down of common choices, and free text is also allowed. Shown on Accounts →
               Access Matrix.
             </p>
           </div>
+          <span className="shrink-0 rounded-md border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-500 hover:bg-neutral-50">
+            ✕ Close
+          </span>
+        </summary>
+        <div className="space-y-3 border-t border-neutral-100 p-4">
           {(matrixRows ?? []).length === 0 && (
             <form action={seedAccessTables}>
               <input type="hidden" name="return_to" value={RETURN_TO} />
               <button className={adminBtn}>Import current defaults</button>
             </form>
           )}
+          <div className="overflow-x-auto rounded-lg border border-neutral-200">
+            <div style={{ minWidth: 980 }}>
+              <div
+                className="grid items-center gap-2 border-b border-neutral-200 bg-neutral-50 px-3 py-2"
+                style={{ gridTemplateColumns: MATRIX_TEMPLATE }}
+              >
+                <span className={gridHeaderCell}>No.</span>
+                <span className={gridHeaderCell}>Resource</span>
+                <span className={gridHeaderCell}>Admin</span>
+                <span className={gridHeaderCell}>Organizer</span>
+                <span className={gridHeaderCell}>Participant Support</span>
+                <span className={gridHeaderCell}>Referee</span>
+                <span className={gridHeaderCell}>Note</span>
+                <span className={gridHeaderCell}>Actions</span>
+              </div>
+              <form
+                action={saveAccessMatrixRow}
+                className="grid items-center gap-2 border-b border-neutral-100 px-3 py-2"
+                style={{ gridTemplateColumns: MATRIX_TEMPLATE }}
+              >
+                <input type="hidden" name="return_to" value={RETURN_TO} />
+                <input name="position" type="number" min="1" placeholder="No." className={cellInput} />
+                <input name="resource" required placeholder="Resource *" className={cellInput} />
+                <input name="admin" list="access_choices" placeholder="Admin" className={cellInput} />
+                <input name="organizer" list="access_choices" placeholder="Organizer" className={cellInput} />
+                <input name="customer_support" list="access_choices" placeholder="Participant Support" className={cellInput} />
+                <input name="referee" list="access_choices" placeholder="Referee" className={cellInput} />
+                <input name="note" placeholder="Note (optional)" className={cellInput} />
+                <button className="rounded-md bg-neutral-900 px-3 py-1 text-xs font-semibold text-white hover:bg-neutral-700">
+                  Add row
+                </button>
+              </form>
+              <div className="divide-y divide-neutral-100">
+                {(matrixRows ?? []).map((r) => (
+                  <form
+                    key={r.id}
+                    action={saveAccessMatrixRow}
+                    className="grid items-center gap-2 px-3 py-2"
+                    style={{ gridTemplateColumns: MATRIX_TEMPLATE }}
+                  >
+                    <input type="hidden" name="id" value={r.id} />
+                    <input type="hidden" name="return_to" value={RETURN_TO} />
+                    <input name="position" type="number" min="1" defaultValue={r.position} className={cellInput} />
+                    <input name="resource" required defaultValue={r.resource} className={`${cellInput} font-semibold`} />
+                    <input name="admin" list="access_choices" defaultValue={r.admin} className={cellInput} />
+                    <input name="organizer" list="access_choices" defaultValue={r.organizer} className={cellInput} />
+                    <input name="customer_support" list="access_choices" defaultValue={r.customer_support} className={cellInput} />
+                    <input name="referee" list="access_choices" defaultValue={r.referee} className={cellInput} />
+                    <input name="note" defaultValue={r.note ?? ""} placeholder="Note" className={cellInput} />
+                    <span className="flex gap-1.5">
+                      <button className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50">
+                        Save
+                      </button>
+                      <button
+                        formAction={deleteAccessMatrixRow}
+                        className="rounded border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"
+                      >
+                        Delete
+                      </button>
+                    </span>
+                  </form>
+                ))}
+              </div>
+            </div>
+          </div>
+          {(matrixRows ?? []).length === 0 && (
+            <EmptyState>Table is empty — the built-in defaults are shown until you import or add rows.</EmptyState>
+          )}
         </div>
-        <Card>
-          <form action={saveAccessMatrixRow} className="grid gap-2 sm:grid-cols-7">
-            <input type="hidden" name="return_to" value={RETURN_TO} />
-            <input name="position" type="number" min="1" placeholder="No." className={cellInput} />
-            <input name="resource" required placeholder="Resource *" className={`${cellInput} sm:col-span-2`} />
-            <input name="admin" list="access_choices" placeholder="Admin" className={cellInput} />
-            <input name="organizer" list="access_choices" placeholder="Organizer" className={cellInput} />
-            <input name="customer_support" list="access_choices" placeholder="Participant Support" className={cellInput} />
-            <input name="referee" list="access_choices" placeholder="Referee" className={cellInput} />
-            <input name="note" placeholder="Note (optional)" className={`${cellInput} sm:col-span-6`} />
-            <button className="rounded-md bg-neutral-900 px-3 py-1 text-xs font-semibold text-white hover:bg-neutral-700">
-              Add row
-            </button>
-          </form>
-        </Card>
-        {(matrixRows ?? []).map((r) => (
-          <Card key={r.id}>
-            <form action={saveAccessMatrixRow} className="grid items-center gap-2 sm:grid-cols-7">
-              <input type="hidden" name="id" value={r.id} />
-              <input type="hidden" name="return_to" value={RETURN_TO} />
-              <input name="position" type="number" min="1" defaultValue={r.position} className={cellInput} />
-              <input name="resource" required defaultValue={r.resource} className={`${cellInput} sm:col-span-2 font-semibold`} />
-              <input name="admin" list="access_choices" defaultValue={r.admin} className={cellInput} />
-              <input name="organizer" list="access_choices" defaultValue={r.organizer} className={cellInput} />
-              <input name="customer_support" list="access_choices" defaultValue={r.customer_support} className={cellInput} />
-              <input name="referee" list="access_choices" defaultValue={r.referee} className={cellInput} />
-              <input name="note" defaultValue={r.note ?? ""} placeholder="Note" className={`${cellInput} sm:col-span-6`} />
-              <span className="flex gap-1.5">
-                <button className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50">
-                  Save
-                </button>
-                <button
-                  formAction={deleteAccessMatrixRow}
-                  className="rounded border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"
-                >
-                  Delete
-                </button>
-              </span>
-            </form>
-          </Card>
-        ))}
-        {(matrixRows ?? []).length === 0 && (
-          <EmptyState>Table is empty — the built-in defaults are shown until you import or add rows.</EmptyState>
-        )}
-      </div>
+      </details>
 
-      <div className="mt-10 space-y-4">
+      <div className="mt-10 space-y-3">
         <h2 className="text-lg font-bold">&quot;What Your Payment Unlocks&quot; — Access Comparison (Editable)</h2>
         <p className="text-sm text-neutral-500">
           These rows render on the public Registration page. Columns: Participant · School ·
           Sensei · Referee · Audience · Organizer · Participant Support.
         </p>
-        <Card>
-          <form action={saveAccessComparisonRow} className="grid gap-2 sm:grid-cols-9">
-            <input type="hidden" name="return_to" value={RETURN_TO} />
-            <input name="position" type="number" min="1" placeholder="No." className={cellInput} />
-            <input name="what" required placeholder="Access row *" className={cellInput} />
-            <input name="participant" list="access_choices" placeholder="Participant" className={cellInput} />
-            <input name="school" list="access_choices" placeholder="School" className={cellInput} />
-            <input name="sensei" list="access_choices" placeholder="Sensei" className={cellInput} />
-            <input name="referee" list="access_choices" placeholder="Referee" className={cellInput} />
-            <input name="audience" list="access_choices" placeholder="Audience" className={cellInput} />
-            <input name="organizer" list="access_choices" placeholder="Organizer" className={cellInput} />
-            <span className="flex gap-1.5">
+        <div className="overflow-x-auto rounded-lg border border-neutral-200">
+          <div style={{ minWidth: 1280 }}>
+            <div
+              className="grid items-center gap-2 border-b border-neutral-200 bg-neutral-50 px-3 py-2"
+              style={{ gridTemplateColumns: COMPARISON_TEMPLATE }}
+            >
+              <span className={gridHeaderCell}>No.</span>
+              <span className={gridHeaderCell}>Access row</span>
+              <span className={gridHeaderCell}>Participant</span>
+              <span className={gridHeaderCell}>School</span>
+              <span className={gridHeaderCell}>Sensei</span>
+              <span className={gridHeaderCell}>Referee</span>
+              <span className={gridHeaderCell}>Audience</span>
+              <span className={gridHeaderCell}>Organizer</span>
+              <span className={gridHeaderCell}>P. Support</span>
+              <span className={gridHeaderCell}>Actions</span>
+            </div>
+            <form
+              action={saveAccessComparisonRow}
+              className="grid items-center gap-2 border-b border-neutral-100 px-3 py-2"
+              style={{ gridTemplateColumns: COMPARISON_TEMPLATE }}
+            >
+              <input type="hidden" name="return_to" value={RETURN_TO} />
+              <input name="position" type="number" min="1" placeholder="No." className={cellInput} />
+              <input name="what" required placeholder="Access row *" className={cellInput} />
+              <input name="participant" list="access_choices" placeholder="Participant" className={cellInput} />
+              <input name="school" list="access_choices" placeholder="School" className={cellInput} />
+              <input name="sensei" list="access_choices" placeholder="Sensei" className={cellInput} />
+              <input name="referee" list="access_choices" placeholder="Referee" className={cellInput} />
+              <input name="audience" list="access_choices" placeholder="Audience" className={cellInput} />
+              <input name="organizer" list="access_choices" placeholder="Organizer" className={cellInput} />
               <input name="support" list="access_choices" placeholder="P. Support" className={cellInput} />
               <button className="rounded-md bg-neutral-900 px-3 py-1 text-xs font-semibold text-white hover:bg-neutral-700">
                 Add
               </button>
-            </span>
-          </form>
-        </Card>
-        {(comparisonRows ?? []).map((r) => (
-          <Card key={r.id}>
-            <form action={saveAccessComparisonRow} className="grid items-center gap-2 sm:grid-cols-9">
-              <input type="hidden" name="id" value={r.id} />
-              <input type="hidden" name="return_to" value={RETURN_TO} />
-              <input name="position" type="number" min="1" defaultValue={r.position} className={cellInput} />
-              <input name="what" required defaultValue={r.what} className={`${cellInput} font-semibold`} />
-              <input name="participant" list="access_choices" defaultValue={r.participant} className={cellInput} />
-              <input name="school" list="access_choices" defaultValue={r.school} className={cellInput} />
-              <input name="sensei" list="access_choices" defaultValue={r.sensei} className={cellInput} />
-              <input name="referee" list="access_choices" defaultValue={r.referee} className={cellInput} />
-              <input name="audience" list="access_choices" defaultValue={r.audience} className={cellInput} />
-              <input name="organizer" list="access_choices" defaultValue={r.organizer} className={cellInput} />
-              <span className="flex gap-1.5">
-                <input name="support" list="access_choices" defaultValue={r.support} className={cellInput} />
-                <button className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50">
-                  Save
-                </button>
-                <button
-                  formAction={deleteAccessComparisonRow}
-                  className="rounded border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"
-                >
-                  Delete
-                </button>
-              </span>
             </form>
-          </Card>
-        ))}
+            <div className="divide-y divide-neutral-100">
+              {(comparisonRows ?? []).map((r) => (
+                <form
+                  key={r.id}
+                  action={saveAccessComparisonRow}
+                  className="grid items-center gap-2 px-3 py-2"
+                  style={{ gridTemplateColumns: COMPARISON_TEMPLATE }}
+                >
+                  <input type="hidden" name="id" value={r.id} />
+                  <input type="hidden" name="return_to" value={RETURN_TO} />
+                  <input name="position" type="number" min="1" defaultValue={r.position} className={cellInput} />
+                  <input name="what" required defaultValue={r.what} className={`${cellInput} font-semibold`} />
+                  <input name="participant" list="access_choices" defaultValue={r.participant} className={cellInput} />
+                  <input name="school" list="access_choices" defaultValue={r.school} className={cellInput} />
+                  <input name="sensei" list="access_choices" defaultValue={r.sensei} className={cellInput} />
+                  <input name="referee" list="access_choices" defaultValue={r.referee} className={cellInput} />
+                  <input name="audience" list="access_choices" defaultValue={r.audience} className={cellInput} />
+                  <input name="organizer" list="access_choices" defaultValue={r.organizer} className={cellInput} />
+                  <input name="support" list="access_choices" defaultValue={r.support} className={cellInput} />
+                  <span className="flex gap-1.5">
+                    <button className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50">
+                      Save
+                    </button>
+                    <button
+                      formAction={deleteAccessComparisonRow}
+                      className="rounded border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"
+                    >
+                      Delete
+                    </button>
+                  </span>
+                </form>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     </AdminShell>
   );

@@ -32,8 +32,8 @@ const ROWS: Array<{ what: string; cells: [string, string, string, string, string
     what: "Kata Arena",
     cells: [
       "Own competition tier",
-      "Own school's students only — their tier & kata events",
-      "Own students only — their tier & kata events",
+      "Own school's students only — their tier & kata events (all recordings once Winners are announced)",
+      "Own students only — their tier & kata events (all recordings once Winners are announced)",
       "All recordings",
       "All recordings",
       "All recordings",
@@ -56,8 +56,8 @@ const ROWS: Array<{ what: string; cells: [string, string, string, string, string
     what: "Record & submit kata / viewing scope",
     cells: [
       "Record & submit own event(s)",
-      "View own students' events only",
-      "View own students' events only",
+      "View own students' events only (all events once Winners are announced)",
+      "View own students' events only (all events once Winners are announced)",
       "View own assigned events",
       "View all events",
       "View all events",
