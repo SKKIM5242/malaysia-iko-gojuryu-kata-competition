@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { triggerEmailVerification } from "@/app/actions/email-verification";
+import PasswordInput from "@/components/PasswordInput";
 
 const inputCls =
   "w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm focus:border-red-600 focus:outline-none focus:ring-1 focus:ring-red-600";
@@ -235,10 +236,9 @@ export default function AuthForms({ defaultMode = "signin" }: { defaultMode?: "s
             </div>
             <div>
               <label htmlFor="auth_password" className={labelCls}>Password *</label>
-              <input
+              <PasswordInput
                 id="auth_password"
                 name="password"
-                type="password"
                 required
                 minLength={8}
                 autoComplete={mode === "signup" ? "new-password" : "current-password"}

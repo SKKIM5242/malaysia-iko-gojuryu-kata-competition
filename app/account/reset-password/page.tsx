@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { SiteFooter, SiteHeader } from "@/components/ui";
+import PasswordInput from "@/components/PasswordInput";
 
 const inputCls =
   "w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm focus:border-red-600 focus:outline-none focus:ring-1 focus:ring-red-600";
@@ -91,9 +92,8 @@ export default function ResetPasswordPage() {
             )}
             <div>
               <label htmlFor="password" className={labelCls}>New password</label>
-              <input
+              <PasswordInput
                 id="password"
-                type="password"
                 required
                 minLength={8}
                 autoComplete="new-password"
@@ -104,9 +104,8 @@ export default function ResetPasswordPage() {
             </div>
             <div>
               <label htmlFor="confirm" className={labelCls}>Confirm new password</label>
-              <input
+              <PasswordInput
                 id="confirm"
-                type="password"
                 required
                 minLength={8}
                 autoComplete="new-password"
