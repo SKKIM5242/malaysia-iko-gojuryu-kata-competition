@@ -163,7 +163,7 @@ export default async function AdminParticipantRecords() {
 
   const refereeColumns = [
     { key: "full_name", label: "Full Name" },
-    { key: "id", label: "Reference ID" },
+    { key: "reference_id", label: "Reference ID" },
     { key: "ic_passport", label: "IC / Passport" },
     { key: "date_of_birth", label: "DOB" },
     { key: "gender", label: "Gender" },
@@ -183,7 +183,8 @@ export default async function AdminParticipantRecords() {
     { key: "status", label: "Application Status" },
   ];
   const refereeRows = referees.map((r) => ({
-    id: r.id.slice(0, 8).toUpperCase(),
+    id: r.id,
+    reference_id: r.id.slice(0, 8).toUpperCase(),
     full_name: r.full_name,
     ic_passport: r.ic_passport,
     date_of_birth: formatDOB(r.date_of_birth),
@@ -206,7 +207,7 @@ export default async function AdminParticipantRecords() {
 
   const audienceColumns = [
     { key: "full_name", label: "Full Name" },
-    { key: "id", label: "Reference ID" },
+    { key: "reference_id", label: "Reference ID" },
     { key: "email", label: "Email" },
     { key: "phone", label: "Phone" },
     { key: "home_country", label: "Country" },
@@ -214,7 +215,8 @@ export default async function AdminParticipantRecords() {
     { key: "payment_status", label: "Payment Status" },
   ];
   const audienceRows = audiences.map((a) => ({
-    id: a.id.slice(0, 8).toUpperCase(),
+    id: a.id,
+    reference_id: a.id.slice(0, 8).toUpperCase(),
     full_name: a.full_name,
     email: a.email ?? "",
     phone: a.phone ?? "",
@@ -225,7 +227,7 @@ export default async function AdminParticipantRecords() {
 
   const schoolColumns = [
     { key: "name", label: "School Name" },
-    { key: "id", label: "Reference ID" },
+    { key: "reference_id", label: "Reference ID" },
     { key: "state", label: "State" },
     { key: "contact_title", label: "Contact Title" },
     { key: "contact_name", label: "Contact Name" },
@@ -239,7 +241,8 @@ export default async function AdminParticipantRecords() {
     { key: "phone", label: "Phone" },
   ];
   const schoolRows = schools.map((s) => ({
-    id: s.id.slice(0, 8).toUpperCase(),
+    id: s.id,
+    reference_id: s.id.slice(0, 8).toUpperCase(),
     name: s.name,
     state: s.state ?? "",
     contact_title: s.contact_title ?? "",
@@ -256,7 +259,7 @@ export default async function AdminParticipantRecords() {
 
   const senseiColumns = [
     { key: "name", label: "Full Name" },
-    { key: "id", label: "Reference ID" },
+    { key: "reference_id", label: "Reference ID" },
     { key: "rank", label: "Rank" },
     { key: "gender", label: "Gender" },
     { key: "school", label: "School" },
@@ -269,7 +272,8 @@ export default async function AdminParticipantRecords() {
     { key: "certificateUrl", label: "Certificate" },
   ];
   const senseiRows = senseis.map((s) => ({
-    id: s.id.slice(0, 8).toUpperCase(),
+    id: s.id,
+    reference_id: s.id.slice(0, 8).toUpperCase(),
     name: s.name,
     rank: s.rank ?? "",
     gender: s.gender ?? "",
@@ -285,14 +289,15 @@ export default async function AdminParticipantRecords() {
 
   const staffColumns = [
     { key: "full_name", label: "Full Name" },
-    { key: "user_id", label: "Reference ID" },
+    { key: "reference_id", label: "Reference ID" },
     { key: "role", label: "Role" },
     { key: "country", label: "Country" },
     { key: "email", label: "Email" },
     { key: "approved", label: "Status" },
   ];
   const staffRows = staffAccounts.map((s) => ({
-    user_id: s.user_id.slice(0, 8).toUpperCase(),
+    user_id: s.user_id,
+    reference_id: s.user_id.slice(0, 8).toUpperCase(),
     full_name: s.full_name ?? "",
     role: ROLE_LABEL[s.role] ?? s.role,
     country: s.country ?? "",
