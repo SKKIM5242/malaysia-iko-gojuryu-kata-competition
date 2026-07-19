@@ -236,10 +236,11 @@ export async function submitScore(formData: FormData) {
   const videoId = String(formData.get("video_id") ?? "");
   const raw = String(formData.get("score") ?? "").trim();
   const score = Math.round(Number(raw) * 10) / 10;
-  // Optional per-criterion breakdown (the 7 rows from the official rubric) —
-  // kept alongside the total so Admin/Organizer can review how it was made
-  // up. Absent when an Admin/Organizer override-scores via the plain
-  // single-number field on /admin/judging.
+  // Optional per-criterion breakdown (10 rows = Score Sheet 1, 7 rows =
+  // Score Sheet 2 of the official rubric) — kept alongside the total so
+  // Admin/Organizer can review how it was made up. Absent when an
+  // Admin/Organizer override-scores via the plain single-number field on
+  // /admin/judging.
   const criteriaRaw = formData.getAll("criteria");
   const criteria = criteriaRaw.length > 0 ? criteriaRaw.map((v) => Number(v)) : null;
   const supabase = await createClient();

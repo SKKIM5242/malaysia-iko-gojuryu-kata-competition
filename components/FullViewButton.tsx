@@ -4,7 +4,7 @@ import { useState } from "react";
 import FloatingWindow from "@/components/FloatingWindow";
 import LockedVideo from "@/components/LockedVideo";
 import { RubricTable } from "@/components/RefereeScoring";
-import { SCORING_CRITERIA, splitEvenly } from "@/lib/scoring-rubric";
+import { SHEET1_CRITERIA, SHEET2_CRITERIA, rubricFor, splitEvenly } from "@/lib/scoring-rubric";
 
 export interface FullViewJudge {
   judgeName: string;
@@ -74,10 +74,11 @@ export default function FullViewButton({
                 <p className="text-sm text-neutral-400 md:col-span-3">No referees assigned yet.</p>
               ) : (
                 judges.map((j, i) => {
-                  const values =
-                    j.criteria && j.criteria.length === SCORING_CRITERIA.length
-                      ? j.criteria
-                      : splitEvenly(j.total);
+                  const isEstimated =
+                    !j.criteria ||
+                    (j.criteria.length !== SHEET1_CRITERIA.length &&
+                      j.criteria.length !== SHEET2_CRITERIA.length);
+                  const values = isEstimated ? splitEvenly(j.total) : j.criteria!;
                   return (
                     <div key={`${j.judgeName}-${i}`} className="rounded-lg border border-neutral-200 p-3">
                       <p className="mb-2 text-sm font-bold text-neutral-900">
@@ -88,12 +89,12 @@ export default function FullViewButton({
                         <p className="text-sm font-semibold text-amber-600">Score pending</p>
                       ) : (
                         <>
-                          {(!j.criteria || j.criteria.length !== SCORING_CRITERIA.length) && (
+                          {isEstimated && (
                             <p className="mb-1 text-[11px] text-amber-700">
                               Even split of the total — per-row detail wasn&apos;t recorded for this score.
                             </p>
                           )}
-                          <RubricTable values={values} readOnly />
+                          <RubricTable values={values} rubric={rubricFor(values)} readOnly />
                         </>
                       )}
                     </div>

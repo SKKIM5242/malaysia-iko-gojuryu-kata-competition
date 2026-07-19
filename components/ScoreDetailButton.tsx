@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { RubricTable } from "@/components/RefereeScoring";
-import { SCORING_CRITERIA, splitEvenly } from "@/lib/scoring-rubric";
+import { SHEET1_CRITERIA, SHEET2_CRITERIA, rubricFor, splitEvenly } from "@/lib/scoring-rubric";
 
 /**
  * Admin/Organizer view-only detail: clicking a judge's "Total X.X" chip
@@ -21,8 +21,10 @@ export default function ScoreDetailButton({
   criteria: number[] | null;
 }) {
   const [open, setOpen] = useState(false);
-  const values = criteria && criteria.length === SCORING_CRITERIA.length ? criteria : splitEvenly(total);
-  const isEstimated = !criteria || criteria.length !== SCORING_CRITERIA.length;
+  const isEstimated =
+    !criteria ||
+    (criteria.length !== SHEET1_CRITERIA.length && criteria.length !== SHEET2_CRITERIA.length);
+  const values = isEstimated ? splitEvenly(total) : criteria!;
 
   return (
     <>
@@ -55,7 +57,7 @@ export default function ScoreDetailButton({
                 below is an even split of the total, not the judge&apos;s original per-row entries.
               </p>
             )}
-            <RubricTable values={values} readOnly />
+            <RubricTable values={values} rubric={rubricFor(values)} readOnly />
           </div>
         </div>
       )}
