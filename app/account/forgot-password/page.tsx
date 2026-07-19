@@ -16,8 +16,9 @@ export default function ForgotPasswordPage() {
       <main className="mx-auto max-w-md px-4 py-10">
         <h1 className="text-2xl font-bold tracking-tight">Forgot Password</h1>
         <p className="mt-1 mb-6 text-sm text-neutral-500">
-          Enter the IC/Passport number or mobile phone number you registered with — we&apos;ll email
-          a password reset link to the address on file.
+          Enter the email address you signed up with (or your IC/Passport number or mobile phone
+          number, if you registered one) — we&apos;ll email a password reset link to the address
+          on file.
         </p>
 
         {state.ok ? (
@@ -33,14 +34,14 @@ export default function ForgotPasswordPage() {
             )}
             <div>
               <label htmlFor="identifier" className="mb-1 block text-sm font-medium text-neutral-700">
-                IC / Passport number or mobile phone number
+                Email, IC / Passport number, or mobile phone number
               </label>
               <input
                 id="identifier"
                 name="identifier"
                 required
                 className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm focus:border-red-600 focus:outline-none focus:ring-1 focus:ring-red-600"
-                placeholder="e.g. 081234-14-5671 or +60123456789"
+                placeholder="e.g. name@example.com, 081234-14-5671, or +60123456789"
               />
             </div>
             <button

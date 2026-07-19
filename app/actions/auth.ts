@@ -47,10 +47,10 @@ export async function requestPasswordReset(
   const generic: ForgotPasswordState = {
     ok: true,
     message:
-      "If that IC/Passport or phone number matches a registered account, a password reset link has been emailed to the address on file.",
+      "If that email, IC/Passport, or phone number matches a registered account, a password reset link has been emailed to the address on file.",
   };
   if (!identifier) {
-    return { ok: false, message: "Enter your IC/Passport number or mobile phone number." };
+    return { ok: false, message: "Enter your email address, IC/Passport number, or mobile phone number." };
   }
 
   const supabase = await createClient();
