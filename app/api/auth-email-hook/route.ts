@@ -128,6 +128,10 @@ export async function POST(request: Request) {
   const rawBody = await request.text();
 
   if (!verifySignature(rawBody, request.headers)) {
+    console.error("[auth-email-hook] signature verification failed", {
+      hasSecretEnv: !!process.env.SEND_EMAIL_HOOK_SECRET,
+      headers: Object.fromEntries(request.headers),
+    });
     return errorResponse("401", "Invalid webhook signature.", 401);
   }
 
@@ -135,11 +139,13 @@ export async function POST(request: Request) {
   try {
     payload = JSON.parse(rawBody);
   } catch {
+    console.error("[auth-email-hook] malformed JSON payload", rawBody.slice(0, 500));
     return errorResponse("400", "Malformed JSON payload.", 400);
   }
 
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
+    console.error("[auth-email-hook] RESEND_API_KEY is not configured on this deployment");
     return errorResponse("500", "RESEND_API_KEY is not configured.", 500);
   }
 
@@ -158,9 +164,11 @@ export async function POST(request: Request) {
     });
     if (!resendRes.ok) {
       const body = await resendRes.text();
+      console.error("[auth-email-hook] Resend API rejected the send", resendRes.status, body.slice(0, 500));
       return errorResponse(String(resendRes.status), `Resend API error: ${body.slice(0, 300)}`, 500);
     }
   } catch (err) {
+    console.error("[auth-email-hook] failed to reach Resend", err);
     return errorResponse("500", `Failed to reach Resend: ${err instanceof Error ? err.message : String(err)}`, 500);
   }
 
