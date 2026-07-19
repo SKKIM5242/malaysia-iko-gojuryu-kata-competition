@@ -10,6 +10,7 @@ import {
   SHEET2_CRITERIA,
   TOTAL_MAX,
   splitCapped,
+  splitSheet1,
   type RubricCriterion,
 } from "@/lib/scoring-rubric";
 import { splitCategoryName } from "@/lib/division";
@@ -70,7 +71,7 @@ export function RubricTable({
                       type="number"
                       min={0}
                       max={c.max}
-                      step={0.1}
+                      step={0.01}
                       value={values[i]}
                       onChange={(e) => onChange?.(i, e.target.value)}
                       className="w-20 rounded-md border border-neutral-300 px-2 py-1 text-sm"
@@ -130,8 +131,11 @@ export function ScoreSession({
   const [scoreOpen, setScoreOpen] = useState(true);
   const [saved, setSaved] = useState(item.existingScore != null);
   const [pending, setPending] = useState(false);
-  const [sheet1Values, setSheet1Values] = useState<number[]>(() => SHEET1_CRITERIA.map(() => 0));
+  const [sheet1Values, setSheet1Values] = useState<number[]>(() => splitSheet1(item.existingScore));
   const [sheet2Values, setSheet2Values] = useState<number[]>(() => splitCapped(item.existingScore));
+  const [sheet1QuickTotal, setSheet1QuickTotal] = useState<string>(
+    item.existingScore != null ? String(item.existingScore) : "",
+  );
   const [quickTotal, setQuickTotal] = useState<string>(
     item.existingScore != null ? String(item.existingScore) : "",
   );
@@ -145,9 +149,24 @@ export function ScoreSession({
     [sheet2Values],
   );
 
+  /** A hand-adjusted row overrides Sheet 1's self-population; its Total
+   * box resyncs to the new row sum (1 decimal place). */
   function setSheet1Criterion(i: number, raw: string) {
     const n = Math.max(0, Math.min(SHEET1_CRITERIA[i].max, Number(raw) || 0));
-    setSheet1Values((v) => v.map((x, idx) => (idx === i ? n : x)));
+    setSheet1Values((v) => {
+      const next = v.map((x, idx) => (idx === i ? n : x));
+      setSheet1QuickTotal(String(Math.round(next.reduce((a, b) => a + b, 0) * 10) / 10));
+      return next;
+    });
+    setSaved(false);
+  }
+
+  function setSheet1Quick(raw: string) {
+    setSheet1QuickTotal(raw);
+    if (raw !== "") {
+      const t = Math.max(0, Math.min(TOTAL_MAX, Number(raw) || 0));
+      setSheet1Values(splitSheet1(t));
+    }
     setSaved(false);
   }
 
@@ -195,8 +214,9 @@ export function ScoreSession({
             >
               <p className="font-bold text-neutral-900">Score Sheet 1</p>
               <p className="mt-1 text-xs text-neutral-500">
-                Score all 10 criteria row by row (Stances, Techniques, Focus, Speed, Balance, …),
-                0–1 each — the Total (0–{TOTAL_MAX}) computes itself.
+                10 criteria (Stances, Techniques, Focus, Speed, Balance, …), 0–1 each — input one
+                Total Score (0–{TOTAL_MAX}) to self-populate all rows, then readjust any row if
+                you wish.
               </p>
             </button>
             <button
@@ -225,7 +245,9 @@ export function ScoreSession({
 
   const submittedScore = sheet === 1 ? sheet1Total : sheet2Total;
   const submittedCriteria = sheet === 1 ? sheet1Values : sheet2Values;
-  const submitBlocked = submittedScore > TOTAL_MAX || (sheet === 2 && quickTotal === "");
+  const submitBlocked =
+    submittedScore > TOTAL_MAX ||
+    (sheet === 1 ? sheet1QuickTotal === "" : quickTotal === "");
 
   const scoreForm = (
     <form
@@ -248,7 +270,32 @@ export function ScoreSession({
         <input key={i} type="hidden" name="criteria" value={v} />
       ))}
       {sheet === 1 ? (
-        <RubricTable rubric={SHEET1_CRITERIA} values={sheet1Values} onChange={setSheet1Criterion} />
+        <>
+          <div className="mb-3 rounded-md border-2 border-red-200 bg-red-50 p-3">
+            <label htmlFor={`quick1_${item.videoId}`} className="mb-1 block text-sm font-bold text-neutral-800">
+              Just input one Total Score (0–{TOTAL_MAX}) — the rows below self-populate
+            </label>
+            <input
+              id={`quick1_${item.videoId}`}
+              name="quick_total_display"
+              type="number"
+              min={0}
+              max={TOTAL_MAX}
+              step={0.1}
+              required
+              value={sheet1QuickTotal}
+              onChange={(e) => setSheet1Quick(e.target.value)}
+              className="w-32 rounded-md border border-neutral-300 px-3 py-2 text-lg font-bold"
+            />
+            <p className="mt-2 text-xs text-neutral-600">
+              Self-population fills items 1–10 up to their 0–1 maximum, at 2 decimal points; the
+              Total Score keeps to 1 decimal point. <strong>Not happy with the self-population?
+              Adjust any row below yourself</strong> — the Total resyncs to your adjusted rows.
+            </p>
+            <p className="mt-1 text-xs font-semibold text-red-700">0 = Disqualified.</p>
+          </div>
+          <RubricTable rubric={SHEET1_CRITERIA} values={sheet1Values} onChange={setSheet1Criterion} />
+        </>
       ) : (
         <>
           <div className="mb-3 rounded-md border-2 border-red-200 bg-red-50 p-3">

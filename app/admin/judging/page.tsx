@@ -53,11 +53,11 @@ export default async function AdminJudging({
   // auto-assign): Admin, Organizer/Staff, and Referee/Judge all get Full
   // access. Participant Support stays view only.
   const canManageJudging = ["admin", "organizer", "staff", "referee"].includes(myRole ?? "");
-  // Kata video scoring override: Admin and Organizer/Staff may score any
-  // recording, not just ones assigned to them. Participant Support stays
-  // blocked (not a referee); Referee/Judge is unchanged — own assigned
-  // videos only, via the separate My Account scoring flow.
-  const canScoreAnyVideo = ["admin", "organizer", "staff"].includes(myRole ?? "");
+  // Kata video scoring: Admin, Organizer/Staff, AND Referee/Judge may score
+  // any recording from this page — per the organizer's instruction, every
+  // signed-in Referee/Judge gets the Judging page with full access.
+  // Participant Support stays view only (not a referee).
+  const canScoreAnyVideo = ["admin", "organizer", "staff", "referee"].includes(myRole ?? "");
   // The browser video player's three-dot menu (download / picture-in-picture)
   // is exposed to Admin/Organizer only, per the organizer's instruction.
   const allowAdvancedControls = ["admin", "organizer", "staff"].includes(myRole ?? "");

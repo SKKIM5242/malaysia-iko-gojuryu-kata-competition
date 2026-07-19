@@ -61,6 +61,17 @@ export function splitEvenly(total: number | null): number[] {
   return SHEET2_CRITERIA.map(() => Math.round((total / SHEET2_CRITERIA.length) * 100) / 100);
 }
 
+/** Score Sheet 1's self-populate rule: the typed total (0–10) spreads
+ * evenly across all 10 rows — total ÷ 10 each, capped at the row's 0–1
+ * maximum, kept to 2 decimal places. The judge can then readjust any row
+ * by hand (the Total itself displays to 1 decimal place). */
+export function splitSheet1(total: number | null): number[] {
+  if (total == null) return SHEET1_CRITERIA.map(() => 0);
+  const t = Math.max(0, Math.min(TOTAL_MAX, total));
+  const perRow = Math.round(Math.min(t / SHEET1_CRITERIA.length, 1) * 100) / 100;
+  return SHEET1_CRITERIA.map(() => perRow);
+}
+
 /** Score Sheet 2's self-populate rule: the typed total spreads on average
  * (total ÷ 7) but items 1–5 never exceed their 0–1 range — whatever the
  * cap holds back is split equally between items 6 and 7 (0–3 each; at the

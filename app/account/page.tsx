@@ -323,6 +323,20 @@ export default async function AccountPage({
         <SiteHeader />
         <main className="mx-auto max-w-3xl px-4 py-10">
           <h1 className="text-2xl font-bold">Referee / Judge Scoring</h1>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link
+              href="/admin/judging"
+              className="rounded-md bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-600"
+            >
+              Judging page (full access)
+            </Link>
+            <Link
+              href="/kata-arena"
+              className="rounded-md border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-50"
+            >
+              Kata Arena
+            </Link>
+          </div>
           <div className="mt-6 rounded-lg border border-neutral-200 bg-neutral-50 p-4">
             <p className="mb-2 text-sm font-semibold text-neutral-700">
               Full access — every Telegram group:
