@@ -100,7 +100,7 @@ export default async function AdminSenseis({
           />
         </div>
       )}
-      <div className="grid gap-8 lg:grid-cols-2">
+      <div className="space-y-8">
         <div>
           <h2 className="mb-3 text-lg font-bold">{editing ? "Edit Sensei" : "Add Sensei"}</h2>
           <Card>

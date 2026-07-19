@@ -13,6 +13,14 @@ export interface Competition {
   description: string | null;
   judges_required: number;
   max_participants: number | null;
+  /** Manual override of the "deadline + 30 days, next Malaysia working
+   * day" winners rule — set when the organizer wants a tier's date to be
+   * special. Null = computed rule applies. */
+  winners_announce_date: string | null;
+  /** Recommended public/audience sign-in date shown next to the winners
+   * announcement — usually on/after the announce date so one paid sign-in
+   * sees everything including judge scores. */
+  audience_signin_date: string | null;
   created_at: string;
 }
 
@@ -204,7 +212,7 @@ export interface ClassInvoice {
   stripe_invoice_id: string | null;
   checkout_url: string | null;
   created_at: string;
-  student?: Pick<Student, "id" | "full_name" | "phone"> | null;
+  student?: Pick<Student, "id" | "full_name" | "phone" | "email"> | null;
   fee_plan?: Pick<FeePlan, "id" | "name" | "kind"> | null;
 }
 

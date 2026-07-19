@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/judging-timeline",
+      "schedule": "0 1 * * *"
+    }
+  ]
+}

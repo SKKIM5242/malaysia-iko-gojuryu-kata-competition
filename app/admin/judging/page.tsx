@@ -8,8 +8,8 @@ import {
 import { submitScore } from "@/app/actions/account";
 import { AdminShell, Card, adminBtn, adminInput } from "@/components/admin";
 import { CategoryName, EmptyState, SetupNotice } from "@/components/ui";
-import VideoWatchButton from "@/components/VideoWatchButton";
 import FullViewButton from "@/components/FullViewButton";
+import { ScoreSessionButton } from "@/components/RefereeScoring";
 import DownloadCsvButton from "@/components/DownloadCsvButton";
 import FilterableTable from "@/components/FilterableTable";
 import ScoreDetailButton from "@/components/ScoreDetailButton";
@@ -186,10 +186,20 @@ export default async function AdminJudging({
               disqualified={dq}
               allowAdvancedControls={allowAdvancedControls}
             />
-            <VideoWatchButton
-              url={playbackUrl ?? null}
-              label="Watch recording"
+            <ScoreSessionButton
+              item={{
+                videoId: v.id,
+                participantName: v.participant?.full_name ?? "Unknown participant",
+                participantCountry: null,
+                categoryName: v.registration?.category?.name ?? null,
+                competitionName:
+                  competitions.find((c) => c.id === v.registration?.competition_id)?.name ?? null,
+                playbackUrl: playbackUrl ?? null,
+                existingScore: myScore ?? null,
+              }}
+              canScore={canScoreAnyVideo || (user != null && assigned.includes(user.id))}
               allowAdvancedControls={allowAdvancedControls}
+              label="Watch recording"
             />
           </div>
         </div>

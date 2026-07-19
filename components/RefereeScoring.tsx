@@ -5,7 +5,7 @@ import { submitScore } from "@/app/actions/account";
 import { CategoryName } from "@/components/ui";
 import FloatingWindow from "@/components/FloatingWindow";
 import LockedVideo from "@/components/LockedVideo";
-import { SCORING_CRITERIA, splitEvenly } from "@/lib/scoring-rubric";
+import { SCORING_CRITERIA, TOTAL_MAX, splitEvenly } from "@/lib/scoring-rubric";
 import { splitCategoryName } from "@/lib/division";
 
 export interface ScoringItem {
@@ -18,10 +18,11 @@ export interface ScoringItem {
   existingScore: number | null;
 }
 
-/** The rubric table itself — shared by Score Sheet 2 (editable, for a
- * referee) and the read-only admin detail view via the `readOnly` prop.
- * Matches "SCORE TABLE 2 WITH FORMULA.xlsx" exactly: No. / Criteria /
- * Range / Score, ending in a Total Score row. */
+/** The official rubric table, matching "SCORE TABLE 2 WITH FORMULA.xlsx"
+ * exactly: No. / Criteria / Score range (0–1 ×5, 0–3 ×2) / score column,
+ * ending in the Total Score (0–10) row and the sheet's "0 = Disqualified"
+ * rule. `readOnly` renders values only (admin detail view + Score Sheet
+ * 1's self-populated rows). */
 export function RubricTable({
   values,
   onChange,
@@ -33,6 +34,7 @@ export function RubricTable({
 }) {
   const total = useMemo(() => Math.round(values.reduce((a, b) => a + b, 0) * 10) / 10, [values]);
   const disqualifying = total === 0;
+  const overMax = total > TOTAL_MAX;
   return (
     <>
       <div className="overflow-x-auto rounded-md border border-neutral-200">
@@ -41,8 +43,8 @@ export function RubricTable({
             <tr>
               <th className="px-2 py-1.5">No.</th>
               <th className="px-2 py-1.5">Criteria</th>
-              <th className="px-2 py-1.5">Range</th>
-              <th className="px-2 py-1.5">{readOnly ? "Score" : "Your score"}</th>
+              <th className="px-2 py-1.5">Score</th>
+              <th className="px-2 py-1.5">{readOnly ? "Points" : "Your score"}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100">
@@ -53,7 +55,7 @@ export function RubricTable({
                 <td className="px-2 py-1.5 text-neutral-400">0–{c.max}</td>
                 <td className="px-2 py-1.5">
                   {readOnly ? (
-                    <span className="font-semibold text-neutral-800">{(values[i] ?? 0).toFixed(1)}</span>
+                    <span className="font-semibold text-neutral-800">{(values[i] ?? 0).toFixed(2)}</span>
                   ) : (
                     <input
                       type="number"
@@ -69,31 +71,49 @@ export function RubricTable({
               </tr>
             ))}
             <tr className="bg-neutral-50 font-semibold">
-              <td colSpan={3} className="px-2 py-2 text-right">Total Score</td>
-              <td className={`px-2 py-2 ${disqualifying ? "text-red-700" : "text-neutral-900"}`}>
+              <td colSpan={2} className="px-2 py-2 text-right">Total Score</td>
+              <td className="px-2 py-2 text-neutral-400">0–{TOTAL_MAX}</td>
+              <td className={`px-2 py-2 ${disqualifying || overMax ? "text-red-700" : "text-neutral-900"}`}>
                 {total.toFixed(1)}
               </td>
             </tr>
           </tbody>
         </table>
       </div>
+      {overMax && (
+        <p className="mt-2 text-xs font-semibold text-red-700">
+          Total Score cannot exceed {TOTAL_MAX} — lower one or more rows before submitting.
+        </p>
+      )}
       {disqualifying && (
         <p className="mt-2 text-xs font-semibold text-red-700">
-          A Total Score of 0 disqualifies this participant — they will not be announced as a
-          winner, regardless of the other judges&apos; scores.
+          0 = Disqualified — this participant will not be announced as a winner, regardless of the
+          other judges&apos; scores.
         </p>
       )}
     </>
   );
 }
 
-/** One judging session: chooser (Score Sheet 1 or 2) → two floating
- * windows, video on one half and the chosen score sheet on the other
- * (side-by-side in landscape; stacked in portrait). Closing the score
- * sheet expands the video to full screen so the judge can finish watching
- * first — the moment the video ends, the score board pops back up to
- * score and save. Closing the video window ends the session. */
-function ScoreSession({ item, onExit }: { item: ScoringItem; onExit: () => void }) {
+/** One judging session, exactly as instructed: chooser first (Score Sheet
+ * 1 or 2, both straight from the Excel), then two floating windows — the
+ * recording on one half and the chosen sheet on the other (side-by-side
+ * in landscape, stacked in portrait). Sheet 1 is the spreadsheet's
+ * "Sensei Just Input a No. to Self-Populate" mode: one Total (0–10) and
+ * every criterion row fills itself with total÷7. Sheet 2 is row-by-row
+ * entry. Closing the sheet (✕ top right) expands the video to full
+ * screen; when the recording ends the score board pops back up to score
+ * and save. The Sheet 1 / Sheet 2 buttons on the recording window switch
+ * sheets mid-session. Closing the video window ends the session. */
+export function ScoreSession({
+  item,
+  onExit,
+  allowAdvancedControls = false,
+}: {
+  item: ScoringItem;
+  onExit: () => void;
+  allowAdvancedControls?: boolean;
+}) {
   const [sheet, setSheet] = useState<1 | 2 | null>(null);
   const [scoreOpen, setScoreOpen] = useState(true);
   const [saved, setSaved] = useState(item.existingScore != null);
@@ -103,12 +123,19 @@ function ScoreSession({ item, onExit }: { item: ScoringItem; onExit: () => void 
     item.existingScore != null ? String(item.existingScore) : "",
   );
 
-  const total = useMemo(() => Math.round(values.reduce((a, b) => a + b, 0) * 10) / 10, [values]);
+  const rowTotal = useMemo(() => Math.round(values.reduce((a, b) => a + b, 0) * 10) / 10, [values]);
+  const sheet1Total = quickTotal === "" ? null : Math.max(0, Math.min(TOTAL_MAX, Number(quickTotal) || 0));
+  const sheet1Values = useMemo(() => splitEvenly(sheet1Total), [sheet1Total]);
 
   function setCriterion(i: number, raw: string) {
     const n = Math.max(0, Math.min(SCORING_CRITERIA[i].max, Number(raw) || 0));
     setValues((v) => v.map((x, idx) => (idx === i ? n : x)));
     setSaved(false);
+  }
+
+  function pickSheet(n: 1 | 2) {
+    setSheet(n);
+    setScoreOpen(true);
   }
 
   if (sheet === null) {
@@ -117,26 +144,31 @@ function ScoreSession({ item, onExit }: { item: ScoringItem; onExit: () => void 
         <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
           <p className="font-bold text-neutral-900">Which score sheet do you prefer?</p>
           <p className="mt-1 text-xs text-neutral-500">
-            The recording and your chosen score sheet open side by side — on iPad or phone, rotate
-            to landscape for the side-by-side view (portrait stacks them top and bottom).
+            Both are the official table from the organizer&apos;s spreadsheet. The recording and
+            your chosen sheet open side by side — on iPad or phone, rotate to landscape for the
+            side-by-side view (portrait stacks them top and bottom).
           </p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <button
               type="button"
-              onClick={() => setSheet(1)}
+              onClick={() => pickSheet(1)}
               className="rounded-lg border-2 border-neutral-300 p-4 text-left hover:border-red-700 hover:bg-red-50"
             >
               <p className="font-bold text-neutral-900">Score Sheet 1</p>
-              <p className="mt-1 text-xs text-neutral-500">Quick entry — one Total Score box (0–10).</p>
+              <p className="mt-1 text-xs text-neutral-500">
+                Input one Total Score (0–{TOTAL_MAX}) — every criteria row self-populates, exactly
+                like the spreadsheet&apos;s &quot;input a No. to self-populate&quot; column.
+              </p>
             </button>
             <button
               type="button"
-              onClick={() => setSheet(2)}
+              onClick={() => pickSheet(2)}
               className="rounded-lg border-2 border-neutral-300 p-4 text-left hover:border-red-700 hover:bg-red-50"
             >
-              <p className="font-bold text-neutral-900">Score Sheet 2 — Detail View</p>
+              <p className="font-bold text-neutral-900">Score Sheet 2</p>
               <p className="mt-1 text-xs text-neutral-500">
-                The official 7-criteria rubric, scored row by row with the total computed for you.
+                Score each of the 7 criteria row by row (0–1 and 0–3 ranges) — the Total computes
+                itself, capped at {TOTAL_MAX}.
               </p>
             </button>
           </div>
@@ -152,6 +184,10 @@ function ScoreSession({ item, onExit }: { item: ScoringItem; onExit: () => void 
     );
   }
 
+  const submitBlocked = sheet === 2 ? rowTotal > TOTAL_MAX : sheet1Total == null;
+  const submittedScore = sheet === 2 ? rowTotal : (sheet1Total ?? 0);
+  const submittedCriteria = sheet === 2 ? values : sheet1Values;
+
   const scoreForm = (
     <form
       action={async (formData) => {
@@ -163,40 +199,39 @@ function ScoreSession({ item, onExit }: { item: ScoringItem; onExit: () => void 
       className="p-4"
     >
       <input type="hidden" name="video_id" value={item.videoId} />
+      <input type="hidden" name="score" value={submittedScore} />
+      {submittedCriteria.map((v, i) => (
+        <input key={i} type="hidden" name="criteria" value={v} />
+      ))}
       {sheet === 2 ? (
-        <>
-          <input type="hidden" name="score" value={total} />
-          {values.map((v, i) => (
-            <input key={i} type="hidden" name="criteria" value={v} />
-          ))}
-          <RubricTable values={values} onChange={setCriterion} />
-        </>
+        <RubricTable values={values} onChange={setCriterion} />
       ) : (
-        <div className="rounded-md border border-neutral-200 p-4">
-          <label htmlFor={`quick_${item.videoId}`} className="mb-1 block text-sm font-semibold text-neutral-700">
-            Total Score (0–10)
-          </label>
-          <input
-            id={`quick_${item.videoId}`}
-            name="score"
-            type="number"
-            min={0}
-            max={10}
-            step={0.1}
-            required
-            value={quickTotal}
-            onChange={(e) => {
-              setQuickTotal(e.target.value);
-              setSaved(false);
-            }}
-            className="w-32 rounded-md border border-neutral-300 px-3 py-2 text-lg font-bold"
-          />
-          {Number(quickTotal) === 0 && quickTotal !== "" && (
-            <p className="mt-2 text-xs font-semibold text-red-700">
-              A Total Score of 0 disqualifies this participant.
-            </p>
-          )}
-        </div>
+        <>
+          <RubricTable values={sheet1Values} readOnly />
+          <div className="mt-3 rounded-md border-2 border-red-200 bg-red-50 p-3">
+            <label htmlFor={`quick_${item.videoId}`} className="mb-1 block text-sm font-bold text-neutral-800">
+              Just input one Total Score (0–{TOTAL_MAX}) — the rows above self-populate
+            </label>
+            <input
+              id={`quick_${item.videoId}`}
+              name="quick_total_display"
+              type="number"
+              min={0}
+              max={TOTAL_MAX}
+              step={0.1}
+              required
+              value={quickTotal}
+              onChange={(e) => {
+                setQuickTotal(e.target.value);
+                setSaved(false);
+              }}
+              className="w-32 rounded-md border border-neutral-300 px-3 py-2 text-lg font-bold"
+            />
+            {sheet1Total === 0 && quickTotal !== "" && (
+              <p className="mt-2 text-xs font-semibold text-red-700">0 = Disqualified.</p>
+            )}
+          </div>
+        </>
       )}
       <p className="mt-2 text-xs text-neutral-400">
         Submitting is final — scores cannot be appealed or changed once judging closes.
@@ -204,21 +239,34 @@ function ScoreSession({ item, onExit }: { item: ScoringItem; onExit: () => void 
       <div className="mt-2 flex flex-wrap items-center gap-3">
         <button
           type="submit"
-          disabled={pending}
+          disabled={pending || submitBlocked}
           className="rounded-md bg-red-700 px-4 py-1.5 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-60"
         >
           {pending ? "Saving…" : saved ? "Update score" : "Submit score"}
         </button>
         {saved && <span className="text-xs font-semibold text-green-700">✔ Score saved</span>}
-        <button
-          type="button"
-          onClick={() => setSheet(sheet === 1 ? 2 : 1)}
-          className="text-xs font-semibold text-neutral-500 underline underline-offset-2 hover:text-neutral-700"
-        >
-          Switch to Score Sheet {sheet === 1 ? "2" : "1"}
-        </button>
       </div>
     </form>
+  );
+
+  const sheetSwitchButtons = (
+    <div className="mr-1 flex items-center gap-1" data-no-drag>
+      {([1, 2] as const).map((n) => (
+        <button
+          key={n}
+          type="button"
+          onClick={() => pickSheet(n)}
+          className={`rounded px-2 py-0.5 text-[11px] font-bold ${
+            sheet === n && scoreOpen
+              ? "bg-red-700 text-white"
+              : "bg-white text-neutral-600 ring-1 ring-neutral-300 hover:bg-neutral-100"
+          }`}
+          title={`Open Score Sheet ${n}`}
+        >
+          Sheet {n}
+        </button>
+      ))}
+    </div>
   );
 
   return (
@@ -227,10 +275,16 @@ function ScoreSession({ item, onExit }: { item: ScoringItem; onExit: () => void 
         title={`Watch Recording — ${item.participantName}`}
         onClose={onExit}
         initial={scoreOpen ? "first-half" : "max"}
+        headerExtra={sheetSwitchButtons}
       >
         <div className="flex h-full flex-col bg-black">
           {item.playbackUrl ? (
-            <LockedVideo src={item.playbackUrl} autoPlay onEnded={() => setScoreOpen(true)} />
+            <LockedVideo
+              src={item.playbackUrl}
+              autoPlay
+              allowAdvancedControls={allowAdvancedControls}
+              onEnded={() => setScoreOpen(true)}
+            />
           ) : (
             <p className="p-6 text-sm text-neutral-300">Video not available.</p>
           )}
@@ -249,12 +303,53 @@ function ScoreSession({ item, onExit }: { item: ScoringItem; onExit: () => void 
             </p>
             <p className="mt-1 text-xs text-neutral-400">
               Close this sheet (✕) to finish watching first — it pops back up the moment the
-              recording ends.
+              recording ends. Switch sheets with the Sheet 1 / Sheet 2 buttons on the recording
+              window.
             </p>
           </div>
           {scoreForm}
         </FloatingWindow>
       )}
+    </>
+  );
+}
+
+/** "Watch recording" that scores: for anyone allowed to score this video
+ * it opens the full ScoreSession (sheet chooser → dual windows); for
+ * view-only staff it opens a plain video window. Used on the Judging page
+ * and the admin Score Recordings page. */
+export function ScoreSessionButton({
+  item,
+  canScore,
+  allowAdvancedControls = false,
+  label = "Watch recording",
+}: {
+  item: ScoringItem;
+  canScore: boolean;
+  allowAdvancedControls?: boolean;
+  label?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  if (!item.playbackUrl) return null;
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="shrink-0 rounded border border-neutral-300 px-3 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
+      >
+        {label}
+      </button>
+      {open &&
+        (canScore ? (
+          <ScoreSession item={item} onExit={() => setOpen(false)} allowAdvancedControls={allowAdvancedControls} />
+        ) : (
+          <FloatingWindow title={`Watch Recording — ${item.participantName}`} onClose={() => setOpen(false)}>
+            <div className="flex h-full flex-col bg-black">
+              <LockedVideo src={item.playbackUrl} autoPlay allowAdvancedControls={allowAdvancedControls} />
+            </div>
+          </FloatingWindow>
+        ))}
     </>
   );
 }

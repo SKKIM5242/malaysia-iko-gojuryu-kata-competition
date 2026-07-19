@@ -79,6 +79,7 @@ export default async function AdminParticipantRecords() {
     ? await supabase.from("profiles").select("role").eq("user_id", user.id).maybeSingle()
     : { data: null };
   const isAdmin = myProfile?.role === "admin";
+  const canManageSlot = ["admin", "organizer", "staff", "referee"].includes(myProfile?.role ?? "");
 
   const { data: purchases } = await supabase
     .from("attempt_purchases")
@@ -154,6 +155,10 @@ export default async function AdminParticipantRecords() {
     recordingDate: r.videoCreatedAt ? formatDate(r.videoCreatedAt.slice(0, 10)) : "",
     attempts: `${r.recordAttempts}/${r.maxAttempts}`,
     videoUrl: r.videoUrl,
+    slotStatus: r.slotStatus,
+    slotStatusNote: r.slotStatusNote,
+    slotStatusChangedBy: r.slotStatusChangedBy,
+    slotStatusChangedAt: r.slotStatusChangedAt,
   }));
 
   const refereeColumns = [
@@ -306,10 +311,16 @@ export default async function AdminParticipantRecords() {
       </p>
 
       <Section id="participants" title="Participants">
+        <p className="mb-3 text-xs text-neutral-400">
+          A participant who has not submitted a recording by their competition&apos;s deadline is
+          automatically marked Unslotted and their payment Forfeited (checked daily). Admin,
+          Organizer, and Referee/Judge accounts can also set or reset Unslot / Forfeited / Give Up
+          manually from the Slot Status column, to clean up the list at any time.
+        </p>
         {participantRows.length === 0 ? (
           <EmptyState>No successful registrations yet.</EmptyState>
         ) : (
-          <ParticipantRecordsTable rows={participantRows} isAdmin={isAdmin} />
+          <ParticipantRecordsTable rows={participantRows} isAdmin={isAdmin} canManageSlot={canManageSlot} />
         )}
       </Section>
 

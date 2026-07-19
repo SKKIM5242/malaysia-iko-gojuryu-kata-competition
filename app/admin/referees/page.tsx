@@ -126,7 +126,7 @@ export default async function AdminReferees({
         </div>
       )}
 
-      <div className="grid gap-8 lg:grid-cols-2">
+      <div className="space-y-8">
         <div>
           <h2 className="mb-3 text-lg font-bold">{editing ? "Edit Referee/Judge" : "Add Referee/Judge"}</h2>
           <Card>

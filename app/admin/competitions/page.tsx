@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getAllCompetitions } from "@/lib/admin-data";
 import { getCategories, schemaReady } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
-import { saveCompetition, saveCategory, deleteCategory, mergeCategoryToMix } from "@/app/actions/admin";
+import { saveCompetition, saveCategory, deleteCategory, mergeCategoryToMix, mergeCategoryAgeGroup } from "@/app/actions/admin";
 import { AdminShell, Card, adminBtn, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, NoTranslate, SetupNotice, formatDate, formatUSD } from "@/components/ui";
 import DownloadCsvButton from "@/components/DownloadCsvButton";
@@ -92,6 +92,26 @@ export default async function AdminCompetitions({
                       <label htmlFor="registration_deadline" className={adminLabel}>Registration deadline</label>
                       <input id="registration_deadline" name="registration_deadline" type="date" defaultValue={editing?.registration_deadline ?? ""} className={adminInput} />
                     </div>
+                    <div>
+                      <label htmlFor="winners_announce_date" className={adminLabel}>
+                        Winners announce date{" "}
+                        <span className="font-normal text-neutral-400">(blank = deadline + 30 days rule)</span>
+                      </label>
+                      <input id="winners_announce_date" name="winners_announce_date" type="date" defaultValue={editing?.winners_announce_date ?? ""} className={adminInput} />
+                    </div>
+                    <div>
+                      <label htmlFor="audience_signin_date" className={adminLabel}>
+                        Audience recommended sign-in date
+                      </label>
+                      <input id="audience_signin_date" name="audience_signin_date" type="date" defaultValue={editing?.audience_signin_date ?? ""} className={adminInput} />
+                    </div>
+                    <p className="text-xs text-neutral-400 sm:col-span-2">
+                      Event date → Registration deadline is the participants&apos; recording-submission
+                      timeline; referees start scoring only after the deadline. Setting a Winners
+                      announce date makes this tier &quot;special&quot; — it overrides the default
+                      &quot;deadline + 30 days, next Malaysia working day&quot; rule everywhere
+                      (Winners page, audience score reveal, and the registration page).
+                    </p>
                     <div>
                       <label htmlFor="registration_fee_usd" className={adminLabel}>Fee (USD)</label>
                       <input id="registration_fee_usd" name="registration_fee_usd" type="number" step="0.01" min="0" defaultValue={editing?.registration_fee_usd ?? ""} className={adminInput} />
@@ -219,11 +239,19 @@ export default async function AdminCompetitions({
             <EmptyState>No competitions yet — create one on the left.</EmptyState>
           ) : (
             <div className="space-y-4">
-              {competitions.map((c) => (
-                <Card key={c.id}>
-                  <div className="flex flex-wrap items-start justify-between gap-2">
+              {/* Tiers listed cheapest first (USD 10 → 100 → 200), newly
+                  created ones after, each in its own drop-down/up panel. */}
+              {[...competitions]
+                .sort(
+                  (a, b) =>
+                    (a.registration_fee_usd ?? 0) - (b.registration_fee_usd ?? 0) ||
+                    a.created_at.localeCompare(b.created_at),
+                )
+                .map((c) => (
+                <details key={c.id} className="rounded-lg border border-neutral-200 bg-white shadow-sm" open={editing?.id === c.id}>
+                  <summary className="flex cursor-pointer flex-wrap items-start justify-between gap-2 px-4 py-3 hover:bg-neutral-50">
                     <div>
-                      <p className="font-bold text-neutral-900">{c.name}</p>
+                      <p className="font-bold text-neutral-900">▾ {c.name}</p>
                       <p className="mt-0.5 text-sm text-neutral-500">
                         {formatDate(c.event_date)} · {c.venue ?? "Venue TBA"} · {formatUSD(c.registration_fee_usd)}
                       </p>
@@ -232,6 +260,11 @@ export default async function AdminCompetitions({
                           {c.status}
                         </span>
                         {" · deadline "}{formatDate(c.registration_deadline)}
+                        {c.winners_announce_date && ` · winners ${formatDate(c.winners_announce_date)}`}
+                      </p>
+                      <p className="mt-0.5 text-[11px] normal-case text-neutral-400">
+                        Event date → deadline is the participant recording-submission timeline;
+                        referees start scoring after the deadline.
                       </p>
                     </div>
                     {canManageCompetition && (
@@ -242,8 +275,8 @@ export default async function AdminCompetitions({
                         Edit
                       </Link>
                     )}
-                  </div>
-                  <div className="mt-3 border-t border-neutral-100 pt-3">
+                  </summary>
+                  <div className="border-t border-neutral-100 px-4 pb-4 pt-3">
                     <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-neutral-400">Categories</p>
                     {(categoriesByCompetition.get(c.id) ?? []).length === 0 ? (
                       <p className="text-sm text-neutral-400">None yet — edit this competition to add categories.</p>
@@ -286,6 +319,26 @@ export default async function AdminCompetitions({
                                             </button>
                                           </form>
                                         )}
+                                        <form action={mergeCategoryAgeGroup}>
+                                          <input type="hidden" name="category_id" value={cat.id} />
+                                          <input type="hidden" name="direction" value="before" />
+                                          <button
+                                            className="rounded border border-purple-300 px-2 py-0.5 text-xs text-purple-700 hover:bg-purple-50"
+                                            title="Merge with the earlier age group (same kata, belt, and gender) — the age range widens to cover both; repeat to combine 2 or 3 age groups"
+                                          >
+                                            ⇤ Merge age
+                                          </button>
+                                        </form>
+                                        <form action={mergeCategoryAgeGroup}>
+                                          <input type="hidden" name="category_id" value={cat.id} />
+                                          <input type="hidden" name="direction" value="after" />
+                                          <button
+                                            className="rounded border border-purple-300 px-2 py-0.5 text-xs text-purple-700 hover:bg-purple-50"
+                                            title="Merge with the later age group (same kata, belt, and gender) — the age range widens to cover both; repeat to combine 2 or 3 age groups"
+                                          >
+                                            Merge age ⇥
+                                          </button>
+                                        </form>
                                         <Link
                                           href={`/admin/competitions?editcat=${cat.id}`}
                                           className="rounded border border-neutral-300 px-2 py-0.5 text-xs text-neutral-600 hover:bg-neutral-50"
@@ -308,8 +361,13 @@ export default async function AdminCompetitions({
                         ))}
                       </div>
                     )}
+                    <p className="mt-2 text-[11px] text-neutral-400">
+                      Policy: any event with fewer than 70 recording submissions may have its
+                      categories or divisions merged with others — use Merge → Mix for gender and
+                      ⇤/⇥ Merge age to combine 2 or 3 age groups within the same event.
+                    </p>
                   </div>
-                </Card>
+                </details>
               ))}
             </div>
           )}

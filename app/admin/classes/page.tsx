@@ -4,9 +4,10 @@ import { schemaReady } from "@/lib/data";
 import {
   saveStudent, deleteStudent, bulkUploadStudents, saveFeePlan, deleteFeePlan, enrollStudent,
   updateEnrollmentStatus, generateDueInvoices, createManualInvoice, updateInvoiceStatus,
-  generateInvoicePaymentLink,
+  generateInvoicePaymentLink, emailInvoice, emailAllUnpaidPaymentLinks,
 } from "@/app/actions/classes";
 import { paymentsEnabled } from "@/lib/payments";
+import { getTelegramLink } from "@/lib/telegram";
 import { AdminShell, Card, adminBtn, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice, formatDate } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
@@ -102,13 +103,22 @@ export default async function AdminClasses({
   if (tab === "invoices") {
     let q = supabase
       .from("class_invoices")
-      .select("*, student:students(id, full_name, phone), fee_plan:fee_plans(id, name, kind)")
+      .select("*, student:students(id, full_name, phone, email), fee_plan:fee_plans(id, name, kind)")
       .order("created_at", { ascending: false })
       .limit(300);
     if (invoiceFilter) q = q.eq("status", invoiceFilter);
     const { data } = await q;
     invoices = (data as unknown as ClassInvoice[]) ?? [];
   }
+
+  const activePlans = plans.filter((p) => p.active);
+  const plansForAudience = (audience: "student" | "adult") =>
+    activePlans.filter((p) => p.audience === audience || p.audience === "all");
+  const categoryOptionLabel = (audience: "student" | "adult", fallback: string) => {
+    const matches = plansForAudience(audience);
+    if (matches.length === 0) return `${fallback} (no active fee plan yet — add one under Fee plans)`;
+    return `${fallback} — ${matches.map((p) => `${p.name} (${fmtMoney(p.amount_myr, p.currency)}/${(INTERVAL_LABEL[p.billing_interval] ?? p.billing_interval).toLowerCase()})`).join(", ")}`;
+  };
 
   const editingStudent = tab === "students" && params.edit ? students.find((s) => s.id === params.edit) : undefined;
   const editingPlan = tab === "plans" && params.edit ? plans.find((p) => p.id === params.edit) : undefined;
@@ -163,9 +173,13 @@ export default async function AdminClasses({
                   <div>
                     <label htmlFor="category" className={adminLabel}>Fee category *</label>
                     <select id="category" name="category" defaultValue={editingStudent?.category ?? "student"} className={adminInput}>
-                      <option value="student">Student (RM 800/mo plan)</option>
-                      <option value="adult">Adult (RM 900/mo plan)</option>
+                      <option value="student">{categoryOptionLabel("student", "Student")}</option>
+                      <option value="adult">{categoryOptionLabel("adult", "Adult")}</option>
                     </select>
+                    <p className="mt-1 text-xs text-neutral-400">
+                      Matching plan(s) shown automatically from the Fee plans tab — edit a plan&apos;s
+                      Audience there to change which category it lists under.
+                    </p>
                   </div>
                   <div>
                     <label htmlFor="status" className={adminLabel}>Status</label>
@@ -530,6 +544,13 @@ export default async function AdminClasses({
             <form action={generateDueInvoices}>
               <button className={adminBtn}>Generate due invoices</button>
             </form>
+            {paymentsEnabled() && (
+              <form action={emailAllUnpaidPaymentLinks}>
+                <button className="rounded-md border border-neutral-900 bg-white px-4 py-2 text-sm font-semibold text-neutral-900 hover:bg-neutral-50">
+                  Email payment links to all unpaid
+                </button>
+              </form>
+            )}
             <div className="flex gap-2 text-sm">
               {["all", "unpaid", "paid", "void"].map((s) => (
                 <Link
@@ -656,6 +677,14 @@ export default async function AdminClasses({
                     status_text: inv.status,
                     actions: (
                       <div className="flex flex-wrap gap-1.5">
+                        {inv.student?.email && (
+                          <form action={emailInvoice} title="Emails this invoice to the student, with the class Telegram group link">
+                            <input type="hidden" name="id" value={inv.id} />
+                            <button className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50">
+                              Email invoice
+                            </button>
+                          </form>
+                        )}
                         {inv.status === "unpaid" && paymentsEnabled() && (
                           inv.checkout_url ? (
                             <a
@@ -711,7 +740,11 @@ export default async function AdminClasses({
               <p className="mt-3 text-xs text-neutral-400">
                 “Generate due invoices” bills every active enrollment whose billing date has arrived and
                 schedules the next cycle (yearly / monthly / bi-monthly / quarterly). When your Stripe
-                secret key is added, these invoices can be charged online automatically.
+                secret key is added, these invoices can be charged online automatically. “Email invoice”
+                and “Email payment links to all unpaid” send to the student&apos;s own email address —
+                {getTelegramLink("class")
+                  ? " each email also includes the Dojo Class Students Telegram group link, since individual students aren't bot-linked for a direct Telegram message."
+                  : " set TELEGRAM_GROUP_CLASS to also include the Dojo Class Students Telegram group link in these emails."}
               </p>
             </div>
           </div>

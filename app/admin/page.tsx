@@ -19,6 +19,22 @@ export default async function AdminDashboard() {
 
   const [counts, logs] = await Promise.all([getAdminCounts(), getRecentAuditLogs(10)]);
 
+  // "Who did it" column — resolve each audit row's actor to their signed-in
+  // name and email address.
+  const { createClient } = await import("@/lib/supabase/server");
+  const supabase = await createClient();
+  const actorIds = [...new Set(logs.map((l) => l.actor_id).filter((id): id is string => !!id))];
+  const { data: actorProfiles } =
+    actorIds.length > 0
+      ? await supabase.from("profiles").select("user_id, full_name, email").in("user_id", actorIds)
+      : { data: [] };
+  const actorLabel = new Map(
+    (actorProfiles ?? []).map((p) => [
+      p.user_id as string,
+      [p.full_name, p.email].filter(Boolean).join(" — ") || (p.user_id as string).slice(0, 8),
+    ]),
+  );
+
   const stats: Array<[string, number, string]> = [
     ["Pending payments", counts.registrations.pending, "/admin/registrations?status=pending"],
     ["Paid registrations", counts.registrations.paid, "/admin/registrations?status=paid"],
@@ -57,6 +73,7 @@ export default async function AdminDashboard() {
           columns={[
             { key: "when", label: "When" },
             { key: "action", label: "Action" },
+            { key: "by", label: "By (Name — Email)" },
             { key: "table", label: "Table" },
             { key: "record", label: "Record" },
           ]}
@@ -64,6 +81,7 @@ export default async function AdminDashboard() {
             id: l.id,
             action: l.action,
             when: new Date(l.created_at).toLocaleString("en-MY"),
+            by: l.actor_id ? (actorLabel.get(l.actor_id) ?? l.actor_id.slice(0, 8)) : "System / public",
             table: l.table_name,
             record: l.record_id?.slice(0, 8) ?? "—",
           }))}

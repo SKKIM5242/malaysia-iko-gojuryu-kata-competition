@@ -88,7 +88,7 @@ export default async function AdminSchools({
           />
         </div>
       )}
-      <div className="grid gap-8 lg:grid-cols-2">
+      <div className="space-y-8">
         <div>
           <h2 className="mb-3 text-lg font-bold">{editing ? "Edit School" : "Add School"}</h2>
           <Card>

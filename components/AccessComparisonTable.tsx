@@ -106,7 +106,32 @@ const ROWS: Array<{ what: string; cells: [string, string, string, string, string
   },
 ];
 
-export default function AccessComparisonTable() {
+/** The code's built-in rows, used to seed the editable
+ * access_comparison_rows table and as the fallback while it's empty. */
+export const DEFAULT_COMPARISON_ROWS = ROWS;
+
+export interface ComparisonRow {
+  id?: string;
+  what: string;
+  cells: [string, string, string, string, string, string, string];
+}
+
+/** DB-backed since the organizer can now edit this table from the admin
+ * Content page — falls back to the built-in rows while the table is
+ * empty. */
+export default async function AccessComparisonTable() {
+  const { createClient } = await import("@/lib/supabase/server");
+  const supabase = await createClient();
+  const { data } = await supabase.from("access_comparison_rows").select("*").order("position");
+  const rows: ComparisonRow[] =
+    data && data.length > 0
+      ? data.map((r) => ({
+          id: r.id,
+          what: r.what,
+          cells: [r.participant, r.school, r.sensei, r.referee, r.audience, r.organizer, r.support],
+        }))
+      : ROWS;
+
   return (
     <div className="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
       <h2 className="text-lg font-bold text-neutral-900">What Your Payment Unlocks — Access Comparison</h2>
@@ -124,8 +149,8 @@ export default function AccessComparisonTable() {
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100">
-            {ROWS.map((r) => (
-              <tr key={r.what} className="align-top hover:bg-neutral-50">
+            {rows.map((r) => (
+              <tr key={r.id ?? r.what} className="align-top hover:bg-neutral-50">
                 <td className="px-3 py-2 font-semibold text-neutral-800">{r.what}</td>
                 {r.cells.map((cell, i) => (
                   <td key={i} className="px-3 py-2 text-neutral-600">{cell}</td>

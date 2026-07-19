@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { writeAudit } from "@/lib/audit";
 import { getStripe, paymentsEnabled } from "@/lib/payments";
 import { parseCsvWithHeader, type CsvUploadResult } from "@/lib/csv-bulk";
+import { sendConfirmationEmail } from "@/lib/notify";
+import { getTelegramLink } from "@/lib/telegram";
 import type { ClassEnrollment, ClassInvoice, FeePlan } from "@/lib/types";
 
 /** Dojo class billing actions — admin only (RLS: authenticated). */
@@ -385,6 +387,124 @@ export async function generateInvoicePaymentLink(formData: FormData) {
     backTo("invoices", { error: "Stripe did not return a payment link. Please try again." });
   }
   backTo("invoices", { ok: "Payment link created — click “Payment link” on the invoice to open or copy it." });
+}
+
+/**
+ * Emails one invoice to the student's own email address, including its
+ * Stripe payment link (if one exists yet) and the Dojo Class Students
+ * Telegram group link — individual students don't have a bot-linked chat
+ * ID, so Telegram delivery here means "here's the group to watch for it",
+ * same as every other confirmation email in the app.
+ */
+export async function emailInvoice(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const { supabase, actorId } = await getActor();
+  const { data } = await supabase
+    .from("class_invoices")
+    .select("*, student:students(id, full_name, email)")
+    .eq("id", id)
+    .maybeSingle();
+  const invoice = data as unknown as ClassInvoice | null;
+  if (!invoice) backTo("invoices", { error: "Invoice not found." });
+  if (!invoice!.student?.email) backTo("invoices", { error: "This student has no email address on file." });
+
+  await sendConfirmationEmail({
+    toEmail: invoice!.student!.email,
+    recipientName: invoice!.student!.full_name,
+    subject: `Invoice: ${invoice!.description}`,
+    bodyLines: [
+      `${invoice!.description} — ${invoice!.currency || "MYR"} ${Number(invoice!.amount_myr).toFixed(2)}`,
+      invoice!.due_date ? `Due date: ${invoice!.due_date}` : "",
+      invoice!.checkout_url
+        ? `Pay online: ${invoice!.checkout_url}`
+        : "Please contact the dojo to arrange payment.",
+    ].filter(Boolean),
+    telegramCategory: "class",
+  });
+  await writeAudit(supabase, {
+    table_name: "class_invoices", record_id: id, action: "invoice_emailed",
+    new_value: { to: invoice!.student!.email }, actor_id: actorId,
+  });
+  const telegramUrl = getTelegramLink("class");
+  backTo("invoices", {
+    ok: telegramUrl
+      ? "Invoice emailed. Dojo Class Students Telegram group is also linked in that email."
+      : "Invoice emailed.",
+  });
+}
+
+/**
+ * Bulk-sends every unpaid invoice's payment link by email — generating one
+ * first (via Stripe) for any unpaid invoice that doesn't have one yet.
+ * Skips invoices whose student has no email on file; reports both counts.
+ */
+export async function emailAllUnpaidPaymentLinks() {
+  const { supabase, actorId } = await getActor();
+  if (!paymentsEnabled()) backTo("invoices", { error: "Online payment is not configured yet." });
+
+  const { data } = await supabase
+    .from("class_invoices")
+    .select("*, student:students(id, full_name, email)")
+    .eq("status", "unpaid");
+  const unpaid = (data as unknown as ClassInvoice[]) ?? [];
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  let sent = 0;
+  let skippedNoEmail = 0;
+
+  for (const invoice of unpaid) {
+    if (!invoice.student?.email) { skippedNoEmail++; continue; }
+
+    let checkoutUrl = invoice.checkout_url;
+    if (!checkoutUrl) {
+      try {
+        const session = await getStripe().checkout.sessions.create({
+          mode: "payment",
+          line_items: [
+            {
+              price_data: {
+                currency: (invoice.currency || "MYR").toLowerCase(),
+                unit_amount: Math.round(Number(invoice.amount_myr) * 100),
+                product_data: {
+                  name: invoice.description,
+                  description: `Payer: ${invoice.student.full_name} — IKO GOJU-RYU KARATE-DO MALAYSIA SDN BHD`,
+                },
+              },
+              quantity: 1,
+            },
+          ],
+          metadata: { invoice_id: invoice.id },
+          success_url: `${appUrl}/pay/thanks?session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `${appUrl}/pay/thanks?cancelled=1`,
+        });
+        checkoutUrl = session.url;
+        await supabase.from("class_invoices").update({ checkout_url: checkoutUrl }).eq("id", invoice.id);
+      } catch {
+        continue;
+      }
+    }
+
+    await sendConfirmationEmail({
+      toEmail: invoice.student.email,
+      recipientName: invoice.student.full_name,
+      subject: `Payment link: ${invoice.description}`,
+      bodyLines: [
+        `${invoice.description} — ${invoice.currency || "MYR"} ${Number(invoice.amount_myr).toFixed(2)}`,
+        invoice.due_date ? `Due date: ${invoice.due_date}` : "",
+        `Pay online: ${checkoutUrl}`,
+      ].filter(Boolean),
+      telegramCategory: "class",
+    });
+    sent++;
+  }
+
+  await writeAudit(supabase, {
+    table_name: "class_invoices", record_id: null, action: "invoices_payment_links_emailed",
+    new_value: { sent, skippedNoEmail }, actor_id: actorId,
+  });
+  backTo("invoices", {
+    ok: `Payment links emailed to ${sent} student(s).${skippedNoEmail ? ` ${skippedNoEmail} skipped (no email on file).` : ""}`,
+  });
 }
 
 export async function updateInvoiceStatus(formData: FormData) {

@@ -403,7 +403,7 @@ export default async function KataArenaPage({
             arenas.map(({ competition: c, arena }) => (
               <div key={c.id} className="mb-10">
                 <h2 className="mb-3 text-lg font-bold">{c.name}</h2>
-                {isAudience && !winnersRevealed(c.registration_deadline) && (
+                {isAudience && !winnersRevealed(c.registration_deadline, c.winners_announce_date) && (
                   <p className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
                     Judge scores for this competition appear after Winners are finalized — until
                     then you can watch every submitted recording with its round status.
@@ -412,7 +412,7 @@ export default async function KataArenaPage({
                 <KataGroups
                   arena={tools.apply(arena)}
                   judgesRequired={c.judges_required}
-                  showJudgeScores={isAudience ? winnersRevealed(c.registration_deadline) : showJudgeScores}
+                  showJudgeScores={isAudience ? winnersRevealed(c.registration_deadline, c.winners_announce_date) : showJudgeScores}
                   emptyMessage="No recordings match — clear the filters above or check back later."
                 />
               </div>

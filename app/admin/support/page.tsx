@@ -1,7 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import { schemaReady } from "@/lib/data";
 import { getAllCompetitions } from "@/lib/admin-data";
-import { updateCommunityStatus, createStaffAccount, bulkUploadSupport, clockIn, clockOut } from "@/app/actions/admin";
+import {
+  updateCommunityStatus, createStaffAccount, bulkUploadSupport, clockIn, clockOut,
+  saveSupportTicket, deleteSupportTicket, toggleTicketComplaint,
+} from "@/app/actions/admin";
+import Link from "next/link";
+import { getAllTelegramLinks } from "@/lib/telegram";
 import { getOpenShift, getAllShifts } from "@/lib/support-shifts";
 import { AdminShell, Card, CertificateField, adminBtn, adminBtnSecondary, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice, formatUSD } from "@/components/ui";
@@ -27,7 +32,7 @@ interface StaffApp {
 export default async function AdminSupport({
   searchParams,
 }: {
-  searchParams: Promise<{ editcode?: string; ok?: string; error?: string }>;
+  searchParams: Promise<{ editcode?: string; editticket?: string; ok?: string; error?: string }>;
 }) {
   const params = await searchParams;
   const ready = await schemaReady();
@@ -57,12 +62,47 @@ export default async function AdminSupport({
   ]);
 
   const competitions = await getAllCompetitions();
-  const { data: supportProfiles } = canCreate
-    ? await supabase
-        .from("profiles")
-        .select("user_id, full_name, email, sign_in_count, sign_in_limit, sign_in_competition_id, sign_in_valid_from, sign_in_valid_until")
-        .eq("role", "customer_support")
-    : { data: [] };
+  const { data: supportProfiles } =
+    canCreate || isCustomerSupport
+      ? await supabase
+          .from("profiles")
+          .select("user_id, full_name, email, sign_in_count, sign_in_limit, sign_in_competition_id, sign_in_valid_from, sign_in_valid_until")
+          .eq("role", "customer_support")
+      : { data: [] };
+
+  // ── Per-resolved-ticket bounty: 10% of total PAID participant fees is the
+  // pool, shared by weighted resolved tickets (advance 3 : intermediate 2 :
+  // general 1). Own-school answers don't count; each complaint is -1 USD.
+  const TICKET_WEIGHTS: Record<string, number> = { advance: 3, intermediate: 2, general: 1 };
+  const [{ data: ticketsData }, { data: paidRegs }] = await Promise.all([
+    supabase.from("support_tickets").select("*").order("created_at", { ascending: false }),
+    supabase
+      .from("registrations")
+      .select("competition:competitions(registration_fee_usd)")
+      .eq("payment_status", "paid"),
+  ]);
+  const tickets = ticketsData ?? [];
+  const editingTicket = params.editticket ? tickets.find((t) => t.id === params.editticket) : undefined;
+  const totalPaidFees = ((paidRegs as unknown as Array<{ competition: { registration_fee_usd: number | null } | null }>) ?? [])
+    .reduce((sum, r) => sum + Number(r.competition?.registration_fee_usd ?? 0), 0);
+  const rewardPool = totalPaidFees * 0.1;
+  const supportName = new Map(
+    (supportProfiles ?? []).map((p) => [p.user_id as string, (p.full_name as string) || (p.email as string) || p.user_id.slice(0, 8)]),
+  );
+  const perSupporter = new Map<string, { weighted: number; complaints: number }>();
+  let totalWeighted = 0;
+  for (const t of tickets) {
+    if (!t.answered_by) continue;
+    const entry = perSupporter.get(t.answered_by) ?? { weighted: 0, complaints: 0 };
+    if (t.status === "resolved" && !t.own_school) {
+      const w = TICKET_WEIGHTS[t.category] ?? 1;
+      entry.weighted += w;
+      totalWeighted += w;
+    }
+    if (t.complaint) entry.complaints += 1;
+    perSupporter.set(t.answered_by, entry);
+  }
+  const telegramGroups = getAllTelegramLinks();
 
   const { data: apps } = await supabase
     .from("staff_applications")
@@ -355,6 +395,197 @@ export default async function AdminSupport({
               }))}
             />
           )}
+        </div>
+      )}
+
+      {isAdminTier && (
+        <div className="mt-8 space-y-4">
+          <h2 className="text-lg font-bold">Support Tickets — Per-Resolved-Ticket Bounty</h2>
+          <p className="text-sm text-neutral-500">
+            Copy each question from its Telegram topic into a ticket (answer it back in the same
+            group), classify it Advance / Intermediate / General, and mark it resolved. The reward
+            pool is <strong>10% of total paid participant fees</strong>, shared by weighted
+            resolved tickets (Advance 3 : Intermediate 2 : General 1). Answers to your own school
+            or your own students don&apos;t count, and every complaint received is −1 USD.
+          </p>
+          <Card>
+            <form action={saveSupportTicket} className="space-y-4">
+              {editingTicket && <input type="hidden" name="id" value={editingTicket.id} />}
+              <div>
+                <label htmlFor="ticket_question" className={adminLabel}>
+                  {editingTicket ? "Edit Question / Issue *" : "Question / Issue (copied from Telegram) *"}
+                </label>
+                <textarea
+                  id="ticket_question"
+                  name="question"
+                  rows={2}
+                  required
+                  defaultValue={editingTicket?.question ?? ""}
+                  className={adminInput}
+                />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="ticket_group" className={adminLabel}>Telegram group</label>
+                  <select id="ticket_group" name="telegram_group" defaultValue={editingTicket?.telegram_group ?? ""} className={adminInput}>
+                    <option value="">— Not from Telegram —</option>
+                    {telegramGroups.map((g) => (
+                      <option key={g.category} value={g.label}>{g.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="ticket_category" className={adminLabel}>Classification *</label>
+                  <select id="ticket_category" name="category" required defaultValue={editingTicket?.category ?? "general"} className={adminInput}>
+                    <option value="general">General issue / question (weight 1)</option>
+                    <option value="intermediate">Intermediate (weight 2)</option>
+                    <option value="advance">Advance (weight 3)</option>
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="ticket_answered_by" className={adminLabel}>Answered by</label>
+                  <select id="ticket_answered_by" name="answered_by" defaultValue={editingTicket?.answered_by ?? ""} className={adminInput}>
+                    <option value="">— Not answered yet —</option>
+                    {(supportProfiles ?? []).map((p) => (
+                      <option key={p.user_id} value={p.user_id}>
+                        {(p.full_name as string) || (p.email as string) || p.user_id}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="ticket_status" className={adminLabel}>Status *</label>
+                  <select id="ticket_status" name="status" required defaultValue={editingTicket?.status ?? "open"} className={adminInput}>
+                    <option value="open">Open</option>
+                    <option value="resolved">Resolved (counts toward the pool)</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label htmlFor="ticket_answer" className={adminLabel}>Answer (also sent to the Telegram group)</label>
+                <textarea id="ticket_answer" name="answer" rows={2} defaultValue={editingTicket?.answer ?? ""} className={adminInput} />
+              </div>
+              <label className="flex items-center gap-2 text-sm text-neutral-700">
+                <input
+                  type="checkbox"
+                  name="own_school"
+                  defaultChecked={editingTicket?.own_school ?? false}
+                  className="h-4 w-4 rounded border-neutral-300 accent-red-700"
+                />
+                From the supporter&apos;s own school / own student (does not count toward the pool)
+              </label>
+              <div className="flex gap-2">
+                <button type="submit" className={adminBtn}>{editingTicket ? "Save changes" : "Log ticket"}</button>
+                {editingTicket && (
+                  <Link href="/admin/support" className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-semibold text-neutral-600 hover:bg-neutral-50">
+                    Cancel
+                  </Link>
+                )}
+              </div>
+            </form>
+          </Card>
+          {tickets.length === 0 ? (
+            <EmptyState>No tickets logged yet.</EmptyState>
+          ) : (
+            <FilterableTable
+              rowKey="id"
+              downloadName="support-tickets"
+              stickyColumns={2}
+              firstColumnWidth={56}
+              columns={[
+                { key: "no", label: "No." },
+                { key: "question", label: "Question / Issue" },
+                { key: "category", label: "Class" },
+                { key: "group", label: "Telegram Group" },
+                { key: "answered_by", label: "Answered By" },
+                { key: "status", label: "Status" },
+                { key: "own_school", label: "Own School" },
+                { key: "complaint", label: "Complaint (−1 USD)" },
+                { key: "actions", label: "Actions" },
+              ]}
+              csvColumns={[
+                { key: "no", label: "No." },
+                { key: "question", label: "Question" },
+                { key: "category", label: "Class" },
+                { key: "group", label: "Telegram Group" },
+                { key: "answered_by", label: "Answered By" },
+                { key: "status", label: "Status" },
+                { key: "own_school", label: "Own School" },
+                { key: "complaint", label: "Complaint" },
+              ]}
+              rows={tickets.map((t, i) => ({
+                id: t.id,
+                no: String(i + 1),
+                question: t.question,
+                category: t.category,
+                group: t.telegram_group ?? "",
+                answered_by: t.answered_by ? (supportName.get(t.answered_by) ?? t.answered_by.slice(0, 8)) : "",
+                status: t.status,
+                own_school: t.own_school ? "Yes (not counted)" : "No",
+                complaint: (
+                  <form action={toggleTicketComplaint}>
+                    <input type="hidden" name="id" value={t.id} />
+                    <input type="hidden" name="complaint" value={(!t.complaint).toString()} />
+                    <button
+                      className={`rounded px-2.5 py-1 text-xs font-semibold ${
+                        t.complaint
+                          ? "bg-red-600 text-white hover:bg-red-500"
+                          : "border border-neutral-300 text-neutral-600 hover:bg-neutral-50"
+                      }`}
+                    >
+                      {t.complaint ? "Complaint −1 USD" : "Record complaint"}
+                    </button>
+                  </form>
+                ),
+                actions: (
+                  <div className="flex gap-1.5">
+                    <Link
+                      href={`/admin/support?editticket=${t.id}`}
+                      className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
+                    >
+                      Edit
+                    </Link>
+                    {canCreate && (
+                      <form action={deleteSupportTicket}>
+                        <input type="hidden" name="id" value={t.id} />
+                        <button className="rounded border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50">
+                          Delete
+                        </button>
+                      </form>
+                    )}
+                  </div>
+                ),
+              }))}
+            />
+          )}
+          <Card>
+            <h3 className="font-bold text-neutral-900">Reward Pool</h3>
+            <p className="mt-1 text-sm text-neutral-600">
+              Total paid participant fees: <strong>{formatUSD(totalPaidFees)}</strong> → pool (10%):{" "}
+              <strong>{formatUSD(rewardPool)}</strong>
+            </p>
+            {perSupporter.size === 0 ? (
+              <p className="mt-2 text-sm text-neutral-400">No resolved tickets attributed yet.</p>
+            ) : (
+              <ul className="mt-2 space-y-1 text-sm text-neutral-700">
+                {[...perSupporter.entries()].map(([uid, s]) => {
+                  const share = totalWeighted > 0 ? (rewardPool * s.weighted) / totalWeighted : 0;
+                  const payout = share - s.complaints;
+                  return (
+                    <li key={uid} className="flex flex-wrap justify-between gap-2 rounded border border-neutral-100 bg-neutral-50 px-3 py-1.5">
+                      <span>{supportName.get(uid) ?? uid.slice(0, 8)}</span>
+                      <span>
+                        weighted {s.weighted}
+                        {s.complaints > 0 && <span className="text-red-600"> · {s.complaints} complaint(s) −{s.complaints} USD</span>}
+                        {" → "}
+                        <strong>{formatUSD(Math.max(0, payout))}</strong>
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </Card>
         </div>
       )}
 

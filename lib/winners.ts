@@ -19,7 +19,23 @@ export function winnersRevealDate(registrationDeadline: string): Date {
   return nextMalaysiaWorkingDay(plus30);
 }
 
-export function winnersRevealed(registrationDeadline: string | null): boolean {
-  if (!registrationDeadline) return false;
-  return new Date() >= winnersRevealDate(registrationDeadline);
+/** The organizer can mark a tier "special" by setting a manual
+ * winners_announce_date on the competition — that overrides the 30-day
+ * rule everywhere (Winners page, Kata Arena score reveal, hub box). */
+export function winnersRevealDateFor(
+  registrationDeadline: string | null,
+  overrideDate?: string | null,
+): Date | null {
+  if (overrideDate) {
+    const [y, m, d] = overrideDate.split("-").map(Number);
+    return new Date(Date.UTC(y, m - 1, d));
+  }
+  if (!registrationDeadline) return null;
+  return winnersRevealDate(registrationDeadline);
+}
+
+export function winnersRevealed(registrationDeadline: string | null, overrideDate?: string | null): boolean {
+  const date = winnersRevealDateFor(registrationDeadline, overrideDate);
+  if (!date) return false;
+  return new Date() >= date;
 }

@@ -137,23 +137,33 @@ export interface ParticipantRecord {
   videoCreatedAt: string | null;
   videoUrl: string | null;
   certificateUrl: string | null;
+  slotStatus: "active" | "unslotted" | "forfeited" | "given_up";
+  slotStatusNote: string | null;
+  slotStatusChangedBy: string | null;
+  slotStatusChangedAt: string | null;
 }
 
-/** One row per successfully-paid registration, joining participant details,
- * assigned category, submitted-kata-video status, and re-record attempt
- * count — the dataset behind the admin Participant Records page. */
+/** One row per paid (or slot-actioned) registration, joining participant
+ * details, assigned category, submitted-kata-video status, re-record
+ * attempt count, and slot status — the dataset behind the admin Participant
+ * Records page. Forfeited registrations stay visible so staff can review
+ * and clean them up rather than disappearing from the list. */
 export async function getParticipantRecords(): Promise<ParticipantRecord[]> {
   const supabase = await createClient();
   const { data: regs } = await supabase
     .from("registrations")
     .select(
-      "id, participant:participants(*, school:schools(id,name,state), sensei:senseis(id,name,rank), bank:participant_bank_details(bank_name,bank_account_no,bank_account_name)), category:categories(id,name), competition:competitions(id,name)",
+      "id, slot_status, slot_status_note, slot_status_changed_by, slot_status_changed_at, participant:participants(*, school:schools(id,name,state), sensei:senseis(id,name,rank), bank:participant_bank_details(bank_name,bank_account_no,bank_account_name)), category:categories(id,name), competition:competitions(id,name)",
     )
-    .eq("payment_status", "paid")
+    .in("payment_status", ["paid", "forfeited"])
     .order("created_at", { ascending: false });
   const regList =
     (regs as unknown as Array<{
       id: string;
+      slot_status: "active" | "unslotted" | "forfeited" | "given_up";
+      slot_status_note: string | null;
+      slot_status_changed_by: string | null;
+      slot_status_changed_at: string | null;
       participant: Participant | null;
       category: { id: string; name: string } | null;
       competition: { id: string; name: string } | null;
@@ -161,9 +171,13 @@ export async function getParticipantRecords(): Promise<ParticipantRecord[]> {
   if (regList.length === 0) return [];
 
   const regIds = regList.map((r) => r.id);
-  const [{ data: videos }, { data: profiles }] = await Promise.all([
+  const changedByIds = [...new Set(regList.map((r) => r.slot_status_changed_by).filter((id): id is string => !!id))];
+  const [{ data: videos }, { data: profiles }, { data: changedByProfiles }] = await Promise.all([
     supabase.from("kata_videos").select("registration_id, storage_path, created_at").in("registration_id", regIds),
     supabase.from("profiles").select("registration_id, record_attempts, bonus_record_attempts").in("registration_id", regIds),
+    changedByIds.length > 0
+      ? supabase.from("profiles").select("user_id, full_name, email").in("user_id", changedByIds)
+      : Promise.resolve({ data: [] }),
   ]);
   const videoByReg = new Map(
     (videos ?? []).map((v) => [v.registration_id as string, { storagePath: v.storage_path as string, createdAt: v.created_at as string }]),
@@ -171,6 +185,9 @@ export async function getParticipantRecords(): Promise<ParticipantRecord[]> {
   const attemptsByReg = new Map((profiles ?? []).map((p) => [p.registration_id as string, p.record_attempts as number]));
   const maxAttemptsByReg = new Map(
     (profiles ?? []).map((p) => [p.registration_id as string, 3 + (p.bonus_record_attempts as number ?? 0)]),
+  );
+  const nameByChangedBy = new Map(
+    (changedByProfiles ?? []).map((p) => [p.user_id as string, (p.full_name as string) || (p.email as string) || (p.user_id as string)]),
   );
 
   const paths = [...videoByReg.values()].map((v) => v.storagePath);
@@ -206,6 +223,10 @@ export async function getParticipantRecords(): Promise<ParticipantRecord[]> {
         videoCreatedAt: video?.createdAt ?? null,
         videoUrl: video ? (signedUrlByPath.get(video.storagePath) ?? null) : null,
         certificateUrl: certPath ? (certUrlByPath.get(certPath) ?? null) : null,
+        slotStatus: r.slot_status ?? "active",
+        slotStatusNote: r.slot_status_note,
+        slotStatusChangedBy: r.slot_status_changed_by ? (nameByChangedBy.get(r.slot_status_changed_by) ?? r.slot_status_changed_by) : null,
+        slotStatusChangedAt: r.slot_status_changed_at,
       };
     });
 }

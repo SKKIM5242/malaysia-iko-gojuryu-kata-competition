@@ -3,7 +3,7 @@ import { getCategories, schemaReady } from "@/lib/data";
 import { EmptyState, NoTranslate, SectionTitle, SetupNotice, SiteFooter, SiteHeader, formatDate } from "@/components/ui";
 import { groupByKata } from "@/lib/division";
 import { finalScore, isDisqualified } from "@/lib/scoring";
-import { winnersRevealDate } from "@/lib/winners";
+import { winnersRevealDate, winnersRevealDateFor } from "@/lib/winners";
 import type { Competition } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -116,7 +116,9 @@ async function CompetitionWinners({
     );
   }
 
-  const revealDate = winnersRevealDate(competition.registration_deadline);
+  const revealDate =
+    winnersRevealDateFor(competition.registration_deadline, competition.winners_announce_date) ??
+    winnersRevealDate(competition.registration_deadline);
   const revealed = new Date() >= revealDate;
 
   if (!revealed) {

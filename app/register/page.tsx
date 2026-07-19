@@ -2,7 +2,8 @@ import Link from "next/link";
 import { SiteFooter, SiteHeader } from "@/components/ui";
 import AccessComparisonTable from "@/components/AccessComparisonTable";
 import { getOpenCompetitions, schemaReady } from "@/lib/data";
-import { winnersRevealDate } from "@/lib/winners";
+import { winnersRevealDateFor } from "@/lib/winners";
+import type { Competition } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -64,14 +65,18 @@ const OPTIONS: Array<{
   },
 ];
 
-function formatAnnounceDate(deadline: string): string {
-  return winnersRevealDate(deadline).toLocaleDateString("en-MY", {
+function formatFullDate(date: Date): string {
+  return date.toLocaleDateString("en-MY", {
     weekday: "long",
     day: "numeric",
     month: "long",
     year: "numeric",
     timeZone: "UTC",
   });
+}
+
+function announceDateOf(c: Competition): Date | null {
+  return winnersRevealDateFor(c.registration_deadline, c.winners_announce_date);
 }
 
 export default async function RegisterHub({
@@ -159,19 +164,33 @@ export default async function RegisterHub({
             <h2 className="text-lg font-bold text-neutral-900">Winners</h2>
             <p className="mt-1 text-sm text-neutral-500">
               Winners for each competition are announced 30 days after its registration deadline,
-              on the next working day (Monday–Friday) in Malaysia, at 00:00 Malaysia time.
+              on the next working day (Monday–Friday) in Malaysia, at 00:00 Malaysia time — unless
+              the organizer sets a special announcement date for that tier (shown below). The
+              period from Event date to Registration deadline is the participants&apos;
+              recording-submission timeline; referees start scoring only after the deadline.
             </p>
             <ul className="mt-3 space-y-2">
               {competitions
-                .filter((c) => c.registration_deadline)
+                .filter((c) => announceDateOf(c) != null)
                 .map((c) => (
                   <li key={c.id} className="rounded-md border border-neutral-100 bg-neutral-50 px-4 py-2.5 text-sm">
                     <span className="font-semibold text-neutral-800">{c.name}</span>
                     <span className="block text-neutral-600">
                       Winners will be announced on{" "}
-                      <strong>{formatAnnounceDate(c.registration_deadline!)}</strong>, 00:00 Malaysia
-                      time.
+                      <strong>{formatFullDate(announceDateOf(c)!)}</strong>, 00:00 Malaysia time.
+                      {c.winners_announce_date && (
+                        <span className="text-neutral-400"> (special date set by the organizer)</span>
+                      )}
                     </span>
+                    {c.audience_signin_date && (
+                      <span className="block text-neutral-600">
+                        Recommended public / audience sign-in date:{" "}
+                        <strong>
+                          {formatFullDate(winnersRevealDateFor(null, c.audience_signin_date)!)}
+                        </strong>{" "}
+                        — one sign-in then shows every recording and the judges&apos; scores.
+                      </span>
+                    )}
                   </li>
                 ))}
             </ul>

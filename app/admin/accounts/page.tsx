@@ -66,20 +66,38 @@ export default async function AdminAccounts({
 
       {tab === "approvals" && <ApprovalsTab supabase={supabase} />}
       {tab === "codes" && <CodesTab editingId={params.editcode} />}
-      {tab === "access" && <AccessMatrixTab />}
+      {tab === "access" && <AccessMatrixTab supabase={supabase} />}
     </AdminShell>
   );
 }
 
-function AccessMatrixTab() {
+async function AccessMatrixTab({ supabase }: { supabase: Awaited<ReturnType<typeof createClient>> }) {
+  // Editable rows (managed on the Content page) win; the code's built-in
+  // snapshot is the fallback while the table is empty.
+  const { data: dbRows } = await supabase.from("access_matrix_rows").select("*").order("position");
+  const matrix =
+    dbRows && dbRows.length > 0
+      ? dbRows.map((r) => ({
+          resource: r.resource,
+          admin: r.admin,
+          organizer: r.organizer,
+          customerSupport: r.customer_support,
+          referee: r.referee,
+          note: r.note ?? undefined,
+        }))
+      : ACCESS_MATRIX;
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-lg font-bold">Access Matrix</h2>
           <p className="text-sm text-neutral-500">
-            What each role can actually do, read straight from the route gating and server-action
-            guards in the code — not a description of intent.
+            What each role can actually do. Admin/Organizer can add, edit, or delete these rows on
+            the{" "}
+            <Link href="/admin/content" className="font-semibold text-red-700 underline underline-offset-2">
+              Content
+            </Link>{" "}
+            page.
           </p>
         </div>
         <form action={publishAccessMatrixAnnouncement}>
@@ -100,7 +118,7 @@ function AccessMatrixTab() {
           { key: "customerSupport", label: "Participant Support" },
           { key: "referee", label: "Referee / Judge" },
         ]}
-        rows={ACCESS_MATRIX.map((row) => ({
+        rows={matrix.map((row) => ({
           resource: row.note ? (
             <>
               {row.resource}

@@ -74,8 +74,8 @@ export default async function AdminParticipants({
           />
         </div>
       )}
-      <div className="grid gap-8 lg:grid-cols-5">
-        <div className="lg:col-span-2">
+      <div className="space-y-8">
+        <div>
           <h2 className="mb-3 text-lg font-bold">{editing ? "Edit Participant" : "Add Participant"}</h2>
           <Card>
             <form action={saveParticipant} className="space-y-4">
@@ -197,7 +197,7 @@ export default async function AdminParticipants({
           </Card>
         </div>
 
-        <div className="lg:col-span-3">
+        <div>
           <h2 className="mb-3 text-lg font-bold">All Participants</h2>
           {participants.length === 0 ? (
             <EmptyState>No participants yet.</EmptyState>

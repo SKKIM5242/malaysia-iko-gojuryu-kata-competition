@@ -7,6 +7,9 @@ import DownloadCsvButton from "@/components/DownloadCsvButton";
 import AdminVideoUploadForm from "@/components/AdminVideoUploadForm";
 import ColumnFilterDropdown from "@/components/ColumnFilterDropdown";
 import DualScrollBox from "@/components/DualScrollBox";
+import { updateRegistrationSlotStatus } from "@/app/actions/admin";
+
+export type SlotStatus = "active" | "unslotted" | "forfeited" | "given_up";
 
 export interface ParticipantRecordRow {
   registrationId: string;
@@ -33,6 +36,76 @@ export interface ParticipantRecordRow {
   recordingDate: string;
   attempts: string;
   videoUrl: string | null;
+  slotStatus: SlotStatus;
+  slotStatusNote: string | null;
+  slotStatusChangedBy: string | null;
+  slotStatusChangedAt: string | null;
+}
+
+const SLOT_STATUS_BADGE: Record<SlotStatus, { label: string; cls: string }> = {
+  active: { label: "Active", cls: "border-neutral-200 bg-neutral-50 text-neutral-500" },
+  unslotted: { label: "Unslotted (by organiser)", cls: "border-orange-300 bg-orange-50 text-orange-800" },
+  forfeited: { label: "Forfeited (by organiser)", cls: "border-red-300 bg-red-50 text-red-800" },
+  given_up: { label: "Given up (by participant)", cls: "border-neutral-400 bg-neutral-100 text-neutral-700" },
+};
+
+function SlotStatusCell({ row, canManage }: { row: ParticipantRecordRow; canManage: boolean }) {
+  const badge = SLOT_STATUS_BADGE[row.slotStatus];
+  return (
+    <div className="flex flex-col items-start gap-1.5">
+      <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${badge.cls}`}>{badge.label}</span>
+      {row.slotStatusChangedBy && (
+        <span className="text-[10px] text-neutral-400">
+          by {row.slotStatusChangedBy}
+          {row.slotStatusChangedAt ? ` · ${new Date(row.slotStatusChangedAt).toLocaleDateString("en-MY")}` : ""}
+        </span>
+      )}
+      {canManage && (
+        <div className="flex flex-wrap gap-1">
+          {row.slotStatus !== "unslotted" && (
+            <form action={updateRegistrationSlotStatus}>
+              <input type="hidden" name="registration_id" value={row.registrationId} />
+              <input type="hidden" name="slot_status" value="unslotted" />
+              <input type="hidden" name="return_to" value="/admin/records" />
+              <button type="submit" className="rounded border border-orange-300 px-1.5 py-0.5 text-[10px] font-semibold text-orange-700 hover:bg-orange-50">
+                Unslot
+              </button>
+            </form>
+          )}
+          {row.slotStatus !== "forfeited" && (
+            <form action={updateRegistrationSlotStatus}>
+              <input type="hidden" name="registration_id" value={row.registrationId} />
+              <input type="hidden" name="slot_status" value="forfeited" />
+              <input type="hidden" name="return_to" value="/admin/records" />
+              <button type="submit" className="rounded border border-red-300 px-1.5 py-0.5 text-[10px] font-semibold text-red-700 hover:bg-red-50">
+                Forfeited
+              </button>
+            </form>
+          )}
+          {row.slotStatus !== "given_up" && (
+            <form action={updateRegistrationSlotStatus}>
+              <input type="hidden" name="registration_id" value={row.registrationId} />
+              <input type="hidden" name="slot_status" value="given_up" />
+              <input type="hidden" name="return_to" value="/admin/records" />
+              <button type="submit" className="rounded border border-neutral-300 px-1.5 py-0.5 text-[10px] font-semibold text-neutral-600 hover:bg-neutral-50">
+                Give Up
+              </button>
+            </form>
+          )}
+          {row.slotStatus !== "active" && (
+            <form action={updateRegistrationSlotStatus}>
+              <input type="hidden" name="registration_id" value={row.registrationId} />
+              <input type="hidden" name="slot_status" value="active" />
+              <input type="hidden" name="return_to" value="/admin/records" />
+              <button type="submit" className="rounded border border-green-300 px-1.5 py-0.5 text-[10px] font-semibold text-green-700 hover:bg-green-50">
+                Reset
+              </button>
+            </form>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 const COLUMNS: Array<{ key: keyof ParticipantRecordRow; label: string }> = [
@@ -63,9 +136,11 @@ const COLUMNS: Array<{ key: keyof ParticipantRecordRow; label: string }> = [
 export default function ParticipantRecordsTable({
   rows,
   isAdmin = false,
+  canManageSlot = false,
 }: {
   rows: ParticipantRecordRow[];
   isAdmin?: boolean;
+  canManageSlot?: boolean;
 }) {
   const [filters, setFilters] = useState<Partial<Record<keyof ParticipantRecordRow, Set<string>>>>({});
 
@@ -131,6 +206,7 @@ export default function ParticipantRecordsTable({
               ))}
               <th className="px-3 py-2.5 whitespace-nowrap">Certificate</th>
               <th className="px-3 py-2.5 whitespace-nowrap">Recording</th>
+              <th className="px-3 py-2.5 whitespace-nowrap">Slot Status</th>
             </tr>
             <tr className="border-t border-neutral-200 bg-white normal-case">
               {COLUMNS.map((c, i) => (
@@ -147,12 +223,13 @@ export default function ParticipantRecordsTable({
               ))}
               <th className="px-2 py-1.5" />
               <th className="px-2 py-1.5" />
+              <th className="px-2 py-1.5" />
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100">
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={COLUMNS.length + 2} className="px-3 py-6 text-center text-neutral-400">
+                <td colSpan={COLUMNS.length + 3} className="px-3 py-6 text-center text-neutral-400">
                   No records match these filters.
                 </td>
               </tr>
@@ -230,6 +307,9 @@ export default function ParticipantRecordsTable({
                       )}
                       {isAdmin && <AdminVideoUploadForm registrationId={row.registrationId} />}
                     </div>
+                  </td>
+                  <td className="px-3 py-2">
+                    <SlotStatusCell row={row} canManage={canManageSlot} />
                   </td>
                 </tr>
               ))

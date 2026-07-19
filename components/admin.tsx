@@ -17,6 +17,7 @@ const FULL_NAV: Array<[string, string]> = [
   ["Organizers", "/admin/organizers"],
   ["Support", "/admin/support"],
   ["Judging", "/admin/judging"],
+  ["Score Recordings", "/admin/scoring"],
   ["Kata Categories", "/kata-categories"],
   ["Kata Arena", "/kata-arena"],
   ["Participant Records", "/admin/records"],
@@ -32,7 +33,7 @@ const FULL_NAV: Array<[string, string]> = [
 /** Pages hidden from the nav per role: Accounts/Email Verifications are the
  * owner's alone; the Content studio is Admin & Organizer only. */
 const ADMIN_ONLY_NAV = ["/admin/accounts", "/admin/email-verifications"];
-const ADMIN_ORGANIZER_NAV = ["/admin/content"];
+const ADMIN_ORGANIZER_NAV = ["/admin/content", "/admin/scoring"];
 
 export async function AdminShell({
   title,

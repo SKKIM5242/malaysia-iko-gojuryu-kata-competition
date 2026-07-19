@@ -10,7 +10,8 @@ import { kataBaseOf } from "@/lib/division";
 import { notifyRefereeAssignment, sendConfirmationEmail, notifyAnnouncementPublished } from "@/lib/notify";
 import type { PaymentStatus } from "@/lib/types";
 import { parseCsvWithHeader, type CsvUploadResult } from "@/lib/csv-bulk";
-import { accessMatrixToMarkdown } from "@/lib/access-matrix";
+import { ACCESS_MATRIX, accessMatrixToMarkdown } from "@/lib/access-matrix";
+import { DEFAULT_COMPARISON_ROWS } from "@/components/AccessComparisonTable";
 import { formatUSD } from "@/components/ui";
 
 /**
@@ -216,6 +217,8 @@ export async function saveCompetition(formData: FormData) {
       : null,
     status: String(formData.get("status") ?? "draft"),
     description: String(formData.get("description") ?? "").trim() || null,
+    winners_announce_date: String(formData.get("winners_announce_date") ?? "") || null,
+    audience_signin_date: String(formData.get("audience_signin_date") ?? "") || null,
   };
   if (!values.name) backTo(returnTo, { error: "Competition name is required." });
   if (values.registration_fee_usd != null && Number.isNaN(values.registration_fee_usd)) {
@@ -380,6 +383,72 @@ export async function mergeCategoryToMix(formData: FormData) {
   });
   revalidatePath("/");
   backTo(returnTo, { ok: `Merged into “${mixName}”.` });
+}
+
+/**
+ * Merges a category with its ADJACENT age group in the same kata event,
+ * belt division, and gender — the "merge before/after age group" button,
+ * used when an age group has too few submissions (the organizer's policy:
+ * events under 70 recordings get merged). The surviving category's age
+ * range expands to cover both (its name's "Age lo–hi" part is rewritten),
+ * the neighbor's registrations move over, and the emptied neighbor is
+ * deleted. Repeatable, so 2 or 3 age groups can be combined.
+ */
+export async function mergeCategoryAgeGroup(formData: FormData) {
+  const categoryId = String(formData.get("category_id") ?? "");
+  const direction = formData.get("direction") === "before" ? "before" : "after";
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/competitions";
+  const { supabase, actorId } = await getActor();
+
+  const { data: source } = await supabase
+    .from("categories").select("*").eq("id", categoryId).maybeSingle();
+  if (!source) backTo(returnTo, { error: "Category not found." });
+  if (source!.age_min == null || source!.age_max == null) {
+    backTo(returnTo, { error: "This category has no age range to merge." });
+  }
+
+  const kataBase = kataBaseOf(source!.name);
+  const { data: siblingsRaw } = await supabase
+    .from("categories")
+    .select("*")
+    .eq("competition_id", source!.competition_id)
+    .eq("belt_group", source!.belt_group)
+    .eq("gender", source!.gender);
+  const siblings = (siblingsRaw ?? []).filter(
+    (s) => kataBaseOf(s.name) === kataBase && s.id !== categoryId && s.age_min != null && s.age_max != null,
+  );
+  const neighbor =
+    direction === "before"
+      ? siblings.filter((s) => s.age_max! < source!.age_min!).sort((a, b) => b.age_max! - a.age_max!)[0]
+      : siblings.filter((s) => s.age_min! > source!.age_max!).sort((a, b) => a.age_min! - b.age_min!)[0];
+  if (!neighbor) {
+    backTo(returnTo, { error: `No ${direction === "before" ? "earlier" : "later"} age group left to merge with.` });
+  }
+
+  const newMin = Math.min(source!.age_min!, neighbor!.age_min!);
+  const newMax = Math.max(source!.age_max!, neighbor!.age_max!);
+  // Rewrite only the "Age lo–hi" part of the hierarchical name.
+  const newName = source!.name.replace(/Age \d+–\d+/, `Age ${newMin}–${newMax}`);
+
+  const { error: moveErr } = await supabase
+    .from("registrations")
+    .update({ category_id: categoryId })
+    .eq("category_id", neighbor!.id);
+  if (moveErr) backTo(returnTo, { error: "Could not move the neighbor age group's registrations." });
+
+  const { error: renameErr } = await supabase
+    .from("categories")
+    .update({ age_min: newMin, age_max: newMax, name: newName })
+    .eq("id", categoryId);
+  if (renameErr) backTo(returnTo, { error: "Moved registrations, but could not widen the age range." });
+
+  await supabase.from("categories").delete().eq("id", neighbor!.id);
+  await writeAudit(supabase, {
+    table_name: "categories", record_id: categoryId, action: "age_groups_merged",
+    new_value: { absorbed_category: neighbor!.name, into: newName, direction }, actor_id: actorId,
+  });
+  revalidatePath("/");
+  backTo(returnTo, { ok: `Merged “${neighbor!.name}” into “${newName}”.` });
 }
 
 // ── Announcements ────────────────────────────────────────────────────────────
@@ -1120,6 +1189,207 @@ export async function deleteInvitationCode(formData: FormData) {
     table_name: "invitation_codes", record_id: id, action: "invitation_code_deleted", actor_id: actorId,
   });
   backTo(returnTo, { ok: "Invitation code deleted." });
+}
+
+// ── Editable Access Matrix + Access Comparison tables ───────────────────────
+
+async function requireAccessTableEditor(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  actorId: string | null,
+  returnTo: string,
+) {
+  const role = await getActorRole(supabase, actorId);
+  if (!["admin", "organizer", "staff"].includes(role ?? "")) {
+    backTo(returnTo, { error: "Only Admin / Organizer can edit the access tables." });
+  }
+}
+
+/** One-click import of the code's built-in rows into the editable tables
+ * (only fills a table that is still empty, so re-clicking is safe). */
+export async function seedAccessTables(formData: FormData) {
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/content";
+  const { supabase, actorId } = await getActor();
+  await requireAccessTableEditor(supabase, actorId, returnTo);
+
+  const { count: matrixCount } = await supabase
+    .from("access_matrix_rows").select("id", { count: "exact", head: true });
+  if (!matrixCount) {
+    await supabase.from("access_matrix_rows").insert(
+      ACCESS_MATRIX.map((r, i) => ({
+        position: i + 1, resource: r.resource, note: r.note ?? null,
+        admin: r.admin, organizer: r.organizer, customer_support: r.customerSupport, referee: r.referee,
+      })),
+    );
+  }
+  const { count: cmpCount } = await supabase
+    .from("access_comparison_rows").select("id", { count: "exact", head: true });
+  if (!cmpCount) {
+    await supabase.from("access_comparison_rows").insert(
+      DEFAULT_COMPARISON_ROWS.map((r, i) => ({
+        position: i + 1, what: r.what,
+        participant: r.cells[0], school: r.cells[1], sensei: r.cells[2], referee: r.cells[3],
+        audience: r.cells[4], organizer: r.cells[5], support: r.cells[6],
+      })),
+    );
+  }
+  await writeAudit(supabase, {
+    table_name: "access_matrix_rows", record_id: null, action: "access_tables_seeded", actor_id: actorId,
+  });
+  backTo(returnTo, { ok: "Access tables imported — edit the rows below." });
+}
+
+export async function saveAccessMatrixRow(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/content";
+  const { supabase, actorId } = await getActor();
+  await requireAccessTableEditor(supabase, actorId, returnTo);
+  const values = {
+    position: Number(formData.get("position") ?? 0) || 0,
+    resource: String(formData.get("resource") ?? "").trim(),
+    note: String(formData.get("note") ?? "").trim() || null,
+    admin: String(formData.get("admin") ?? "").trim(),
+    organizer: String(formData.get("organizer") ?? "").trim(),
+    customer_support: String(formData.get("customer_support") ?? "").trim(),
+    referee: String(formData.get("referee") ?? "").trim(),
+  };
+  if (!values.resource) backTo(returnTo, { error: "Resource name is required." });
+  const { error } = id
+    ? await supabase.from("access_matrix_rows").update(values).eq("id", id)
+    : await supabase.from("access_matrix_rows").insert(values);
+  if (error) backTo(returnTo, { error: "Could not save the Access Matrix row." });
+  await writeAudit(supabase, {
+    table_name: "access_matrix_rows", record_id: id || null,
+    action: id ? "access_matrix_row_updated" : "access_matrix_row_created",
+    new_value: values, actor_id: actorId,
+  });
+  backTo(returnTo, { ok: "Access Matrix row saved." });
+}
+
+export async function deleteAccessMatrixRow(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/content";
+  const { supabase, actorId } = await getActor();
+  await requireAccessTableEditor(supabase, actorId, returnTo);
+  const { error } = await supabase.from("access_matrix_rows").delete().eq("id", id);
+  if (error) backTo(returnTo, { error: "Could not delete the row." });
+  await writeAudit(supabase, {
+    table_name: "access_matrix_rows", record_id: id, action: "access_matrix_row_deleted", actor_id: actorId,
+  });
+  backTo(returnTo, { ok: "Access Matrix row deleted." });
+}
+
+export async function saveAccessComparisonRow(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/content";
+  const { supabase, actorId } = await getActor();
+  await requireAccessTableEditor(supabase, actorId, returnTo);
+  const values = {
+    position: Number(formData.get("position") ?? 0) || 0,
+    what: String(formData.get("what") ?? "").trim(),
+    participant: String(formData.get("participant") ?? "").trim(),
+    school: String(formData.get("school") ?? "").trim(),
+    sensei: String(formData.get("sensei") ?? "").trim(),
+    referee: String(formData.get("referee") ?? "").trim(),
+    audience: String(formData.get("audience") ?? "").trim(),
+    organizer: String(formData.get("organizer") ?? "").trim(),
+    support: String(formData.get("support") ?? "").trim(),
+  };
+  if (!values.what) backTo(returnTo, { error: "The Access row name is required." });
+  const { error } = id
+    ? await supabase.from("access_comparison_rows").update(values).eq("id", id)
+    : await supabase.from("access_comparison_rows").insert(values);
+  if (error) backTo(returnTo, { error: "Could not save the comparison row." });
+  await writeAudit(supabase, {
+    table_name: "access_comparison_rows", record_id: id || null,
+    action: id ? "access_comparison_row_updated" : "access_comparison_row_created",
+    new_value: values, actor_id: actorId,
+  });
+  revalidatePath("/register");
+  backTo(returnTo, { ok: "Access Comparison row saved." });
+}
+
+export async function deleteAccessComparisonRow(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/content";
+  const { supabase, actorId } = await getActor();
+  await requireAccessTableEditor(supabase, actorId, returnTo);
+  const { error } = await supabase.from("access_comparison_rows").delete().eq("id", id);
+  if (error) backTo(returnTo, { error: "Could not delete the row." });
+  await writeAudit(supabase, {
+    table_name: "access_comparison_rows", record_id: id, action: "access_comparison_row_deleted", actor_id: actorId,
+  });
+  revalidatePath("/register");
+  backTo(returnTo, { ok: "Access Comparison row deleted." });
+}
+
+// ── Participant Support tickets (per-resolved-ticket bounty) ────────────────
+
+export async function saveSupportTicket(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const returnTo = "/admin/support";
+  const question = String(formData.get("question") ?? "").trim();
+  const telegram_group = String(formData.get("telegram_group") ?? "").trim() || null;
+  const category = ["advance", "intermediate", "general"].includes(String(formData.get("category")))
+    ? String(formData.get("category"))
+    : "general";
+  const status = formData.get("status") === "resolved" ? "resolved" : "open";
+  const answered_by = String(formData.get("answered_by") ?? "").trim() || null;
+  const answer = String(formData.get("answer") ?? "").trim() || null;
+  const own_school = formData.get("own_school") === "on";
+  if (!question) backTo(returnTo, { error: "The question text is required." });
+
+  const { supabase, actorId } = await getActor();
+  const values = {
+    question, telegram_group, category, status, answered_by, answer, own_school,
+    resolved_at: status === "resolved" ? new Date().toISOString() : null,
+  };
+  if (id) {
+    const { error } = await supabase.from("support_tickets").update(values).eq("id", id);
+    if (error) backTo(returnTo, { error: "Could not update the ticket." });
+  } else {
+    const { error } = await supabase.from("support_tickets").insert(values);
+    if (error) backTo(returnTo, { error: "Could not create the ticket." });
+  }
+  await writeAudit(supabase, {
+    table_name: "support_tickets", record_id: id || null,
+    action: id ? "support_ticket_updated" : "support_ticket_created",
+    new_value: values, actor_id: actorId,
+  });
+  backTo(returnTo, { ok: "Ticket saved." });
+}
+
+export async function deleteSupportTicket(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const returnTo = "/admin/support";
+  const { supabase, actorId } = await getActor();
+  const role = await getActorRole(supabase, actorId);
+  if (!["admin", "organizer", "staff"].includes(role ?? "")) {
+    backTo(returnTo, { error: "Only Admin / Organizer can delete tickets." });
+  }
+  const { error } = await supabase.from("support_tickets").delete().eq("id", id);
+  if (error) backTo(returnTo, { error: "Could not delete the ticket." });
+  await writeAudit(supabase, {
+    table_name: "support_tickets", record_id: id, action: "support_ticket_deleted", actor_id: actorId,
+  });
+  backTo(returnTo, { ok: "Ticket deleted." });
+}
+
+export async function toggleTicketComplaint(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const complaint = formData.get("complaint") === "true";
+  const returnTo = "/admin/support";
+  const { supabase, actorId } = await getActor();
+  const role = await getActorRole(supabase, actorId);
+  if (!["admin", "organizer", "staff"].includes(role ?? "")) {
+    backTo(returnTo, { error: "Only Admin / Organizer can record complaints." });
+  }
+  const { error } = await supabase.from("support_tickets").update({ complaint }).eq("id", id);
+  if (error) backTo(returnTo, { error: "Could not update the complaint flag." });
+  await writeAudit(supabase, {
+    table_name: "support_tickets", record_id: id,
+    action: complaint ? "support_complaint_recorded" : "support_complaint_cleared", actor_id: actorId,
+  });
+  backTo(returnTo, { ok: complaint ? "Complaint recorded (-1 USD)." : "Complaint cleared." });
 }
 
 // ── Auto-assign Referee Terms & Conditions ──────────────────────────────────
@@ -2442,6 +2712,48 @@ export async function markBulkUploadPaymentPaid(formData: FormData) {
     });
   }
   backTo(returnTo, { ok: "Payment confirmed — sensei can now upload." });
+}
+
+// ── Registration slot status (Admin/Organizer/Referee) ──────────────────────
+
+const SLOT_STATUS_LABEL: Record<string, string> = {
+  active: "Active",
+  unslotted: "Unslotted",
+  forfeited: "Forfeited",
+  given_up: "Given up",
+};
+
+/** Admin, Organizer, and Referee/Judge accounts can flag a registration as
+ * unslotted, forfeited, or self-given-up (or reset it back to active) to
+ * clean up the Participant Records list — e.g. after a missed recording
+ * deadline. Delegates to the set_registration_slot_status() RPC so
+ * referees get exactly this one capability without a general UPDATE grant
+ * on registrations. */
+export async function updateRegistrationSlotStatus(formData: FormData) {
+  const registrationId = String(formData.get("registration_id") ?? "");
+  const newStatus = String(formData.get("slot_status") ?? "");
+  const note = String(formData.get("slot_status_note") ?? "").trim();
+  const returnTo = String(formData.get("return_to") ?? "/admin/records");
+  const { supabase, actorId } = await getActor();
+  const actorRole = await getActorRole(supabase, actorId);
+  if (!["admin", "organizer", "staff", "referee"].includes(actorRole ?? "")) {
+    backTo(returnTo, { error: "Only Admin, Organizer, or Referee/Judge accounts can update slot status." });
+  }
+  if (!["active", "unslotted", "forfeited", "given_up"].includes(newStatus)) {
+    backTo(returnTo, { error: "Invalid slot status." });
+  }
+
+  const { error } = await supabase.rpc("set_registration_slot_status", {
+    reg_id: registrationId,
+    new_status: newStatus,
+    note: note || null,
+  });
+  if (error) backTo(returnTo, { error: "Could not update slot status — please try again." });
+  await writeAudit(supabase, {
+    table_name: "registrations", record_id: registrationId, action: "slot_status_updated",
+    new_value: { status: newStatus, note }, actor_id: actorId,
+  });
+  backTo(returnTo, { ok: `Marked ${SLOT_STATUS_LABEL[newStatus] ?? newStatus}.` });
 }
 
 // ── Sign-in quota control (Admin/Organizer only) ────────────────────────────
