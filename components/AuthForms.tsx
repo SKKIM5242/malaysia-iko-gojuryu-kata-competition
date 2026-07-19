@@ -35,12 +35,16 @@ export default function AuthForms({ defaultMode = "signin" }: { defaultMode?: "s
     const form = new FormData(e.currentTarget);
     const email = String(form.get("email") ?? "").trim();
     const password = String(form.get("password") ?? "");
+    const confirmPassword = String(form.get("confirm_password") ?? "");
     const supabase = createClient();
     try {
       if (form.get("not_a_robot") !== "on") {
         throw new Error("Please confirm you are not a robot or AI.");
       }
       if (mode === "signup") {
+        if (password !== confirmPassword) {
+          throw new Error("Passwords do not match.");
+        }
         if (form.get("terms_accepted") !== "on") {
           throw new Error("Please accept the Terms & Conditions to create an account.");
         }
@@ -253,6 +257,19 @@ export default function AuthForms({ defaultMode = "signin" }: { defaultMode?: "s
                 </Link>
               )}
             </div>
+            {mode === "signup" && (
+              <div>
+                <label htmlFor="auth_confirm_password" className={labelCls}>Confirm password *</label>
+                <PasswordInput
+                  id="auth_confirm_password"
+                  name="confirm_password"
+                  required
+                  minLength={8}
+                  autoComplete="new-password"
+                  className={inputCls}
+                />
+              </div>
+            )}
             {mode === "signup" && (
               <label htmlFor="terms_accepted" className="flex items-start gap-2 text-xs text-neutral-600">
                 <input id="terms_accepted" name="terms_accepted" type="checkbox" required className="mt-0.5" />
