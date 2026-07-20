@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { submitScore } from "@/app/actions/account";
-import { DISQUALIFICATION_REASONS, OTHER_DISQUALIFICATION_REASON } from "@/lib/scoring-rubric";
+import ReasonPicker from "@/components/ReasonPicker";
+import { OTHER_DISQUALIFICATION_REASON } from "@/lib/scoring-rubric";
 
 /** The plain single-number "Admin/Organizer override" score field on the
  * Judging page (no rubric sheet, just a Total Score straight in) — same
@@ -53,36 +54,17 @@ export default function QuickScoreForm({
         </button>
       </div>
       {isZero && (
-        <div className="mt-2 max-w-md rounded-md border-2 border-red-300 bg-red-50 p-3">
+        <div className="mt-2 rounded-md border-2 border-red-300 bg-red-50 p-3">
           <p className="text-xs font-semibold text-red-700">
             0 = Disqualified — this participant will not be announced as a winner. A reason is required.
           </p>
-          <label htmlFor={`override_reason_${videoId}`} className="mb-1 mt-2 block text-xs font-bold text-neutral-700">
-            Reason *
-          </label>
-          <select
-            id={`override_reason_${videoId}`}
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            required
-            className="w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
-          >
-            <option value="" disabled>Select a reason…</option>
-            {DISQUALIFICATION_REASONS.map((r, i) => (
-              <option key={r} value={r}>{i + 1}) {r}</option>
-            ))}
-            <option value={OTHER_DISQUALIFICATION_REASON}>{DISQUALIFICATION_REASONS.length + 1}) {OTHER_DISQUALIFICATION_REASON}</option>
-          </select>
-          {reason === OTHER_DISQUALIFICATION_REASON && (
-            <input
-              type="text"
-              value={customReason}
-              onChange={(e) => setCustomReason(e.target.value)}
-              placeholder="Type the reason…"
-              required
-              className="mt-2 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
-            />
-          )}
+          <label className="mb-1 mt-2 block text-xs font-bold text-neutral-700">Reason *</label>
+          <ReasonPicker
+            reason={reason}
+            customReason={customReason}
+            onReasonChange={setReason}
+            onCustomReasonChange={setCustomReason}
+          />
         </div>
       )}
     </form>

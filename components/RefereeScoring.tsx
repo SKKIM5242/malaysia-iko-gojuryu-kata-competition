@@ -5,11 +5,11 @@ import { submitScore } from "@/app/actions/account";
 import { CategoryName } from "@/components/ui";
 import FloatingWindow from "@/components/FloatingWindow";
 import LockedVideo from "@/components/LockedVideo";
+import ReasonPicker from "@/components/ReasonPicker";
 import {
   SHEET1_CRITERIA,
   SHEET2_CRITERIA,
   TOTAL_MAX,
-  DISQUALIFICATION_REASONS,
   OTHER_DISQUALIFICATION_REASON,
   splitCapped,
   splitSheet1,
@@ -260,32 +260,13 @@ export function ScoreSession({
       <p className="text-xs font-semibold text-red-700">
         0 = Disqualified — this participant will not be announced as a winner. A reason is required.
       </p>
-      <label htmlFor={`reason_${item.videoId}`} className="mb-1 mt-2 block text-xs font-bold text-neutral-700">
-        Reason *
-      </label>
-      <select
-        id={`reason_${item.videoId}`}
-        value={reason}
-        onChange={(e) => setReason(e.target.value)}
-        required
-        className="w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
-      >
-        <option value="" disabled>Select a reason…</option>
-        {DISQUALIFICATION_REASONS.map((r, i) => (
-          <option key={r} value={r}>{i + 1}) {r}</option>
-        ))}
-        <option value={OTHER_DISQUALIFICATION_REASON}>{DISQUALIFICATION_REASONS.length + 1}) {OTHER_DISQUALIFICATION_REASON}</option>
-      </select>
-      {reason === OTHER_DISQUALIFICATION_REASON && (
-        <input
-          type="text"
-          value={customReason}
-          onChange={(e) => setCustomReason(e.target.value)}
-          placeholder="Type the reason…"
-          required
-          className="mt-2 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
-        />
-      )}
+      <label className="mb-1 mt-2 block text-xs font-bold text-neutral-700">Reason *</label>
+      <ReasonPicker
+        reason={reason}
+        customReason={customReason}
+        onReasonChange={setReason}
+        onCustomReasonChange={setCustomReason}
+      />
     </div>
   );
 
