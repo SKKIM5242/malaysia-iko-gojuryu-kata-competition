@@ -60,7 +60,7 @@ export const DISQUALIFICATION_REASONS: string[] = [
   "Color/Kyu Belt Holder divisions must perform a kata from their registration list only. Black Belt Holder or Dan Holder divisions must perform a kata from their registration list only.",
   "Not announcing the kata name, announcing the wrong kata name — or performing another kata.",
   "Failing to bow at the beginning and completion of the Kata performance.",
-  "For this recording of Kata, we accept a 45-degree left or right front view, or a direct front view, facing the judge.",
+  "Not starting the Kata facing the Judges is the general rules of disqualification. For this recording of Kata, we accept 45 degrees at the left or right or direct front view of facing the judge (Pick direction only).",
   "A distinct pause or stop in the performance.",
   "Having to take a corrective step to recover from a total loss of balance or have a fall.",
   "Did not wear a white Karate Gi/uniform, or the belt fell off during the performance.",
