@@ -271,10 +271,10 @@ export function ScoreSession({
         className="w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
       >
         <option value="" disabled>Select a reason…</option>
-        {DISQUALIFICATION_REASONS.map((r) => (
-          <option key={r} value={r}>{r}</option>
+        {DISQUALIFICATION_REASONS.map((r, i) => (
+          <option key={r} value={r}>{i + 1}) {r}</option>
         ))}
-        <option value={OTHER_DISQUALIFICATION_REASON}>{OTHER_DISQUALIFICATION_REASON}</option>
+        <option value={OTHER_DISQUALIFICATION_REASON}>{DISQUALIFICATION_REASONS.length + 1}) {OTHER_DISQUALIFICATION_REASON}</option>
       </select>
       {reason === OTHER_DISQUALIFICATION_REASON && (
         <input

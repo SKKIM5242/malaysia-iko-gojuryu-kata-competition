@@ -5,7 +5,6 @@ import {
   assignRefereeToVideo, unassignRefereeFromVideo, setJudgesRequired, autoAssignReferees,
   resendRefereeNotification, seedAutoAssignCriteria, deleteAutoAssignCriterion,
 } from "@/app/actions/admin";
-import { submitScore } from "@/app/actions/account";
 import { AdminShell, Card, adminBtn, adminBtnSecondary, adminInput } from "@/components/admin";
 import { CategoryName, EmptyState, SetupNotice } from "@/components/ui";
 import FullViewButton from "@/components/FullViewButton";
@@ -14,6 +13,7 @@ import DownloadCsvButton from "@/components/DownloadCsvButton";
 import FilterableTable from "@/components/FilterableTable";
 import ScoreDetailButton from "@/components/ScoreDetailButton";
 import AutoAssignCriterionModal from "@/components/AutoAssignCriterionModal";
+import QuickScoreForm from "@/components/QuickScoreForm";
 import { finalScore, isDisqualified } from "@/lib/scoring";
 import { getTelegramLink } from "@/lib/telegram";
 
@@ -341,28 +341,7 @@ export default async function AdminJudging({
           </div>
         )}
 
-        {canScoreAnyVideo && (
-          <form action={submitScore} className="mt-3 flex flex-wrap items-center gap-2 border-t border-neutral-100 pt-3">
-            <input type="hidden" name="video_id" value={v.id} />
-            <label htmlFor={`score_${v.id}`} className="text-xs font-semibold text-neutral-500">
-              {myScore != null ? "Update your score" : "Score this recording"} (0–10) — Admin/Organizer override
-            </label>
-            <input
-              id={`score_${v.id}`}
-              name="score"
-              type="number"
-              min={0}
-              max={10}
-              step={0.1}
-              defaultValue={myScore ?? ""}
-              required
-              className="w-20 rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
-            />
-            <button className="rounded-md bg-red-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-600">
-              Submit score
-            </button>
-          </form>
-        )}
+        {canScoreAnyVideo && <QuickScoreForm videoId={v.id} existingScore={myScore ?? null} />}
       </Card>
     );
   }

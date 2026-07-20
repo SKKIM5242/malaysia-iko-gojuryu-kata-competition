@@ -48,28 +48,28 @@ export const SCORING_CRITERIA = SHEET2_CRITERIA;
 
 export const TOTAL_MAX = 10;
 
-/** The organizer's official disqualification reasons, verbatim from the
- * "Kata Requirements & Rules & Regulation Briefing" announcement's "Kata
- * or Team Kata - Disqualification" list — offered as a dropdown whenever a
- * judge gives a Total Score of 0, plus a free-text "Other" option for
- * anything not on this list. Kept here (not parsed from the announcement
- * at runtime) since the announcement is free-form markdown prose, not a
- * structured list — update this array by hand if the organizer revises
- * the announcement's wording. */
+/** The organizer's official disqualification reasons — offered as a
+ * numbered dropdown whenever a judge (or an Admin/Organizer override)
+ * gives a Total Score of 0, plus a free-text "Others" option for anything
+ * not on this list. Update this array by hand if the organizer revises
+ * the list. */
 export const DISQUALIFICATION_REASONS: string[] = [
-  "Not announcing the kata, announcing the wrong kata – or performing another kata than pre-announced to the official table.",
+  "If the participant's latest rank and certificate do not match, the participant will be disqualified.",
+  "Submission of a recording that is not a genuine, unedited recording of the participant's own Kata performance.",
+  "Did not perform a Goju-ryu version Kata or IKO Goju-ryu version Kata. Omitting or adding movements — or otherwise substantially changing the performance from its original form.",
+  "Color/Kyu Belt Holder divisions must perform a kata from their registration list only. Black Belt Holder or Dan Holder divisions must perform a kata from their registration list only.",
+  "Not announcing the kata name, announcing the wrong kata name — or performing another kata.",
   "Failing to bow at the beginning and completion of the Kata performance.",
-  "Not starting the Kata facing the Judges.",
+  "For this recording of Kata, we accept a 45-degree left or right front view, or a direct front view, facing the judge.",
   "A distinct pause or stop in the performance.",
-  "Omitting or adding movements - or otherwise substantially change the performance from its original form.",
   "Having to take a corrective step to recover from a total loss of balance or have a fall.",
-  "Belt falling off during the performance.",
-  "Exceeding the total time limit of 5 minutes duration for Kata and Bunkai.",
-  "Performing a scissor takedown technique to the neck area in Bunkai (Jodan Kani Basami)",
+  "Did not wear a white Karate Gi/uniform, or the belt fell off during the performance.",
+  "Exceeding the total time limit of 5 minutes duration for Kata.",
   "Failure to follow the instructions of the Chief Judge or other misconduct (SHIKKAKU).",
+  "Competitors are expected to respect the ceremony of salutations before and after the performance. Any excessive celebration, such as falling on one's knees, or political or religious expressions during or immediately after the performance, is prohibited.",
 ];
 
-export const OTHER_DISQUALIFICATION_REASON = "Other (type your own reason)";
+export const OTHER_DISQUALIFICATION_REASON = "Others — please state below";
 
 /** Picks which rubric a stored criteria array belongs to by its length —
  * 10 rows = Score Sheet 1, anything else = the 7-row Score Sheet 2. */
