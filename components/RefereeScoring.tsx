@@ -9,6 +9,8 @@ import {
   SHEET1_CRITERIA,
   SHEET2_CRITERIA,
   TOTAL_MAX,
+  DISQUALIFICATION_REASONS,
+  OTHER_DISQUALIFICATION_REASON,
   splitCapped,
   splitSheet1,
   type RubricCriterion,
@@ -139,6 +141,9 @@ export function ScoreSession({
   const [quickTotal, setQuickTotal] = useState<string>(
     item.existingScore != null ? String(item.existingScore) : "",
   );
+  const [reason, setReason] = useState("");
+  const [customReason, setCustomReason] = useState("");
+  const finalReason = (reason === OTHER_DISQUALIFICATION_REASON ? customReason : reason).trim();
 
   const sheet1Total = useMemo(
     () => Math.round(sheet1Values.reduce((a, b) => a + b, 0) * 10) / 10,
@@ -247,7 +252,42 @@ export function ScoreSession({
   const submittedCriteria = sheet === 1 ? sheet1Values : sheet2Values;
   const submitBlocked =
     submittedScore > TOTAL_MAX ||
-    (sheet === 1 ? sheet1QuickTotal === "" : quickTotal === "");
+    (sheet === 1 ? sheet1QuickTotal === "" : quickTotal === "") ||
+    (submittedScore === 0 && !finalReason);
+
+  const disqualificationReasonBox = (
+    <div className="mt-2 rounded-md border-2 border-red-300 bg-red-50 p-3">
+      <p className="text-xs font-semibold text-red-700">
+        0 = Disqualified — this participant will not be announced as a winner. A reason is required.
+      </p>
+      <label htmlFor={`reason_${item.videoId}`} className="mb-1 mt-2 block text-xs font-bold text-neutral-700">
+        Reason *
+      </label>
+      <select
+        id={`reason_${item.videoId}`}
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
+        required
+        className="w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
+      >
+        <option value="" disabled>Select a reason…</option>
+        {DISQUALIFICATION_REASONS.map((r) => (
+          <option key={r} value={r}>{r}</option>
+        ))}
+        <option value={OTHER_DISQUALIFICATION_REASON}>{OTHER_DISQUALIFICATION_REASON}</option>
+      </select>
+      {reason === OTHER_DISQUALIFICATION_REASON && (
+        <input
+          type="text"
+          value={customReason}
+          onChange={(e) => setCustomReason(e.target.value)}
+          placeholder="Type the reason…"
+          required
+          className="mt-2 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
+        />
+      )}
+    </div>
+  );
 
   const scoreForm = (
     <form
@@ -266,6 +306,7 @@ export function ScoreSession({
     >
       <input type="hidden" name="video_id" value={item.videoId} />
       <input type="hidden" name="score" value={submittedScore} />
+      {submittedScore === 0 && <input type="hidden" name="reason" value={finalReason} />}
       {submittedCriteria.map((v, i) => (
         <input key={i} type="hidden" name="criteria" value={v} />
       ))}
@@ -292,7 +333,7 @@ export function ScoreSession({
               Total Score keeps to 1 decimal point. <strong>Not happy with the self-population?
               Adjust any row below yourself</strong> — the Total resyncs to your adjusted rows.
             </p>
-            <p className="mt-1 text-xs font-semibold text-red-700">0 = Disqualified.</p>
+            {sheet1Total === 0 && sheet1QuickTotal !== "" && disqualificationReasonBox}
           </div>
           <RubricTable rubric={SHEET1_CRITERIA} values={sheet1Values} onChange={setSheet1Criterion} />
         </>
@@ -319,9 +360,7 @@ export function ScoreSession({
               between items 6 and 7. <strong>Not happy with the self-population? Adjust any row
               below yourself</strong> — the Total resyncs to your adjusted rows.
             </p>
-            {sheet2Total === 0 && quickTotal !== "" && (
-              <p className="mt-2 text-xs font-semibold text-red-700">0 = Disqualified.</p>
-            )}
+            {sheet2Total === 0 && quickTotal !== "" && disqualificationReasonBox}
           </div>
           <RubricTable values={sheet2Values} onChange={setSheet2Criterion} />
         </>

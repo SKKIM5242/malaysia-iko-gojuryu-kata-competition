@@ -91,7 +91,7 @@ export default async function AdminJudging({
         .order("full_name"),
       supabase.from("profiles").select("user_id, full_name, email, country").eq("role", "referee").eq("approved", true),
       supabase.from("referee_assignments").select("video_id, referee_user_id"),
-      supabase.from("video_scores").select("video_id, referee_user_id, score, criteria"),
+      supabase.from("video_scores").select("video_id, referee_user_id, score, criteria, disqualification_reason"),
       supabase.from("auto_assign_criteria").select("*").order("position"),
     ]);
   const criteriaRows = criteria ?? [];
@@ -130,9 +130,11 @@ export default async function AdminJudging({
   }
   const scoreByKey = new Map<string, number>();
   const criteriaByKey = new Map<string, number[] | null>();
+  const reasonByKey = new Map<string, string | null>();
   for (const s of scores ?? []) {
     scoreByKey.set(`${s.video_id}:${s.referee_user_id}`, Number(s.score));
     criteriaByKey.set(`${s.video_id}:${s.referee_user_id}`, (s.criteria as number[] | null) ?? null);
+    reasonByKey.set(`${s.video_id}:${s.referee_user_id}`, (s.disqualification_reason as string | null) ?? null);
   }
 
   // Signed playback URLs (1hr) for the private kata-videos bucket.
@@ -236,7 +238,12 @@ export default async function AdminJudging({
                   {country && <span className="font-normal text-neutral-400">({country})</span>}
                   {score != null ? (
                     canScoreAnyVideo ? (
-                      <ScoreDetailButton judgeName={judgeName} total={score} criteria={criteriaByKey.get(`${v.id}:${uid}`) ?? null} />
+                      <ScoreDetailButton
+                        judgeName={judgeName}
+                        total={score}
+                        criteria={criteriaByKey.get(`${v.id}:${uid}`) ?? null}
+                        reason={reasonByKey.get(`${v.id}:${uid}`) ?? null}
+                      />
                     ) : (
                       <span className={score === 0 ? "font-bold text-red-700" : "text-green-700"}>
                         Total {score.toFixed(1)}

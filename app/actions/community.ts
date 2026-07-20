@@ -176,6 +176,7 @@ export async function registerAudience(
   }
   const phone = String(formData.get("phone") ?? "").trim();
   const invitation_code = String(formData.get("invitation_code") ?? "").trim();
+  const support_referral = String(formData.get("support_referral") ?? "").trim();
 
   const supabase = await createClient();
 
@@ -197,6 +198,7 @@ export async function registerAudience(
     phone: phone || null,
     home_country: values.home_country,
     invitation_code: invitation_code || null,
+    support_referral: support_referral || null,
     payment_status: paymentStatus,
   });
   if (error) return { ok: false, error: "Could not save your registration. Please try again." };

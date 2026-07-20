@@ -825,6 +825,7 @@ export async function createAudienceMember(formData: FormData) {
   const phone = String(formData.get("phone") ?? "").trim();
   const home_country = String(formData.get("home_country") ?? "").trim() || null;
   const invitation_code = String(formData.get("invitation_code") ?? "").trim() || null;
+  const support_referral = String(formData.get("support_referral") ?? "").trim() || null;
   if (!full_name || !email || !phone) {
     backTo(returnTo, { error: "Name, email, and mobile phone are required." });
   }
@@ -842,7 +843,7 @@ export async function createAudienceMember(formData: FormData) {
 
   const id = crypto.randomUUID();
   const { error } = await supabase.from("audiences").insert({
-    id, full_name, email, phone, home_country, invitation_code, payment_status,
+    id, full_name, email, phone, home_country, invitation_code, support_referral, payment_status,
   });
   if (error) backTo(returnTo, { error: "Could not add audience member — please try again." });
   await writeAudit(supabase, {

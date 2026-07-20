@@ -15,10 +15,12 @@ export default function ScoreDetailButton({
   judgeName,
   total,
   criteria,
+  reason,
 }: {
   judgeName: string;
   total: number;
   criteria: number[] | null;
+  reason?: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const isEstimated =
@@ -55,6 +57,11 @@ export default function ScoreDetailButton({
               <p className="mb-2 text-xs text-amber-700">
                 This score was submitted before per-criterion detail was tracked — the breakdown
                 below is an even split of the total, not the judge&apos;s original per-row entries.
+              </p>
+            )}
+            {total === 0 && (
+              <p className="mb-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
+                <strong>Disqualification reason:</strong> {reason || "Not recorded (submitted before this was required)."}
               </p>
             )}
             <RubricTable values={values} rubric={rubricFor(values)} readOnly />

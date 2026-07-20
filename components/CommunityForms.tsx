@@ -234,6 +234,16 @@ export function AudienceForm({ telegramLink }: { telegramLink: string | null }) 
           </label>
           <input id="invitation_code" name="invitation_code" className={inputCls} />
         </div>
+        <div className="sm:col-span-2">
+          <label htmlFor="support_referral" className={labelCls}>
+            Participant Support referral <span className="font-normal text-neutral-400">(optional)</span>
+          </label>
+          <input id="support_referral" name="support_referral" className={inputCls} placeholder="e.g. Amy / KSK" />
+          <p className="mt-1 text-xs text-neutral-400">
+            Leave blank unless a Participant Support member recommended you sign in — if they did,
+            enter their short name or initial here.
+          </p>
+        </div>
       </div>
       <button type="submit" disabled={pending}
         className="rounded-md bg-red-700 px-5 py-2.5 font-semibold text-white hover:bg-red-600 disabled:opacity-60">

@@ -243,11 +243,19 @@ export async function submitScore(formData: FormData) {
   // /admin/judging.
   const criteriaRaw = formData.getAll("criteria");
   const criteria = criteriaRaw.length > 0 ? criteriaRaw.map((v) => Number(v)) : null;
+  // A Total Score of 0 disqualifies the entry — a reason is mandatory
+  // (dropdown from the organizer's official list, or free text), enforced
+  // here as well as client-side in RefereeScoring.tsx's submitBlocked.
+  const reason = String(formData.get("reason") ?? "").trim() || null;
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user || !videoId || Number.isNaN(score) || score < 0 || score > 10) {
+    revalidatePath("/account");
+    return;
+  }
+  if (score === 0 && !reason) {
     revalidatePath("/account");
     return;
   }
@@ -259,10 +267,11 @@ export async function submitScore(formData: FormData) {
     // Arena, Kata Arena's per-judge chips), same as a regular referee.
     await supabase.rpc("assign_referee", { p_video: videoId, p_referee: user.id });
   }
+  const disqualification_reason = score === 0 ? reason : null;
   const { error } = await supabase
     .from("video_scores")
     .upsert(
-      { video_id: videoId, referee_user_id: user.id, score, criteria },
+      { video_id: videoId, referee_user_id: user.id, score, criteria, disqualification_reason },
       { onConflict: "video_id,referee_user_id" },
     );
   if (!error) {
@@ -270,7 +279,7 @@ export async function submitScore(formData: FormData) {
       table_name: "video_scores",
       record_id: videoId,
       action: "score_submitted",
-      new_value: { score },
+      new_value: { score, disqualification_reason },
       actor_id: user.id,
     });
   }

@@ -59,7 +59,8 @@ const OPTIONS: Array<{
   {
     n: 6,
     title: "Participant Support",
-    desc: "Apply to join the organizing or support team. Reviewed by the organizer.",
+    desc:
+      "Apply to join the Participant Support team. Reviewed by the organizer. Each country is allocated only 1 Participant Support slot, so secure yours early. Why does Participant Support get view access that Schools, Senseis, Participants, Audience, and Referees don't? Because they are the help desk: to answer a registrant's or referee's question, they must be able to see the same screens the person asking is looking at — payments, registrations, and judging status. They can look things up and mark payments, but they can't score, delete records, or change the competition setup. This is a voluntary role with no guaranteed return from the USD 10 tier, since its margin is low — but it's a training ground for the USD 100 / USD 200 tiers. The organizer will try to allocate 20% of the Audience group's revenue to reward the Participant Support team, based on the number and complexity of tasks handled outside their own school or students. Good performance earns priority offers for the next competition. On top of that, you earn a 10% cut of every Audience sign-in made under your recommendation — the Audience member enters your Participant Support short name or initial at sign-in (e.g. Amy / KSK).",
     href: "/register/staff",
     cta: "Apply to the team",
   },

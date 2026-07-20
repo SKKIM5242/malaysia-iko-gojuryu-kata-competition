@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 
 interface Audience {
   id: string; full_name: string; email: string | null; phone: string | null;
-  home_country: string | null; invitation_code: string | null;
+  home_country: string | null; invitation_code: string | null; support_referral: string | null;
   user_id: string | null;
   payment_status: string; created_at: string;
 }
@@ -126,6 +126,10 @@ export default async function AdminAudience({
                 <label htmlFor="aud_invitation_code" className={adminLabel}>Invitation code (optional)</label>
                 <input id="aud_invitation_code" name="invitation_code" className={adminInput} placeholder="Waives the USD 10 fee" />
               </div>
+              <div>
+                <label htmlFor="aud_support_referral" className={adminLabel}>Participant Support referral (optional)</label>
+                <input id="aud_support_referral" name="support_referral" className={adminInput} placeholder="e.g. Amy / KSK" />
+              </div>
             </div>
             <button type="submit" className={adminBtn}>Add Audience / Spectator</button>
           </form>
@@ -145,6 +149,7 @@ export default async function AdminAudience({
             { key: "contact", label: "Contact" },
             { key: "home_country", label: "Country" },
             { key: "invitation_code", label: "Code" },
+            { key: "support_referral", label: "Support Referral" },
             { key: "payment", label: "Payment" },
             { key: "telegram", label: "Telegram" },
             ...(isAdminTier ? [{ key: "sign_in_control", label: "Sign-in Control" }] : []),
@@ -156,6 +161,7 @@ export default async function AdminAudience({
             { key: "phone", label: "Phone" },
             { key: "home_country", label: "Country" },
             { key: "invitation_code", label: "Code" },
+            { key: "support_referral", label: "Support Referral" },
             { key: "payment_status", label: "Payment Status" },
           ]}
           rows={(audiences as Audience[]).map((a) => ({
@@ -167,6 +173,7 @@ export default async function AdminAudience({
             phone: a.phone ?? "",
             home_country: a.home_country ?? "",
             invitation_code: a.invitation_code ?? "",
+            support_referral: a.support_referral ?? "",
             payment_status: a.payment_status,
             payment: (
               <StatusButtons table="audiences" id={a.id} field="payment_status" current={a.payment_status}

@@ -48,6 +48,29 @@ export const SCORING_CRITERIA = SHEET2_CRITERIA;
 
 export const TOTAL_MAX = 10;
 
+/** The organizer's official disqualification reasons, verbatim from the
+ * "Kata Requirements & Rules & Regulation Briefing" announcement's "Kata
+ * or Team Kata - Disqualification" list — offered as a dropdown whenever a
+ * judge gives a Total Score of 0, plus a free-text "Other" option for
+ * anything not on this list. Kept here (not parsed from the announcement
+ * at runtime) since the announcement is free-form markdown prose, not a
+ * structured list — update this array by hand if the organizer revises
+ * the announcement's wording. */
+export const DISQUALIFICATION_REASONS: string[] = [
+  "Not announcing the kata, announcing the wrong kata – or performing another kata than pre-announced to the official table.",
+  "Failing to bow at the beginning and completion of the Kata performance.",
+  "Not starting the Kata facing the Judges.",
+  "A distinct pause or stop in the performance.",
+  "Omitting or adding movements - or otherwise substantially change the performance from its original form.",
+  "Having to take a corrective step to recover from a total loss of balance or have a fall.",
+  "Belt falling off during the performance.",
+  "Exceeding the total time limit of 5 minutes duration for Kata and Bunkai.",
+  "Performing a scissor takedown technique to the neck area in Bunkai (Jodan Kani Basami)",
+  "Failure to follow the instructions of the Chief Judge or other misconduct (SHIKKAKU).",
+];
+
+export const OTHER_DISQUALIFICATION_REASON = "Other (type your own reason)";
+
 /** Picks which rubric a stored criteria array belongs to by its length —
  * 10 rows = Score Sheet 1, anything else = the 7-row Score Sheet 2. */
 export function rubricFor(criteria: number[] | null | undefined): RubricCriterion[] {
