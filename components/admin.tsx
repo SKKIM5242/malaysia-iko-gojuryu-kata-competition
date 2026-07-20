@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { signOut } from "@/app/actions/auth";
 import { createClient } from "@/lib/supabase/server";
 import CertificateUploadField from "@/components/CertificateUploadField";
+import { adminInput, adminLabel, adminBtn, adminBtnSecondary } from "@/components/admin-styles";
 
 const FULL_NAV: Array<[string, string]> = [
   ["Dashboard", "/admin"],
@@ -115,13 +116,7 @@ export async function AdminShell({
   );
 }
 
-export const adminInput =
-  "w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm focus:border-red-600 focus:outline-none focus:ring-1 focus:ring-red-600";
-export const adminLabel = "mb-1 block text-sm font-medium text-neutral-700";
-export const adminBtn =
-  "rounded-md bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-600";
-export const adminBtnSecondary =
-  "rounded-md border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-50";
+export { adminInput, adminLabel, adminBtn, adminBtnSecondary };
 
 export function Card({ children }: { children: ReactNode }) {
   return (

@@ -3,16 +3,17 @@ import { getAllCompetitions } from "@/lib/admin-data";
 import { schemaReady } from "@/lib/data";
 import {
   assignRefereeToVideo, unassignRefereeFromVideo, setJudgesRequired, autoAssignReferees,
-  resendRefereeNotification,
+  resendRefereeNotification, seedAutoAssignCriteria, deleteAutoAssignCriterion,
 } from "@/app/actions/admin";
 import { submitScore } from "@/app/actions/account";
-import { AdminShell, Card, adminBtn, adminInput } from "@/components/admin";
+import { AdminShell, Card, adminBtn, adminBtnSecondary, adminInput } from "@/components/admin";
 import { CategoryName, EmptyState, SetupNotice } from "@/components/ui";
 import FullViewButton from "@/components/FullViewButton";
 import { ScoreSessionButton } from "@/components/RefereeScoring";
 import DownloadCsvButton from "@/components/DownloadCsvButton";
 import FilterableTable from "@/components/FilterableTable";
 import ScoreDetailButton from "@/components/ScoreDetailButton";
+import AutoAssignCriterionModal from "@/components/AutoAssignCriterionModal";
 import { finalScore, isDisqualified } from "@/lib/scoring";
 import { getTelegramLink } from "@/lib/telegram";
 
@@ -53,6 +54,15 @@ export default async function AdminJudging({
   // auto-assign): Admin, Organizer/Staff, and Referee/Judge all get Full
   // access. Participant Support stays view only.
   const canManageJudging = ["admin", "organizer", "staff", "referee"].includes(myRole ?? "");
+  // Admin/Organizer/Staff can assign or unassign ANY referee. A Referee
+  // account may only assign/unassign THEMSELVES (see the video card below)
+  // -- enforced here for the UI and again in the assign_referee /
+  // unassign_referee RPCs (migration 0064) as the real security boundary,
+  // so a referee can never delete another referee's score.
+  const isJudgingManager = ["admin", "organizer", "staff"].includes(myRole ?? "");
+  // Editing the Auto-Assign Criteria documentation table is Admin/Organizer
+  // only, same tier as the Access Matrix / Access Comparison editors.
+  const canEditCriteria = isJudgingManager;
   // Kata video scoring: Admin, Organizer/Staff, AND Referee/Judge may score
   // any recording from this page — per the organizer's instruction, every
   // signed-in Referee/Judge gets the Judging page with full access.
@@ -62,7 +72,10 @@ export default async function AdminJudging({
   // is exposed to Admin/Organizer only, per the organizer's instruction.
   const allowAdvancedControls = ["admin", "organizer", "staff"].includes(myRole ?? "");
 
-  const [competitions, { data: videos }, { data: directory }, { data: refereeProfiles }, { data: assignments }, { data: scores }] =
+  const [
+    competitions, { data: videos }, { data: directory }, { data: refereeProfiles }, { data: assignments }, { data: scores },
+    { data: criteria },
+  ] =
     await Promise.all([
       getAllCompetitions(),
       supabase
@@ -79,7 +92,9 @@ export default async function AdminJudging({
       supabase.from("profiles").select("user_id, full_name, email, country").eq("role", "referee").eq("approved", true),
       supabase.from("referee_assignments").select("video_id, referee_user_id"),
       supabase.from("video_scores").select("video_id, referee_user_id, score, criteria"),
+      supabase.from("auto_assign_criteria").select("*").order("position"),
     ]);
+  const criteriaRows = criteria ?? [];
 
   const videoList = (videos as unknown as VideoRow[]) ?? [];
   // The workload panel is the Referee page's directory: every APPROVED
@@ -243,12 +258,21 @@ export default async function AdminJudging({
                       </button>
                     </form>
                   )}
-                  {canManageJudging && (
+                  {(isJudgingManager || (myRole === "referee" && uid === user?.id)) && (
                     <form action={unassignRefereeFromVideo}>
                       <input type="hidden" name="video_id" value={v.id} />
                       <input type="hidden" name="referee_user_id" value={uid} />
                       <input type="hidden" name="return_to" value="/admin/judging" />
-                      <button className="text-neutral-400 hover:text-red-600" title="Unassign">✕</button>
+                      <button
+                        className="text-neutral-400 hover:text-red-600"
+                        title={
+                          isJudgingManager
+                            ? "Unassign"
+                            : "Unassign yourself — this also deletes your score, so you'll need to submit a fresh one if you re-assign"
+                        }
+                      >
+                        ✕
+                      </button>
                     </form>
                   )}
                 </span>
@@ -263,7 +287,7 @@ export default async function AdminJudging({
           )}
         </div>
 
-        {canManageJudging && available.length > 0 && (
+        {isJudgingManager && available.length > 0 && (
           <div className="mt-3 space-y-1.5">
             {/* 3 independent slots so an admin can manually assign up to 3
                 judges at once (e.g. when auto-assign has run out of
@@ -292,6 +316,21 @@ export default async function AdminJudging({
                 </button>
               </form>
             ))}
+          </div>
+        )}
+        {/* A Referee/Judge can only assign THEMSELVES — never pick another
+            referee — so this is a single fixed button, not the manager's
+            open dropdown above. */}
+        {!isJudgingManager && myRole === "referee" && user && available.some((r) => r.user_id === user.id) && (
+          <div className="mt-3">
+            <form action={assignRefereeToVideo}>
+              <input type="hidden" name="video_id" value={v.id} />
+              <input type="hidden" name="referee_user_id" value={user.id} />
+              <input type="hidden" name="return_to" value="/admin/judging" />
+              <button className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-neutral-700">
+                Assign myself to judge this recording
+              </button>
+            </form>
           </div>
         )}
 
@@ -418,6 +457,81 @@ export default async function AdminJudging({
                 scored_text: String(scoredCount),
               };
             })}
+          />
+        </div>
+      )}
+
+      <div className="mb-3 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+        <strong>How to use Auto-assign referees:</strong> &quot;Judges per recording&quot; is a saved
+        setting per competition — set the number once and click Save; it stays in effect until you
+        change it again. Clicking <strong>Auto-assign referees</strong> is safe to click more than
+        once: each click only fills that competition&apos;s currently-empty judge slots up to the
+        saved target, and never touches an already-assigned judge or their score — so a 2nd or 3rd
+        click when everything is already full simply reports &quot;Every recording already has its
+        full panel of judges.&quot; It is <strong>not automatic</strong>, though — a newly-submitted
+        recording starts with 0 judges, and stays that way until someone clicks Auto-assign
+        referees again. You don&apos;t need to re-save Judges per recording each time, only click
+        Auto-assign referees whenever new recordings come in.
+      </div>
+
+      <h2 className="mb-1 text-lg font-bold">Auto-Assign Referees — Criteria</h2>
+      <p className="mb-3 text-sm text-neutral-500">
+        The rules Auto-assign referees currently follows, listed here for reference. Editing a row
+        below only updates this documentation for the team — it doesn&apos;t change the algorithm
+        itself.
+      </p>
+      {canEditCriteria && (
+        <div className="mb-3 flex flex-wrap gap-2">
+          <AutoAssignCriterionModal returnTo="/admin/judging" />
+          {criteriaRows.length === 0 && (
+            <form action={seedAutoAssignCriteria}>
+              <input type="hidden" name="return_to" value="/admin/judging" />
+              <button className={adminBtnSecondary}>Import default criteria</button>
+            </form>
+          )}
+        </div>
+      )}
+      {criteriaRows.length === 0 ? (
+        <div className="mb-8">
+          <EmptyState>
+            No criteria listed yet
+            {canEditCriteria ? " — import the defaults above or add your own." : "."}
+          </EmptyState>
+        </div>
+      ) : (
+        <div className="mb-8">
+          <FilterableTable
+            rowKey="id"
+            downloadName="auto-assign-criteria"
+            columns={[
+              { key: "position", label: "No." },
+              { key: "title", label: "Title" },
+              { key: "description", label: "Description" },
+              { key: "actions", label: "Actions" },
+            ]}
+            rows={criteriaRows.map((c) => ({
+              id: c.id,
+              position: String(c.position),
+              title: c.title,
+              description: c.description,
+              actions: canEditCriteria ? (
+                <div className="flex gap-1.5">
+                  <AutoAssignCriterionModal
+                    criterion={{ id: c.id, position: c.position, title: c.title, description: c.description }}
+                    returnTo="/admin/judging"
+                  />
+                  <form action={deleteAutoAssignCriterion}>
+                    <input type="hidden" name="id" value={c.id} />
+                    <input type="hidden" name="return_to" value="/admin/judging" />
+                    <button className="rounded border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50">
+                      Delete
+                    </button>
+                  </form>
+                </div>
+              ) : (
+                <span className="text-xs text-neutral-400">View only</span>
+              ),
+            }))}
           />
         </div>
       )}

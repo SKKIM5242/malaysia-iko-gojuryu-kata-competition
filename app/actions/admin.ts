@@ -12,6 +12,7 @@ import type { PaymentStatus } from "@/lib/types";
 import { parseCsvWithHeader, type CsvUploadResult } from "@/lib/csv-bulk";
 import { ACCESS_MATRIX, accessMatrixToMarkdown } from "@/lib/access-matrix";
 import { DEFAULT_COMPARISON_ROWS } from "@/components/AccessComparisonTable";
+import { DEFAULT_AUTO_ASSIGN_CRITERIA } from "@/lib/auto-assign-criteria";
 import { formatUSD } from "@/components/ui";
 
 /**
@@ -1763,6 +1764,61 @@ export async function autoAssignReferees(formData: FormData) {
       ? `Auto-assigned ${newAssignments.length} referee slot${newAssignments.length === 1 ? "" : "s"}.`
       : "Every recording already has its full panel of judges.",
   });
+}
+
+export async function seedAutoAssignCriteria(formData: FormData) {
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/judging";
+  const { supabase, actorId } = await getActor();
+  await requireAccessTableEditor(supabase, actorId, returnTo);
+  const { count } = await supabase.from("auto_assign_criteria").select("id", { count: "exact", head: true });
+  if (!count) {
+    await supabase.from("auto_assign_criteria").insert(
+      DEFAULT_AUTO_ASSIGN_CRITERIA.map((r, i) => ({ position: i + 1, title: r.title, description: r.description })),
+    );
+  }
+  await writeAudit(supabase, {
+    table_name: "auto_assign_criteria", record_id: null, action: "auto_assign_criteria_seeded", actor_id: actorId,
+  });
+  revalidatePath("/admin/judging");
+  backTo(returnTo, { ok: "Default criteria imported — edit the rows below." });
+}
+
+export async function saveAutoAssignCriterion(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/judging";
+  const { supabase, actorId } = await getActor();
+  await requireAccessTableEditor(supabase, actorId, returnTo);
+  const values = {
+    position: Number(formData.get("position") ?? 0) || 0,
+    title: String(formData.get("title") ?? "").trim(),
+    description: String(formData.get("description") ?? "").trim(),
+  };
+  if (!values.title) backTo(returnTo, { error: "A title is required." });
+  const { error } = id
+    ? await supabase.from("auto_assign_criteria").update(values).eq("id", id)
+    : await supabase.from("auto_assign_criteria").insert(values);
+  if (error) backTo(returnTo, { error: "Could not save the criterion." });
+  await writeAudit(supabase, {
+    table_name: "auto_assign_criteria", record_id: id || null,
+    action: id ? "auto_assign_criterion_updated" : "auto_assign_criterion_created",
+    new_value: values, actor_id: actorId,
+  });
+  revalidatePath("/admin/judging");
+  backTo(returnTo, { ok: "Criterion saved." });
+}
+
+export async function deleteAutoAssignCriterion(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/judging";
+  const { supabase, actorId } = await getActor();
+  await requireAccessTableEditor(supabase, actorId, returnTo);
+  const { error } = await supabase.from("auto_assign_criteria").delete().eq("id", id);
+  if (error) backTo(returnTo, { error: "Could not delete the criterion." });
+  await writeAudit(supabase, {
+    table_name: "auto_assign_criteria", record_id: id, action: "auto_assign_criterion_deleted", actor_id: actorId,
+  });
+  revalidatePath("/admin/judging");
+  backTo(returnTo, { ok: "Criterion deleted." });
 }
 
 export interface AdminVideoUploadState {
