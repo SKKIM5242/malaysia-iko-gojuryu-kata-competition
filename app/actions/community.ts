@@ -138,6 +138,9 @@ export async function registerReferee(
     action: "referee_registered",
     new_value: { full_name: values.full_name, invitation_code: invitation_code || null },
   });
+  // Best-effort: if an account with this email already exists, it picks up
+  // the "referee" role right away — one account can hold more than one role.
+  await supabase.rpc("grant_profile_role", { p_email: values.email, p_role: "referee" });
   const referenceId = id.slice(0, 8).toUpperCase();
   await sendConfirmationEmail({
     toEmail: values.email,
@@ -201,6 +204,9 @@ export async function registerAudience(
     action: "audience_registered",
     new_value: { full_name: values.full_name },
   });
+  // Best-effort: if an account with this email already exists, it picks up
+  // the "audience" role right away — one account can hold more than one role.
+  await supabase.rpc("grant_profile_role", { p_email: values.email, p_role: "audience" });
   const referenceId = id.slice(0, 8).toUpperCase();
   await sendConfirmationEmail({
     toEmail: values.email,
@@ -333,6 +339,9 @@ export async function applyStaff(
     action: "staff_application_submitted",
     new_value: { full_name: values.full_name, role_requested: values.role_requested },
   });
+  // Best-effort: if an account with this email already exists, it picks up
+  // the requested role right away — one account can hold more than one role.
+  await supabase.rpc("grant_profile_role", { p_email: values.email, p_role: values.role_requested });
   const referenceId = id.slice(0, 8).toUpperCase();
   await sendConfirmationEmail({
     toEmail: values.email,

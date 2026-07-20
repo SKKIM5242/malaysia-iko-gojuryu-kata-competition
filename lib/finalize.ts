@@ -212,6 +212,11 @@ export async function finalizeStripeSession(sessionId: string): Promise<Finalize
     .eq("id", v.competition_id)
     .maybeSingle();
   const competitionName = competitionRow?.name ?? "the competition";
+  // Best-effort: if an account with this email already exists, it picks up
+  // the "participant" role right away — one account can hold more than one role.
+  if (v.email) {
+    await admin.rpc("grant_profile_role", { p_email: v.email, p_role: "participant" });
+  }
   await sendConfirmationEmail({
     toEmail: v.email ?? null,
     recipientName: v.full_name,

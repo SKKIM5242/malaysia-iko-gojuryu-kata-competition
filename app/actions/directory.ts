@@ -141,6 +141,9 @@ export async function registerSchool(
     action: "school_self_registered",
     new_value: { name, state, contact_title, contact_name, contact_karate_title, contact_rank, tier: tier.name },
   });
+  // Best-effort: if an account with this email already exists, it picks up
+  // the "school" role right away — one account can hold more than one role.
+  await supabase.rpc("grant_profile_role", { p_email: email, p_role: "school" });
   const checkoutUrl = await directoryCheckout("school", id, name, tier);
   await sendConfirmationEmail({
     toEmail: email,
@@ -288,6 +291,9 @@ export async function registerSensei(
     action: "sensei_self_registered",
     new_value: { name, rank, school_id, tier: tier.name },
   });
+  // Best-effort: if an account with this email already exists, it picks up
+  // the "sensei" role right away — one account can hold more than one role.
+  await supabase.rpc("grant_profile_role", { p_email: email, p_role: "sensei" });
   const checkoutUrl = await directoryCheckout("sensei", id, name, tier);
   await sendConfirmationEmail({
     toEmail: email,

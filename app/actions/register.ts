@@ -331,6 +331,11 @@ export async function submitRegistration(
     referenceIds.push(registrationId.slice(0, 8).toUpperCase());
   }
 
+  // Best-effort: if an account with this email already exists, it picks up
+  // the "participant" role right away — one account can hold more than one role.
+  if (values.email) {
+    await supabase.rpc("grant_profile_role", { p_email: values.email, p_role: "participant" });
+  }
   await sendConfirmationEmail({
     toEmail: values.email || null,
     recipientName: values.full_name,

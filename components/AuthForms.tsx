@@ -21,12 +21,29 @@ const labelCls = "mb-1 block text-sm font-medium text-neutral-700";
  * personal invitation code generated from that existing directory record. */
 const CODE_OPTIONAL_ROLES = new Set(["referee", "audience"]);
 
+/** One account can now hold more than one role (ticked via checkboxes below)
+ * — a person only ever needs a single login, since auth.users.email is
+ * unique anyway. School/Sensei/Organizer/Participant Support/Admin still
+ * need a valid invitation code (any one of them present triggers the code
+ * field); Referee/Audience's code is optional, same as before. */
+const ROLE_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: "school", label: "School / Dojo / Club" },
+  { value: "sensei", label: "Sensei / Shihan / Hanshi" },
+  { value: "participant", label: "Participant (record my kata)" },
+  { value: "referee", label: "Referee / Judge" },
+  { value: "audience", label: "Audience / Spectator (view Kata Arena)" },
+  { value: "customer_support", label: "Participant Support" },
+  { value: "organizer", label: "Organizer" },
+  { value: "admin", label: "Admin" },
+];
+const CODE_REQUIRED_ROLES = new Set(["school", "sensei", "organizer", "customer_support", "admin"]);
+
 export default function AuthForms({ defaultMode = "signin" }: { defaultMode?: "signin" | "signup" }) {
   const router = useRouter();
   const [mode, setMode] = useState<"signin" | "signup">(defaultMode);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  const [role, setRole] = useState("participant");
+  const [roles, setRoles] = useState<string[]>(["participant"]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -45,18 +62,20 @@ export default function AuthForms({ defaultMode = "signin" }: { defaultMode?: "s
         if (password !== confirmPassword) {
           throw new Error("Passwords do not match.");
         }
+        if (roles.length === 0) {
+          throw new Error("Please tick at least one role.");
+        }
         if (form.get("terms_accepted") !== "on") {
           throw new Error("Please accept the Terms & Conditions to create an account.");
         }
-        const signupRole = String(form.get("role") ?? "participant");
         const { data: signUpData, error: err } = await supabase.auth.signUp({
           email,
           password,
           options: {
             data: {
               full_name: String(form.get("full_name") ?? "").trim(),
-              country: String(form.get("country") ?? "").trim(),
-              role: signupRole,
+              role: roles[0],
+              roles,
               invite_code: String(form.get("invite_code") ?? "").trim(),
               terms_accepted: true,
             },
@@ -65,7 +84,7 @@ export default function AuthForms({ defaultMode = "signin" }: { defaultMode?: "s
         if (err) throw err;
         if (signUpData.user) {
           // Best-effort — never blocks account creation on a slow/failed email.
-          triggerEmailVerification(signUpData.user.id, email, signupRole).catch(() => {});
+          triggerEmailVerification(signUpData.user.id, email, roles[0]).catch(() => {});
         }
         const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
         if (signInErr) throw signInErr;
@@ -83,6 +102,9 @@ export default function AuthForms({ defaultMode = "signin" }: { defaultMode?: "s
       setPending(false);
     }
   }
+
+  const requiresInviteCode = roles.some((r) => CODE_REQUIRED_ROLES.has(r));
+  const codeOptionalOnly = !requiresInviteCode && roles.some((r) => CODE_OPTIONAL_ROLES.has(r));
 
   return (
     <div className="mx-auto max-w-md">
@@ -126,32 +148,31 @@ export default function AuthForms({ defaultMode = "signin" }: { defaultMode?: "s
         )}
         {mode === "signup" && (
           <div>
-            <label htmlFor="auth_role" className={labelCls}>I am registering as *</label>
-            <select
-              id="auth_role"
-              name="role"
-              required
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-              className={inputCls}
-            >
-              <option value="school">School / Dojo / Club</option>
-              <option value="sensei">Sensei / Shihan / Hanshi</option>
-              <option value="participant">Participant (record my kata)</option>
-              <option value="referee">Referee / Judge</option>
-              <option value="audience">Audience / Spectator (view Kata Arena)</option>
-              <option value="customer_support">Participant Support</option>
-              <option value="organizer">Organizer</option>
-              <option value="admin">Admin</option>
-            </select>
+            <label className={labelCls}>I am creating an account for *</label>
+            <div className="space-y-1.5 rounded-md border border-neutral-300 p-3">
+              {ROLE_OPTIONS.map((opt) => (
+                <label key={opt.value} className="flex items-center gap-2 text-sm text-neutral-700">
+                  <input
+                    type="checkbox"
+                    checked={roles.includes(opt.value)}
+                    onChange={(e) =>
+                      setRoles((prev) =>
+                        e.target.checked ? [...prev, opt.value] : prev.filter((r) => r !== opt.value),
+                      )
+                    }
+                  />
+                  {opt.label}
+                </label>
+              ))}
+            </div>
             <p className="mt-1 text-xs text-neutral-400">
-              Referee/Judge and Audience accounts need the organizer&apos;s approval before they
-              activate — unless you have an invitation code below. Once approved, sign-in is
-              unlimited and free.
+              Tick every role that applies — one account covers all of them. Referee/Judge and
+              Audience roles need the organizer&apos;s approval before they activate — unless you
+              have an invitation code below. Once approved, sign-in is unlimited and free.
             </p>
           </div>
         )}
-        {mode === "signup" && (role === "school" || role === "sensei") && (
+        {mode === "signup" && roles.some((r) => r === "school" || r === "sensei") && (
           <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
             <p>
               Signing in here is the second step — your School/Sensei must already be registered
@@ -168,7 +189,8 @@ export default function AuthForms({ defaultMode = "signin" }: { defaultMode?: "s
             </p>
           </div>
         )}
-        {mode === "signup" && (role === "organizer" || role === "customer_support" || role === "admin") && (
+        {mode === "signup" &&
+          roles.some((r) => r === "organizer" || r === "customer_support" || r === "admin") && (
           <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
             <p>
               A valid invitation code is required to self-signup for this role — it activates your
@@ -181,58 +203,30 @@ export default function AuthForms({ defaultMode = "signin" }: { defaultMode?: "s
           </div>
         )}
         <>
-            {mode === "signup" && CODE_OPTIONAL_ROLES.has(role) && (
+            {mode === "signup" && (requiresInviteCode || codeOptionalOnly) && (
               <div>
-                <label htmlFor="auth_invite" className={labelCls}>Invitation code (optional)</label>
-                <input id="auth_invite" name="invite_code" className={inputCls} placeholder="e.g. IKO-JUDGE-2026" />
+                <label htmlFor="auth_invite" className={labelCls}>
+                  Invitation code {requiresInviteCode ? "*" : "(optional)"}
+                </label>
+                <input
+                  id="auth_invite"
+                  name="invite_code"
+                  required={requiresInviteCode}
+                  className={inputCls}
+                  placeholder="e.g. SCHOOL-4F9A2B"
+                />
                 <p className="mt-1 text-xs text-neutral-400">
-                  A valid code activates your account immediately — no payment, no waiting for approval.
-                </p>
-              </div>
-            )}
-            {mode === "signup" && role === "school" && (
-              <div>
-                <label htmlFor="auth_invite" className={labelCls}>Invitation code *</label>
-                <input id="auth_invite" name="invite_code" required className={inputCls} placeholder="e.g. SCHOOL-4F9A2B" />
-                <p className="mt-1 text-xs text-neutral-400">
-                  Required — get this from your school&apos;s own record on the admin site (ask the
-                  organizer if you don&apos;t have one yet). It's what links this account to your
-                  students only.
-                </p>
-              </div>
-            )}
-            {mode === "signup" && role === "sensei" && (
-              <div>
-                <label htmlFor="auth_invite" className={labelCls}>Invitation code *</label>
-                <input id="auth_invite" name="invite_code" required className={inputCls} placeholder="e.g. SENSEI-4F9A2B" />
-                <p className="mt-1 text-xs text-neutral-400">
-                  Required — get this from your sensei&apos;s own record on the admin site (ask the
-                  organizer if you don&apos;t have one yet). It's what links this account to your
-                  students only.
-                </p>
-              </div>
-            )}
-            {mode === "signup" && (role === "organizer" || role === "customer_support" || role === "admin") && (
-              <div>
-                <label htmlFor="auth_invite" className={labelCls}>Invitation code *</label>
-                <input id="auth_invite" name="invite_code" required className={inputCls} placeholder="e.g. STAFF-4F9A2B" />
-                <p className="mt-1 text-xs text-neutral-400">
-                  Required — get this from the organizer. A valid code activates your account
-                  immediately with no approval step.
+                  {requiresInviteCode
+                    ? "Required for School / Sensei / Organizer / Participant Support / Admin — get this from the organizer (or your school/sensei's own record). It activates the matching role immediately, linking it to the right record where relevant."
+                    : "A valid code activates your Referee/Judge or Audience role immediately — no payment, no waiting for approval."}
                 </p>
               </div>
             )}
             {mode === "signup" && (
-              <>
-                <div>
-                  <label htmlFor="auth_name" className={labelCls}>Full name *</label>
-                  <input id="auth_name" name="full_name" required className={inputCls} />
-                </div>
-                <div>
-                  <label htmlFor="auth_country" className={labelCls}>Country *</label>
-                  <input id="auth_country" name="country" required defaultValue="Malaysia" className={inputCls} />
-                </div>
-              </>
+              <div>
+                <label htmlFor="auth_name" className={labelCls}>Full name *</label>
+                <input id="auth_name" name="full_name" required className={inputCls} />
+              </div>
             )}
             <div>
               <label htmlFor="auth_email" className={labelCls}>Email *</label>
