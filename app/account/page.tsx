@@ -240,8 +240,8 @@ export default async function AccountPage({
             <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-6">
               <p className="font-semibold text-amber-900">Waiting for organizer approval.</p>
               <p className="mt-1 text-sm text-amber-800">
-                Your Admin / Organizer / Participant Support account needs approval, or a valid
-                invitation code at sign-up, before it activates. Contact the organizer.
+                Your Admin / Organizer / Participant Support account needs the organizer&apos;s
+                approval before it activates. Contact the organizer.
               </p>
             </div>
           )}
@@ -264,7 +264,7 @@ export default async function AccountPage({
               <p className="font-semibold text-amber-900">Waiting for approval.</p>
               <p className="mt-1 text-sm text-amber-800">
                 Your Referee / Judge account activates once the organizer confirms your USD 100
-                deposit (or your invitation code — enter it at sign-up next time).
+                deposit.
               </p>
             </div>
             <div className="mt-4">{SignOutButton}</div>
@@ -394,7 +394,7 @@ export default async function AccountPage({
               <p className="font-semibold text-amber-900">Waiting for approval.</p>
               <p className="mt-1 text-sm text-amber-800">
                 Your Audience / Spectator account activates once the organizer confirms your USD 10
-                sign-in (or your invitation code — enter it at sign-up next time).
+                sign-in.
               </p>
             </div>
           )}

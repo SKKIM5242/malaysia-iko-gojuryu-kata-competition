@@ -152,7 +152,7 @@ export async function registerReferee(
       "This confirms your Referee / Judge registration.",
       paymentStatus === "waived"
         ? "Your invitation code waived the USD 100 deposit — you're all set."
-        : "The organizer will review your registration and contact you about the USD 100 deposit (or confirm your invitation code). Remember: the USD 100 is a deposit for participants — for non-participants it will be forfeited.",
+        : "The organizer will review your registration and contact you about the USD 100 deposit. Remember: the USD 100 is a deposit for participants — for non-participants it will be forfeited.",
       "",
       "Once signed in (and approved), you can view every event on Kata Arena, with every judge's individual score — your own scoring responsibility is limited to the recordings assigned to you.",
       "Next: once every registration under this email is done, create your sign-in account (or sign in if you already have one) using the Kata Arena log in link below.",
@@ -221,7 +221,7 @@ export async function registerAudience(
       "This confirms your Audience / Spectator registration.",
       paymentStatus === "waived"
         ? "Your invitation code waived the USD 10 fee — you're all set."
-        : "The organizer will confirm your USD 10 sign-in (or your invitation code) and share viewing access details.",
+        : "The organizer will confirm your USD 10 sign-in and share viewing access details.",
       "",
       "Once signed in, you can view all events — during the recording/upload window, during referee/judge scoring, and after Winners are announced.",
       "Next: once every registration under this email is done, create your sign-in account (or sign in if you already have one) using the Kata Arena log in link below.",

@@ -56,7 +56,7 @@ export function RefereeForm({ telegramLink }: { telegramLink: string | null }) {
         what="Referee / judge registration"
         refId={state.referenceId}
         telegramLink={telegramLink}
-        note="The organizer will review your registration and contact you about the USD 100 deposit (or confirm your invitation code). Remember: the USD 100 is a deposit for participants — for non-participants it will be forfeited."
+        note="The organizer will review your registration and contact you about the USD 100 deposit. Remember: the USD 100 is a deposit for participants — for non-participants it will be forfeited."
       />
     );
   }
@@ -177,7 +177,7 @@ export function RefereeForm({ telegramLink }: { telegramLink: string | null }) {
 
         <div className="sm:col-span-2">
           <label htmlFor="invitation_code" className={labelCls}>
-            Invitation code <span className="font-normal text-neutral-400">(register free — USD 0 — by invitation only)</span>
+            Invitation code <span className="font-normal text-neutral-400">(optional)</span>
           </label>
           <input id="invitation_code" name="invitation_code" className={inputCls} />
         </div>
@@ -198,7 +198,7 @@ export function AudienceForm({ telegramLink }: { telegramLink: string | null }) 
         what="Audience registration"
         refId={state.referenceId}
         telegramLink={telegramLink}
-        note="The organizer will confirm your USD 10 sign-in (or your invitation code) and share viewing access details."
+        note="The organizer will confirm your USD 10 sign-in and share viewing access details."
       />
     );
   }
@@ -230,7 +230,7 @@ export function AudienceForm({ telegramLink }: { telegramLink: string | null }) 
         </div>
         <div>
           <label htmlFor="invitation_code" className={labelCls}>
-            Invitation code <span className="font-normal text-neutral-400">(free with code)</span>
+            Invitation code <span className="font-normal text-neutral-400">(optional)</span>
           </label>
           <input id="invitation_code" name="invitation_code" className={inputCls} />
         </div>

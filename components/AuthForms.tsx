@@ -167,8 +167,8 @@ export default function AuthForms({ defaultMode = "signin" }: { defaultMode?: "s
             </div>
             <p className="mt-1 text-xs text-neutral-400">
               Tick every role that applies — one account covers all of them. Referee/Judge and
-              Audience roles need the organizer&apos;s approval before they activate — unless you
-              have an invitation code below. Once approved, sign-in is unlimited and free.
+              Audience roles need the organizer&apos;s approval before they activate. Once
+              approved, sign-in is unlimited and free.
             </p>
           </div>
         )}
@@ -176,9 +176,8 @@ export default function AuthForms({ defaultMode = "signin" }: { defaultMode?: "s
           <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
             <p>
               Signing in here is the second step — your School/Sensei must already be registered
-              in the directory (with contact and bank details) before you can get a personal
-              invitation code from your own record&apos;s Edit page. That code links this login to
-              your students only.
+              in the directory (with contact and bank details) first. Contact the organizer to
+              activate this login and link it to your students only.
             </p>
             <p className="mt-1">
               A registration fee — matching your students&apos; competition tier fee (e.g. USD 100 if
@@ -193,12 +192,12 @@ export default function AuthForms({ defaultMode = "signin" }: { defaultMode?: "s
           roles.some((r) => r === "organizer" || r === "customer_support" || r === "admin") && (
           <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
             <p>
-              A valid invitation code is required to self-signup for this role — it activates your
-              account immediately, no approval step. No code?{" "}
+              These roles are staff-managed.{" "}
               <Link href="/register/staff" className="font-semibold underline underline-offset-2">
                 Submit an application
               </Link>{" "}
-              for the organizer to review instead.
+              for the organizer to review, or contact the organizer directly if access has already
+              been arranged with you.
             </p>
           </div>
         )}
@@ -216,9 +215,7 @@ export default function AuthForms({ defaultMode = "signin" }: { defaultMode?: "s
                   placeholder="e.g. SCHOOL-4F9A2B"
                 />
                 <p className="mt-1 text-xs text-neutral-400">
-                  {requiresInviteCode
-                    ? "Required for School / Sensei / Organizer / Participant Support / Admin — get this from the organizer (or your school/sensei's own record). It activates the matching role immediately, linking it to the right record where relevant."
-                    : "A valid code activates your Referee/Judge or Audience role immediately — no payment, no waiting for approval."}
+                  If the organizer has given you one, enter it here.
                 </p>
               </div>
             )}

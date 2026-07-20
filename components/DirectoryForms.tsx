@@ -85,9 +85,10 @@ function Success({
       <div className="mx-auto mt-6 max-w-md rounded-md border border-amber-200 bg-amber-50 p-4 text-left text-xs text-amber-900">
         <p className="font-bold">One more step — sign in to watch your students&apos; recordings</p>
         <p className="mt-1">
-          Ask the organizer for a personal invitation code tied to this exact record, then use it
-          to sign in via <Link href="/account?mode=signup" className="underline">Kata Arena Log In</Link>.
-          A registration fee — matching your students&apos; competition tier fee — unlocks unlimited
+          Once every registration under this email is done, create your sign-in account (or sign
+          in if you already have one) via{" "}
+          <Link href="/account?mode=signup" className="underline">Kata Arena Log In</Link>. A
+          registration fee — matching your students&apos; competition tier fee — unlocks unlimited
           sign-in to watch your students&apos; kata recordings and judge scores as they come in —
           no waiting for winners day.
         </p>
