@@ -306,6 +306,16 @@ export function formatDOB(d: string | null | undefined): string {
   return `${day}/${m}/${y}`;
 }
 
+/** Registration-timeline dates (Event date, Deadline, Winners announce,
+ * Audience sign-in) render as MM/DD/YYYY on the Registration Open cards --
+ * distinct from the long-form formatDate() used elsewhere. */
+export function formatDateMDY(d: string | null | undefined): string {
+  if (!d) return "TBA";
+  const [y, m, day] = d.slice(0, 10).split("-");
+  if (!y || !m || !day) return d;
+  return `${m}/${day}/${y}`;
+}
+
 export function formatUSD(n: number | null | undefined): string {
   if (n == null) return "TBA";
   return `USD ${Number(n).toFixed(2)}`;

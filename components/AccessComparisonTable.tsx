@@ -55,7 +55,7 @@ const ROWS: Array<{ what: string; cells: [string, string, string, string, string
   {
     what: "Record & submit kata / viewing scope",
     cells: [
-      "Record & submit own event(s)",
+      "Record & submission or recording of own event(s) (all events once Winners are announced)",
       "View own students' events only (all events once Winners are announced)",
       "View own students' events only (all events once Winners are announced)",
       "View all events",

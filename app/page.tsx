@@ -14,13 +14,20 @@ import {
   SiteFooter,
   SiteHeader,
   formatDate,
+  formatDateMDY,
   formatUSD,
   protectKataNames,
 } from "@/components/ui";
 import { Markdown } from "@/lib/markdown";
 import { groupByKata, kataBases } from "@/lib/division";
 import { createClient } from "@/lib/supabase/server";
+import { winnersRevealDateFor } from "@/lib/winners";
 import type { Category } from "@/lib/types";
+
+function announceDateOf(c: { registration_deadline: string | null; winners_announce_date: string | null }): string | null {
+  const date = winnersRevealDateFor(c.registration_deadline, c.winners_announce_date);
+  return date ? date.toISOString().slice(0, 10) : null;
+}
 
 export const dynamic = "force-dynamic";
 
@@ -90,11 +97,19 @@ export default async function Home() {
                     <div className="space-y-3 px-6 py-5 text-sm">
                       <div className="flex justify-between">
                         <span className="text-neutral-400">Event date</span>
-                        <span className="font-semibold text-neutral-900">{formatDate(competition.event_date)}</span>
+                        <span className="font-semibold text-neutral-900">{formatDateMDY(competition.event_date)}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-neutral-400">Deadline</span>
-                        <span className="font-semibold text-neutral-900">{formatDate(competition.registration_deadline)}</span>
+                        <span className="text-neutral-400">Registration deadline</span>
+                        <span className="font-semibold text-neutral-900">{formatDateMDY(competition.registration_deadline)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-neutral-400">Winners announce date</span>
+                        <span className="font-semibold text-neutral-900">{formatDateMDY(announceDateOf(competition))}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-neutral-400">Audience recommended sign-in date</span>
+                        <span className="font-semibold text-neutral-900">{formatDateMDY(competition.audience_signin_date)}</span>
                       </div>
                     </div>
                     <div className="border-t border-neutral-100 px-6 py-4">
@@ -114,6 +129,15 @@ export default async function Home() {
                   </div>
                 );
               })}
+            </div>
+            <div className="mt-4 rounded-md border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
+              Event date → Registration deadline is the participants&apos; recording-submission
+              timeline; referees start scoring only after the deadline. Participants, senseis, or
+              anyone else can also register as audience to create an audience account and sign in
+              before the Winners announce date to see other participants&apos; or competitors&apos;
+              recordings if you&apos;re unable to wait until the Winners announcement date. Audience
+              sign-in is USD 10 / 100 / 200 per sign-in, per competition tier. Thank you for your
+              support — all the best to every participant!
             </div>
             <Link href="/participants" className="mt-4 inline-block text-sm font-medium text-red-700 underline underline-offset-2">
               View confirmed participants →
