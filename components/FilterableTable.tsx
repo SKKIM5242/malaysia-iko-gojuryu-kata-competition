@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { useCallback, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import DownloadCsvButton from "@/components/DownloadCsvButton";
 import ColumnFilterDropdown from "@/components/ColumnFilterDropdown";
 import DualScrollBox from "@/components/DualScrollBox";
@@ -16,10 +16,16 @@ export interface FilterableColumn {
  * but never a callback/closure (RSC serialization forbids it). */
 type CellValue = string | ReactNode;
 
+const MIN_COL_WIDTH = 60;
+const DEFAULT_COL_WIDTH = 150;
+
 /** Generic per-column-filterable data table — same filter-box-per-column
  * pattern as the Participant Records table, reused for every other
  * registrant type (Referees, Audience, Schools, Senseis, Staff Accounts)
- * so each gets its own filterable list without duplicating the table UI. */
+ * so each gets its own filterable list without duplicating the table UI.
+ * Every column — including the sticky/pinned ones — can be dragged wider
+ * or narrower from its right edge; widths reset on page reload (not
+ * persisted). */
 export default function FilterableTable({
   columns,
   rows,
@@ -42,22 +48,56 @@ export default function FilterableTable({
    * extra keys on each row alongside the display keys `columns` reads. */
   csvColumns?: FilterableColumn[];
   /** How many leading columns stay pinned during horizontal scroll (1 or 2).
-   * With 2, the first column gets a fixed width so the second column's
-   * sticky offset is known — meant for a narrow "No." column. */
+   * With 2, the first column defaults to a narrow width so the second
+   * column's sticky offset is known — meant for a narrow "No." column. Both
+   * stay resizable like every other column. */
   stickyColumns?: 1 | 2;
-  /** Fixed pixel width of column 0 when stickyColumns is 2. */
+  /** Default pixel width of column 0 when stickyColumns is 2 (until dragged). */
   firstColumnWidth?: number;
 }) {
   const [filters, setFilters] = useState<Record<string, Set<string>>>({});
+  const [colWidths, setColWidths] = useState<Record<string, number>>({});
+  const resizingRef = useRef<{ key: string; startX: number; startWidth: number } | null>(null);
+
+  const widthOf = useCallback(
+    (key: string, index: number): number => {
+      if (colWidths[key] != null) return colWidths[key];
+      return stickyColumns === 2 && index === 0 ? firstColumnWidth : DEFAULT_COL_WIDTH;
+    },
+    [colWidths, stickyColumns, firstColumnWidth],
+  );
+
+  const handleMove = useCallback((e: MouseEvent) => {
+    const r = resizingRef.current;
+    if (!r) return;
+    const next = Math.max(MIN_COL_WIDTH, r.startWidth + (e.clientX - r.startX));
+    setColWidths((prev) => ({ ...prev, [r.key]: next }));
+  }, []);
+
+  const handleUp = useCallback(() => {
+    resizingRef.current = null;
+    window.removeEventListener("mousemove", handleMove);
+    window.removeEventListener("mouseup", handleUp);
+  }, [handleMove]);
+
+  const handleResizeStart = useCallback(
+    (e: React.MouseEvent, key: string, index: number) => {
+      e.preventDefault();
+      e.stopPropagation();
+      resizingRef.current = { key, startX: e.clientX, startWidth: widthOf(key, index) };
+      window.addEventListener("mousemove", handleMove);
+      window.addEventListener("mouseup", handleUp);
+    },
+    [widthOf, handleMove, handleUp],
+  );
+
   const stickyCellClass = (i: number, bg: string) =>
     i < stickyColumns
       ? `sticky z-10 border-r border-neutral-200 ${bg} ${i === 0 ? "left-0" : ""}`
       : "";
-  const stickyCellStyle = (i: number): CSSProperties | undefined => {
-    if (stickyColumns < 2) return undefined;
-    if (i === 0) return { width: firstColumnWidth, minWidth: firstColumnWidth, maxWidth: firstColumnWidth };
-    if (i === 1) return { left: firstColumnWidth };
-    return undefined;
+  const stickyLeftStyle = (i: number): CSSProperties | undefined => {
+    if (stickyColumns < 2 || i !== 1) return undefined;
+    return { left: widthOf(columns[0].key, 0) };
   };
 
   const uniqueValues = useMemo(() => {
@@ -107,21 +147,35 @@ export default function FilterableTable({
     <div>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-neutral-400">
-          Showing {filtered.length} of {rows.length}. Filters combine (AND).
+          Showing {filtered.length} of {rows.length}. Filters combine (AND). Drag a column's right
+          edge to resize it.
         </p>
         <DownloadCsvButton rows={csvRows} filename={downloadName} />
       </div>
       <DualScrollBox>
-        <table className="w-full text-left text-sm" style={{ minWidth: `${columns.length * 150}px` }}>
+        <table
+          className="text-left text-sm"
+          style={{ tableLayout: "fixed", width: columns.reduce((sum, c, i) => sum + widthOf(c.key, i), 0) }}
+        >
+          <colgroup>
+            {columns.map((c, i) => (
+              <col key={c.key} style={{ width: widthOf(c.key, i) }} />
+            ))}
+          </colgroup>
           <thead className="sticky top-0 z-20 border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
             <tr>
               {columns.map((c, i) => (
                 <th
                   key={c.key}
-                  className={`px-3 py-2.5 whitespace-nowrap ${stickyCellClass(i, "bg-neutral-50")}`}
-                  style={stickyCellStyle(i)}
+                  className={`relative select-none px-3 py-2.5 whitespace-nowrap ${stickyCellClass(i, "bg-neutral-50")}`}
+                  style={stickyLeftStyle(i)}
                 >
-                  {c.label}
+                  <span className="block overflow-hidden text-ellipsis pr-2">{c.label}</span>
+                  <span
+                    onMouseDown={(e) => handleResizeStart(e, c.key, i)}
+                    title="Drag to resize this column"
+                    className="absolute right-0 top-0 z-10 h-full w-2 cursor-col-resize touch-none select-none hover:bg-red-300 active:bg-red-500"
+                  />
                 </th>
               ))}
             </tr>
@@ -130,7 +184,7 @@ export default function FilterableTable({
                 <th
                   key={c.key}
                   className={`px-2 py-1.5 ${stickyCellClass(i, "bg-white")}`}
-                  style={stickyCellStyle(i)}
+                  style={stickyLeftStyle(i)}
                 >
                   <ColumnFilterDropdown
                     values={uniqueValues[c.key] ?? []}
@@ -157,8 +211,8 @@ export default function FilterableTable({
                     return (
                       <td
                         key={c.key}
-                        className={`max-w-[220px] truncate px-3 py-2 ${stickyCellClass(i, "bg-white group-hover:bg-neutral-50")}`}
-                        style={stickyCellStyle(i)}
+                        className={`truncate px-3 py-2 ${stickyCellClass(i, "bg-white group-hover:bg-neutral-50")}`}
+                        style={stickyLeftStyle(i)}
                         title={isText ? cell : undefined}
                       >
                         {isText ? cell || "—" : cell}

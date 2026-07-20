@@ -6,8 +6,9 @@ import {
   getSchools,
   schemaReady,
 } from "@/lib/data";
-import { CategoryName, EmptyState, SetupNotice, SiteFooter, SiteHeader, formatUSD } from "@/components/ui";
+import { EmptyState, SetupNotice, SiteFooter, SiteHeader, formatUSD } from "@/components/ui";
 import { kataBases } from "@/lib/division";
+import ParticipantsTable from "@/components/ParticipantsTable";
 
 export const dynamic = "force-dynamic";
 
@@ -152,38 +153,18 @@ export default async function ParticipantsPage({
           {rows.length === 0 ? (
             <EmptyState>No confirmed participants yet.</EmptyState>
           ) : (
-            <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white shadow-sm">
-              <table className="w-full min-w-[640px] text-left text-sm">
-                <thead className="border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
-                  <tr>
-                    <th className="px-4 py-3">#</th>
-                    <th className="px-4 py-3">Name</th>
-                    <th className="px-4 py-3">Category</th>
-                    <th className="px-4 py-3">Division</th>
-                    <th className="px-4 py-3">Belt</th>
-                    <th className="px-4 py-3">School</th>
-                    <th className="px-4 py-3">Sensei</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-neutral-100">
-                  {rows.map((r, i) => (
-                    <tr key={r.id} className="hover:bg-neutral-50">
-                      <td className="px-4 py-3 text-neutral-400">{(page - 1) * PAGE_SIZE + i + 1}</td>
-                      <td className="px-4 py-3 font-medium text-neutral-900">{r.participant?.full_name ?? "—"}</td>
-                      <td className="max-w-[220px] truncate px-4 py-3" title={r.category?.name ?? undefined}>
-                        <CategoryName name={r.category?.name} />
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-xs">{r.division ?? "—"}</td>
-                      <td className="px-4 py-3">{r.participant?.belt_rank ?? "—"}</td>
-                      <td className="max-w-[220px] truncate px-4 py-3" title={r.participant?.school?.name ?? undefined}>
-                        {r.participant?.school?.name ?? "—"}
-                      </td>
-                      <td className="px-4 py-3">{r.participant?.sensei?.name ?? "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <ParticipantsTable
+              rows={rows.map((r, i) => ({
+                id: r.id,
+                no: (page - 1) * PAGE_SIZE + i + 1,
+                name: r.participant?.full_name ?? "—",
+                categoryName: r.category?.name ?? null,
+                division: r.division,
+                belt: r.participant?.belt_rank ?? null,
+                school: r.participant?.school?.name ?? null,
+                sensei: r.participant?.sensei?.name ?? null,
+              }))}
+            />
           )}
         </div>
 
