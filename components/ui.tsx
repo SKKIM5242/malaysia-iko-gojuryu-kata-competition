@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import type { PaymentStatus } from "@/lib/types";
+import RoleSwitcher from "@/components/RoleSwitcher";
 
 export function StatusBadge({ status }: { status: PaymentStatus }) {
   const styles: Record<PaymentStatus, string> = {
@@ -98,6 +99,7 @@ export function SiteHeader() {
           <Link href="/admin" className="rounded px-3 py-1.5 text-neutral-400 hover:bg-neutral-800">
             Admin
           </Link>
+          <RoleSwitcher />
         </nav>
       </div>
     </header>
