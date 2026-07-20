@@ -2575,6 +2575,32 @@ export async function setCommissionPayoutStatus(formData: FormData) {
   backTo(returnTo, { ok: "Payout status updated." });
 }
 
+export async function setWinnerPayoutStatus(formData: FormData) {
+  const registrationId = String(formData.get("registration_id") ?? "");
+  const status = String(formData.get("status") ?? "");
+  const returnTo = "/admin/commissions";
+  if (!registrationId || !["unpaid", "paid"].includes(status)) {
+    backTo(returnTo, { error: "Invalid request." });
+  }
+  const { supabase, actorId } = await getActor();
+  const { error } = await supabase
+    .from("winner_payouts")
+    .upsert(
+      {
+        registration_id: registrationId, status,
+        paid_at: status === "paid" ? new Date().toISOString() : null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "registration_id" },
+    );
+  if (error) backTo(returnTo, { error: `Could not update payout status: ${error.message}` });
+  await writeAudit(supabase, {
+    table_name: "winner_payouts", record_id: registrationId, action: "winner_payout_status_changed",
+    new_value: { status }, actor_id: actorId,
+  });
+  backTo(returnTo, { ok: "Payout status updated." });
+}
+
 // ── Participant Support shift log ────────────────────────────────────────────
 
 /** Manual clock-in — deliberately not tied to page-session timestamps,

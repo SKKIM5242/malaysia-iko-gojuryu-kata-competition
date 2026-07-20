@@ -356,7 +356,8 @@ export default function RegisterForm({
         <div className="sm:col-span-2 mt-2 rounded-md border border-neutral-200 bg-neutral-50 p-4">
           <p className="text-sm font-bold text-neutral-800">Bank details for prize / reward payout *</p>
           <p className="mt-0.5 text-xs text-neutral-500">
-            Winnings are transferred to this account. Kept private — visible to the organizer only.
+            Winnings are transferred to this account after 1 month of the winner announcement. Kept
+            private — visible to the organizer only.
           </p>
           <div className="mt-3 grid gap-4 sm:grid-cols-2">
             <div>
