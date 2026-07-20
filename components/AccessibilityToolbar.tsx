@@ -14,6 +14,17 @@ declare global {
       };
     };
   }
+  // TypeScript's DOM lib only declares `forEach` for the CSS Custom
+  // Highlight API's Highlight/HighlightRegistry — these Set/Map-like
+  // methods are real at runtime (MDN) but missing from lib.dom.d.ts.
+  interface Highlight {
+    add(range: AbstractRange): void;
+    clear(): void;
+  }
+  interface HighlightRegistry {
+    set(name: string, highlight: Highlight): HighlightRegistry;
+    delete(name: string): boolean;
+  }
 }
 
 const LANGUAGES = [
@@ -41,9 +52,111 @@ const GOOGLE_TRANSLATE_SCRIPT_ID = "google-translate-script";
 const SENTENCE_CHUNK_MAX = 200;
 const KEEP_ALIVE_MS = 10_000;
 
-function getReadableText(): string {
-  const root = (document.querySelector("main") ?? document.body) as HTMLElement;
-  return root.innerText.trim();
+const BLOCK_DISPLAY = new Set([
+  "block", "flex", "grid", "table", "list-item", "table-row",
+  "table-row-group", "table-cell", "table-caption", "flow-root",
+]);
+
+interface TextSegment {
+  node: Text;
+  /** Offset within `node.data` where this segment's text begins. */
+  offset: number;
+  /** Start/end offset of this segment within the assembled reading text. */
+  start: number;
+  end: number;
+}
+
+function isReadableElement(el: Element): boolean {
+  if (typeof el.checkVisibility === "function") {
+    return el.checkVisibility({ checkOpacity: false, checkVisibilityCSS: true });
+  }
+  return (el as HTMLElement).offsetParent !== null || getComputedStyle(el).position === "fixed";
+}
+
+/** Walks visible text nodes under `root` (optionally narrowed to a Range, for
+ * "read the selected text only") and builds both the plain string that gets
+ * queued for speech AND a map back from character offsets in that string to
+ * real DOM (Text node, offset) positions — so the currently-spoken word can
+ * be highlighted live via the CSS Custom Highlight API without mutating the
+ * page's DOM (safe alongside React, which owns these nodes). */
+function collectReadableSegments(root: Node, range?: Range): { text: string; segments: TextSegment[] } {
+  const segments: TextSegment[] = [];
+  let text = "";
+  const blockCache = new Map<Element, Element>();
+  const closestBlock = (el: Element): Element => {
+    const cached = blockCache.get(el);
+    if (cached) return cached;
+    let cur: Element | null = el;
+    while (cur && cur !== root && !BLOCK_DISPLAY.has(getComputedStyle(cur).display)) {
+      cur = cur.parentElement;
+    }
+    const result = cur ?? el;
+    blockCache.set(el, result);
+    return result;
+  };
+
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      const parent = (node as Text).parentElement;
+      if (!parent) return NodeFilter.FILTER_REJECT;
+      const tag = parent.tagName;
+      if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT" || tag === "TEMPLATE") {
+        return NodeFilter.FILTER_REJECT;
+      }
+      if (parent.closest('[data-a11y-skip-read="true"], [aria-hidden="true"]')) return NodeFilter.FILTER_REJECT;
+      if (!isReadableElement(parent)) return NodeFilter.FILTER_REJECT;
+      if (range && !range.intersectsNode(node)) return NodeFilter.FILTER_REJECT;
+      return (node as Text).data.length > 0 ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+    },
+  });
+
+  let lastBlock: Element | null = null;
+  let node: Node | null;
+  while ((node = walker.nextNode())) {
+    const textNode = node as Text;
+    let start = 0;
+    let end = textNode.data.length;
+    if (range) {
+      if (textNode === range.startContainer) start = range.startOffset;
+      if (textNode === range.endContainer) end = range.endOffset;
+    }
+    if (end <= start) continue;
+    const raw = textNode.data.slice(start, end);
+    if (!raw) continue;
+
+    const block = closestBlock(textNode.parentElement!);
+    if (lastBlock && block !== lastBlock && text && !/\s$/.test(text)) text += "\n";
+    lastBlock = block;
+
+    segments.push({ node: textNode, offset: start, start: text.length, end: text.length + raw.length });
+    text += raw;
+  }
+  return { text, segments };
+}
+
+/** Resolves the word boundaries around a spoken-boundary event's charIndex
+ * within `chunk`. Prefers the browser-supplied charLength (most reliable);
+ * falls back to Intl.Segmenter word segmentation (handles CJK/Thai, which
+ * have no whitespace between words), then a plain whitespace split. */
+function wordBoundsAt(chunk: string, charIndex: number, charLength: number | undefined, lang: string): [number, number] {
+  if (charLength && charLength > 0) return [charIndex, Math.min(chunk.length, charIndex + charLength)];
+  if (typeof Intl !== "undefined" && "Segmenter" in Intl) {
+    try {
+      const segmenter = new Intl.Segmenter(lang || undefined, { granularity: "word" });
+      for (const seg of segmenter.segment(chunk)) {
+        if (charIndex >= seg.index && charIndex < seg.index + seg.segment.length) {
+          return [seg.index, seg.index + seg.segment.length];
+        }
+      }
+    } catch {
+      // Unsupported locale tag — fall through to the whitespace heuristic.
+    }
+  }
+  let start = charIndex;
+  while (start < chunk.length && /\s/.test(chunk[start])) start++;
+  let end = start;
+  while (end < chunk.length && !/\s/.test(chunk[end])) end++;
+  return [start, end];
 }
 
 function chunkText(text: string): string[] {
@@ -125,6 +238,9 @@ export default function AccessibilityToolbar() {
   const indexRef = useRef(0);
   const charIndexRef = useRef(0);
   const rateRef = useRef(1);
+  const segmentsRef = useRef<TextSegment[]>([]);
+  const chunkOffsetsRef = useRef<number[]>([]);
+  const highlightRef = useRef<Highlight | null>(null);
   const voiceRef = useRef<SpeechSynthesisVoice | null>(null);
   const selectedLangRef = useRef("en");
   const restartingRef = useRef(false);
@@ -219,6 +335,44 @@ export default function AccessibilityToolbar() {
     }, KEEP_ALIVE_MS);
   }, [stopKeepAlive]);
 
+  const clearHighlight = useCallback(() => {
+    if (typeof CSS === "undefined" || !("highlights" in CSS)) return;
+    highlightRef.current?.clear();
+    CSS.highlights.delete("read-aloud-cursor");
+    highlightRef.current = null;
+  }, []);
+
+  /** Highlights the word currently being spoken (given as a [start, end)
+   * offset pair into the assembled reading text) using the CSS Custom
+   * Highlight API — it styles arbitrary Ranges without touching the DOM, so
+   * it can't conflict with React re-rendering the same text nodes. */
+  const applyHighlight = useCallback((absStart: number, absEnd: number) => {
+    if (typeof CSS === "undefined" || !("highlights" in CSS)) return;
+    const range = new Range();
+    let rangeSet = false;
+    for (const seg of segmentsRef.current) {
+      if (seg.end <= absStart || seg.start >= absEnd) continue;
+      const localStart = seg.offset + Math.max(absStart, seg.start) - seg.start;
+      const localEnd = seg.offset + Math.min(absEnd, seg.end) - seg.start;
+      if (!rangeSet) {
+        range.setStart(seg.node, localStart);
+        rangeSet = true;
+      }
+      range.setEnd(seg.node, localEnd);
+    }
+    if (!rangeSet) return;
+    if (!highlightRef.current) {
+      highlightRef.current = new Highlight();
+      CSS.highlights.set("read-aloud-cursor", highlightRef.current);
+    }
+    highlightRef.current.clear();
+    highlightRef.current.add(range);
+    const rect = range.getBoundingClientRect();
+    if (rect.top < 96 || rect.bottom > window.innerHeight - 96) {
+      range.startContainer.parentElement?.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
+  }, []);
+
   const speakNext = useCallback(() => {
     const queue = queueRef.current;
     const idx = indexRef.current;
@@ -226,6 +380,7 @@ export default function AccessibilityToolbar() {
       setIsSpeaking(false);
       setIsPaused(false);
       stopKeepAlive();
+      clearHighlight();
       return;
     }
     const utterance = new SpeechSynthesisUtterance(queue[idx]);
@@ -234,6 +389,12 @@ export default function AccessibilityToolbar() {
     if (voiceRef.current) utterance.voice = voiceRef.current;
     utterance.onboundary = (e) => {
       charIndexRef.current = e.charIndex;
+      if (e.name && e.name !== "word") return;
+      const chunk = queueRef.current[idx];
+      if (!chunk) return;
+      const [wStart, wEnd] = wordBoundsAt(chunk, e.charIndex, e.charLength, selectedLangRef.current);
+      const base = chunkOffsetsRef.current[idx] ?? 0;
+      applyHighlight(base + wStart, base + wEnd);
     };
     utterance.onend = () => {
       indexRef.current += 1;
@@ -250,9 +411,10 @@ export default function AccessibilityToolbar() {
       setIsSpeaking(false);
       setIsPaused(false);
       stopKeepAlive();
+      clearHighlight();
     };
     window.speechSynthesis.speak(utterance);
-  }, [stopKeepAlive]);
+  }, [stopKeepAlive, clearHighlight, applyHighlight]);
 
   /** Speed slider changes can't alter an utterance already in progress (the
    * Web Speech API bakes `rate` in at speak()-time), so to make it feel
@@ -264,12 +426,17 @@ export default function AccessibilityToolbar() {
       rateRef.current = newRate;
       const synth = window.speechSynthesis;
       if (!isSpeaking || isPaused || !synth.speaking) return;
-      const currentChunk = queueRef.current[indexRef.current];
+      const idx = indexRef.current;
+      const currentChunk = queueRef.current[idx];
       if (!currentChunk) return;
       const remaining = currentChunk.slice(charIndexRef.current).trimStart();
       if (!remaining) return;
       restartingRef.current = true;
-      queueRef.current[indexRef.current] = remaining;
+      // Keep absolute-offset math (used for word highlighting) correct: the
+      // chunk shrank by the part we already read, so bump its recorded
+      // start offset by the same amount.
+      chunkOffsetsRef.current[idx] = (chunkOffsetsRef.current[idx] ?? 0) + (currentChunk.length - remaining.length);
+      queueRef.current[idx] = remaining;
       charIndexRef.current = 0;
       synth.cancel();
       setTimeout(() => speakNext(), 50);
@@ -281,8 +448,21 @@ export default function AccessibilityToolbar() {
     const synth = window.speechSynthesis;
     if (!isSpeaking) {
       synth.cancel();
-      const selected = window.getSelection()?.toString().trim();
-      queueRef.current = chunkText(selected || getReadableText());
+      const selection = window.getSelection();
+      const hasSelection = !!selection && selection.rangeCount > 0 && selection.toString().trim().length > 0;
+      const root = (document.querySelector("main") ?? document.body) as HTMLElement;
+      const { text, segments } = hasSelection
+        ? collectReadableSegments(root, selection!.getRangeAt(0))
+        : collectReadableSegments(root);
+      segmentsRef.current = segments;
+      const chunks = chunkText(text);
+      let pos = 0;
+      chunkOffsetsRef.current = chunks.map((c) => {
+        const offset = pos;
+        pos += c.length;
+        return offset;
+      });
+      queueRef.current = chunks;
       indexRef.current = 0;
       setIsSpeaking(true);
       setIsPaused(false);
@@ -300,16 +480,18 @@ export default function AccessibilityToolbar() {
   const handleStop = useCallback(() => {
     window.speechSynthesis.cancel();
     stopKeepAlive();
+    clearHighlight();
     setIsSpeaking(false);
     setIsPaused(false);
-  }, [stopKeepAlive]);
+  }, [stopKeepAlive, clearHighlight]);
 
   useEffect(() => {
     return () => {
       window.speechSynthesis?.cancel();
       stopKeepAlive();
+      clearHighlight();
     };
-  }, [stopKeepAlive]);
+  }, [stopKeepAlive, clearHighlight]);
 
   // Google Website Translator — loaded once, driven entirely through our own
   // dropdown; its default banner/gadget UI is hidden via globals.css.
@@ -369,7 +551,15 @@ export default function AccessibilityToolbar() {
   const current = LANGUAGES.find((l) => l.code === selectedLang) ?? LANGUAGES[0];
 
   return (
-    <div className="fixed top-56 right-4 z-[60] flex flex-col items-end gap-2 sm:top-36 print:hidden">
+    <div
+      data-a11y-skip-read="true"
+      className="fixed top-56 right-4 z-[60] flex flex-col items-end gap-2 sm:top-36 print:hidden"
+    >
+      {/* Read Aloud word cursor — styled via the CSS Custom Highlight API, which
+          doesn't require mutating the page's DOM. Rendered as a literal <style>
+          tag (not globals.css) because the build's CSS parser doesn't yet
+          recognize the ::highlight() functional pseudo-element syntax. */}
+      <style>{"::highlight(read-aloud-cursor) { background-color: #fde68a; color: #451a03; }"}</style>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -412,6 +602,10 @@ export default function AccessibilityToolbar() {
             <p className="mb-1.5 text-[11px] text-neutral-400">
               Select some text on the page first, then press play to read it aloud — otherwise the
               play button will read the whole page.
+            </p>
+            <p className="mb-1.5 text-[11px] text-neutral-400">
+              The word currently being read is highlighted on the page as you listen, in any
+              language.
             </p>
             <div className="flex items-center gap-2">
               <button
