@@ -214,7 +214,9 @@ export default function RegisterForm({
               language button in the site header) before confirming.{" "}
               <strong>A participant may be disqualified from the event they take part in if the
               Latest Belt Rank does not match the certificate, or is submitted without Sensei
-              confirmation.</strong> *
+              confirmation. If the participant&apos;s Latest Belt Rank and certificate do not match,
+              the participant will be disqualified and will have to register again with matching
+              data.</strong> *
             </span>
           </label>
           <p className="mt-1.5 text-xs text-neutral-400">

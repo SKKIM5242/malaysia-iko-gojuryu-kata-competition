@@ -22,7 +22,14 @@ export default function TermsPage() {
             </p>
           </section>
           <section>
-            <h2 className="mb-1 font-bold text-neutral-900">2. Recording &amp; Submission</h2>
+            <h2 className="mb-1 font-bold text-neutral-900">2. Faulty Participant Data</h2>
+            <p>
+              Example: If a participant&apos;s Latest Belt Rank and certificate do not match, the
+              participant will be disqualified and will have to register again with matching data.
+            </p>
+          </section>
+          <section>
+            <h2 className="mb-1 font-bold text-neutral-900">3. Recording &amp; Submission</h2>
             <p>
               Participants may record and re-record their kata up to the attempt limit shown in the
               recorder. Once submitted, a recording is final and cannot be replaced. By submitting,
@@ -32,7 +39,7 @@ export default function TermsPage() {
             </p>
           </section>
           <section>
-            <h2 className="mb-1 font-bold text-neutral-900">3. Judging</h2>
+            <h2 className="mb-1 font-bold text-neutral-900">4. Judging</h2>
             <p>
               Each recording is scored by a panel of Referees / Judges assigned by the organizer
               (typically 3, 5, or 7 per recording). Where 5 or more judges score a recording, the
@@ -42,7 +49,7 @@ export default function TermsPage() {
             </p>
           </section>
           <section>
-            <h2 className="mb-1 font-bold text-neutral-900">4. Visibility</h2>
+            <h2 className="mb-1 font-bold text-neutral-900">5. Visibility</h2>
             <p>
               Every submitted recording is visible to every signed-in Kata Arena account as soon as
               it is submitted, listed by kata event in submission order. A recording shows a green
@@ -58,14 +65,14 @@ export default function TermsPage() {
             </p>
           </section>
           <section>
-            <h2 className="mb-1 font-bold text-neutral-900">5. Payments</h2>
+            <h2 className="mb-1 font-bold text-neutral-900">6. Payments</h2>
             <p>
               Once payment for a registration or deposit is made, no refund will be given if a
               participant does not attend or later decides not to participate.
             </p>
           </section>
           <section>
-            <h2 className="mb-1 font-bold text-neutral-900">6. Conduct</h2>
+            <h2 className="mb-1 font-bold text-neutral-900">7. Conduct</h2>
             <p>
               Accounts are personal and may not be shared. The organizer may suspend or remove any
               account for abusive conduct, attempted score manipulation, or submission of
@@ -73,9 +80,23 @@ export default function TermsPage() {
             </p>
           </section>
           <section>
-            <h2 className="mb-1 font-bold text-neutral-900">7. Contact</h2>
+            <h2 className="mb-1 font-bold text-neutral-900">8. Contact on this competition</h2>
             <p>
-              Questions about these terms can be sent to the organizer at{" "}
+              <strong>Telegram:</strong> Please join the Telegram group for your registration
+              category as directed by the organizer — the link is in your confirmation email. It&apos;s
+              where you&apos;ll find the latest announcements, chat with other participants, ask the
+              organizer questions, or get help from Participant Support.
+            </p>
+            <p className="mt-2">
+              This is an international competition — please read every announcement covering the
+              rules and regulations.
+            </p>
+            <p className="mt-2">
+              Your patience and cooperation — and any help you can offer fellow participants or the
+              organizer — is greatly appreciated.
+            </p>
+            <p className="mt-2">
+              Questions about these terms can also be sent to the organizer at{" "}
               <a href="mailto:kimsiewkiew@gmail.com" className="font-semibold text-red-700 underline underline-offset-2">
                 kimsiewkiew@gmail.com
               </a>.
