@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { finalScore, isDisqualified } from "@/lib/scoring";
+import { computeCategoryRankings } from "@/lib/winners-ranking";
 import { winnersRevealDate, winnersRevealDateFor } from "@/lib/winners";
 
 export interface WinnerRewardRow {
@@ -56,66 +56,16 @@ export async function computeWinnerRewards(): Promise<WinnerRewardRow[]> {
   const entriesWithMeta: Array<{ entry: Entry; competitionName: string; categoryName: string; rank: number }> = [];
 
   for (const comp of revealed) {
-    const { data: regs } = await supabase
-      .from("registrations")
-      .select("id, category_id, participant_id, participant:participants(full_name)")
-      .eq("competition_id", comp.id)
-      .eq("payment_status", "paid")
-      .not("category_id", "is", null);
-    const regList =
-      (regs as unknown as Array<{
-        id: string;
-        category_id: string;
-        participant_id: string;
-        participant: { full_name: string } | null;
-      }>) ?? [];
-    if (regList.length === 0) continue;
-    const regIds = regList.map((r) => r.id);
-
-    const { data: videos } = await supabase
-      .from("kata_videos")
-      .select("id, registration_id")
-      .in("registration_id", regIds);
-    const videoByReg = new Map((videos ?? []).map((v) => [v.registration_id as string, v.id as string]));
-    const videoIds = (videos ?? []).map((v) => v.id as string);
-    if (videoIds.length === 0) continue;
-
-    const { data: scores } = await supabase.from("video_scores").select("video_id, score").in("video_id", videoIds);
-    const scoresByVideo = new Map<string, number[]>();
-    for (const s of scores ?? []) {
-      const list = scoresByVideo.get(s.video_id as string) ?? [];
-      list.push(Number(s.score));
-      scoresByVideo.set(s.video_id as string, list);
-    }
-
-    const byCategory = new Map<string, Entry[]>();
-    for (const r of regList) {
-      const videoId = videoByReg.get(r.id);
-      if (!videoId) continue;
-      const videoScores = scoresByVideo.get(videoId) ?? [];
-      if (isDisqualified(videoScores)) continue;
-      const fs = finalScore(videoScores);
-      if (fs == null) continue;
-      const list = byCategory.get(r.category_id) ?? [];
-      list.push({
-        regId: r.id,
-        participantId: r.participant_id,
-        name: r.participant?.full_name ?? "Unknown participant",
-        score: fs,
-      });
-      byCategory.set(r.category_id, list);
-    }
-
-    for (const [catId, entries] of byCategory) {
-      const top3 = entries.sort((a, b) => b.score - a.score).slice(0, 3);
-      top3.forEach((entry, i) => {
+    const rankings = await computeCategoryRankings(supabase, comp.id as string);
+    for (const [catId, entries] of rankings) {
+      for (const e of entries) {
         entriesWithMeta.push({
-          entry,
+          entry: { regId: e.registrationId, participantId: e.participantId, name: e.participantName, score: e.finalScore },
           competitionName: comp.name as string,
           categoryName: categoryNameById.get(catId) ?? "Unknown category",
-          rank: i + 1,
+          rank: e.rank,
         });
-      });
+      }
     }
   }
 
