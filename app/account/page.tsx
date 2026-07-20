@@ -229,6 +229,22 @@ export default async function AccountPage({
                 You have unlimited sign-in access — no payment required. Manage the competition in{" "}
                 <Link href="/admin" className="underline font-semibold">the admin panel</Link>.
               </p>
+              {["staff", "admin", "organizer"].includes(profile.role) && (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Link
+                    href="/admin/judging"
+                    className="rounded-md bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-600"
+                  >
+                    Judging page (full access)
+                  </Link>
+                  <Link
+                    href="/kata-arena"
+                    className="rounded-md border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-50"
+                  >
+                    Kata Arena
+                  </Link>
+                </div>
+              )}
               <div className="mt-4">
                 <p className="mb-2 text-sm font-semibold text-green-900">
                   Full access — every Telegram group:
