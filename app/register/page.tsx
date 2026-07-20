@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { SiteFooter, SiteHeader } from "@/components/ui";
+import { SiteFooter, SiteHeader, formatDate } from "@/components/ui";
 import AccessComparisonTable from "@/components/AccessComparisonTable";
 import { getOpenCompetitions, schemaReady } from "@/lib/data";
 import { winnersRevealDateFor } from "@/lib/winners";
@@ -58,22 +58,12 @@ const OPTIONS: Array<{
   },
   {
     n: 6,
-    title: "Organizer / Participant Support",
+    title: "Participant Support",
     desc: "Apply to join the organizing or support team. Reviewed by the organizer.",
     href: "/register/staff",
     cta: "Apply to the team",
   },
 ];
-
-function formatFullDate(date: Date): string {
-  return date.toLocaleDateString("en-MY", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  });
-}
 
 function announceDateOf(c: Competition): Date | null {
   return winnersRevealDateFor(c.registration_deadline, c.winners_announce_date);
@@ -177,7 +167,8 @@ export default async function RegisterHub({
                     <span className="font-semibold text-neutral-800">{c.name}</span>
                     <span className="block text-neutral-600">
                       Winners will be announced on{" "}
-                      <strong>{formatFullDate(announceDateOf(c)!)}</strong>, 00:00 Malaysia time.
+                      <strong>{formatDate(announceDateOf(c)!.toISOString().slice(0, 10))}</strong>, 00:00
+                      Malaysia time.
                       {c.winners_announce_date && (
                         <span className="text-neutral-400"> (special date set by the organizer)</span>
                       )}
@@ -186,7 +177,7 @@ export default async function RegisterHub({
                       <span className="block text-neutral-600">
                         Recommended public / audience sign-in date:{" "}
                         <strong>
-                          {formatFullDate(winnersRevealDateFor(null, c.audience_signin_date)!)}
+                          {formatDate(winnersRevealDateFor(null, c.audience_signin_date)!.toISOString().slice(0, 10))}
                         </strong>{" "}
                         — one sign-in then shows every recording and the judges&apos; scores.
                       </span>

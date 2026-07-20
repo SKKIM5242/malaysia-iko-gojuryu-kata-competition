@@ -14,7 +14,6 @@ import {
   SiteFooter,
   SiteHeader,
   formatDate,
-  formatDateMDY,
   formatUSD,
   protectKataNames,
 } from "@/components/ui";
@@ -97,19 +96,19 @@ export default async function Home() {
                     <div className="space-y-3 px-6 py-5 text-sm">
                       <div className="flex justify-between">
                         <span className="text-neutral-400">Event date</span>
-                        <span className="font-semibold text-neutral-900">{formatDateMDY(competition.event_date)}</span>
+                        <span className="font-semibold text-neutral-900">{formatDate(competition.event_date)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-neutral-400">Registration deadline</span>
-                        <span className="font-semibold text-neutral-900">{formatDateMDY(competition.registration_deadline)}</span>
+                        <span className="font-semibold text-neutral-900">{formatDate(competition.registration_deadline)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-neutral-400">Winners announce date</span>
-                        <span className="font-semibold text-neutral-900">{formatDateMDY(announceDateOf(competition))}</span>
+                        <span className="font-semibold text-neutral-900">{formatDate(announceDateOf(competition))}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-neutral-400">Audience recommended sign-in date</span>
-                        <span className="font-semibold text-neutral-900">{formatDateMDY(competition.audience_signin_date)}</span>
+                        <span className="font-semibold text-neutral-900">{formatDate(competition.audience_signin_date)}</span>
                       </div>
                     </div>
                     <div className="border-t border-neutral-100 px-6 py-4">
@@ -180,7 +179,11 @@ export default async function Home() {
                           <>
                             {" "}— once the registration deadline is reached, any Male or Female sub-category
                             with fewer than <strong>{cap}</strong> participants is merged into a{" "}
-                            <strong>Mix (Male &amp; Female)</strong> category.
+                            <strong>Mix (Male &amp; Female)</strong> category. Each age group with fewer than{" "}
+                            <strong>{cap}</strong> participants will also merge with a neighboring age group
+                            — whichever of the lower or upper group has fewer participants — and if needed,
+                            both the lower and upper groups may merge together, to keep within the available
+                            budget.
                           </>
                         )}
                       </p>

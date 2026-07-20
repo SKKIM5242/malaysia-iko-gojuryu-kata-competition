@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { schemaReady } from "@/lib/data";
 import { markEmailVerified, resendVerificationEmail } from "@/app/actions/email-verification";
 import { AdminShell } from "@/components/admin";
-import { EmptyState, SetupNotice } from "@/components/ui";
+import { EmptyState, SetupNotice, formatDateTime } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
 
 export const dynamic = "force-dynamic";
@@ -14,10 +14,6 @@ interface EmailVerificationRow {
   sent_at: string;
   verified_at: string | null;
   created_at: string;
-}
-
-function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString("en-MY", { dateStyle: "medium", timeStyle: "short" });
 }
 
 export default async function AdminEmailVerifications({

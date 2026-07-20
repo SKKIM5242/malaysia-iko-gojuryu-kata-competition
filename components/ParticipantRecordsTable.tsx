@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CategoryName } from "@/components/ui";
+import { CategoryName, formatDate } from "@/components/ui";
 import VideoWatchButton from "@/components/VideoWatchButton";
 import DownloadCsvButton from "@/components/DownloadCsvButton";
 import AdminVideoUploadForm from "@/components/AdminVideoUploadForm";
@@ -57,7 +57,7 @@ function SlotStatusCell({ row, canManage }: { row: ParticipantRecordRow; canMana
       {row.slotStatusChangedBy && (
         <span className="text-[10px] text-neutral-400">
           by {row.slotStatusChangedBy}
-          {row.slotStatusChangedAt ? ` · ${new Date(row.slotStatusChangedAt).toLocaleDateString("en-MY")}` : ""}
+          {row.slotStatusChangedAt ? ` · ${formatDate(row.slotStatusChangedAt)}` : ""}
         </span>
       )}
       {canManage && (

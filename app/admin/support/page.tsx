@@ -9,7 +9,7 @@ import Link from "next/link";
 import { getAllTelegramLinks } from "@/lib/telegram";
 import { getOpenShift, getAllShifts } from "@/lib/support-shifts";
 import { AdminShell, Card, CertificateField, adminBtn, adminBtnSecondary, adminInput, adminLabel } from "@/components/admin";
-import { EmptyState, SetupNotice, formatUSD } from "@/components/ui";
+import { EmptyState, SetupNotice, formatUSD, formatDateTime } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
 import SignInControlBox from "@/components/SignInControlBox";
@@ -18,10 +18,6 @@ import InvitationCodeList from "@/components/InvitationCodeList";
 import { EDUCATION_LEVELS, SPOKEN_LANGUAGES } from "@/lib/reference-data";
 
 export const dynamic = "force-dynamic";
-
-function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString("en-MY", { dateStyle: "medium", timeStyle: "short" });
-}
 
 interface StaffApp {
   id: string; full_name: string; email: string | null; phone: string | null;

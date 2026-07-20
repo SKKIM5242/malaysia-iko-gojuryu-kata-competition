@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getAdminCounts, getRecentAuditLogs } from "@/lib/admin-data";
 import { schemaReady } from "@/lib/data";
 import { AdminShell, Card } from "@/components/admin";
-import { SetupNotice } from "@/components/ui";
+import { SetupNotice, formatDateTime } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
 
 export const dynamic = "force-dynamic";
@@ -80,7 +80,7 @@ export default async function AdminDashboard() {
           rows={logs.map((l) => ({
             id: l.id,
             action: l.action,
-            when: new Date(l.created_at).toLocaleString("en-MY"),
+            when: formatDateTime(l.created_at),
             by: l.actor_id ? (actorLabel.get(l.actor_id) ?? l.actor_id.slice(0, 8)) : "System / public",
             table: l.table_name,
             record: l.record_id?.slice(0, 8) ?? "—",

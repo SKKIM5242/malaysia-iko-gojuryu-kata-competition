@@ -283,22 +283,14 @@ export function protectKataNames(text: string, kataNames: string[]): ReactNode[]
   );
 }
 
+/** Every date displayed site-wide (public + admin) renders as DD/MM/YYYY. */
 export function formatDate(d: string | null | undefined): string {
   if (!d) return "TBA";
-  try {
-    return new Date(d + (d.length === 10 ? "T00:00:00" : "")).toLocaleDateString("en-MY", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    });
-  } catch {
-    return d;
-  }
+  const [y, m, day] = d.slice(0, 10).split("-");
+  if (!y || !m || !day) return d;
+  return `${day}/${m}/${y}`;
 }
 
-/** Date of birth specifically renders as DD/MM/YYYY -- distinct from the
- * long-form formatDate() used for deadlines/event dates, which stays
- * unchanged everywhere else. */
 export function formatDOB(d: string | null | undefined): string {
   if (!d) return "—";
   const [y, m, day] = d.slice(0, 10).split("-");
@@ -306,14 +298,16 @@ export function formatDOB(d: string | null | undefined): string {
   return `${day}/${m}/${y}`;
 }
 
-/** Registration-timeline dates (Event date, Deadline, Winners announce,
- * Audience sign-in) render as MM/DD/YYYY on the Registration Open cards --
- * distinct from the long-form formatDate() used elsewhere. */
-export function formatDateMDY(d: string | null | undefined): string {
+/** Date + time (e.g. activity logs) — same DD/MM/YYYY date portion as
+ * formatDate(), plus a short time. */
+export function formatDateTime(d: string | null | undefined): string {
   if (!d) return "TBA";
-  const [y, m, day] = d.slice(0, 10).split("-");
-  if (!y || !m || !day) return d;
-  return `${m}/${day}/${y}`;
+  const date = new Date(d);
+  if (Number.isNaN(date.getTime())) return d;
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const time = date.toLocaleTimeString("en-MY", { hour: "2-digit", minute: "2-digit" });
+  return `${day}/${month}/${date.getFullYear()}, ${time}`;
 }
 
 export function formatUSD(n: number | null | undefined): string {
