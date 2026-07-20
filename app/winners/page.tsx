@@ -221,10 +221,6 @@ export default async function WinnersPage() {
       <SiteHeader />
       <main className="mx-auto max-w-4xl px-4 py-10">
         <SectionTitle>Winners</SectionTitle>
-        <p className="mb-8 text-sm text-neutral-500">
-          Winners for each competition are announced 30 days after its registration deadline, on
-          the next working day (Monday–Friday) in Malaysia.
-        </p>
         {competitions.length === 0 ? (
           <EmptyState>No competitions yet.</EmptyState>
         ) : (
