@@ -95,12 +95,6 @@ export default function TermsPage() {
               Your patience and cooperation — and any help you can offer fellow participants or the
               organizer — is greatly appreciated.
             </p>
-            <p className="mt-2">
-              Questions about these terms can also be sent to the organizer at{" "}
-              <a href="mailto:kimsiewkiew@gmail.com" className="font-semibold text-red-700 underline underline-offset-2">
-                kimsiewkiew@gmail.com
-              </a>.
-            </p>
           </section>
         </div>
       </main>
