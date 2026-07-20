@@ -96,6 +96,12 @@ export default function TermsPage() {
               organizer — is greatly appreciated.
             </p>
           </section>
+          <p className="border-t border-neutral-200 pt-6 italic text-neutral-600">
+            Lastly, the organizer would like to wish all types of participants of this Malaysia
+            Open Kata Competition — All the best… may everything go well and smoothly.
+            <br />
+            Thank you for your participation and trust.
+          </p>
         </div>
       </main>
       <SiteFooter />
