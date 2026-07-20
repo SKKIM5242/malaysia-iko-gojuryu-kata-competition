@@ -227,6 +227,9 @@ export async function finalizeStripeSession(sessionId: string): Promise<Finalize
       `Your reference ID${referenceIds.length > 1 ? "s" : ""}: ${referenceIds.join(", ")}.`,
       "Payment received — your slot is confirmed and your name will appear on the participants list. A Stripe receipt was also sent to the email you entered at checkout.",
       "Keep your reference ID and the IC/passport you registered with — you'll need both to link your account when you're ready to record your kata.",
+      "",
+      "Once signed in, you can record & submit your own registered event(s) — and every event once Winners are announced.",
+      "Next: once every registration under this email is done, create your sign-in account (or sign in if you already have one) using the Kata Arena log in link below.",
     ],
   });
 

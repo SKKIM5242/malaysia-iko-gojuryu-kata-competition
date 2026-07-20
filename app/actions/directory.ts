@@ -155,10 +155,12 @@ export async function registerSchool(
       `Registration tier: ${tier.name} — one-time registration fee USD ${tier.fee.toFixed(2)}.`,
       "Next: register your Sensei / Coach, then register participants.",
       "",
-      "One more step: ask the organizer for a personal invitation code for this record, then " +
-        "sign in via Kata Arena Log In. Your paid tier registration fee unlocks unlimited " +
-        "sign-in to watch your own students' kata recordings and judge scores any time — 10 or " +
-        "more participants qualifies you for a 10% share of their registration fees.",
+      "Your paid tier registration fee unlocks unlimited sign-in to watch your own students' " +
+        "kata recordings and judge scores any time — 10 or more participants qualifies you " +
+        "for a 10% share of their registration fees.",
+      "",
+      "Next: once every registration under this email is done, create your sign-in account " +
+        "(or sign in if you already have one) using the Kata Arena log in link below.",
     ],
   });
   return { ok: true, name, checkoutUrl: checkoutUrl ?? undefined };
@@ -305,10 +307,12 @@ export async function registerSensei(
       `Registration tier: ${tier.name} — one-time registration fee USD ${tier.fee.toFixed(2)}.`,
       "Next: register participants or bulk-register your students.",
       "",
-      "One more step: ask the organizer for a personal invitation code for this record, then " +
-        "sign in via Kata Arena Log In. Your paid tier registration fee unlocks unlimited " +
-        "sign-in to watch your own students' kata recordings and judge scores any time — 10 or " +
-        "more participants qualifies you for a 10% share of their registration fees.",
+      "Your paid tier registration fee unlocks unlimited sign-in to watch your own students' " +
+        "kata recordings and judge scores any time — 10 or more participants qualifies you " +
+        "for a 10% share of their registration fees.",
+      "",
+      "Next: once every registration under this email is done, create your sign-in account " +
+        "(or sign in if you already have one) using the Kata Arena log in link below.",
     ],
   });
   return { ok: true, name, checkoutUrl: checkoutUrl ?? undefined };

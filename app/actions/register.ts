@@ -346,6 +346,9 @@ export async function submitRegistration(
       `Your reference ID${referenceIds.length > 1 ? "s" : ""}: ${referenceIds.join(", ")}.`,
       "Payment status: pending — transfer the registration fee and send your receipt to the organizer (see the announcement for bank details). The organizer will confirm your payment, after which your name appears on the participants list.",
       "Organizer contact: WhatsApp +60 12-453 2831 / kimsiewkiew@gmail.com",
+      "",
+      "Once signed in, you can record & submit your own registered event(s) — and every event once Winners are announced.",
+      "Next: once every registration under this email is done, create your sign-in account (or sign in if you already have one) using the Kata Arena log in link below.",
     ],
   });
 

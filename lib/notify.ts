@@ -104,7 +104,13 @@ export async function sendConfirmationEmail(input: ConfirmationEmailInput): Prom
     `Kata Arena log in: ${appUrl()}/account`,
     `App: ${appUrl()}`,
   );
-  if (telegramUrl) lines.push(`Telegram group: ${telegramUrl}`);
+  if (telegramUrl) {
+    lines.push(
+      `Telegram group: ${telegramUrl}`,
+      "Make sure you are in the Telegram group to receive any announcements from the " +
+        "organizer — it's also where you communicate with the organizer and all other participants.",
+    );
+  }
   lines.push("", "— Malaysia Open IKO Goju-ryu Kata Championship");
   await sendEmail(input.toEmail, input.subject, lines.join("\n"));
 }

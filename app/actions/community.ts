@@ -153,6 +153,9 @@ export async function registerReferee(
       paymentStatus === "waived"
         ? "Your invitation code waived the USD 100 deposit — you're all set."
         : "The organizer will review your registration and contact you about the USD 100 deposit (or confirm your invitation code). Remember: the USD 100 is a deposit for participants — for non-participants it will be forfeited.",
+      "",
+      "Once signed in (and approved), you can view your own assigned events — and every event once Winners are announced.",
+      "Next: once every registration under this email is done, create your sign-in account (or sign in if you already have one) using the Kata Arena log in link below.",
     ],
   });
   return { ok: true, referenceId };
@@ -219,6 +222,9 @@ export async function registerAudience(
       paymentStatus === "waived"
         ? "Your invitation code waived the USD 10 fee — you're all set."
         : "The organizer will confirm your USD 10 sign-in (or your invitation code) and share viewing access details.",
+      "",
+      "Once signed in, you can view all events — during the recording/upload window, during referee/judge scoring, and after Winners are announced.",
+      "Next: once every registration under this email is done, create your sign-in account (or sign in if you already have one) using the Kata Arena log in link below.",
     ],
   });
   return { ok: true, referenceId };
@@ -352,6 +358,9 @@ export async function applyStaff(
     bodyLines: [
       `This confirms your application to join as Organizer / Participant Support (requested role: ${values.role_requested === "customer_support" ? "Participant Support" : "Organizer"}).`,
       "The organizer will review your application and contact you.",
+      "",
+      "Once approved and signed in, you can view all events — during the recording/upload window, during referee/judge scoring, and after Winners are announced.",
+      "Next: once every registration under this email is done, create your sign-in account (or sign in if you already have one) using the Kata Arena log in link below.",
     ],
   });
   return { ok: true, referenceId };
