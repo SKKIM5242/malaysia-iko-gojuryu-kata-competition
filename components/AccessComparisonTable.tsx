@@ -58,7 +58,7 @@ const ROWS: Array<{ what: string; cells: [string, string, string, string, string
       "Record & submit own event(s)",
       "View own students' events only (all events once Winners are announced)",
       "View own students' events only (all events once Winners are announced)",
-      "View own assigned events",
+      "View all events",
       "View all events",
       "View all events",
       "View all events",

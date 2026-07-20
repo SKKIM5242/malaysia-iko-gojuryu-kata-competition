@@ -154,7 +154,7 @@ export async function registerReferee(
         ? "Your invitation code waived the USD 100 deposit — you're all set."
         : "The organizer will review your registration and contact you about the USD 100 deposit (or confirm your invitation code). Remember: the USD 100 is a deposit for participants — for non-participants it will be forfeited.",
       "",
-      "Once signed in (and approved), you can view your own assigned events — and every event once Winners are announced.",
+      "Once signed in (and approved), you can view every event on Kata Arena, with every judge's individual score — your own scoring responsibility is limited to the recordings assigned to you.",
       "Next: once every registration under this email is done, create your sign-in account (or sign in if you already have one) using the Kata Arena log in link below.",
     ],
   });
