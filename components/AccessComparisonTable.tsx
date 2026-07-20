@@ -95,9 +95,9 @@ const ROWS: Array<{ what: string; cells: [string, string, string, string, string
   {
     what: "Sign-in allowance per competition tier",
     cells: [
-      "Unlimited (own recording)",
-      "Unlimited once fee paid (own school's recordings)",
-      "Unlimited once fee paid (own participants only)",
+      "Unlimited per competition tier once fee paid (own recording)",
+      "Unlimited per competition tier once fee paid (own school's recordings only)",
+      "Unlimited per competition tier once fee paid (own participants only)",
       "Unlimited once approved",
       "Paid per sign-in, per competition tier (USD 10 / 100 / 200)",
       "Unlimited",
