@@ -55,7 +55,7 @@ export const TOTAL_MAX = 10;
  * the list. */
 export const DISQUALIFICATION_REASONS: string[] = [
   "If the participant's latest rank and certificate do not match, the participant will be disqualified.",
-  "Submission of recordings that are not a genuine or edited recording of Kata performance by participant.",
+  "Submission of recordings that are not a genuine, i.e. not participant performing the kata (based on telegram picture not match), age group not match, sex not match, recording was a group training or team kata performance or edited recording of Kata performance by participant, etc.",
   "Did not perform a Goju-ryu version Kata or IKO Goju-ryu version Kata. Omitting or adding movements — or otherwise substantially changing the performance from its original form.",
   "Color/Kyu Belt Holder divisions must perform a kata from their registration list only. Black Belt Holder or Dan Holder divisions must perform a kata from their registration list only.",
   "Not announcing the kata name, announcing the wrong kata name — or performing another kata.",
