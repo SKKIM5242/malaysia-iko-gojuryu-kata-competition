@@ -42,6 +42,16 @@ export default function RegisterForm({
   const [kataBase, setKataBase] = useState("");
   const [kataBase2, setKataBase2] = useState("");
   const [kataBase3, setKataBase3] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [otherBankName, setOtherBankName] = useState(false);
+  const [bankAccountName, setBankAccountName] = useState("");
+
+  // The bank account holder name defaults to (and is locked to) the
+  // participant's own Full name, so reward payouts can't silently go to
+  // someone else's account — unlocked only by the consent checkbox below.
+  useEffect(() => {
+    if (!otherBankName) setBankAccountName(fullName);
+  }, [fullName, otherBankName]);
 
   // Only shows kata events with a matching, non-full sub-category for the
   // belt rank / date of birth / gender entered so far — resolveCategory()
@@ -131,8 +141,21 @@ export default function RegisterForm({
 
       <div className="grid gap-5 sm:grid-cols-2">
         <div className="sm:col-span-2">
-          <label htmlFor="full_name" className={labelCls}>Full name *</label>
-          <input id="full_name" name="full_name" required className={inputCls} placeholder="As per IC / passport" />
+          <label htmlFor="full_name" className={labelCls}>
+            Full name *{" "}
+            <span className="font-normal text-neutral-400">
+              (must match your IC / Passport, and your bank account name for reward payout)
+            </span>
+          </label>
+          <input
+            id="full_name"
+            name="full_name"
+            required
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            className={inputCls}
+            placeholder="As per IC / passport"
+          />
           <FieldError message={err.full_name} />
         </div>
 
@@ -372,8 +395,37 @@ export default function RegisterForm({
             </div>
             <div className="sm:col-span-2">
               <label htmlFor="bank_account_name" className={labelCls}>Bank account holder name *</label>
-              <input id="bank_account_name" name="bank_account_name" required className={inputCls} placeholder="As per bank records" />
+              <input
+                id="bank_account_name"
+                name="bank_account_name"
+                required
+                readOnly={!otherBankName}
+                value={bankAccountName}
+                onChange={(e) => setBankAccountName(e.target.value)}
+                className={`${inputCls} ${!otherBankName ? "cursor-not-allowed bg-neutral-100 text-neutral-500" : ""}`}
+                placeholder="As per bank records"
+              />
+              <p className="mt-1 text-xs text-neutral-400">
+                Auto-filled from your Full name above and locked — tick the box below if the payout
+                account is under a different name.
+              </p>
               <FieldError message={err.bank_account_name} />
+            </div>
+            <div className="sm:col-span-2">
+              <label htmlFor="consent_other_bank_name" className="flex items-start gap-2 text-xs text-neutral-700">
+                <input
+                  id="consent_other_bank_name"
+                  type="checkbox"
+                  checked={otherBankName}
+                  onChange={(e) => setOtherBankName(e.target.checked)}
+                  className="mt-0.5"
+                />
+                <span>
+                  I give consent to the organizer to pay my winnings to a bank account under a
+                  different name than my own (e.g. a parent/guardian&apos;s account). Only tick this
+                  if the account holder name needs to differ from your Full name above.
+                </span>
+              </label>
             </div>
           </div>
         </div>
