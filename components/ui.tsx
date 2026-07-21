@@ -73,33 +73,30 @@ export function SiteHeader() {
             className="h-11 w-11 rounded-lg bg-white p-0.5"
           />
           <span className="leading-tight">
-            <span className="block text-sm font-bold tracking-wide">MALAYSIA OPEN KARATE-DO KATA COMPETITION</span>
-            <span className="block text-sm font-bold tracking-wide">
+            <span className="block text-[10.5px] font-bold tracking-wide sm:text-sm">MALAYSIA OPEN KARATE-DO KATA COMPETITION</span>
+            <span className="block text-[10.5px] font-bold tracking-wide sm:text-sm">
               Goju-ryu or IKO Goju-ryu Version Only &amp; Open Version for Kobudo (Weapon) Kata
             </span>
           </span>
         </Link>
-        <nav className="flex flex-wrap items-center gap-1 text-sm">
-          <Link href="/" className="rounded px-3 py-1.5 hover:bg-neutral-800">Home</Link>
-          <Link href="/participants" className="rounded px-3 py-1.5 hover:bg-neutral-800">Participants</Link>
-          <Link href="/winners" className="rounded px-3 py-1.5 hover:bg-neutral-800">Winners</Link>
-          <Link href="/kata-arena" className="rounded px-3 py-1.5 hover:bg-neutral-800">Kata Arena</Link>
-          <Link href="/announcements" className="rounded px-3 py-1.5 hover:bg-neutral-800">Announcements</Link>
+        <nav className="flex flex-wrap items-center gap-0.5 text-xs sm:gap-1 sm:text-sm">
+          <Link href="/" className="rounded px-1.5 py-0.5 hover:bg-neutral-800 sm:px-3 sm:py-1.5">Home</Link>
+          <Link href="/participants" className="rounded px-1.5 py-0.5 hover:bg-neutral-800 sm:px-3 sm:py-1.5">Participants</Link>
+          <Link href="/winners" className="rounded px-1.5 py-0.5 hover:bg-neutral-800 sm:px-3 sm:py-1.5">Winners</Link>
+          <Link href="/kata-arena" className="rounded px-1.5 py-0.5 hover:bg-neutral-800 sm:px-3 sm:py-1.5">Kata Arena</Link>
+          <Link href="/announcements" className="rounded px-1.5 py-0.5 hover:bg-neutral-800 sm:px-3 sm:py-1.5">Announcements</Link>
           <Link
             href="/register"
-            className="ml-1 rounded bg-red-700 px-4 py-1.5 font-semibold hover:bg-red-600"
+            className="ml-0.5 rounded bg-red-700 px-2 py-0.5 font-semibold hover:bg-red-600 sm:ml-1 sm:px-4 sm:py-1.5"
           >
             Register
           </Link>
           <Link
             href="/account"
-            className="ml-1 rounded border border-white/30 px-4 py-1.5 font-semibold hover:bg-neutral-800"
+            className="ml-0.5 rounded border border-white/30 px-2 py-0.5 font-semibold hover:bg-neutral-800 sm:ml-1 sm:px-4 sm:py-1.5"
             title="Sign in to Kata Arena — watch/record your kata, judge as a referee, or manage your account"
           >
             Kata Arena Log In
-          </Link>
-          <Link href="/admin" className="rounded px-3 py-1.5 text-neutral-400 hover:bg-neutral-800">
-            Admin
           </Link>
           <RoleSwitcher />
         </nav>
@@ -131,7 +128,7 @@ export function SiteFooter() {
               rel="noopener noreferrer"
               className="font-semibold underline underline-offset-2 hover:text-white"
             >
-              IKO GOJU-RYU KARATE-DO MALAYSIA SDN BHD
+              IKO GOJU-RYU KARATE-DO (M) SDN BHD
             </a>
           </p>
           <Link
