@@ -1910,11 +1910,16 @@ export async function createStaffAccount(formData: FormData) {
     backTo(returnTo, { error: "Invalid role." });
   }
   const full_name = String(formData.get("full_name") ?? "").trim();
+  const short_name = String(formData.get("short_name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim();
   if (!full_name || !email) {
     backTo(returnTo, { error: "Full name and email are required." });
   }
+  if (role === "customer_support" && !short_name) {
+    backTo(returnTo, { error: "My short name or initial is required." });
+  }
   const extra = {
+    short_name: short_name || null,
     ic_passport: String(formData.get("ic_passport") ?? "").trim() || null,
     date_of_birth: String(formData.get("date_of_birth") ?? "").trim() || null,
     gender: String(formData.get("gender") ?? "").trim() || null,

@@ -62,7 +62,7 @@ export default async function AdminSupport({
     canCreate || isCustomerSupport
       ? await supabase
           .from("profiles")
-          .select("user_id, full_name, email, sign_in_count, sign_in_limit, sign_in_competition_id, sign_in_valid_from, sign_in_valid_until")
+          .select("user_id, full_name, short_name, email, sign_in_count, sign_in_limit, sign_in_competition_id, sign_in_valid_from, sign_in_valid_until")
           .eq("role", "customer_support")
       : { data: [] };
 
@@ -165,6 +165,16 @@ export default async function AdminSupport({
                 <div>
                   <label htmlFor="cs_full_name" className={adminLabel}>Full name *</label>
                   <input id="cs_full_name" name="full_name" required className={adminInput} />
+                </div>
+                <div className="sm:col-span-2">
+                  <label htmlFor="cs_short_name" className={adminLabel}>My short name or initial *</label>
+                  <input id="cs_short_name" name="short_name" required className={adminInput} placeholder="e.g. Amy / KSK" />
+                  <p className="mt-1 text-xs text-neutral-400">
+                    Note: To earn a 10% cut of Audience sign-ins made under your recommendation for
+                    the competition tier you&apos;re in charge of, from 1 August 2026 to 31 January
+                    2027 — subject to the organizer&apos;s approval based on the competition tier.
+                    Payout by 28 February 2027.
+                  </p>
                 </div>
                 <div>
                   <label htmlFor="cs_email" className={adminLabel}>Email *</label>
@@ -559,10 +569,12 @@ export default async function AdminSupport({
           )}
           <Card>
             <h3 className="font-bold text-neutral-900">Reward Pool</h3>
-            <p className="mt-1 text-sm text-neutral-600">
-              Total paid participant fees: <strong>{formatUSD(totalPaidFees)}</strong> → pool (10%):{" "}
-              <strong>{formatUSD(rewardPool)}</strong>
-            </p>
+            {canCreate && (
+              <p className="mt-1 text-sm text-neutral-600">
+                Total paid participant fees: <strong>{formatUSD(totalPaidFees)}</strong> → pool (10%):{" "}
+                <strong>{formatUSD(rewardPool)}</strong>
+              </p>
+            )}
             {perSupporter.size === 0 ? (
               <p className="mt-2 text-sm text-neutral-400">No resolved tickets attributed yet.</p>
             ) : (
@@ -597,7 +609,10 @@ export default async function AdminSupport({
             <div className="space-y-2">
               {(supportProfiles ?? []).map((p) => (
                 <div key={p.user_id} className="rounded-md border border-neutral-200 p-3">
-                  <p className="mb-2 font-semibold text-neutral-900">{p.full_name ?? p.email ?? p.user_id}</p>
+                  <p className="mb-2 font-semibold text-neutral-900">
+                    {p.full_name ?? p.email ?? p.user_id}
+                    {p.short_name && <span className="font-normal text-neutral-400"> — {p.short_name}</span>}
+                  </p>
                   <SignInControlBox
                     userId={p.user_id}
                     signInCount={p.sign_in_count ?? 0}
