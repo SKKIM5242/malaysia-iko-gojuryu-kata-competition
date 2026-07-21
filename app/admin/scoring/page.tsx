@@ -53,7 +53,7 @@ export default async function AdminScoring({
     );
   }
 
-  const [allCompetitions, { data: videos }, { data: myScores }] = await Promise.all([
+  const [competitions, { data: videos }, { data: myScores }] = await Promise.all([
     getAllCompetitions(),
     supabase
       .from("kata_videos")
@@ -63,13 +63,6 @@ export default async function AdminScoring({
       .order("created_at", { ascending: false }),
     supabase.from("video_scores").select("video_id, score").eq("referee_user_id", user!.id),
   ]);
-  // USD 10 tier first, USD 100 second, USD 200 third, any other competition
-  // (different or unset fee) after — ascending by fee, nulls last.
-  const competitions = [...allCompetitions].sort((a, b) => {
-    if (a.registration_fee_usd == null) return 1;
-    if (b.registration_fee_usd == null) return -1;
-    return a.registration_fee_usd - b.registration_fee_usd;
-  });
   const selectedTier = params.tier && competitions.some((c) => c.id === params.tier) ? params.tier : undefined;
   const visibleCompetitions = selectedTier ? competitions.filter((c) => c.id === selectedTier) : competitions;
   const videoList = (videos as unknown as VideoRow[]) ?? [];

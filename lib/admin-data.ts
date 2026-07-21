@@ -97,11 +97,16 @@ export async function getAllRegistrations(statusFilter?: PaymentStatus): Promise
   return (data as unknown as Registration[]) ?? [];
 }
 
+/** Every competition, cheapest tier first (USD 10, USD 100, USD 200, ...) so
+ * every tier dropdown and competition-grouped section across the admin site
+ * lists them in the same order as the public registration page. Competitions
+ * with no fee set sort last; ties fall back to newest first. */
 export async function getAllCompetitions(): Promise<Competition[]> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("competitions")
     .select("*")
+    .order("registration_fee_usd", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: false });
   return (data as Competition[]) ?? [];
 }
