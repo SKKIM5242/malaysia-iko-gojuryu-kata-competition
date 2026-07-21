@@ -87,7 +87,7 @@ export default async function ParticipantsPage({
 
         <form method="GET" action="/participants" className="mt-6 flex flex-wrap items-end gap-3">
           {openCompetitions.length > 1 && (
-            <div>
+            <div className="w-full sm:w-auto">
               <label htmlFor="tier" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-neutral-500">
                 Registration tier
               </label>
@@ -95,16 +95,16 @@ export default async function ParticipantsPage({
                 id="tier"
                 name="tier"
                 defaultValue={params.tier ?? ""}
-                className="rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm"
+                className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm sm:w-56"
               >
                 <option value="">All tiers</option>
                 {openCompetitions.map((c) => (
-                  <option key={c.id} value={c.id}>{formatUSD(c.registration_fee_usd)} tier</option>
+                  <option key={c.id} value={c.id} className="whitespace-normal">{formatUSD(c.registration_fee_usd)} tier</option>
                 ))}
               </select>
             </div>
           )}
-          <div>
+          <div className="w-full sm:w-auto">
             <label htmlFor="kata" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-neutral-500">
               Kata event
             </label>
@@ -112,15 +112,15 @@ export default async function ParticipantsPage({
               id="kata"
               name="kata"
               defaultValue={params.kata ?? ""}
-              className="rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm"
+              className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm sm:w-56"
             >
               <option value="">All kata events</option>
               {bases.map((k) => (
-                <option key={k} value={k}>{k}</option>
+                <option key={k} value={k} className="whitespace-normal">{k}</option>
               ))}
             </select>
           </div>
-          <div>
+          <div className="w-full sm:w-auto">
             <label htmlFor="school" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-neutral-500">
               School
             </label>
@@ -128,17 +128,17 @@ export default async function ParticipantsPage({
               id="school"
               name="school"
               defaultValue={params.school ?? ""}
-              className="rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm"
+              className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm sm:w-56"
             >
               <option value="">All schools</option>
               {schools.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
+                <option key={s.id} value={s.id} className="whitespace-normal">{s.name}</option>
               ))}
             </select>
           </div>
           <button
             type="submit"
-            className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-semibold text-white hover:bg-neutral-700"
+            className="w-full rounded-md bg-neutral-900 px-4 py-2 text-sm font-semibold text-white hover:bg-neutral-700 sm:w-auto"
           >
             Filter
           </button>
