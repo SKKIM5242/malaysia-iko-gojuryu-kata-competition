@@ -6,7 +6,7 @@ import DualScrollBox from "@/components/DualScrollBox";
 import type { ComparisonRow } from "@/components/AccessComparisonTable";
 
 const COLUMNS: Array<{ key: string; label: string; width: number }> = [
-  { key: "what", label: "Access", width: 190 },
+  { key: "what", label: "Access", width: 220 },
   { key: "participant", label: "Participant", width: 220 },
   { key: "school", label: "School / Dojo", width: 220 },
   { key: "sensei", label: "Sensei / Coach", width: 220 },
