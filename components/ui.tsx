@@ -64,36 +64,36 @@ export function SetupNotice() {
 export function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-neutral-200 bg-neutral-950 text-white">
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-4">
-        <Link href="/" className="flex items-center gap-3">
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-1.5 px-4 py-2 sm:gap-3 sm:py-4">
+        <Link href="/" className="flex items-center gap-1.5 sm:gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/logo.jpg"
             alt="Malaysia IKO Goju-ryu Karate-do crest"
-            className="h-11 w-11 rounded-lg bg-white p-0.5"
+            className="h-7 w-7 rounded-lg bg-white p-0.5 sm:h-11 sm:w-11"
           />
-          <span className="leading-tight">
+          <span className="leading-none sm:leading-tight">
             <span className="block text-[10.5px] font-bold tracking-wide sm:text-sm">MALAYSIA OPEN KARATE-DO KATA COMPETITION</span>
             <span className="block text-[10.5px] font-bold tracking-wide sm:text-sm">
               Goju-ryu or IKO Goju-ryu Version Only &amp; Open Version for Kobudo (Weapon) Kata
             </span>
           </span>
         </Link>
-        <nav className="flex flex-wrap items-center gap-0.5 text-xs sm:gap-1 sm:text-sm">
-          <Link href="/" className="rounded px-1.5 py-0.5 hover:bg-neutral-800 sm:px-3 sm:py-1.5">Home</Link>
-          <Link href="/participants" className="rounded px-1.5 py-0.5 hover:bg-neutral-800 sm:px-3 sm:py-1.5">Participants</Link>
-          <Link href="/winners" className="rounded px-1.5 py-0.5 hover:bg-neutral-800 sm:px-3 sm:py-1.5">Winners</Link>
-          <Link href="/kata-arena" className="rounded px-1.5 py-0.5 hover:bg-neutral-800 sm:px-3 sm:py-1.5">Kata Arena</Link>
-          <Link href="/announcements" className="rounded px-1.5 py-0.5 hover:bg-neutral-800 sm:px-3 sm:py-1.5">Announcements</Link>
+        <nav className="flex flex-wrap items-center gap-x-1.5 gap-y-0 text-xs sm:gap-1 sm:text-sm">
+          <Link href="/" className="rounded px-1.5 py-px hover:bg-neutral-800 sm:px-3 sm:py-1.5">Home</Link>
+          <Link href="/participants" className="rounded px-1.5 py-px hover:bg-neutral-800 sm:px-3 sm:py-1.5">Participants</Link>
+          <Link href="/winners" className="rounded px-1.5 py-px hover:bg-neutral-800 sm:px-3 sm:py-1.5">Winners</Link>
+          <Link href="/kata-arena" className="rounded px-1.5 py-px hover:bg-neutral-800 sm:px-3 sm:py-1.5">Kata Arena</Link>
+          <Link href="/announcements" className="rounded px-1.5 py-px hover:bg-neutral-800 sm:px-3 sm:py-1.5">Announcements</Link>
           <Link
             href="/register"
-            className="ml-0.5 rounded bg-red-700 px-2 py-0.5 font-semibold hover:bg-red-600 sm:ml-1 sm:px-4 sm:py-1.5"
+            className="rounded bg-red-700 px-2 py-px font-semibold hover:bg-red-600 sm:ml-1 sm:px-4 sm:py-1.5"
           >
             Register
           </Link>
           <Link
             href="/account"
-            className="ml-0.5 rounded border border-white/30 px-2 py-0.5 font-semibold hover:bg-neutral-800 sm:ml-1 sm:px-4 sm:py-1.5"
+            className="rounded border border-white/30 px-2 py-px font-semibold hover:bg-neutral-800 sm:ml-1 sm:px-4 sm:py-1.5"
             title="Sign in to Kata Arena — watch/record your kata, judge as a referee, or manage your account"
           >
             Kata Arena Log In
