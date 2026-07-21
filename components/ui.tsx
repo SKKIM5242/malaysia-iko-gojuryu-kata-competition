@@ -74,7 +74,9 @@ export function SiteHeader() {
           />
           <span className="leading-tight">
             <span className="block text-sm font-bold tracking-wide">MALAYSIA OPEN KARATE-DO KATA COMPETITION</span>
-            <span className="block text-sm font-bold tracking-wide">Goju-ryu or IKO Goju-ryu Version Only</span>
+            <span className="block text-sm font-bold tracking-wide">
+              Goju-ryu or IKO Goju-ryu Version Only &amp; Open Version for Kobudo (Weapon) Kata
+            </span>
           </span>
         </Link>
         <nav className="flex flex-wrap items-center gap-1 text-sm">
@@ -113,12 +115,9 @@ export function SiteFooter() {
           whole footer to the bottom of the viewport, so it stays visible
           while scrolling a long page, mirroring the sticky SiteHeader at
           the top. */}
-      <div aria-hidden className="h-64 sm:h-40" />
+      <div aria-hidden className="h-32 sm:h-24" />
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-neutral-800 bg-neutral-950 text-white">
         <div className="mx-auto max-w-6xl px-4 py-3 text-center text-xs sm:text-sm">
-          <p className="font-bold">
-            Malaysia Open Karate-do Kata Competition - Goju-ryu or IKO Goju-ryu Version Only.
-          </p>
           <p className="font-bold">
             Specially for all Goju-ryu Karateka to compete globally without leaving their beloved
             Country.
@@ -135,25 +134,6 @@ export function SiteFooter() {
               IKO GOJU-RYU KARATE-DO MALAYSIA SDN BHD
             </a>
           </p>
-          <div className="mt-1.5 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-neutral-300">
-            <Link href="/announcements" className="underline underline-offset-2 hover:text-white">Announcements</Link>
-            <span aria-hidden>·</span>
-            <Link href="/participants" className="underline underline-offset-2 hover:text-white">Participants List</Link>
-            <span aria-hidden>·</span>
-            <Link href="/register/participant" className="underline underline-offset-2 hover:text-white">Register Participant</Link>
-            <span aria-hidden>·</span>
-            <Link href="/register/school" className="underline underline-offset-2 hover:text-white">Register School</Link>
-            <span aria-hidden>·</span>
-            <Link href="/register/sensei" className="underline underline-offset-2 hover:text-white">Register Sensei</Link>
-            <span aria-hidden>·</span>
-            <Link href="/register/bulk" className="underline underline-offset-2 hover:text-white">Bulk Registration by Sensei</Link>
-            <span aria-hidden>·</span>
-            <Link href="/register/referee" className="underline underline-offset-2 hover:text-white">Register Referee/Judge</Link>
-            <span aria-hidden>·</span>
-            <Link href="/register/staff" className="underline underline-offset-2 hover:text-white">Register Participant Support</Link>
-            <span aria-hidden>·</span>
-            <Link href="/register/audience" className="underline underline-offset-2 hover:text-white">Register Audience</Link>
-          </div>
           <Link
             href="/register"
             className="mt-2 inline-block rounded-md bg-red-700 px-5 py-1.5 font-semibold text-white hover:bg-red-600"
