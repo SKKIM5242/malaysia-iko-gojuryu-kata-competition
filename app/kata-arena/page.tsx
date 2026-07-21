@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { schemaReady } from "@/lib/data";
+import { getCategories, schemaReady } from "@/lib/data";
 import { getAllCompetitions } from "@/lib/admin-data";
 import { groupArenaByKata, loadKataArena, type ArenaEntry } from "@/lib/arena";
 import { CategoryName, NoTranslate, SetupNotice, SiteFooter, SiteHeader } from "@/components/ui";
 import ArenaFilterBar from "@/components/ArenaFilterBar";
-import { splitCategoryName } from "@/lib/division";
+import { kataBases, splitCategoryName } from "@/lib/division";
 import { winnersRevealed } from "@/lib/winners";
 import AuthForms from "@/components/AuthForms";
 import ClaimForm from "@/components/ClaimForm";
@@ -352,6 +352,11 @@ export default async function KataArenaPage({
     const loaded = await Promise.all(
       shownCompetitions.map(async (c) => ({ competition: c, arena: await loadKataArena(supabase, c.id) })),
     );
+    // The Kata filter lists every registered kata event for the shown
+    // tier(s), not just ones with a submission so far — otherwise a kata
+    // nobody has recorded yet simply can't be filtered to.
+    const categoriesForShown = await Promise.all(shownCompetitions.map((c) => getCategories(c.id)));
+    const allKatas = kataBases(categoriesForShown.flat()).sort();
     // School/Sensei logins are scoped to their own students — their own
     // competition tier and kata events only, never the whole arena. Once a
     // competition's Winners are announced, that scoping lifts for it and
@@ -395,7 +400,7 @@ export default async function KataArenaPage({
           </p>
           <ArenaFilterBar
             tiers={competitions.map((c) => ({ id: c.id, name: c.name }))}
-            katas={tools.katas}
+            katas={allKatas}
             belts={tools.belts}
             ages={tools.ages}
             sexes={tools.sexes}

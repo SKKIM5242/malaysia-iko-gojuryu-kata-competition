@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import OptionPicker from "@/components/OptionPicker";
 
 /** Dropdown filters for the Kata Arena — Competition Tier, Kata, Belt
  * division, Age, and Sex/Mix section. Selections live in the URL query so
@@ -49,15 +50,7 @@ export default function ArenaFilterBar({
           </select>
         </label>
       )}
-      <label className={labelCls}>
-        Kata
-        <select value={params.get("kata") ?? ""} onChange={(e) => setParam("kata", e.target.value)} className={selectCls}>
-          <option value="">All</option>
-          {katas.map((k) => (
-            <option key={k} value={k}>{k}</option>
-          ))}
-        </select>
-      </label>
+      <OptionPicker label="Kata" value={params.get("kata") ?? ""} options={katas} onChange={(v) => setParam("kata", v)} />
       <label className={labelCls}>
         Belt Division
         <select value={params.get("belt") ?? ""} onChange={(e) => setParam("belt", e.target.value)} className={selectCls}>
