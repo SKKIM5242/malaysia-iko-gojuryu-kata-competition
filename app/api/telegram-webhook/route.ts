@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 
 interface TelegramUpdate {
   message?: {
-    chat: { id: number };
+    chat: { id: number; title?: string; type?: string };
     text?: string;
   };
 }
@@ -33,6 +33,14 @@ export async function POST(request: Request) {
 
   const text = update.message?.text?.trim() ?? "";
   const chatId = update.message?.chat.id;
+  // Group/supergroup messages log their chat id + title — the quickest way
+  // to find a TELEGRAM_CHAT_ID_<CATEGORY> value: send any command-style
+  // message (e.g. "/hello") in the group once, then read this line back
+  // from Vercel's function logs for that group's title.
+  const chatType = update.message?.chat.type;
+  if (chatType === "group" || chatType === "supergroup") {
+    console.log(`[telegram-webhook] group message — chat_id=${chatId} title="${update.message?.chat.title}"`);
+  }
   const match = /^\/start\s+([0-9a-f-]{36})$/i.exec(text);
   if (match && chatId) {
     const userId = match[1];
