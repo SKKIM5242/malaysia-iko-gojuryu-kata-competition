@@ -492,7 +492,7 @@ export default async function AdminJudging({
             columns={[
               { key: "position", label: "No." },
               { key: "title", label: "Title" },
-              { key: "description", label: "Description" },
+              { key: "description", label: "Description", width: 480, wrap: true },
               { key: "actions", label: "Actions" },
             ]}
             rows={criteriaRows.map((c) => ({

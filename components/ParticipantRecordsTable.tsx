@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { CategoryName, formatDate } from "@/components/ui";
 import VideoWatchButton from "@/components/VideoWatchButton";
 import DownloadCsvButton from "@/components/DownloadCsvButton";
@@ -108,30 +108,40 @@ function SlotStatusCell({ row, canManage }: { row: ParticipantRecordRow; canMana
   );
 }
 
-const COLUMNS: Array<{ key: keyof ParticipantRecordRow; label: string }> = [
-  { key: "fullName", label: "Full Name" },
-  { key: "registrationId", label: "Reference ID" },
-  { key: "competition", label: "Tier" },
-  { key: "category", label: "Category" },
-  { key: "icPassport", label: "IC / Passport" },
-  { key: "dateOfBirth", label: "DOB" },
-  { key: "gender", label: "Gender" },
-  { key: "beltRank", label: "Belt" },
-  { key: "rankConfirmation", label: "Rank Confirmation" },
-  { key: "homeAddress", label: "Home Address" },
-  { key: "country", label: "Country" },
-  { key: "cityTown", label: "City/Town" },
-  { key: "email", label: "Email" },
-  { key: "phone", label: "Phone" },
-  { key: "school", label: "School" },
-  { key: "sensei", label: "Sensei" },
-  { key: "bankName", label: "Bank Name" },
-  { key: "bankAccountNo", label: "Bank Account No" },
-  { key: "bankAccountName", label: "Bank Account Holder Name" },
-  { key: "recordingStatus", label: "Recording Status" },
-  { key: "recordingDate", label: "Recording Date" },
-  { key: "attempts", label: "Re-record Attempts" },
+const COLUMNS: Array<{ key: keyof ParticipantRecordRow; label: string; width: number }> = [
+  { key: "fullName", label: "Full Name", width: 200 },
+  { key: "registrationId", label: "Reference ID", width: 110 },
+  { key: "competition", label: "Tier", width: 170 },
+  { key: "category", label: "Category", width: 240 },
+  { key: "icPassport", label: "IC / Passport", width: 130 },
+  { key: "dateOfBirth", label: "DOB", width: 100 },
+  { key: "gender", label: "Gender", width: 90 },
+  { key: "beltRank", label: "Belt", width: 130 },
+  { key: "rankConfirmation", label: "Rank Confirmation", width: 150 },
+  { key: "homeAddress", label: "Home Address", width: 220 },
+  { key: "country", label: "Country", width: 110 },
+  { key: "cityTown", label: "City/Town", width: 120 },
+  { key: "email", label: "Email", width: 180 },
+  { key: "phone", label: "Phone", width: 130 },
+  { key: "school", label: "School", width: 160 },
+  { key: "sensei", label: "Sensei", width: 160 },
+  { key: "bankName", label: "Bank Name", width: 140 },
+  { key: "bankAccountNo", label: "Bank Account No", width: 150 },
+  { key: "bankAccountName", label: "Bank Account Holder Name", width: 200 },
+  { key: "recordingStatus", label: "Recording Status", width: 130 },
+  { key: "recordingDate", label: "Recording Date", width: 130 },
+  { key: "attempts", label: "Re-record Attempts", width: 90 },
 ];
+
+/** The 3 trailing columns rendered outside `ParticipantRecordRow` (rich
+ * JSX, not a single field) — same resize treatment as every other column. */
+const EXTRA_COLUMNS: Array<{ key: string; label: string; width: number }> = [
+  { key: "certificate", label: "Certificate", width: 100 },
+  { key: "recording", label: "Recording", width: 170 },
+  { key: "slotStatus", label: "Slot Status", width: 240 },
+];
+
+const MIN_COL_WIDTH = 60;
 
 export default function ParticipantRecordsTable({
   rows,
@@ -143,6 +153,34 @@ export default function ParticipantRecordsTable({
   canManageSlot?: boolean;
 }) {
   const [filters, setFilters] = useState<Partial<Record<keyof ParticipantRecordRow, Set<string>>>>({});
+  const [colWidths, setColWidths] = useState<Record<string, number>>({});
+  const resizingRef = useRef<{ key: string; startX: number; startWidth: number } | null>(null);
+
+  const widthOf = useCallback((key: string, fallback: number) => colWidths[key] ?? fallback, [colWidths]);
+
+  const handleMove = useCallback((e: MouseEvent) => {
+    const r = resizingRef.current;
+    if (!r) return;
+    const next = Math.max(MIN_COL_WIDTH, r.startWidth + (e.clientX - r.startX));
+    setColWidths((prev) => ({ ...prev, [r.key]: next }));
+  }, []);
+
+  const handleUp = useCallback(() => {
+    resizingRef.current = null;
+    window.removeEventListener("mousemove", handleMove);
+    window.removeEventListener("mouseup", handleUp);
+  }, [handleMove]);
+
+  const handleResizeStart = useCallback(
+    (e: React.MouseEvent, key: string, fallback: number) => {
+      e.preventDefault();
+      e.stopPropagation();
+      resizingRef.current = { key, startX: e.clientX, startWidth: widthOf(key, fallback) };
+      window.addEventListener("mousemove", handleMove);
+      window.addEventListener("mouseup", handleUp);
+    },
+    [widthOf, handleMove, handleUp],
+  );
 
   const uniqueValues = useMemo(() => {
     const map: Partial<Record<keyof ParticipantRecordRow, string[]>> = {};
@@ -186,27 +224,55 @@ export default function ParticipantRecordsTable({
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-neutral-400">
           Showing {filtered.length} of {rows.length} successful registrations. Type in any column&apos;s filter
-          box to narrow the list — filters combine (AND).
+          box to narrow the list — filters combine (AND). Drag a column&apos;s right edge to resize it.
         </p>
         <DownloadCsvButton rows={csvRows} filename="participants" />
       </div>
       <DualScrollBox>
-        <table className="w-full min-w-[2200px] text-left text-sm">
+        <table
+          className="text-left text-sm"
+          style={{
+            tableLayout: "fixed",
+            width:
+              COLUMNS.reduce((sum, c) => sum + widthOf(c.key, c.width), 0) +
+              EXTRA_COLUMNS.reduce((sum, c) => sum + widthOf(c.key, c.width), 0),
+          }}
+        >
+          <colgroup>
+            {COLUMNS.map((c) => (
+              <col key={c.key} style={{ width: widthOf(c.key, c.width) }} />
+            ))}
+            {EXTRA_COLUMNS.map((c) => (
+              <col key={c.key} style={{ width: widthOf(c.key, c.width) }} />
+            ))}
+          </colgroup>
           <thead className="sticky top-0 z-20 border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
             <tr>
               {COLUMNS.map((c, i) => (
                 <th
                   key={c.key}
-                  className={`px-3 py-2.5 whitespace-nowrap ${
+                  className={`relative select-none px-3 py-2.5 whitespace-nowrap ${
                     i === 0 ? "sticky left-0 z-10 border-r border-neutral-200 bg-neutral-50" : ""
                   }`}
                 >
-                  {c.label}
+                  <span className="block overflow-hidden text-ellipsis pr-2">{c.label}</span>
+                  <span
+                    onMouseDown={(e) => handleResizeStart(e, c.key, c.width)}
+                    title="Drag to resize this column"
+                    className="absolute right-0 top-0 z-10 h-full w-2 cursor-col-resize touch-none select-none hover:bg-red-300 active:bg-red-500"
+                  />
                 </th>
               ))}
-              <th className="px-3 py-2.5 whitespace-nowrap">Certificate</th>
-              <th className="px-3 py-2.5 whitespace-nowrap">Recording</th>
-              <th className="px-3 py-2.5 whitespace-nowrap">Slot Status</th>
+              {EXTRA_COLUMNS.map((c) => (
+                <th key={c.key} className="relative select-none px-3 py-2.5 whitespace-nowrap">
+                  <span className="block overflow-hidden text-ellipsis pr-2">{c.label}</span>
+                  <span
+                    onMouseDown={(e) => handleResizeStart(e, c.key, c.width)}
+                    title="Drag to resize this column"
+                    className="absolute right-0 top-0 z-10 h-full w-2 cursor-col-resize touch-none select-none hover:bg-red-300 active:bg-red-500"
+                  />
+                </th>
+              ))}
             </tr>
             <tr className="border-t border-neutral-200 bg-white normal-case">
               {COLUMNS.map((c, i) => (
@@ -236,42 +302,45 @@ export default function ParticipantRecordsTable({
             ) : (
               filtered.map((row) => (
                 <tr key={row.registrationId} className="group hover:bg-neutral-50">
-                  <td className="sticky left-0 z-10 whitespace-nowrap border-r border-neutral-200 bg-white px-3 py-2 font-medium group-hover:bg-neutral-50">
+                  <td
+                    className="sticky left-0 z-10 truncate border-r border-neutral-200 bg-white px-3 py-2 font-medium group-hover:bg-neutral-50"
+                    title={row.fullName}
+                  >
                     {row.fullName}
                   </td>
-                  <td className="px-3 py-2 font-mono text-xs" title={row.registrationId}>
+                  <td className="truncate px-3 py-2 font-mono text-xs" title={row.registrationId}>
                     {row.registrationId.slice(0, 8).toUpperCase()}
                   </td>
-                  <td className="max-w-[160px] truncate px-3 py-2" title={row.competition}>
+                  <td className="truncate px-3 py-2" title={row.competition}>
                     {row.competition}
                   </td>
-                  <td className="max-w-[240px] truncate px-3 py-2" title={row.category}>
+                  <td className="truncate px-3 py-2" title={row.category}>
                     <CategoryName name={row.category} />
                   </td>
-                  <td className="whitespace-nowrap px-3 py-2 font-mono text-xs">{row.icPassport}</td>
-                  <td className="whitespace-nowrap px-3 py-2">{row.dateOfBirth}</td>
-                  <td className="whitespace-nowrap px-3 py-2 capitalize">{row.gender}</td>
-                  <td className="whitespace-nowrap px-3 py-2">{row.beltRank || "—"}</td>
-                  <td className="whitespace-nowrap px-3 py-2 text-xs">{row.rankConfirmation || "—"}</td>
-                  <td className="max-w-[200px] truncate px-3 py-2" title={row.homeAddress}>
+                  <td className="truncate px-3 py-2 font-mono text-xs" title={row.icPassport}>{row.icPassport}</td>
+                  <td className="truncate px-3 py-2" title={row.dateOfBirth}>{row.dateOfBirth}</td>
+                  <td className="truncate px-3 py-2 capitalize" title={row.gender}>{row.gender}</td>
+                  <td className="truncate px-3 py-2" title={row.beltRank}>{row.beltRank || "—"}</td>
+                  <td className="truncate px-3 py-2 text-xs" title={row.rankConfirmation}>{row.rankConfirmation || "—"}</td>
+                  <td className="truncate px-3 py-2" title={row.homeAddress}>
                     {row.homeAddress || "—"}
                   </td>
-                  <td className="whitespace-nowrap px-3 py-2">{row.country || "—"}</td>
-                  <td className="whitespace-nowrap px-3 py-2">{row.cityTown || "—"}</td>
-                  <td className="whitespace-nowrap px-3 py-2 text-xs">{row.email || "—"}</td>
-                  <td className="whitespace-nowrap px-3 py-2 text-xs">{row.phone || "—"}</td>
-                  <td className="max-w-[160px] truncate px-3 py-2" title={row.school}>
+                  <td className="truncate px-3 py-2" title={row.country}>{row.country || "—"}</td>
+                  <td className="truncate px-3 py-2" title={row.cityTown}>{row.cityTown || "—"}</td>
+                  <td className="truncate px-3 py-2 text-xs" title={row.email}>{row.email || "—"}</td>
+                  <td className="truncate px-3 py-2 text-xs" title={row.phone}>{row.phone || "—"}</td>
+                  <td className="truncate px-3 py-2" title={row.school}>
                     {row.school || "—"}
                   </td>
-                  <td className="max-w-[160px] truncate px-3 py-2" title={row.sensei}>
+                  <td className="truncate px-3 py-2" title={row.sensei}>
                     {row.sensei || "—"}
                   </td>
-                  <td className="whitespace-nowrap px-3 py-2 text-xs">{row.bankName || "—"}</td>
-                  <td className="whitespace-nowrap px-3 py-2 text-xs">{row.bankAccountNo || "—"}</td>
-                  <td className="max-w-[200px] truncate px-3 py-2 text-xs" title={row.bankAccountName}>
+                  <td className="truncate px-3 py-2 text-xs" title={row.bankName}>{row.bankName || "—"}</td>
+                  <td className="truncate px-3 py-2 text-xs" title={row.bankAccountNo}>{row.bankAccountNo || "—"}</td>
+                  <td className="truncate px-3 py-2 text-xs" title={row.bankAccountName}>
                     {row.bankAccountName || "—"}
                   </td>
-                  <td className="whitespace-nowrap px-3 py-2">
+                  <td className="truncate px-3 py-2">
                     <span
                       className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${
                         row.recordingStatus === "Submitted"
@@ -282,9 +351,9 @@ export default function ParticipantRecordsTable({
                       {row.recordingStatus}
                     </span>
                   </td>
-                  <td className="whitespace-nowrap px-3 py-2 text-xs">{row.recordingDate || "—"}</td>
-                  <td className="whitespace-nowrap px-3 py-2 text-xs">{row.attempts}</td>
-                  <td className="whitespace-nowrap px-3 py-2">
+                  <td className="truncate px-3 py-2 text-xs" title={row.recordingDate}>{row.recordingDate || "—"}</td>
+                  <td className="truncate px-3 py-2 text-xs" title={row.attempts}>{row.attempts}</td>
+                  <td className="px-3 py-2">
                     {row.certificateUrl ? (
                       <a
                         href={row.certificateUrl}
@@ -298,7 +367,7 @@ export default function ParticipantRecordsTable({
                       <span className="text-xs text-neutral-400">—</span>
                     )}
                   </td>
-                  <td className="whitespace-nowrap px-3 py-2">
+                  <td className="px-3 py-2">
                     <div className="flex flex-col items-start gap-1.5">
                       {row.videoUrl ? (
                         <VideoWatchButton url={row.videoUrl} />

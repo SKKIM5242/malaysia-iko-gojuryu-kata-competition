@@ -8,6 +8,14 @@ import DualScrollBox from "@/components/DualScrollBox";
 export interface FilterableColumn {
   key: string;
   label: string;
+  /** Default pixel width until the user drags to resize — overrides the
+   * table's standard default for just this column (e.g. a wider start for
+   * a free-text description column). */
+  width?: number;
+  /** Wrap long text onto multiple lines instead of truncating with an
+   * ellipsis — for columns where the full text matters more than a
+   * single-line row height. */
+  wrap?: boolean;
 }
 
 /** A cell is either plain filterable text, or a pre-rendered React node
@@ -60,8 +68,9 @@ export default function FilterableTable({
   const resizingRef = useRef<{ key: string; startX: number; startWidth: number } | null>(null);
 
   const widthOf = useCallback(
-    (key: string, index: number): number => {
-      if (colWidths[key] != null) return colWidths[key];
+    (col: FilterableColumn, index: number): number => {
+      if (colWidths[col.key] != null) return colWidths[col.key];
+      if (col.width != null) return col.width;
       return stickyColumns === 2 && index === 0 ? firstColumnWidth : DEFAULT_COL_WIDTH;
     },
     [colWidths, stickyColumns, firstColumnWidth],
@@ -81,10 +90,10 @@ export default function FilterableTable({
   }, [handleMove]);
 
   const handleResizeStart = useCallback(
-    (e: React.MouseEvent, key: string, index: number) => {
+    (e: React.MouseEvent, col: FilterableColumn, index: number) => {
       e.preventDefault();
       e.stopPropagation();
-      resizingRef.current = { key, startX: e.clientX, startWidth: widthOf(key, index) };
+      resizingRef.current = { key: col.key, startX: e.clientX, startWidth: widthOf(col, index) };
       window.addEventListener("mousemove", handleMove);
       window.addEventListener("mouseup", handleUp);
     },
@@ -97,7 +106,7 @@ export default function FilterableTable({
       : "";
   const stickyLeftStyle = (i: number): CSSProperties | undefined => {
     if (stickyColumns < 2 || i !== 1) return undefined;
-    return { left: widthOf(columns[0].key, 0) };
+    return { left: widthOf(columns[0], 0) };
   };
 
   const uniqueValues = useMemo(() => {
@@ -155,11 +164,11 @@ export default function FilterableTable({
       <DualScrollBox>
         <table
           className="text-left text-sm"
-          style={{ tableLayout: "fixed", width: columns.reduce((sum, c, i) => sum + widthOf(c.key, i), 0) }}
+          style={{ tableLayout: "fixed", width: columns.reduce((sum, c, i) => sum + widthOf(c, i), 0) }}
         >
           <colgroup>
             {columns.map((c, i) => (
-              <col key={c.key} style={{ width: widthOf(c.key, i) }} />
+              <col key={c.key} style={{ width: widthOf(c, i) }} />
             ))}
           </colgroup>
           <thead className="sticky top-0 z-20 border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
@@ -172,7 +181,7 @@ export default function FilterableTable({
                 >
                   <span className="block overflow-hidden text-ellipsis pr-2">{c.label}</span>
                   <span
-                    onMouseDown={(e) => handleResizeStart(e, c.key, i)}
+                    onMouseDown={(e) => handleResizeStart(e, c, i)}
                     title="Drag to resize this column"
                     className="absolute right-0 top-0 z-10 h-full w-2 cursor-col-resize touch-none select-none hover:bg-red-300 active:bg-red-500"
                   />
@@ -208,12 +217,13 @@ export default function FilterableTable({
                   {columns.map((c, i) => {
                     const cell = row[c.key];
                     const isText = typeof cell === "string";
+                    const textCls = c.wrap ? "whitespace-normal break-words" : "truncate";
                     return (
                       <td
                         key={c.key}
-                        className={`truncate px-3 py-2 ${stickyCellClass(i, "bg-white group-hover:bg-neutral-50")}`}
+                        className={`px-3 py-2 ${isText ? textCls : ""} ${stickyCellClass(i, "bg-white group-hover:bg-neutral-50")}`}
                         style={stickyLeftStyle(i)}
-                        title={isText ? cell : undefined}
+                        title={isText && !c.wrap ? cell : undefined}
                       >
                         {isText ? cell || "—" : cell}
                       </td>
