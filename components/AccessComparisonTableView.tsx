@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import DownloadCsvButton from "@/components/DownloadCsvButton";
 import DualScrollBox from "@/components/DualScrollBox";
 import type { ComparisonRow } from "@/components/AccessComparisonTable";
 
@@ -53,9 +54,24 @@ export default function AccessComparisonTableView({ rows }: { rows: ComparisonRo
     [widthOf, handleMove, handleUp],
   );
 
+  const csvRows = useMemo(
+    () =>
+      rows.map((r) => {
+        const out: Record<string, string> = { [COLUMNS[0].label]: r.what };
+        COLUMNS.slice(1).forEach((c, i) => {
+          out[c.label] = r.cells[i];
+        });
+        return out;
+      }),
+    [rows],
+  );
+
   return (
     <>
-      <p className="mb-2 text-xs text-neutral-400">Drag a column&apos;s right edge to resize it.</p>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs text-neutral-400">Drag a column&apos;s right edge to resize it.</p>
+        <DownloadCsvButton rows={csvRows} filename="access-comparison" />
+      </div>
       <DualScrollBox>
         <table
           className="text-left text-xs"
