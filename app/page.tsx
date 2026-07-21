@@ -106,9 +106,11 @@ export default async function Home() {
                         <span className="text-neutral-400">Winners announce date</span>
                         <span className="font-semibold text-neutral-900">{formatDate(announceDateOf(competition))}</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-neutral-400">Audience recommended sign-in date</span>
-                        <span className="font-semibold text-neutral-900">{formatDate(competition.audience_signin_date)}</span>
+                      <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
+                        <span className="min-w-0 flex-1 text-neutral-400">
+                          Audience recommended sign-in date (or any date after)
+                        </span>
+                        <span className="shrink-0 font-semibold text-neutral-900">{formatDate(competition.audience_signin_date)}</span>
                       </div>
                     </div>
                     <div className="border-t border-neutral-100 px-6 py-4">

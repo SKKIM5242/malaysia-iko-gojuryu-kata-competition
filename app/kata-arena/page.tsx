@@ -354,9 +354,11 @@ export default async function KataArenaPage({
     );
     // The Kata filter lists every registered kata event for the shown
     // tier(s), not just ones with a submission so far — otherwise a kata
-    // nobody has recorded yet simply can't be filtered to.
+    // nobody has recorded yet simply can't be filtered to. Order matches
+    // the Kata Categories page exactly (each kata's sort_order), not
+    // alphabetical.
     const categoriesForShown = await Promise.all(shownCompetitions.map((c) => getCategories(c.id)));
-    const allKatas = kataBases(categoriesForShown.flat()).sort();
+    const allKatas = kataBases(categoriesForShown.flat());
     // School/Sensei logins are scoped to their own students — their own
     // competition tier and kata events only, never the whole arena. Once a
     // competition's Winners are announced, that scoping lifts for it and
@@ -390,7 +392,7 @@ export default async function KataArenaPage({
           </p>
           {showJudgeScores && (
             <p className="mb-4 text-xs font-semibold text-red-700">
-              A Referee/Judge&apos;s score is final once submitted — no appeal is available.
+              A Referee/Judge&apos;s score is final once submitted — no appeal will be entertained.
             </p>
           )}
           <p className="mb-4 text-sm">

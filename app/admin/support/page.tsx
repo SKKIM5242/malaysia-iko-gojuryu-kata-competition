@@ -20,7 +20,7 @@ import { EDUCATION_LEVELS, SPOKEN_LANGUAGES } from "@/lib/reference-data";
 export const dynamic = "force-dynamic";
 
 interface StaffApp {
-  id: string; full_name: string; email: string | null; phone: string | null;
+  id: string; full_name: string; short_name: string | null; email: string | null; phone: string | null;
   role_requested: string; message: string | null; status: string; created_at: string;
   support_tier_1_id: string | null; support_tier_2_id: string | null; support_tier_3_id: string | null;
 }
@@ -304,6 +304,7 @@ export default async function AdminSupport({
           downloadName="customer-support-applications"
           columns={[
             { key: "full_name", label: "Name" },
+            { key: "short_name", label: "Short Name" },
             { key: "reference_id", label: "Reference ID" },
             { key: "contact", label: "Contact" },
             ...competitions.map((c) => ({ key: `tier_${c.id}`, label: `Tier ${formatUSD(c.registration_fee_usd)}` })),
@@ -312,6 +313,7 @@ export default async function AdminSupport({
           ]}
           csvColumns={[
             { key: "full_name", label: "Name" },
+            { key: "short_name", label: "Short Name" },
             { key: "reference_id", label: "Reference ID" },
             { key: "email", label: "Email" },
             { key: "phone", label: "Phone" },
@@ -323,6 +325,7 @@ export default async function AdminSupport({
             id: s.id,
             reference_id: s.id.slice(0, 8).toUpperCase(),
             full_name: s.full_name,
+            short_name: s.short_name ?? "",
             contact: [s.email, s.phone].filter(Boolean).join(" · "),
             email: s.email ?? "",
             phone: s.phone ?? "",

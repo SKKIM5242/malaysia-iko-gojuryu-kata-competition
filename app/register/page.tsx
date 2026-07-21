@@ -176,7 +176,7 @@ export default async function RegisterHub({
                     </span>
                     {c.audience_signin_date && (
                       <span className="block text-neutral-600">
-                        Recommended public / audience sign-in date:{" "}
+                        Recommended public / audience sign-in date (or any date after):{" "}
                         <strong>
                           {formatDate(winnersRevealDateFor(null, c.audience_signin_date)!.toISOString().slice(0, 10))}
                         </strong>{" "}

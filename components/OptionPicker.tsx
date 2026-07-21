@@ -13,12 +13,16 @@ export default function OptionPicker({
   options,
   onChange,
   allLabel = "All",
+  triggerClassName = "max-w-[14rem]",
 }: {
   label: string;
   value: string;
   options: string[];
   onChange: (v: string) => void;
   allLabel?: string;
+  /** Width classes for the closed trigger button — override to match a
+   * neighboring control (e.g. a native `<select>` in the same filter bar). */
+  triggerClassName?: string;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -28,7 +32,7 @@ export default function OptionPicker({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex max-w-[14rem] items-center justify-between gap-2 rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-left text-sm font-normal text-neutral-800 hover:bg-neutral-50"
+        className={`flex items-center justify-between gap-2 rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-left text-sm font-normal text-neutral-800 hover:bg-neutral-50 ${triggerClassName}`}
       >
         <span className="truncate">{value || allLabel}</span>
         <span className="shrink-0 text-neutral-400">▾</span>

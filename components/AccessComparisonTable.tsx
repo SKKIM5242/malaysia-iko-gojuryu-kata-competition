@@ -5,15 +5,7 @@
  * the real route gating (see lib/access-matrix.ts for the admin-side
  * version of the same facts).
  */
-const COLUMNS = [
-  "Participant",
-  "School / Dojo",
-  "Sensei / Coach",
-  "Referee / Judge",
-  "Audience",
-  "Organizer",
-  "Participant Support",
-] as const;
+import AccessComparisonTableView from "@/components/AccessComparisonTableView";
 
 const ROWS: Array<{ what: string; cells: [string, string, string, string, string, string, string] }> = [
   {
@@ -138,27 +130,8 @@ export default async function AccessComparisonTable() {
       <p className="mt-1 text-sm text-neutral-500">
         Every registration type side by side, so you can see exactly what you get for your fee.
       </p>
-      <div className="mt-4 overflow-x-auto">
-        <table className="w-full min-w-[900px] text-left text-xs">
-          <thead className="border-b border-neutral-200 bg-neutral-50 uppercase tracking-wide text-neutral-500">
-            <tr>
-              <th className="px-3 py-2">Access</th>
-              {COLUMNS.map((c) => (
-                <th key={c} className="px-3 py-2">{c}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-neutral-100">
-            {rows.map((r) => (
-              <tr key={r.id ?? r.what} className="align-top hover:bg-neutral-50">
-                <td className="px-3 py-2 font-semibold text-neutral-800">{r.what}</td>
-                {r.cells.map((cell, i) => (
-                  <td key={i} className="px-3 py-2 text-neutral-600">{cell}</td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="mt-4">
+        <AccessComparisonTableView rows={rows} />
       </div>
       <p className="mt-3 text-xs text-neutral-400">
         Why does Participant Support get view access that Schools, Senseis, Participants, Audience,

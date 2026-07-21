@@ -242,6 +242,7 @@ export async function applyStaff(
 ): Promise<CommunityState> {
   const { values, fieldErrors } = req(formData, [
     ["full_name", "Full name"],
+    ["short_name", "My short name or initial"],
     ["ic_passport", "IC / passport"],
     ["date_of_birth", "Date of birth"],
     ["gender", "Gender"],
@@ -313,6 +314,7 @@ export async function applyStaff(
   const { error } = await supabase.from("staff_applications").insert({
     id,
     full_name: values.full_name,
+    short_name: values.short_name,
     ic_passport: values.ic_passport,
     date_of_birth: values.date_of_birth,
     gender: values.gender,

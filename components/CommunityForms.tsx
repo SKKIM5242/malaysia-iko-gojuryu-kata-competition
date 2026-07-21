@@ -283,6 +283,17 @@ export function StaffForm({
           <input id="full_name" name="full_name" required className={inputCls} />
           <Err m={e.full_name} />
         </div>
+        <div className="sm:col-span-2">
+          <label htmlFor="short_name" className={labelCls}>My short name or initial *</label>
+          <input id="short_name" name="short_name" required className={inputCls} placeholder="e.g. Amy / KSK" />
+          <Err m={e.short_name} />
+          <p className="mt-1 text-xs text-neutral-400">
+            Note: To earn a 10% cut of Audience sign-ins made under your recommendation for the
+            competition tier you&apos;re in charge of, from 1 August 2026 to 31 January 2027 —
+            subject to the organizer&apos;s approval based on the competition tier. Payout by
+            28 February 2027.
+          </p>
+        </div>
         <div>
           <label htmlFor="ic_passport" className={labelCls}>IC / Passport *</label>
           <input id="ic_passport" name="ic_passport" required className={inputCls} />

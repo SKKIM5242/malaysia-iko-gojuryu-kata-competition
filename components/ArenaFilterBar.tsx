@@ -33,8 +33,9 @@ export default function ArenaFilterBar({
     router.replace(`${pathname}${next.toString() ? `?${next.toString()}` : ""}`);
   }
 
+  const tierBoxWidth = "w-64";
   const selectCls =
-    "rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm font-normal text-neutral-800";
+    `truncate rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm font-normal text-neutral-800 ${tierBoxWidth}`;
   const labelCls = "flex flex-col gap-0.5 text-xs font-semibold text-neutral-500";
 
   return (
@@ -50,7 +51,13 @@ export default function ArenaFilterBar({
           </select>
         </label>
       )}
-      <OptionPicker label="Kata" value={params.get("kata") ?? ""} options={katas} onChange={(v) => setParam("kata", v)} />
+      <OptionPicker
+        label="Kata"
+        value={params.get("kata") ?? ""}
+        options={katas}
+        onChange={(v) => setParam("kata", v)}
+        triggerClassName={tierBoxWidth}
+      />
       <label className={labelCls}>
         Belt Division
         <select value={params.get("belt") ?? ""} onChange={(e) => setParam("belt", e.target.value)} className={selectCls}>
