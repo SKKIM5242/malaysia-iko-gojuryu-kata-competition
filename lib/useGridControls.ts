@@ -2,68 +2,34 @@
 
 import { useCallback, useRef, useState, type CSSProperties } from "react";
 
-const MIN_ROW_HEIGHT = 26;
+/** Both a row's minimum drag height and a column's minimum drag width —
+ * dragging past this point doesn't clamp uselessly, it "closes" that
+ * column/row down to a thin solid-red bar (rendered by each table's own
+ * closed-state styling), which can be dragged back out to reopen. Picked
+ * small enough to read as "closed" but still wide/tall enough to grab with
+ * a mouse or finger. */
+export const CLOSED_SIZE = 10;
+
+export function isClosed(size: number | undefined, fallback: number): boolean {
+  return (size ?? fallback) <= CLOSED_SIZE + 1;
+}
 
 /**
- * Spreadsheet-like column/row selection for data tables: click a column
- * header or a row's leading cell to highlight it, hide a highlighted
- * column/row, or drag its edge to resize. Shared across every table
- * component (FilterableTable, ParticipantsTable, ParticipantRecordsTable,
- * AccessComparisonTableView) so the interaction is identical everywhere.
- * Selection/hidden/height state is per-table-instance and resets on reload,
- * matching the existing column-width behavior.
+ * Shared row-height drag-resize for every table component (FilterableTable,
+ * ParticipantsTable, ParticipantRecordsTable, AccessComparisonTableView) —
+ * identical mechanic to each table's own column-width resize, just
+ * vertical: grab a row's bottom edge and drag to make it taller/shorter,
+ * all the way down to a closed thin bar. Height state is per-table-instance
+ * and resets on reload, matching the existing column-width behavior.
  */
 export function useGridControls() {
-  const [selectedCols, setSelectedCols] = useState<Set<string>>(new Set());
-  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
-  const [hiddenCols, setHiddenCols] = useState<Set<string>>(new Set());
-  const [hiddenRows, setHiddenRows] = useState<Set<string>>(new Set());
   const [rowHeights, setRowHeights] = useState<Record<string, number>>({});
   const resizingRow = useRef<{ key: string; startY: number; startHeight: number } | null>(null);
-
-  const toggleColSelect = useCallback((key: string) => {
-    setSelectedCols((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }, []);
-
-  const toggleRowSelect = useCallback((key: string) => {
-    setSelectedRows((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }, []);
-
-  const hideCol = useCallback((key: string) => {
-    setHiddenCols((prev) => new Set(prev).add(key));
-    setSelectedCols((prev) => {
-      const next = new Set(prev);
-      next.delete(key);
-      return next;
-    });
-  }, []);
-
-  const hideRow = useCallback((key: string) => {
-    setHiddenRows((prev) => new Set(prev).add(key));
-    setSelectedRows((prev) => {
-      const next = new Set(prev);
-      next.delete(key);
-      return next;
-    });
-  }, []);
-
-  const showAllCols = useCallback(() => setHiddenCols(new Set()), []);
-  const showAllRows = useCallback(() => setHiddenRows(new Set()), []);
 
   const handleRowMove = useCallback((e: MouseEvent) => {
     const r = resizingRow.current;
     if (!r) return;
-    const next = Math.max(MIN_ROW_HEIGHT, r.startHeight + (e.clientY - r.startY));
+    const next = Math.max(CLOSED_SIZE, r.startHeight + (e.clientY - r.startY));
     setRowHeights((prev) => ({ ...prev, [r.key]: next }));
   }, []);
 
@@ -86,9 +52,17 @@ export function useGridControls() {
 
   /** Applied to a <tr> alongside its own classes — shrinks/grows every
    * direct <td> via a CSS variable so callers don't need to touch each
-   * cell individually. */
+   * cell individually. Fills every cell solid red once closed, so a
+   * collapsed row still reads clearly as "there's a row here". */
   const rowSizeClass = useCallback(
-    (key: string) => (rowHeights[key] != null ? "[&>td]:h-[var(--row-h)] [&>td]:max-h-[var(--row-h)] [&>td]:overflow-hidden [&>td]:py-1" : ""),
+    (key: string) => {
+      const h = rowHeights[key];
+      if (h == null) return "";
+      const closed = isClosed(h, h);
+      return closed
+        ? "[&>td]:h-[var(--row-h)] [&>td]:max-h-[var(--row-h)] [&>td]:overflow-hidden [&>td]:p-0 [&>td]:bg-red-600"
+        : "[&>td]:h-[var(--row-h)] [&>td]:max-h-[var(--row-h)] [&>td]:overflow-hidden [&>td]:py-1";
+    },
     [rowHeights],
   );
   const rowSizeStyle = useCallback(
@@ -98,17 +72,7 @@ export function useGridControls() {
   );
 
   return {
-    selectedCols,
-    selectedRows,
-    hiddenCols,
-    hiddenRows,
     rowHeights,
-    toggleColSelect,
-    toggleRowSelect,
-    hideCol,
-    hideRow,
-    showAllCols,
-    showAllRows,
     handleRowResizeStart,
     rowSizeClass,
     rowSizeStyle,

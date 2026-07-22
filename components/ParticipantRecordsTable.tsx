@@ -7,7 +7,7 @@ import DownloadCsvButton from "@/components/DownloadCsvButton";
 import AdminVideoUploadForm from "@/components/AdminVideoUploadForm";
 import ColumnFilterDropdown from "@/components/ColumnFilterDropdown";
 import DualScrollBox from "@/components/DualScrollBox";
-import { useGridControls } from "@/lib/useGridControls";
+import { useGridControls, isClosed, CLOSED_SIZE } from "@/lib/useGridControls";
 import { updateRegistrationSlotStatus } from "@/app/actions/admin";
 
 export type SlotStatus = "active" | "unslotted" | "forfeited" | "given_up";
@@ -148,7 +148,6 @@ const EXTRA_COLUMNS: Array<{ key: string; label: string; width: number }> = [
   { key: "slotStatus", label: "Slot Status", width: 240 },
 ];
 
-const MIN_COL_WIDTH = 60;
 
 function standardCell(
   c: (typeof COLUMNS)[number],
@@ -270,7 +269,7 @@ export default function ParticipantRecordsTable({
   const handleMove = useCallback((e: MouseEvent) => {
     const r = resizingRef.current;
     if (!r) return;
-    const next = Math.max(MIN_COL_WIDTH, r.startWidth + (e.clientX - r.startX));
+    const next = Math.max(CLOSED_SIZE, r.startWidth + (e.clientX - r.startX));
     setColWidths((prev) => ({ ...prev, [r.key]: next }));
   }, []);
 
@@ -291,42 +290,22 @@ export default function ParticipantRecordsTable({
     [widthOf, handleMove, handleUp],
   );
 
-  const visibleColumns = useMemo(() => COLUMNS.filter((c) => !grid.hiddenCols.has(c.key)), [grid.hiddenCols]);
-  const visibleExtraColumns = useMemo(() => EXTRA_COLUMNS.filter((c) => !grid.hiddenCols.has(c.key)), [grid.hiddenCols]);
-
   const renderHeaderCell = (key: string, label: string, width: number, sticky: boolean) => {
-    const selected = grid.selectedCols.has(key);
+    const closed = isClosed(width, width);
     return (
       <th
         key={key}
-        className={`relative select-none px-3 py-2.5 whitespace-nowrap ${
-          sticky ? "sticky left-0 z-10 border-r border-neutral-200" : ""
-        } ${selected ? "bg-amber-100" : sticky ? "bg-neutral-50" : ""}`}
+        className={`relative select-none whitespace-nowrap ${sticky ? `sticky left-0 z-10 border-r border-neutral-200` : ""} ${
+          closed ? "bg-red-600 p-0" : `px-3 py-2.5 ${sticky ? "bg-neutral-50" : ""}`
+        }`}
       >
-        <span
-          onClick={() => grid.toggleColSelect(key)}
-          title="Click to select/highlight this column"
-          className="block cursor-pointer overflow-hidden text-ellipsis pr-4"
-        >
-          {label}
-        </span>
-        {selected && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              grid.hideCol(key);
-            }}
-            title="Hide this column"
-            className="absolute right-2.5 top-1/2 z-20 flex h-4 w-4 -translate-y-1/2 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold leading-none text-white hover:bg-red-700"
-          >
-            ×
-          </button>
-        )}
+        {!closed && <span className="block overflow-hidden text-ellipsis pr-2">{label}</span>}
         <span
           onMouseDown={(e) => handleResizeStart(e, key, width)}
-          title="Drag to resize this column"
-          className="absolute right-0 top-0 z-10 h-full w-2 cursor-col-resize touch-none select-none hover:bg-red-300 active:bg-red-500"
+          title={closed ? "Drag to reopen this column" : "Drag to resize (or close) this column"}
+          className={`absolute right-0 top-0 z-10 h-full cursor-col-resize touch-none select-none ${
+            closed ? "w-full bg-red-600 hover:bg-red-700" : "w-2 hover:bg-red-300 active:bg-red-500"
+          }`}
         />
       </th>
     );
@@ -359,11 +338,6 @@ export default function ParticipantRecordsTable({
     );
   }, [rows, filters]);
 
-  const displayedRows = useMemo(
-    () => filtered.filter((row) => !grid.hiddenRows.has(row.registrationId)),
-    [filtered, grid.hiddenRows],
-  );
-
   const csvRows = useMemo(
     () =>
       filtered.map((row) => {
@@ -379,131 +353,113 @@ export default function ParticipantRecordsTable({
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-neutral-400">
           Showing {filtered.length} of {rows.length} successful registrations. Type in any column&apos;s filter
-          box to narrow the list — filters combine (AND). Drag a column&apos;s right edge to resize it, or
-          click a header/row to select and hide it.
+          box to narrow the list — filters combine (AND). Drag a column&apos;s right edge (or a row&apos;s bottom
+          edge) to resize it — drag all the way to close it down to a red bar, then drag that bar back out to
+          reopen.
         </p>
         <DownloadCsvButton rows={csvRows} filename="participants" />
       </div>
-      {(grid.hiddenCols.size > 0 || grid.hiddenRows.size > 0) && (
-        <div className="mb-3 flex flex-wrap items-center gap-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-800">
-          {grid.hiddenCols.size > 0 && (
-            <span>
-              {grid.hiddenCols.size} column{grid.hiddenCols.size === 1 ? "" : "s"} hidden —{" "}
-              <button type="button" onClick={grid.showAllCols} className="font-semibold underline underline-offset-2">
-                show all
-              </button>
-            </span>
-          )}
-          {grid.hiddenRows.size > 0 && (
-            <span>
-              {grid.hiddenRows.size} row{grid.hiddenRows.size === 1 ? "" : "s"} hidden —{" "}
-              <button type="button" onClick={grid.showAllRows} className="font-semibold underline underline-offset-2">
-                show all
-              </button>
-            </span>
-          )}
-        </div>
-      )}
       <DualScrollBox>
         <table
           className="text-left text-sm"
           style={{
             tableLayout: "fixed",
             width:
-              visibleColumns.reduce((sum, c) => sum + widthOf(c.key, c.width), 0) +
-              visibleExtraColumns.reduce((sum, c) => sum + widthOf(c.key, c.width), 0),
+              COLUMNS.reduce((sum, c) => sum + widthOf(c.key, c.width), 0) +
+              EXTRA_COLUMNS.reduce((sum, c) => sum + widthOf(c.key, c.width), 0),
           }}
         >
           <colgroup>
-            {visibleColumns.map((c) => (
+            {COLUMNS.map((c) => (
               <col key={c.key} style={{ width: widthOf(c.key, c.width) }} />
             ))}
-            {visibleExtraColumns.map((c) => (
+            {EXTRA_COLUMNS.map((c) => (
               <col key={c.key} style={{ width: widthOf(c.key, c.width) }} />
             ))}
           </colgroup>
           <thead className="sticky top-0 z-20 border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
             <tr>
-              {visibleColumns.map((c, i) => renderHeaderCell(c.key, c.label, c.width, i === 0))}
-              {visibleExtraColumns.map((c) => renderHeaderCell(c.key, c.label, c.width, false))}
+              {COLUMNS.map((c, i) => renderHeaderCell(c.key, c.label, widthOf(c.key, c.width), i === 0))}
+              {EXTRA_COLUMNS.map((c) => renderHeaderCell(c.key, c.label, widthOf(c.key, c.width), false))}
             </tr>
             <tr className="border-t border-neutral-200 bg-white normal-case">
-              {visibleColumns.map((c, i) => (
-                <th
-                  key={c.key}
-                  className={`px-2 py-1.5 ${i === 0 ? "sticky left-0 z-10 border-r border-neutral-200 bg-white" : ""}`}
-                >
-                  <ColumnFilterDropdown
-                    values={uniqueValues[c.key] ?? []}
-                    selected={filters[c.key] ?? new Set()}
-                    onChange={(next) => setFilters((f) => ({ ...f, [c.key]: next }))}
-                  />
-                </th>
-              ))}
-              {visibleExtraColumns.map((c) => (
+              {COLUMNS.map((c, i) => {
+                const closed = isClosed(widthOf(c.key, c.width), widthOf(c.key, c.width));
+                return (
+                  <th
+                    key={c.key}
+                    className={`${closed ? "bg-red-600 p-0" : "px-2 py-1.5"} ${
+                      i === 0 ? "sticky left-0 z-10 border-r border-neutral-200 bg-white" : ""
+                    }`}
+                  >
+                    {!closed && (
+                      <ColumnFilterDropdown
+                        values={uniqueValues[c.key] ?? []}
+                        selected={filters[c.key] ?? new Set()}
+                        onChange={(next) => setFilters((f) => ({ ...f, [c.key]: next }))}
+                      />
+                    )}
+                  </th>
+                );
+              })}
+              {EXTRA_COLUMNS.map((c) => (
                 <th key={c.key} className="px-2 py-1.5" />
               ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100">
-            {displayedRows.length === 0 ? (
+            {filtered.length === 0 ? (
               <tr>
-                <td colSpan={visibleColumns.length + visibleExtraColumns.length} className="px-3 py-6 text-center text-neutral-400">
+                <td colSpan={COLUMNS.length + EXTRA_COLUMNS.length} className="px-3 py-6 text-center text-neutral-400">
                   No records match these filters.
                 </td>
               </tr>
             ) : (
-              displayedRows.map((row) => {
-                const rowSelected = grid.selectedRows.has(row.registrationId);
+              filtered.map((row) => {
                 const rowHeight = grid.rowHeights[row.registrationId];
+                const rowClosed = rowHeight != null && rowHeight <= CLOSED_SIZE + 1;
                 return (
                   <tr
                     key={row.registrationId}
-                    className={`group hover:bg-neutral-50 ${rowSelected ? "bg-amber-50" : ""} ${grid.rowSizeClass(row.registrationId)}`}
+                    className={`group hover:bg-neutral-50 ${grid.rowSizeClass(row.registrationId)}`}
                     style={grid.rowSizeStyle(row.registrationId)}
                   >
-                    {visibleColumns.map((c, i) => {
+                    {COLUMNS.map((c, i) => {
+                      const width = widthOf(c.key, c.width);
+                      const colClosed = isClosed(width, width);
+                      const closed = colClosed || rowClosed;
                       const { className, title, content } = standardCell(c, row);
                       const isHandle = i === 0;
-                      const handleBg = rowSelected ? "bg-amber-50" : "bg-white group-hover:bg-neutral-50";
+                      const handleBg = colClosed ? "" : "bg-white group-hover:bg-neutral-50";
                       return (
                         <td
                           key={c.key}
-                          className={`truncate px-3 py-2 ${className} ${
-                            isHandle ? `relative sticky left-0 z-10 cursor-pointer select-none border-r border-neutral-200 ${handleBg}` : ""
-                          }`}
-                          title={isHandle ? "Click to select/highlight this row" : title}
-                          onClick={isHandle ? () => grid.toggleRowSelect(row.registrationId) : undefined}
+                          className={`${closed ? "p-0" : `truncate px-3 py-2 ${className}`} ${
+                            isHandle ? "relative sticky left-0 z-10 border-r border-neutral-200" : ""
+                          } ${colClosed ? "bg-red-600" : isHandle ? handleBg : ""}`}
+                          title={!closed ? title : undefined}
                         >
-                          {content}
-                          {isHandle && rowSelected && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                grid.hideRow(row.registrationId);
-                              }}
-                              title="Hide this row"
-                              className="absolute right-1 top-1/2 z-20 flex h-4 w-4 -translate-y-1/2 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold leading-none text-white hover:bg-red-700"
-                            >
-                              ×
-                            </button>
-                          )}
+                          {!closed && content}
                           {isHandle && (
                             <span
                               onMouseDown={(e) => grid.handleRowResizeStart(e, row.registrationId, rowHeight ?? 36)}
-                              title="Drag to resize this row"
+                              title={rowClosed ? "Drag to reopen this row" : "Drag to resize (or close) this row"}
                               className="absolute bottom-0 left-0 right-0 z-10 h-1 cursor-row-resize touch-none select-none hover:bg-red-300 active:bg-red-500"
                             />
                           )}
                         </td>
                       );
                     })}
-                    {visibleExtraColumns.map((c) => (
-                      <td key={c.key} className="px-3 py-2">
-                        {extraCell(c.key, row, isAdmin, canManageSlot)}
-                      </td>
-                    ))}
+                    {EXTRA_COLUMNS.map((c) => {
+                      const width = widthOf(c.key, c.width);
+                      const colClosed = isClosed(width, width);
+                      const closed = colClosed || rowClosed;
+                      return (
+                        <td key={c.key} className={closed ? `p-0 ${colClosed ? "bg-red-600" : ""}` : "px-3 py-2"}>
+                          {!closed && extraCell(c.key, row, isAdmin, canManageSlot)}
+                        </td>
+                      );
+                    })}
                   </tr>
                 );
               })

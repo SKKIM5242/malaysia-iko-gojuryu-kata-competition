@@ -4,7 +4,7 @@ import { useCallback, useMemo, useRef, useState, type CSSProperties, type ReactN
 import DownloadCsvButton from "@/components/DownloadCsvButton";
 import ColumnFilterDropdown from "@/components/ColumnFilterDropdown";
 import DualScrollBox from "@/components/DualScrollBox";
-import { useGridControls } from "@/lib/useGridControls";
+import { useGridControls, isClosed, CLOSED_SIZE } from "@/lib/useGridControls";
 
 export interface FilterableColumn {
   key: string;
@@ -25,7 +25,6 @@ export interface FilterableColumn {
  * but never a callback/closure (RSC serialization forbids it). */
 type CellValue = string | ReactNode;
 
-const MIN_COL_WIDTH = 60;
 const DEFAULT_COL_WIDTH = 150;
 
 /** Generic per-column-filterable data table — same filter-box-per-column
@@ -33,11 +32,10 @@ const DEFAULT_COL_WIDTH = 150;
  * registrant type (Referees, Audience, Schools, Senseis, Staff Accounts)
  * so each gets its own filterable list without duplicating the table UI.
  * Every column — including the sticky/pinned ones — can be dragged wider
- * or narrower from its right edge; widths reset on page reload (not
- * persisted). Click a column's label, or a row's leading cell, to
- * select/highlight it; a highlighted column/row can be hidden with the ×
- * that appears, and rows can be dragged taller/shorter from their bottom
- * edge the same way columns resize from their right edge. */
+ * or narrower from its right edge, all the way down to fully closed (a
+ * solid red bar); drag that bar back out to reopen. Rows resize the same
+ * way from their bottom edge. Widths/heights reset on page reload (not
+ * persisted). */
 export default function FilterableTable({
   columns,
   rows,
@@ -72,8 +70,6 @@ export default function FilterableTable({
   const resizingRef = useRef<{ key: string; startX: number; startWidth: number } | null>(null);
   const grid = useGridControls();
 
-  const visibleColumns = useMemo(() => columns.filter((c) => !grid.hiddenCols.has(c.key)), [columns, grid.hiddenCols]);
-
   const widthOf = useCallback(
     (col: FilterableColumn, index: number): number => {
       if (colWidths[col.key] != null) return colWidths[col.key];
@@ -86,7 +82,7 @@ export default function FilterableTable({
   const handleMove = useCallback((e: MouseEvent) => {
     const r = resizingRef.current;
     if (!r) return;
-    const next = Math.max(MIN_COL_WIDTH, r.startWidth + (e.clientX - r.startX));
+    const next = Math.max(CLOSED_SIZE, r.startWidth + (e.clientX - r.startX));
     setColWidths((prev) => ({ ...prev, [r.key]: next }));
   }, []);
 
@@ -110,7 +106,7 @@ export default function FilterableTable({
   const stickyPosClass = (i: number) => (i < stickyColumns ? `sticky z-10 border-r border-neutral-200 ${i === 0 ? "left-0" : ""}` : "");
   const stickyLeftStyle = (i: number): CSSProperties | undefined => {
     if (stickyColumns < 2 || i !== 1) return undefined;
-    return { left: widthOf(visibleColumns[0], 0) };
+    return { left: widthOf(columns[0], 0) };
   };
 
   const uniqueValues = useMemo(() => {
@@ -143,11 +139,6 @@ export default function FilterableTable({
     );
   }, [rows, filters]);
 
-  const displayedRows = useMemo(
-    () => filtered.filter((row) => !grid.hiddenRows.has(String(row[rowKey]))),
-    [filtered, grid.hiddenRows, rowKey],
-  );
-
   const csvRows = useMemo(
     () =>
       filtered.map((row) => {
@@ -166,154 +157,108 @@ export default function FilterableTable({
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-neutral-400">
           Showing {filtered.length} of {rows.length}. Filters combine (AND). Drag a column's right
-          edge to resize it, or click a header/row to select and hide it.
+          edge (or a row's bottom edge) to resize it — drag all the way to close it down to a red
+          bar, then drag that bar back out to reopen.
         </p>
         <DownloadCsvButton rows={csvRows} filename={downloadName} />
       </div>
-      {(grid.hiddenCols.size > 0 || grid.hiddenRows.size > 0) && (
-        <div className="mb-2 flex flex-wrap items-center gap-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-800">
-          {grid.hiddenCols.size > 0 && (
-            <span>
-              {grid.hiddenCols.size} column{grid.hiddenCols.size === 1 ? "" : "s"} hidden —{" "}
-              <button type="button" onClick={grid.showAllCols} className="font-semibold underline underline-offset-2">
-                show all
-              </button>
-            </span>
-          )}
-          {grid.hiddenRows.size > 0 && (
-            <span>
-              {grid.hiddenRows.size} row{grid.hiddenRows.size === 1 ? "" : "s"} hidden —{" "}
-              <button type="button" onClick={grid.showAllRows} className="font-semibold underline underline-offset-2">
-                show all
-              </button>
-            </span>
-          )}
-        </div>
-      )}
       <DualScrollBox>
         <table
           className="text-left text-sm"
-          style={{ tableLayout: "fixed", width: visibleColumns.reduce((sum, c, i) => sum + widthOf(c, i), 0) }}
+          style={{ tableLayout: "fixed", width: columns.reduce((sum, c, i) => sum + widthOf(c, i), 0) }}
         >
           <colgroup>
-            {visibleColumns.map((c, i) => (
+            {columns.map((c, i) => (
               <col key={c.key} style={{ width: widthOf(c, i) }} />
             ))}
           </colgroup>
           <thead className="sticky top-0 z-20 border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
             <tr>
-              {visibleColumns.map((c, i) => {
-                const selected = grid.selectedCols.has(c.key);
+              {columns.map((c, i) => {
+                const width = widthOf(c, i);
+                const closed = isClosed(width, width);
                 return (
                   <th
                     key={c.key}
-                    className={`relative select-none px-3 py-2.5 whitespace-nowrap ${stickyPosClass(i)} ${
-                      selected ? "bg-amber-100" : i < stickyColumns ? "bg-neutral-50" : ""
+                    className={`relative select-none whitespace-nowrap ${stickyPosClass(i)} ${
+                      closed ? "bg-red-600 p-0" : `px-3 py-2.5 ${i < stickyColumns ? "bg-neutral-50" : ""}`
                     }`}
                     style={stickyLeftStyle(i)}
                   >
-                    <span
-                      onClick={() => grid.toggleColSelect(c.key)}
-                      title="Click to select/highlight this column"
-                      className="block cursor-pointer overflow-hidden text-ellipsis pr-4"
-                    >
-                      {c.label}
-                    </span>
-                    {selected && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          grid.hideCol(c.key);
-                        }}
-                        title="Hide this column"
-                        className="absolute right-2.5 top-1/2 z-20 flex h-4 w-4 -translate-y-1/2 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold leading-none text-white hover:bg-red-700"
-                      >
-                        ×
-                      </button>
-                    )}
+                    {!closed && <span className="block overflow-hidden text-ellipsis pr-2">{c.label}</span>}
                     <span
                       onMouseDown={(e) => handleResizeStart(e, c, i)}
-                      title="Drag to resize this column"
-                      className="absolute right-0 top-0 z-10 h-full w-2 cursor-col-resize touch-none select-none hover:bg-red-300 active:bg-red-500"
+                      title={closed ? "Drag to reopen this column" : "Drag to resize (or close) this column"}
+                      className={`absolute right-0 top-0 z-10 h-full cursor-col-resize touch-none select-none ${
+                        closed ? "w-full bg-red-600 hover:bg-red-700" : "w-2 hover:bg-red-300 active:bg-red-500"
+                      }`}
                     />
                   </th>
                 );
               })}
             </tr>
             <tr className="border-t border-neutral-200 bg-white normal-case">
-              {visibleColumns.map((c, i) => (
-                <th
-                  key={c.key}
-                  className={`px-2 py-1.5 bg-white ${stickyPosClass(i)}`}
-                  style={stickyLeftStyle(i)}
-                >
-                  <ColumnFilterDropdown
-                    values={uniqueValues[c.key] ?? []}
-                    selected={filters[c.key] ?? new Set()}
-                    onChange={(next) => setFilters((f) => ({ ...f, [c.key]: next }))}
-                  />
-                </th>
-              ))}
+              {columns.map((c, i) => {
+                const width = widthOf(c, i);
+                const closed = isClosed(width, width);
+                return (
+                  <th
+                    key={c.key}
+                    className={`${closed ? "bg-red-600 p-0" : "px-2 py-1.5"} ${stickyPosClass(i)}`}
+                    style={stickyLeftStyle(i)}
+                  >
+                    {!closed && (
+                      <ColumnFilterDropdown
+                        values={uniqueValues[c.key] ?? []}
+                        selected={filters[c.key] ?? new Set()}
+                        onChange={(next) => setFilters((f) => ({ ...f, [c.key]: next }))}
+                      />
+                    )}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100">
-            {displayedRows.length === 0 ? (
+            {filtered.length === 0 ? (
               <tr>
-                <td colSpan={visibleColumns.length} className="px-3 py-6 text-center text-neutral-400">
+                <td colSpan={columns.length} className="px-3 py-6 text-center text-neutral-400">
                   No records match these filters.
                 </td>
               </tr>
             ) : (
-              displayedRows.map((row) => {
+              filtered.map((row) => {
                 const key = String(row[rowKey]);
-                const rowSelected = grid.selectedRows.has(key);
                 const rowHeight = grid.rowHeights[key];
+                const rowClosed = rowHeight != null && rowHeight <= CLOSED_SIZE + 1;
                 return (
                   <tr
                     key={key}
-                    className={`group hover:bg-neutral-50 ${rowSelected ? "bg-amber-50" : ""} ${grid.rowSizeClass(key)}`}
+                    className={`group hover:bg-neutral-50 ${grid.rowSizeClass(key)}`}
                     style={grid.rowSizeStyle(key)}
                   >
-                    {visibleColumns.map((c, i) => {
+                    {columns.map((c, i) => {
+                      const width = widthOf(c, i);
+                      const colClosed = isClosed(width, width);
                       const cell = row[c.key];
                       const isText = typeof cell === "string";
                       const textCls = c.wrap ? "whitespace-normal break-words" : "truncate";
                       const isHandle = i === 0;
-                      const cellBg =
-                        i < stickyColumns
-                          ? rowSelected
-                            ? "bg-amber-50"
-                            : "bg-white group-hover:bg-neutral-50"
-                          : "";
+                      const closed = colClosed || rowClosed;
                       return (
                         <td
                           key={c.key}
-                          className={`px-3 py-2 ${isText ? textCls : ""} ${stickyPosClass(i)} ${cellBg} ${
-                            isHandle ? "relative cursor-pointer select-none" : ""
-                          }`}
+                          className={`${closed ? "p-0" : `px-3 py-2 ${isText ? textCls : ""}`} ${stickyPosClass(i)} ${
+                            colClosed ? "bg-red-600" : i < stickyColumns ? "bg-white group-hover:bg-neutral-50" : ""
+                          } ${isHandle ? "relative" : ""}`}
                           style={stickyLeftStyle(i)}
-                          title={isHandle ? "Click to select/highlight this row" : isText && !c.wrap ? (cell as string) : undefined}
-                          onClick={isHandle ? () => grid.toggleRowSelect(key) : undefined}
+                          title={!closed && isText && !c.wrap ? cell : undefined}
                         >
-                          {isText ? cell || "—" : cell}
-                          {isHandle && rowSelected && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                grid.hideRow(key);
-                              }}
-                              title="Hide this row"
-                              className="absolute right-1 top-1/2 z-20 flex h-4 w-4 -translate-y-1/2 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold leading-none text-white hover:bg-red-700"
-                            >
-                              ×
-                            </button>
-                          )}
+                          {!closed && (isText ? cell || "—" : cell)}
                           {isHandle && (
                             <span
                               onMouseDown={(e) => grid.handleRowResizeStart(e, key, rowHeight ?? 36)}
-                              title="Drag to resize this row"
+                              title={rowClosed ? "Drag to reopen this row" : "Drag to resize (or close) this row"}
                               className="absolute bottom-0 left-0 right-0 z-10 h-1 cursor-row-resize touch-none select-none hover:bg-red-300 active:bg-red-500"
                             />
                           )}
