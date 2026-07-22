@@ -158,6 +158,7 @@ export default async function ParticipantsPage({
                 id: r.id,
                 no: (page - 1) * PAGE_SIZE + i + 1,
                 name: r.participant?.full_name ?? "—",
+                tier: r.competition?.name ?? null,
                 categoryName: r.category?.name ?? null,
                 division: r.division,
                 belt: r.participant?.belt_rank ?? null,

@@ -103,7 +103,7 @@ export async function getConfirmedRegistrations(
   let query = supabase
     .from("registrations")
     .select(
-      "*, participant:participants(*, school:schools(id,name,state), sensei:senseis(id,name,rank)), category:categories(id,name)",
+      "*, participant:participants(*, school:schools(id,name,state), sensei:senseis(id,name,rank)), category:categories(id,name), competition:competitions(id,name)",
       { count: "exact" },
     )
     .in("competition_id", ids)

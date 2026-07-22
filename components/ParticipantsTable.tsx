@@ -9,6 +9,7 @@ export interface ParticipantRow {
   id: string;
   no: number;
   name: string;
+  tier: string | null;
   categoryName: string | null;
   division: string | null;
   belt: string | null;
@@ -20,6 +21,7 @@ const COLUMNS = [
   { key: "no", label: "#" },
   { key: "reference_id", label: "Reference ID" },
   { key: "name", label: "Name" },
+  { key: "tier", label: "Competition Tier" },
   { key: "category", label: "Category" },
   { key: "division", label: "Division" },
   { key: "belt", label: "Belt" },
@@ -32,6 +34,7 @@ type FilterableKey = Exclude<(typeof COLUMNS)[number]["key"], "no" | "reference_
 function rawValue(r: ParticipantRow, key: FilterableKey): string {
   switch (key) {
     case "name": return r.name;
+    case "tier": return r.tier ?? "";
     case "category": return r.categoryName ?? "";
     case "division": return r.division ?? "";
     case "belt": return r.belt ?? "";
@@ -45,6 +48,7 @@ const DEFAULT_WIDTHS: Record<string, number> = {
   no: 56,
   reference_id: 110,
   name: 180,
+  tier: 170,
   category: 220,
   division: 100,
   belt: 120,
@@ -170,6 +174,7 @@ export default function ParticipantsTable({ rows }: { rows: ParticipantRow[] }) 
                   <td className="truncate px-4 py-3 text-neutral-400">{r.no}</td>
                   <td className="truncate px-4 py-3 font-mono text-xs">{r.id.slice(0, 8).toUpperCase()}</td>
                   <td className="truncate px-4 py-3 font-medium text-neutral-900">{r.name}</td>
+                  <td className="truncate px-4 py-3" title={r.tier ?? undefined}>{r.tier ?? "—"}</td>
                   <td className="truncate px-4 py-3" title={r.categoryName ?? undefined}>
                     <CategoryName name={r.categoryName ?? undefined} />
                   </td>

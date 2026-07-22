@@ -261,6 +261,7 @@ export default async function RegisterPage({
               </div>
               <RegisterForm
                 competition={competition}
+                competitions={openCompetitions}
                 categories={categories}
                 categoryTaken={categoryTaken}
                 schools={schools}
