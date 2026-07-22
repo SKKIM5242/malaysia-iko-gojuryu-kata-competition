@@ -153,7 +153,7 @@ export default function BulkRegisterForm({
               <th className="px-2 py-2">Rank confirmation *</th>
               <th className="px-2 py-2">Email *</th>
               <th className="px-2 py-2">Mobile phone *</th>
-              <th className="px-2 py-2">Home address *</th>
+              <th className="px-2 py-2">Home address *(no comma &quot;,&quot; allowed)</th>
               <th className="px-2 py-2">City/Town *</th>
               <th className="px-2 py-2">Country *</th>
               <th className="px-2 py-2">Kata event *</th>
@@ -190,7 +190,7 @@ export default function BulkRegisterForm({
                 </td>
                 <td className="px-2 py-1.5"><input aria-label={`Row ${i + 1} email`} type="email" className={cell} value={row.email} onChange={(e) => update(i, "email", e.target.value)} /></td>
                 <td className="px-2 py-1.5"><input aria-label={`Row ${i + 1} mobile phone`} type="tel" className={cell} value={row.phone} onChange={(e) => update(i, "phone", e.target.value)} /></td>
-                <td className="px-2 py-1.5"><input aria-label={`Row ${i + 1} home address`} className={cell} value={row.home_address} onChange={(e) => update(i, "home_address", e.target.value)} /></td>
+                <td className="px-2 py-1.5"><input aria-label={`Row ${i + 1} home address`} className={cell} value={row.home_address} onChange={(e) => update(i, "home_address", e.target.value.replace(/,/g, ""))} /></td>
                 <td className="px-2 py-1.5"><input aria-label={`Row ${i + 1} city or town`} className={cell} value={row.city_town} onChange={(e) => update(i, "city_town", e.target.value)} /></td>
                 <td className="px-2 py-1.5"><input aria-label={`Row ${i + 1} home country`} className={cell} value={row.home_country} onChange={(e) => update(i, "home_country", e.target.value)} /></td>
                 <td className="px-2 py-1.5">

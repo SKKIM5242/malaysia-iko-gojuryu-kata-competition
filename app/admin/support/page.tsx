@@ -13,6 +13,7 @@ import { EmptyState, SetupNotice, formatUSD, formatDateTime } from "@/components
 import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
 import SignInControlBox from "@/components/SignInControlBox";
+import { NoCommaInput } from "@/components/NoCommaAddressField";
 import InvitationCodeForm from "@/components/InvitationCodeForm";
 import InvitationCodeList from "@/components/InvitationCodeList";
 import { EDUCATION_LEVELS, SPOKEN_LANGUAGES } from "@/lib/reference-data";
@@ -205,8 +206,11 @@ export default async function AdminSupport({
                   <CertificateField />
                 </div>
                 <div className="sm:col-span-2">
-                  <label htmlFor="cs_home_address" className={adminLabel}>Home address *</label>
-                  <input id="cs_home_address" name="home_address" required className={adminInput} />
+                  <label htmlFor="cs_home_address" className={adminLabel}>
+                    Home address *{" "}
+                    <span className="font-normal text-neutral-400">(no comma &quot;,&quot; allowed in the box)</span>
+                  </label>
+                  <NoCommaInput id="cs_home_address" className={adminInput} />
                 </div>
                 <div>
                   <label htmlFor="cs_city_town" className={adminLabel}>City / Town *</label>

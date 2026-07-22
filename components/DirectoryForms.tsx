@@ -5,6 +5,7 @@ import Link from "next/link";
 import { registerSchool, registerSensei, type DirectoryState } from "@/app/actions/directory";
 import { TelegramJoinButton } from "@/components/ui";
 import CertificateUploadField from "@/components/CertificateUploadField";
+import { NoCommaTextarea } from "@/components/NoCommaAddressField";
 import type { School } from "@/lib/types";
 
 export interface TierOption {
@@ -191,8 +192,11 @@ export function SchoolForm({ telegramLink, tiers }: { telegramLink: string | nul
           <input id="school_phone" name="phone" type="tel" required className={inputCls} placeholder="+60…" />
         </div>
         <div className="sm:col-span-2">
-          <label htmlFor="home_address" className={labelCls}>Home address *</label>
-          <textarea id="home_address" name="home_address" required rows={2} className={inputCls} />
+          <label htmlFor="home_address" className={labelCls}>
+            Home address *{" "}
+            <span className="font-normal text-neutral-400">(no comma &quot;,&quot; allowed in the box)</span>
+          </label>
+          <NoCommaTextarea id="home_address" className={inputCls} />
         </div>
         <div>
           <label htmlFor="city_town" className={labelCls}>City / Town *</label>
@@ -327,8 +331,11 @@ export function SenseiForm({
           <input id="sensei_phone" name="phone" type="tel" required className={inputCls} placeholder="+60…" />
         </div>
         <div className="sm:col-span-2">
-          <label htmlFor="home_address" className={labelCls}>Home address *</label>
-          <textarea id="home_address" name="home_address" required rows={2} className={inputCls} />
+          <label htmlFor="home_address" className={labelCls}>
+            Home address *{" "}
+            <span className="font-normal text-neutral-400">(no comma &quot;,&quot; allowed in the box)</span>
+          </label>
+          <NoCommaTextarea id="home_address" className={inputCls} />
           <FieldError message={err.home_address} />
         </div>
         <div>

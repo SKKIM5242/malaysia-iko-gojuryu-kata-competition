@@ -10,6 +10,7 @@ import CsvUploadForm from "@/components/CsvUploadForm";
 import SignInControlBox from "@/components/SignInControlBox";
 import InvitationCodeForm from "@/components/InvitationCodeForm";
 import InvitationCodeList from "@/components/InvitationCodeList";
+import { NoCommaInput } from "@/components/NoCommaAddressField";
 
 export const dynamic = "force-dynamic";
 
@@ -151,8 +152,11 @@ export default async function AdminSchools({
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="sm:col-span-2">
-                  <label htmlFor="home_address" className={adminLabel}>School/dojo/club address *</label>
-                  <input id="home_address" name="home_address" required defaultValue={editing?.home_address ?? ""} className={adminInput} />
+                  <label htmlFor="home_address" className={adminLabel}>
+                    School/dojo/club address *{" "}
+                    <span className="font-normal text-neutral-400">(no comma &quot;,&quot; allowed in the box)</span>
+                  </label>
+                  <NoCommaInput id="home_address" defaultValue={editing?.home_address ?? ""} className={adminInput} />
                 </div>
                 <div>
                   <label htmlFor="state" className={adminLabel}>State / Province / Region</label>

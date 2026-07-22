@@ -8,6 +8,7 @@ import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
 import InvitationCodeForm from "@/components/InvitationCodeForm";
 import InvitationCodeList from "@/components/InvitationCodeList";
+import { NoCommaInput } from "@/components/NoCommaAddressField";
 
 export const dynamic = "force-dynamic";
 
@@ -98,8 +99,11 @@ export default async function AdminOrganizers({
                   <CertificateField />
                 </div>
                 <div className="sm:col-span-2">
-                  <label htmlFor="org_home_address" className={adminLabel}>Home address *</label>
-                  <input id="org_home_address" name="home_address" required className={adminInput} />
+                  <label htmlFor="org_home_address" className={adminLabel}>
+                    Home address *{" "}
+                    <span className="font-normal text-neutral-400">(no comma &quot;,&quot; allowed in the box)</span>
+                  </label>
+                  <NoCommaInput id="org_home_address" className={adminInput} />
                 </div>
                 <div>
                   <label htmlFor="org_city_town" className={adminLabel}>City / Town *</label>

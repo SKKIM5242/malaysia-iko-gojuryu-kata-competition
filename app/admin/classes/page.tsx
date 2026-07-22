@@ -12,6 +12,7 @@ import { AdminShell, Card, adminBtn, adminInput, adminLabel } from "@/components
 import { EmptyState, SetupNotice, formatDate } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
+import { NoCommaInput } from "@/components/NoCommaAddressField";
 import type { ClassEnrollment, ClassInvoice, FeePlan, Student } from "@/lib/types";
 import { WORLD_CURRENCIES } from "@/lib/reference-data";
 
@@ -217,8 +218,11 @@ export default async function AdminClasses({
                     <input id="phone" name="phone" type="tel" defaultValue={editingStudent?.phone ?? ""} className={adminInput} placeholder="+60…" />
                   </div>
                   <div className="sm:col-span-2">
-                    <label htmlFor="home_address" className={adminLabel}>Home address</label>
-                    <input id="home_address" name="home_address" defaultValue={editingStudent?.home_address ?? ""} className={adminInput} />
+                    <label htmlFor="home_address" className={adminLabel}>
+                      Home address{" "}
+                      <span className="font-normal text-neutral-400">(no comma &quot;,&quot; allowed in the box)</span>
+                    </label>
+                    <NoCommaInput id="home_address" required={false} defaultValue={editingStudent?.home_address ?? ""} className={adminInput} />
                   </div>
                   <div>
                     <label htmlFor="city_town" className={adminLabel}>City / Town</label>

@@ -10,6 +10,7 @@ import CsvUploadForm from "@/components/CsvUploadForm";
 import SignInControlBox from "@/components/SignInControlBox";
 import InvitationCodeForm from "@/components/InvitationCodeForm";
 import InvitationCodeList from "@/components/InvitationCodeList";
+import { NoCommaInput } from "@/components/NoCommaAddressField";
 
 export const dynamic = "force-dynamic";
 
@@ -167,8 +168,11 @@ export default async function AdminSenseis({
                   </select>
                 </div>
                 <div className="sm:col-span-2">
-                  <label htmlFor="home_address" className={adminLabel}>Personal Home Address *</label>
-                  <input id="home_address" name="home_address" required defaultValue={editing?.home_address ?? ""} className={adminInput} />
+                  <label htmlFor="home_address" className={adminLabel}>
+                    Personal Home Address *{" "}
+                    <span className="font-normal text-neutral-400">(no comma &quot;,&quot; allowed in the box)</span>
+                  </label>
+                  <NoCommaInput id="home_address" defaultValue={editing?.home_address ?? ""} className={adminInput} />
                 </div>
                 <div>
                   <label htmlFor="city_town" className={adminLabel}>City / Town *</label>

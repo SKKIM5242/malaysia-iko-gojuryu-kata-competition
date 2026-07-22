@@ -5,6 +5,7 @@ import Link from "next/link";
 import { submitRegistration, type RegisterState } from "@/app/actions/register";
 import { OrganizerContact } from "@/components/ui";
 import CertificateUploadField from "@/components/CertificateUploadField";
+import { NoCommaTextarea } from "@/components/NoCommaAddressField";
 import { ageAt, beltGroup, genderCode, kataBaseOf, kataBases as allKataBasesOf } from "@/lib/division";
 import type { Category, Competition, School, Sensei } from "@/lib/types";
 
@@ -265,8 +266,11 @@ export default function RegisterForm({
         </div>
 
         <div className="sm:col-span-2">
-          <label htmlFor="home_address" className={labelCls}>Home address *</label>
-          <textarea id="home_address" name="home_address" required rows={2} className={inputCls} placeholder="Street address" />
+          <label htmlFor="home_address" className={labelCls}>
+            Home address *{" "}
+            <span className="font-normal text-neutral-400">(no comma &quot;,&quot; allowed in the box)</span>
+          </label>
+          <NoCommaTextarea id="home_address" className={inputCls} placeholder="Street address" />
           <FieldError message={err.home_address} />
         </div>
 
