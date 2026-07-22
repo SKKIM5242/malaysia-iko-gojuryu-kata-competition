@@ -1,6 +1,11 @@
 import Link from "next/link";
 import { getStripe, paymentsEnabled } from "@/lib/payments";
-import { finalizeAttemptPurchaseSession, finalizeDirectorySession, finalizeInvoiceSession } from "@/lib/finalize";
+import {
+  finalizeAttemptPurchaseSession,
+  finalizeBulkUploadBatchSession,
+  finalizeDirectorySession,
+  finalizeInvoiceSession,
+} from "@/lib/finalize";
 import { SiteFooter, SiteHeader, TelegramJoinButton } from "@/components/ui";
 import { getTelegramLink } from "@/lib/telegram";
 
@@ -15,11 +20,11 @@ export default async function PayThanksPage({
 }) {
   const { session_id, cancelled } = await searchParams;
   let result = null;
-  let kind: "directory" | "invoice" | "attempts" = "invoice";
+  let kind: "directory" | "invoice" | "attempts" | "bulk" = "invoice";
   if (!cancelled && session_id && paymentsEnabled()) {
-    // One thank-you page serves class invoices, School/Sensei tier fees, and
-    // extra re-record attempt purchases — the session's metadata says which
-    // finalizer applies.
+    // One thank-you page serves class invoices, School/Sensei tier fees,
+    // extra re-record attempt purchases, and bulk registration batches — the
+    // session's metadata says which finalizer applies.
     let metadata: Record<string, string> | null = null;
     try {
       metadata = (await getStripe().checkout.sessions.retrieve(session_id)).metadata ?? null;
@@ -30,13 +35,17 @@ export default async function PayThanksPage({
       ? "directory"
       : metadata?.attempt_purchase_id
         ? "attempts"
-        : "invoice";
+        : metadata?.bulk_batch_id
+          ? "bulk"
+          : "invoice";
     result =
       kind === "directory"
         ? await finalizeDirectorySession(session_id)
         : kind === "attempts"
           ? await finalizeAttemptPurchaseSession(session_id)
-          : await finalizeInvoiceSession(session_id);
+          : kind === "bulk"
+            ? await finalizeBulkUploadBatchSession(session_id)
+            : await finalizeInvoiceSession(session_id);
   }
   const isDirectory = kind === "directory";
 
@@ -51,6 +60,12 @@ export default async function PayThanksPage({
             <p className="mt-2 text-green-800">
               {kind === "attempts" ? (
                 <>3 more re-record attempts have been added to your account. A Stripe receipt has been emailed to you.</>
+              ) : kind === "bulk" ? (
+                <>
+                  Bulk registration batch{" "}
+                  <span className="rounded bg-white px-2 py-0.5 font-mono font-bold">{result.referenceIds[0]}</span>{" "}
+                  is paid — you can upload your participants now. A Stripe receipt and email confirmation have been sent to you.
+                </>
               ) : (
                 <>
                   {isDirectory ? "Registration" : "Invoice"}{" "}
@@ -62,6 +77,10 @@ export default async function PayThanksPage({
             {kind === "attempts" ? (
               <Link href="/kata-arena" className="mt-5 inline-block rounded-md bg-red-700 px-5 py-2.5 font-semibold text-white hover:bg-red-600">
                 Back to Kata Arena
+              </Link>
+            ) : kind === "bulk" ? (
+              <Link href="/register/bulk" className="mt-5 inline-block rounded-md bg-red-700 px-5 py-2.5 font-semibold text-white hover:bg-red-600">
+                Back to Bulk Registration
               </Link>
             ) : (
               <div className="mx-auto max-w-md text-green-900">

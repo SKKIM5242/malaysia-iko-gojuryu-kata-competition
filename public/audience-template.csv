@@ -1,2 +1,2 @@
-full_name,email,phone,home_country,invitation_code,payment_status
-Tan Wei Jian,weijian@example.com,+60129998888,Malaysia,,pending
+full_name|email|phone|home_country|invitation_code|payment_status
+Tan Wei Jian|weijian@example.com|+60129998888|Malaysia||pending

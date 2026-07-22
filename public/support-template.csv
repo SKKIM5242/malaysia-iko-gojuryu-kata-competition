@@ -1,2 +1,2 @@
-full_name,email,ic_passport,date_of_birth,gender,belt_rank,home_address,city_town,postcode,country,phone,bank_name,bank_account_no,bank_account_name
-Siti Aminah binti Kassim,siti@example.com,910202-10-1234,1991-02-02,female,,7 Jalan Kenanga,Johor Bahru,80100,Malaysia,+60198887777,CIMB,3456-7890-1234,Siti Aminah binti Kassim
+full_name|email|ic_passport|date_of_birth|gender|belt_rank|home_address|city_town|postcode|country|phone|bank_name|bank_account_no|bank_account_name
+Siti Aminah binti Kassim|siti@example.com|910202-10-1234|1991-02-02|female||7 Jalan Kenanga|Johor Bahru|80100|Malaysia|+60198887777|CIMB|3456-7890-1234|Siti Aminah binti Kassim

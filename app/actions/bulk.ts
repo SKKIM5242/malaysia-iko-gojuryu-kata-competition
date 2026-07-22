@@ -1,10 +1,14 @@
 "use server";
 
+import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { writeAudit } from "@/lib/audit";
-import { resolveCategory } from "@/lib/division";
+import { resolveCategory, ageAt } from "@/lib/division";
 import { parseCsv } from "@/lib/csv";
+import { parseDDMMYYYY } from "@/lib/csv-bulk";
 import { sendConfirmationEmail } from "@/lib/notify";
+import { getStripe, paymentsEnabled } from "@/lib/payments";
+import { formatUSD } from "@/components/ui";
 import type { Category } from "@/lib/types";
 
 export interface BulkRow {
@@ -213,12 +217,96 @@ export async function requestBulkUploadBatch(
     });
   }
 
+  const totalAmountUsd = created.reduce((sum, t) => sum + t.amountUsd, 0);
+
+  const { data: senseiRow } = await supabase.from("senseis").select("name, email").eq("id", senseiId).maybeSingle();
+  if (senseiRow?.email) {
+    await sendConfirmationEmail({
+      toEmail: senseiRow.email,
+      recipientName: senseiRow.name ?? "Sensei",
+      subject: `Bulk registration quotation — batch ${batchId.slice(0, 8).toUpperCase()}`,
+      bodyLines: [
+        "Here is your quotation for bulk registration:",
+        ...created.map(
+          (t) => `${t.competitionName}: ${t.participants} participant${t.participants === 1 ? "" : "s"}, ${t.events} event${t.events === 1 ? "" : "s"} — ${formatUSD(t.amountUsd)}`,
+        ),
+        `Combined total due: ${formatUSD(totalAmountUsd)}.`,
+        `Batch reference: ${batchId.slice(0, 8).toUpperCase()}.`,
+        "Pay online via the Bulk Registration page — the upload unlocks the moment payment succeeds.",
+        "Note: this batch reference is only for payment/upload tracking. Each participant gets their own individual Reference ID once uploaded — that is what they use with their IC/passport to sign in and record their kata.",
+      ],
+    });
+  }
+
   return {
     done: true,
     batchId,
-    totalAmountUsd: created.reduce((sum, t) => sum + t.amountUsd, 0),
+    totalAmountUsd,
     tiers: created,
   };
+}
+
+export interface BulkCheckoutState {
+  ok: boolean;
+  error?: string;
+  checkoutUrl?: string;
+}
+
+/** Creates a Stripe Checkout session for a pending bulk-registration
+ * batch's combined total, tagged with the batch id so
+ * finalizeBulkUploadBatchSession (via the webhook or the /pay/thanks page)
+ * can mark every tier in the batch paid at once. Falls back to an error
+ * telling the sensei to contact the organizer if Stripe isn't configured —
+ * same manual-confirmation safety net as every other payment here. */
+export async function createBulkUploadCheckout(
+  _prev: BulkCheckoutState,
+  formData: FormData,
+): Promise<BulkCheckoutState> {
+  const batchId = String(formData.get("batch_id") ?? "");
+  if (!batchId) return { ok: false, error: "Missing batch reference — please submit the enquiry again." };
+
+  const supabase = await createClient();
+  const { data: rows } = await supabase
+    .from("bulk_upload_payments")
+    .select("id, amount_usd, status")
+    .eq("batch_id", batchId);
+  if (!rows || rows.length === 0) {
+    return { ok: false, error: "Batch not found — please submit the enquiry again." };
+  }
+  if (rows.some((r) => r.status !== "pending")) {
+    return { ok: false, error: "This batch is no longer awaiting payment — refresh the page." };
+  }
+  if (!paymentsEnabled()) {
+    return { ok: false, error: "Online payment isn't available right now — contact the organizer to arrange payment." };
+  }
+
+  const totalAmountUsd = rows.reduce((sum, r) => sum + Number(r.amount_usd), 0);
+  const origin = (await headers()).get("origin") ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  try {
+    const session = await getStripe().checkout.sessions.create({
+      mode: "payment",
+      line_items: [
+        {
+          price_data: {
+            currency: "usd",
+            unit_amount: Math.round(totalAmountUsd * 100),
+            product_data: {
+              name: `Bulk registration — ${rows.length} competition tier${rows.length === 1 ? "" : "s"}`,
+              description: `Batch reference ${batchId.slice(0, 8).toUpperCase()}`,
+            },
+          },
+          quantity: 1,
+        },
+      ],
+      metadata: { bulk_batch_id: batchId },
+      success_url: `${origin}/pay/thanks?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/register/bulk?cancelled=1`,
+    });
+    if (session.url) return { ok: true, checkoutUrl: session.url };
+    return { ok: false, error: "Could not start checkout — please try again." };
+  } catch {
+    return { ok: false, error: "Could not start checkout — please try again." };
+  }
 }
 
 /** How many of this school+sensei's participants already registered for
@@ -499,9 +587,10 @@ export async function bulkRegister(_prev: BulkState, formData: FormData): Promis
 // ── CSV bulk upload (up to 10,000 participants) ─────────────────────────────
 
 const CSV_COLUMNS = [
-  "full_name", "ic_passport", "date_of_birth", "gender", "belt_rank",
+  "full_name", "ic_passport", "date_of_birth", "age", "gender", "belt_rank",
   "rank_confirmation", "email", "phone", "home_address", "city_town",
-  "home_country", "kata_event", "bank_name", "bank_account_no", "bank_account_name",
+  "home_country", "dojo_name", "sensei_name", "competition_tier", "kata_event",
+  "bank_name", "bank_account_no", "bank_account_name",
 ] as const;
 
 export interface CsvBulkState {
@@ -597,8 +686,24 @@ export async function bulkRegisterCsv(_prev: CsvBulkState, formData: FormData): 
     .order("sort_order");
   const categories = (catRows as Category[]) ?? [];
 
+  const [{ data: schoolRow }, { data: senseiRow }] = await Promise.all([
+    supabase.from("schools").select("name").eq("id", schoolId).maybeSingle(),
+    supabase.from("senseis").select("name").eq("id", senseiId).maybeSingle(),
+  ]);
+
   const get = (r: string[], col: (typeof CSV_COLUMNS)[number]) =>
     (r[colIndex.get(col)!] ?? "").trim();
+
+  // One upload = one competition tier — check every row agrees before doing
+  // any per-row work, so a mixed-tier file fails fast with one clear
+  // message instead of a confusing pile of per-row errors.
+  const tiersInFile = [...new Set(dataRows.map((r) => get(r, "competition_tier")).filter(Boolean))];
+  if (tiersInFile.length > 1) {
+    return {
+      done: false,
+      error: `This file has more than one Competition Tier (${tiersInFile.join(", ")}) — upload one tier at a time. Split the rows into separate files, one per tier, and upload each separately.`,
+    };
+  }
 
   // Validate all rows first
   type Valid = {
@@ -626,9 +731,23 @@ export async function bulkRegisterCsv(_prev: CsvBulkState, formData: FormData): 
       failures.push({ row: rowNo, name, error: "Duplicate kata for this IC within the file" });
       return;
     }
-    const dob = get(r, "date_of_birth");
-    if (Number.isNaN(Date.parse(dob))) {
-      failures.push({ row: rowNo, name, error: "Invalid date of birth (use YYYY-MM-DD)" });
+    const dob = parseDDMMYYYY(get(r, "date_of_birth"));
+    if (!dob) {
+      failures.push({ row: rowNo, name, error: "Invalid date of birth (use DD/MM/YYYY)" });
+      return;
+    }
+    const ageInput = Number(get(r, "age"));
+    const computedAge = ageAt(dob, competition.event_date);
+    if (!Number.isFinite(ageInput) || Math.abs(ageInput - computedAge) > 1) {
+      failures.push({ row: rowNo, name, error: `Age (${get(r, "age")}) doesn't match date of birth — expected around ${computedAge}` });
+      return;
+    }
+    if (schoolRow?.name && get(r, "dojo_name").toLowerCase() !== schoolRow.name.toLowerCase()) {
+      failures.push({ row: rowNo, name, error: `Dojo_name ("${get(r, "dojo_name")}") doesn't match the selected School / Dojo ("${schoolRow.name}")` });
+      return;
+    }
+    if (senseiRow?.name && get(r, "sensei_name").toLowerCase() !== senseiRow.name.toLowerCase()) {
+      failures.push({ row: rowNo, name, error: `sensei_name ("${get(r, "sensei_name")}") doesn't match the selected Sensei / Coach ("${senseiRow.name}")` });
       return;
     }
     const gender = get(r, "gender").toLowerCase();

@@ -3,6 +3,7 @@ import type Stripe from "stripe";
 import { getStripe, paymentsEnabled } from "@/lib/payments";
 import {
   finalizeAttemptPurchaseSession,
+  finalizeBulkUploadBatchSession,
   finalizeDirectorySession,
   finalizeInvoiceSession,
   finalizeStripeSession,
@@ -47,6 +48,8 @@ export async function POST(request: Request) {
       await finalizeDirectorySession(session.id);
     } else if (session.metadata?.attempt_purchase_id) {
       await finalizeAttemptPurchaseSession(session.id);
+    } else if (session.metadata?.bulk_batch_id) {
+      await finalizeBulkUploadBatchSession(session.id);
     } else {
       await finalizeStripeSession(session.id);
     }

@@ -5,6 +5,7 @@ import { useActionState } from "react";
 import Link from "next/link";
 import { bulkRegister, type BulkRow, type BulkState } from "@/app/actions/bulk";
 import { formatUSD } from "@/components/ui";
+import { ageAt } from "@/lib/division";
 import type { Competition, School, Sensei } from "@/lib/types";
 
 const initial: BulkState = { done: false };
@@ -146,6 +147,7 @@ export default function BulkRegisterForm({
               <th className="px-2 py-2">Full name *</th>
               <th className="px-2 py-2">IC / Passport *</th>
               <th className="px-2 py-2">Date of birth *</th>
+              <th className="px-2 py-2">Age</th>
               <th className="px-2 py-2">Gender *</th>
               <th className="px-2 py-2">Latest Belt rank *</th>
               <th className="px-2 py-2">Rank confirmation *</th>
@@ -168,6 +170,9 @@ export default function BulkRegisterForm({
                 <td className="px-2 py-1.5"><input aria-label={`Row ${i + 1} full name`} className={cell} value={row.full_name} onChange={(e) => update(i, "full_name", e.target.value)} /></td>
                 <td className="px-2 py-1.5"><input aria-label={`Row ${i + 1} IC`} className={cell} value={row.ic_passport} onChange={(e) => update(i, "ic_passport", e.target.value)} /></td>
                 <td className="px-2 py-1.5"><input aria-label={`Row ${i + 1} date of birth`} type="date" className={cell} value={row.date_of_birth} onChange={(e) => update(i, "date_of_birth", e.target.value)} /></td>
+                <td className="px-2 py-1.5 text-center text-neutral-500">
+                  {row.date_of_birth && !Number.isNaN(Date.parse(row.date_of_birth)) ? ageAt(row.date_of_birth, null) : "—"}
+                </td>
                 <td className="px-2 py-1.5">
                   <select aria-label={`Row ${i + 1} gender`} className={cell} value={row.gender} onChange={(e) => update(i, "gender", e.target.value)}>
                     <option value=""></option>

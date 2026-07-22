@@ -1,21 +1,59 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { requestBulkUploadBatch, type BulkBatchState } from "@/app/actions/bulk";
-import { OrganizerContact, formatUSD } from "@/components/ui";
+import {
+  createBulkUploadCheckout,
+  requestBulkUploadBatch,
+  type BulkBatchState,
+  type BulkCheckoutState,
+} from "@/app/actions/bulk";
+import { formatUSD } from "@/components/ui";
 import type { Competition, School, Sensei } from "@/lib/types";
 
 const initial: BulkBatchState = { done: false };
+const checkoutInitial: BulkCheckoutState = { ok: false };
+
+/** Pay-now button for a pending batch — creates a Stripe Checkout session
+ * for the combined total and redirects there. Once payment succeeds,
+ * finalizeBulkUploadBatchSession marks every tier in the batch paid and
+ * emails the sensei the quotation + batch reference. */
+function PayBatchButton({ batchId }: { batchId: string }) {
+  const [state, formAction, pending] = useActionState(createBulkUploadCheckout, checkoutInitial);
+
+  useEffect(() => {
+    if (state.ok && state.checkoutUrl) window.location.href = state.checkoutUrl;
+  }, [state]);
+
+  return (
+    <div className="mt-2">
+      {state.error && <p className="mb-1 text-sm font-semibold text-red-600">{state.error}</p>}
+      <form action={formAction}>
+        <input type="hidden" name="batch_id" value={batchId} />
+        <button
+          type="submit"
+          disabled={pending}
+          className="rounded-md bg-red-700 px-5 py-2.5 font-semibold text-white hover:bg-red-600 disabled:opacity-60"
+        >
+          {pending ? "Redirecting to payment…" : "Pay with Stripe"}
+        </button>
+      </form>
+      <p className="mt-1 text-xs text-amber-700">
+        Takes you to a secure Stripe checkout — the upload unlocks the moment payment succeeds, and
+        you&apos;ll be emailed the quotation and this batch reference for your records.
+      </p>
+    </div>
+  );
+}
 
 /** Sensei pays for the whole batch upfront (unlike single-participant
  * registration, which registers first and pays after) — a single popup
  * covers all 3 competition tiers at once. For each tier they intend to
  * use, they give a participant headcount AND a total event count (fee
  * scales by events, same up-to-3-per-participant rule as individual
- * registration); one combined bill covers every tier entered. Once the
- * organizer confirms the whole batch paid, use the SAME School/Sensei in
- * Option A or B below (picking the matching tier) to upload — up to
- * exactly the numbers declared here, no more. */
+ * registration); one combined bill covers every tier entered, paid online
+ * via Stripe. The moment payment succeeds the upload unlocks — use the
+ * SAME School/Sensei in Option A or B below (picking the matching tier) —
+ * up to exactly the numbers declared here, no more. */
 export default function BulkUploadGate({
   competitions,
   schools,
@@ -37,9 +75,9 @@ export default function BulkUploadGate({
       <h2 className="text-lg font-bold">Step 1 — Enquire &amp; Pay For Your Bulk Registration</h2>
       <p className="mt-1 text-sm text-neutral-600">
         Bulk registration is paid upfront, before you upload. Tell us — for each tier you&apos;re
-        using — how many participants and how many total kata events they&apos;re taking, pay the
-        combined total, and once the organizer confirms it you can upload your CSV or table below
-        using this same School and Sensei.
+        using — how many participants and how many total kata events they&apos;re taking, then pay
+        the combined total online. The upload unlocks the moment payment succeeds — come back and
+        upload your CSV or table below using this same School and Sensei.
       </p>
 
       <button
@@ -80,16 +118,14 @@ export default function BulkUploadGate({
                 ))}
               </ul>
               <p className="mt-2 text-sm text-amber-800">
-                Combined total due: <strong>{formatUSD(state.totalAmountUsd ?? 0)}</strong>. Transfer
-                this amount and send your receipt to the organizer (see below), quoting batch
+                Combined total due: <strong>{formatUSD(state.totalAmountUsd ?? 0)}</strong>. Batch
                 reference{" "}
                 <span className="rounded bg-white px-1.5 py-0.5 font-mono text-xs font-bold">
                   {state.batchId?.slice(0, 8).toUpperCase()}
                 </span>
-                . Once confirmed, come back and click &quot;Enquire &amp; pay&quot; again with the
-                same School, Sensei, and numbers to unlock the upload.
+                {" "}— pay online below and the upload unlocks immediately.
               </p>
-              <div className="mt-2 text-amber-900"><OrganizerContact /></div>
+              {state.batchId && <PayBatchButton batchId={state.batchId} />}
             </div>
           )}
         </div>

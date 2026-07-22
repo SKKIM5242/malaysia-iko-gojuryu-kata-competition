@@ -438,6 +438,10 @@ export default function ParticipantRecordsTable({
       filtered.map((row) => {
         const out: Record<string, string> = {};
         for (const c of COLUMNS) out[c.label] = String(row[c.key] ?? "");
+        // The on-screen "Reference ID" column truncates+uppercases the raw
+        // UUID (see standardCell's "registrationId" case) — the export must
+        // match it, not the full underlying id used internally for actions.
+        out["Reference ID"] = row.registrationId.slice(0, 8).toUpperCase();
         out["Account Link"] = row.linkedAccountEmail ?? "Not linked";
         out["Slot Status"] = SLOT_STATUS_CSV_LABEL[row.slotStatus];
         return out;

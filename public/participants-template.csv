@@ -1,2 +1,2 @@
-full_name,ic_passport,date_of_birth,gender,belt_rank,rank_confirmation,home_address,city_town,postcode,home_country,email,phone,school_name,sensei_name,invitation_code,bank_name,bank_account_no,bank_account_name
-Nurul Aisyah binti Rahman,081234-14-5672,2008-05-20,female,5th Kyu,sensei_confirmed,12 Jalan Melati,Kuala Lumpur,50450,Malaysia,aisyah@example.com,+60121234568,Sakura Karate Dojo,Ahmad Faris bin Razali,,Maybank,1234-5678-9013,Nurul Aisyah binti Rahman
+full_name|ic_passport|date_of_birth|age|gender|belt_rank|rank_confirmation|home_address|city_town|postcode|home_country|email|phone|school_name|sensei_name|invitation_code|bank_name|bank_account_no|bank_account_name
+Nurul Aisyah binti Rahman|081234-14-5672|20/05/2008|18|female|5th Kyu|sensei_confirmed|12 Jalan Melati|Kuala Lumpur|50450|Malaysia|aisyah@example.com|+60121234568|Sakura Karate Dojo|Ahmad Faris bin Razali||Maybank|1234-5678-9013|Nurul Aisyah binti Rahman

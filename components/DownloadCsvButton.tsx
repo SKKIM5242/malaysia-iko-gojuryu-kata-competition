@@ -1,12 +1,15 @@
 "use client";
 
+import { CSV_DELIMITER } from "@/lib/csv";
+
 function toCsv(rows: Array<Record<string, string>>): string {
   if (rows.length === 0) return "";
   const headers = Object.keys(rows[0]);
-  const escape = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
-  const lines = [headers.join(",")];
+  const needsQuoting = new RegExp(`["${CSV_DELIMITER}\\n]`);
+  const escape = (v: string) => (needsQuoting.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+  const lines = [headers.join(CSV_DELIMITER)];
   for (const row of rows) {
-    lines.push(headers.map((h) => escape(row[h] ?? "")).join(","));
+    lines.push(headers.map((h) => escape(row[h] ?? "")).join(CSV_DELIMITER));
   }
   return lines.join("\n");
 }

@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getStripe } from "@/lib/payments";
 import { writeAudit } from "@/lib/audit";
 import { sendConfirmationEmail } from "@/lib/notify";
+import { formatUSD } from "@/components/ui";
 
 export type FinalizeResult =
   | { status: "paid"; referenceIds: string[] }
@@ -283,4 +284,63 @@ export async function finalizeStripeSession(sessionId: string): Promise<Finalize
   });
 
   return { status: "paid", referenceIds };
+}
+
+/**
+ * Marks every bulk_upload_payments row sharing a batch_id paid after the
+ * sensei's combined Stripe Checkout session succeeds, unlocking their
+ * CSV/table upload. Idempotent — safe to call from both the webhook and the
+ * thank-you page.
+ */
+export async function finalizeBulkUploadBatchSession(sessionId: string): Promise<FinalizeResult> {
+  const stripe = getStripe();
+  let session;
+  try {
+    session = await stripe.checkout.sessions.retrieve(sessionId);
+  } catch {
+    return { status: "error", message: "Payment session not found." };
+  }
+  if (session.payment_status !== "paid") return { status: "unpaid" };
+  const batchId = session.metadata?.bulk_batch_id;
+  if (!batchId) return { status: "error", message: "No batch reference on this payment." };
+
+  const admin = createAdminClient();
+  const { data: batchRows } = await admin
+    .from("bulk_upload_payments")
+    .select("id, sensei_id, amount_usd, status")
+    .eq("batch_id", batchId);
+  if (!batchRows || batchRows.length === 0) return { status: "error", message: "Batch not found." };
+
+  const pending = batchRows.filter((r) => r.status === "pending");
+  if (pending.length > 0) {
+    await admin
+      .from("bulk_upload_payments")
+      .update({ status: "paid", paid_at: new Date().toISOString() })
+      .in("id", pending.map((r) => r.id));
+    await writeAudit(admin, {
+      table_name: "bulk_upload_payments",
+      record_id: batchId,
+      action: "bulk_upload_batch_paid_online",
+      new_value: { batch_id: batchId, tiers: batchRows.length, stripe_session: sessionId },
+    });
+
+    const senseiId = batchRows[0].sensei_id;
+    const { data: sensei } = await admin.from("senseis").select("name, email").eq("id", senseiId).maybeSingle();
+    if (sensei?.email) {
+      const totalAmount = batchRows.reduce((sum, r) => sum + Number(r.amount_usd), 0);
+      await sendConfirmationEmail({
+        toEmail: sensei.email,
+        recipientName: sensei.name ?? "Sensei",
+        subject: "Payment received — bulk registration unlocked",
+        bodyLines: [
+          `Your payment of ${formatUSD(totalAmount)} covering ${batchRows.length} tier${batchRows.length === 1 ? "" : "s"} is confirmed. A Stripe receipt was also sent to the email you entered at checkout.`,
+          `Batch reference: ${batchId.slice(0, 8).toUpperCase()}.`,
+          "Go back to the Bulk Registration page and upload your CSV or table using the same School and Sensei — no further payment needed for these participants.",
+          "Note: this batch reference is only for payment/upload tracking. Each participant gets their own individual Reference ID (sent separately once uploaded) — that is what they use with their IC/passport to sign in and record their kata.",
+        ],
+      });
+    }
+  }
+
+  return { status: "paid", referenceIds: [batchId.slice(0, 8).toUpperCase()] };
 }

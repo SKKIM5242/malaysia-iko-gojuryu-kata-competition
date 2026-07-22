@@ -1,5 +1,24 @@
 import { parseCsv } from "@/lib/csv";
 
+/** Parses a "DD/MM/YYYY" (or "D/M/YYYY") date string into ISO "YYYY-MM-DD"
+ * — the format senseis are asked to key dates in on the bulk CSV template,
+ * since relying on Excel's own locale-dependent date entry (or a bare
+ * `Date.parse`, which reads slash dates as MM/DD in JS) silently misreads
+ * ambiguous dates like 02/03. Returns null if the string doesn't parse to
+ * a real calendar date. */
+export function parseDDMMYYYY(input: string): string | null {
+  const m = input.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!m) return null;
+  const day = Number(m[1]);
+  const month = Number(m[2]);
+  const year = Number(m[3]);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  const iso = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  const d = new Date(iso + "T00:00:00");
+  if (d.getFullYear() !== year || d.getMonth() + 1 !== month || d.getDate() !== day) return null;
+  return iso;
+}
+
 export interface CsvUploadResult {
   done: boolean;
   error?: string;

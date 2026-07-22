@@ -204,7 +204,10 @@ export default async function AdminParticipantRecords({
     bankAccountName: r.participant.bank?.bank_account_name ?? "",
     recordingStatus: r.videoCreatedAt ? "Submitted" : "Not submitted",
     recordingDate: r.videoCreatedAt ? formatDate(r.videoCreatedAt.slice(0, 10)) : "",
-    attempts: `${r.recordAttempts}/${r.maxAttempts}`,
+    // "2 of 3" rather than "2/3" — the slash form reads as a date (e.g.
+    // "2/3") to Excel's CSV auto-import, which silently rewrites it to
+    // "2/3/<current year>".
+    attempts: `${r.recordAttempts} of ${r.maxAttempts}`,
     videoUrl: r.videoUrl,
     slotStatus: r.slotStatus,
     slotStatusNote: r.slotStatusNote,

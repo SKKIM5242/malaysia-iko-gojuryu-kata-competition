@@ -6,10 +6,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { writeAudit } from "@/lib/audit";
-import { kataBaseOf } from "@/lib/division";
+import { kataBaseOf, ageAt } from "@/lib/division";
 import { notifyRefereeAssignment, sendConfirmationEmail, notifyAnnouncementPublished } from "@/lib/notify";
 import type { PaymentStatus } from "@/lib/types";
-import { parseCsvWithHeader, type CsvUploadResult } from "@/lib/csv-bulk";
+import { parseCsvWithHeader, parseDDMMYYYY, type CsvUploadResult } from "@/lib/csv-bulk";
 import { ACCESS_MATRIX, accessMatrixToMarkdown } from "@/lib/access-matrix";
 import { DEFAULT_COMPARISON_ROWS } from "@/components/AccessComparisonTable";
 import { DEFAULT_AUTO_ASSIGN_CRITERIA } from "@/lib/auto-assign-criteria";
@@ -2320,7 +2320,7 @@ export async function bulkUploadAudience(_prev: CsvUploadResult, formData: FormD
 }
 
 const PARTICIPANT_CSV_COLUMNS = [
-  "full_name", "ic_passport", "date_of_birth", "gender", "belt_rank", "rank_confirmation",
+  "full_name", "ic_passport", "date_of_birth", "age", "gender", "belt_rank", "rank_confirmation",
   "home_address", "city_town", "postcode", "home_country", "email", "phone",
   "school_name", "sensei_name", "invitation_code",
   "bank_name", "bank_account_no", "bank_account_name",
@@ -2365,10 +2365,24 @@ export async function bulkUploadParticipants(_prev: CsvUploadResult, formData: F
     const senseiId = senseiIdByName.get(get(r, "sensei_name").trim().toLowerCase());
     if (!senseiId) { failures.push({ row: rowNo, name: full_name, error: "sensei_name does not match an existing sensei" }); continue; }
 
+    const dob = get(r, "date_of_birth") ? parseDDMMYYYY(get(r, "date_of_birth")) : null;
+    if (get(r, "date_of_birth") && !dob) {
+      failures.push({ row: rowNo, name: full_name, error: "Invalid date of birth (use DD/MM/YYYY)" });
+      continue;
+    }
+    if (dob && get(r, "age")) {
+      const ageInput = Number(get(r, "age"));
+      const computedAge = ageAt(dob, null);
+      if (!Number.isFinite(ageInput) || Math.abs(ageInput - computedAge) > 1) {
+        failures.push({ row: rowNo, name: full_name, error: `Age (${get(r, "age")}) doesn't match date of birth — expected around ${computedAge}` });
+        continue;
+      }
+    }
+
     const record = {
       full_name: get(r, "full_name"),
       ic_passport: get(r, "ic_passport"),
-      date_of_birth: get(r, "date_of_birth") || null,
+      date_of_birth: dob,
       gender: get(r, "gender") || null,
       belt_rank: get(r, "belt_rank") || null,
       rank_confirmation: rankConfirmationRaw,
