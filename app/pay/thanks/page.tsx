@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getStripe, paymentsEnabled } from "@/lib/payments";
-import { finalizeDirectorySession, finalizeInvoiceSession } from "@/lib/finalize";
+import { finalizeAttemptPurchaseSession, finalizeDirectorySession, finalizeInvoiceSession } from "@/lib/finalize";
 import { SiteFooter, SiteHeader, TelegramJoinButton } from "@/components/ui";
 import { getTelegramLink } from "@/lib/telegram";
 
@@ -15,21 +15,30 @@ export default async function PayThanksPage({
 }) {
   const { session_id, cancelled } = await searchParams;
   let result = null;
-  let isDirectory = false;
+  let kind: "directory" | "invoice" | "attempts" = "invoice";
   if (!cancelled && session_id && paymentsEnabled()) {
-    // One thank-you page serves class invoices AND School/Sensei tier fees —
-    // the session's metadata says which finalizer applies.
+    // One thank-you page serves class invoices, School/Sensei tier fees, and
+    // extra re-record attempt purchases — the session's metadata says which
+    // finalizer applies.
     let metadata: Record<string, string> | null = null;
     try {
       metadata = (await getStripe().checkout.sessions.retrieve(session_id)).metadata ?? null;
     } catch {
       metadata = null;
     }
-    isDirectory = !!(metadata?.school_id || metadata?.sensei_id);
-    result = isDirectory
-      ? await finalizeDirectorySession(session_id)
-      : await finalizeInvoiceSession(session_id);
+    kind = metadata?.school_id || metadata?.sensei_id
+      ? "directory"
+      : metadata?.attempt_purchase_id
+        ? "attempts"
+        : "invoice";
+    result =
+      kind === "directory"
+        ? await finalizeDirectorySession(session_id)
+        : kind === "attempts"
+          ? await finalizeAttemptPurchaseSession(session_id)
+          : await finalizeInvoiceSession(session_id);
   }
+  const isDirectory = kind === "directory";
 
   return (
     <>
@@ -40,13 +49,25 @@ export default async function PayThanksPage({
             <p className="text-3xl">✅</p>
             <h1 className="mt-2 text-xl font-bold text-green-900">Payment Received — Thank You!</h1>
             <p className="mt-2 text-green-800">
-              {isDirectory ? "Registration" : "Invoice"}{" "}
-              <span className="rounded bg-white px-2 py-0.5 font-mono font-bold">{result.referenceIds[0]}</span>{" "}
-              is now marked paid. A Stripe receipt has been emailed to you.
+              {kind === "attempts" ? (
+                <>3 more re-record attempts have been added to your account. A Stripe receipt has been emailed to you.</>
+              ) : (
+                <>
+                  {isDirectory ? "Registration" : "Invoice"}{" "}
+                  <span className="rounded bg-white px-2 py-0.5 font-mono font-bold">{result.referenceIds[0]}</span>{" "}
+                  is now marked paid. A Stripe receipt has been emailed to you.
+                </>
+              )}
             </p>
-            <div className="mx-auto max-w-md text-green-900">
-              <TelegramJoinButton href={getTelegramLink(isDirectory ? "school" : "class")} />
-            </div>
+            {kind === "attempts" ? (
+              <Link href="/kata-arena" className="mt-5 inline-block rounded-md bg-red-700 px-5 py-2.5 font-semibold text-white hover:bg-red-600">
+                Back to Kata Arena
+              </Link>
+            ) : (
+              <div className="mx-auto max-w-md text-green-900">
+                <TelegramJoinButton href={getTelegramLink(isDirectory ? "school" : "class")} />
+              </div>
+            )}
           </div>
         ) : result?.status === "unpaid" ? (
           <div className="rounded-lg border border-amber-300 bg-amber-50 p-8 text-center">

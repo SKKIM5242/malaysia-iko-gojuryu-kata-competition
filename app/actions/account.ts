@@ -2,13 +2,18 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { writeAudit } from "@/lib/audit";
+import { getStripe, paymentsEnabled } from "@/lib/payments";
 
 export interface AccountActionState {
   ok: boolean;
   error?: string;
+  checkoutUrl?: string;
 }
+
+const EXTRA_ATTEMPTS_FEE_USD = 10;
 
 /** Link a signed-in participant account to their PAID registration. */
 export async function claimRegistration(
@@ -152,8 +157,39 @@ export async function requestExtraAttempts(
     .maybeSingle();
   if (existing) return { ok: false, error: "You already have a purchase request awaiting confirmation." };
 
-  const { error } = await supabase.from("attempt_purchases").insert({ user_id: user.id });
+  const id = crypto.randomUUID();
+  const { error } = await supabase.from("attempt_purchases").insert({ id, user_id: user.id });
   if (error) return { ok: false, error: "Could not submit the request — please try again." };
+
+  if (paymentsEnabled()) {
+    const origin =
+      (await headers()).get("origin") ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+    try {
+      const session = await getStripe().checkout.sessions.create({
+        mode: "payment",
+        line_items: [
+          {
+            price_data: {
+              currency: "usd",
+              unit_amount: EXTRA_ATTEMPTS_FEE_USD * 100,
+              product_data: {
+                name: "3 more delete-and-re-record attempts",
+                description: "Malaysia Open IKO Goju-ryu Kata Championship — Kata Arena recording",
+              },
+            },
+            quantity: 1,
+          },
+        ],
+        metadata: { attempt_purchase_id: id },
+        success_url: `${origin}/pay/thanks?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${origin}/account?cancelled=1`,
+      });
+      if (session.url) return { ok: true, checkoutUrl: session.url };
+    } catch {
+      // Fall through to the manual bank-transfer flow below.
+    }
+  }
+
   revalidatePath("/account");
   return { ok: true };
 }

@@ -82,6 +82,54 @@ export async function finalizeDirectorySession(sessionId: string): Promise<Final
 }
 
 /**
+ * Marks a "3 more re-record attempts" purchase paid after its Stripe
+ * Checkout session succeeds, and immediately grants the 3 bonus attempts.
+ * Idempotent — safe to call from both the webhook and the thank-you page.
+ */
+export async function finalizeAttemptPurchaseSession(sessionId: string): Promise<FinalizeResult> {
+  const stripe = getStripe();
+  let session;
+  try {
+    session = await stripe.checkout.sessions.retrieve(sessionId);
+  } catch {
+    return { status: "error", message: "Payment session not found." };
+  }
+  if (session.payment_status !== "paid") return { status: "unpaid" };
+  const purchaseId = session.metadata?.attempt_purchase_id;
+  if (!purchaseId) return { status: "error", message: "No purchase reference on this payment." };
+
+  const admin = createAdminClient();
+  const { data: purchase } = await admin
+    .from("attempt_purchases")
+    .select("id, user_id, status")
+    .eq("id", purchaseId)
+    .maybeSingle();
+  if (!purchase) return { status: "error", message: "Purchase record not found." };
+  if (purchase.status !== "paid") {
+    const { data: profile } = await admin
+      .from("profiles")
+      .select("bonus_record_attempts")
+      .eq("user_id", purchase.user_id)
+      .maybeSingle();
+    await admin
+      .from("profiles")
+      .update({ bonus_record_attempts: (profile?.bonus_record_attempts ?? 0) + 3 })
+      .eq("user_id", purchase.user_id);
+    await admin
+      .from("attempt_purchases")
+      .update({ status: "paid", paid_at: new Date().toISOString() })
+      .eq("id", purchaseId);
+    await writeAudit(admin, {
+      table_name: "attempt_purchases",
+      record_id: purchaseId,
+      action: "attempt_purchase_paid_online",
+      new_value: { stripe_session: sessionId },
+    });
+  }
+  return { status: "paid", referenceIds: [purchaseId.slice(0, 8).toUpperCase()] };
+}
+
+/**
  * Turn a paid Stripe Checkout session into real participant + bank-details +
  * registration rows. Idempotent: called by both the webhook and the success
  * page, whichever wins; the loser finds the existing registration by
