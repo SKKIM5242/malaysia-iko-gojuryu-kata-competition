@@ -12,6 +12,7 @@ import { AdminShell, adminBtnSecondary } from "@/components/admin";
 import { EmptyState, SetupNotice, formatDate, formatDOB, formatUSD } from "@/components/ui";
 import ParticipantRecordsTable, { type ParticipantRecordRow } from "@/components/ParticipantRecordsTable";
 import FilterableTable from "@/components/FilterableTable";
+import { ageAt } from "@/lib/division";
 import { markAttemptPurchasePaid, markBulkUploadPaymentPaid, markSubscriptionRenewalFulfilled } from "@/app/actions/admin";
 
 export const dynamic = "force-dynamic";
@@ -185,6 +186,7 @@ export default async function AdminParticipantRecords({
     fullName: r.participant.full_name,
     icPassport: r.participant.ic_passport,
     dateOfBirth: formatDOB(r.participant.date_of_birth),
+    age: r.participant.date_of_birth ? String(ageAt(r.participant.date_of_birth, null)) : "—",
     gender: r.participant.gender ?? "—",
     beltRank: r.participant.belt_rank ?? "",
     rankConfirmation: r.participant.rank_confirmation ?? "",

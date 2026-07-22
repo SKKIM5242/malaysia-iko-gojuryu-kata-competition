@@ -19,6 +19,7 @@ export interface ParticipantRecordRow {
   fullName: string;
   icPassport: string;
   dateOfBirth: string;
+  age: string;
   gender: string;
   beltRank: string;
   rankConfirmation: string;
@@ -134,6 +135,7 @@ const COLUMNS: Array<{ key: keyof ParticipantRecordRow; label: string; width: nu
   { key: "category", label: "Category", width: 240 },
   { key: "icPassport", label: "IC / Passport", width: 130 },
   { key: "dateOfBirth", label: "DOB", width: 100 },
+  { key: "age", label: "Age", width: 70 },
   { key: "gender", label: "Gender", width: 90 },
   { key: "beltRank", label: "Belt", width: 130 },
   { key: "rankConfirmation", label: "Rank Confirmation", width: 150 },
@@ -182,6 +184,8 @@ function standardCell(
       return { className: "font-mono text-xs", title: row.icPassport, content: row.icPassport };
     case "dateOfBirth":
       return { className: "", title: row.dateOfBirth, content: row.dateOfBirth };
+    case "age":
+      return { className: "", title: row.age, content: row.age };
     case "gender":
       return { className: "capitalize", title: row.gender, content: row.gender };
     case "beltRank":

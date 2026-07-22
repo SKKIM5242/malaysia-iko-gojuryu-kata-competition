@@ -9,6 +9,8 @@ import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
 import InvitationCodeForm from "@/components/InvitationCodeForm";
 import InvitationCodeList from "@/components/InvitationCodeList";
+import DobAgeField from "@/components/DobAgeField";
+import { ageAt } from "@/lib/division";
 
 export const dynamic = "force-dynamic";
 
@@ -89,10 +91,7 @@ export default async function AdminParticipants({
                   <label htmlFor="ic_passport" className={adminLabel}>IC / Passport *</label>
                   <input id="ic_passport" name="ic_passport" required defaultValue={editing?.ic_passport ?? ""} className={adminInput} />
                 </div>
-                <div>
-                  <label htmlFor="date_of_birth" className={adminLabel}>Date of birth *</label>
-                  <input id="date_of_birth" name="date_of_birth" type="date" required defaultValue={editing?.date_of_birth ?? ""} className={adminInput} />
-                </div>
+                <DobAgeField defaultValue={editing?.date_of_birth ?? ""} />
                 <div>
                   <label htmlFor="gender" className={adminLabel}>Gender *</label>
                   <select id="gender" name="gender" required defaultValue={editing?.gender ?? ""} className={adminInput}>
@@ -213,6 +212,7 @@ export default async function AdminParticipants({
                 { key: "full_name", label: "Name" },
                 { key: "ic_passport", label: "IC / Passport" },
                 { key: "date_of_birth", label: "DOB" },
+                { key: "age", label: "Age" },
                 { key: "belt_rank", label: "Belt" },
                 { key: "rank_status", label: "Rank status" },
                 { key: "home_country", label: "Country" },
@@ -224,6 +224,7 @@ export default async function AdminParticipants({
                 { key: "full_name", label: "Name" },
                 { key: "ic_passport", label: "IC / Passport" },
                 { key: "date_of_birth", label: "DOB" },
+                { key: "age", label: "Age" },
                 { key: "belt_rank", label: "Belt" },
                 { key: "home_country", label: "Country" },
                 { key: "school", label: "School" },
@@ -236,6 +237,7 @@ export default async function AdminParticipants({
                 full_name: p.full_name,
                 ic_passport: p.ic_passport,
                 date_of_birth: formatDOB(p.date_of_birth),
+                age: p.date_of_birth ? ageAt(p.date_of_birth, null) : "",
                 belt_rank: p.belt_rank ?? "",
                 rank_status:
                   p.certificate_path && certUrls.get(p.certificate_path) ? (
