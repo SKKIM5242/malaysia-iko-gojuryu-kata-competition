@@ -53,6 +53,16 @@ const SLOT_STATUS_BADGE: Record<SlotStatus, { label: string; cls: string }> = {
   given_up: { label: "Given up (by participant)", cls: "border-neutral-400 bg-neutral-100 text-neutral-700" },
 };
 
+/** Short, plain-text form of each slot status for the CSV export — same
+ * wording as the action buttons (Active/Unslot/Forfeited/Give Up) rather
+ * than the longer on-screen badge text. */
+const SLOT_STATUS_CSV_LABEL: Record<SlotStatus, string> = {
+  active: "Active",
+  unslotted: "Unslot",
+  forfeited: "Forfeited",
+  given_up: "Give Up",
+};
+
 function SlotStatusCell({ row, canManage }: { row: ParticipantRecordRow; canManage: boolean }) {
   const badge = SLOT_STATUS_BADGE[row.slotStatus];
   return (
@@ -101,8 +111,12 @@ function SlotStatusCell({ row, canManage }: { row: ParticipantRecordRow; canMana
               <input type="hidden" name="registration_id" value={row.registrationId} />
               <input type="hidden" name="slot_status" value="active" />
               <input type="hidden" name="return_to" value="/admin/records" />
-              <button type="submit" className="rounded border border-green-300 px-1.5 py-0.5 text-[10px] font-semibold text-green-700 hover:bg-green-50">
-                Reset
+              <button
+                type="submit"
+                title="Set this registration's slot status back to Active"
+                className="rounded border border-green-300 px-1.5 py-0.5 text-[10px] font-semibold text-green-700 hover:bg-green-50"
+              >
+                Active
               </button>
             </form>
           )}
@@ -380,6 +394,7 @@ export default function ParticipantRecordsTable({
       filtered.map((row) => {
         const out: Record<string, string> = {};
         for (const c of COLUMNS) out[c.label] = String(row[c.key] ?? "");
+        out["Slot Status"] = SLOT_STATUS_CSV_LABEL[row.slotStatus];
         return out;
       }),
     [filtered],
