@@ -112,15 +112,15 @@ export function SiteFooter() {
           whole footer to the bottom of the viewport, so it stays visible
           while scrolling a long page, mirroring the sticky SiteHeader at
           the top. */}
-      <div aria-hidden className="h-32 sm:h-24" />
+      <div aria-hidden className="h-28 sm:h-24" />
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-neutral-800 bg-neutral-950 text-white">
-        <div className="mx-auto max-w-6xl px-4 py-3 text-center text-xs sm:text-sm">
+        <div className="mx-auto max-w-6xl px-4 py-2 text-center text-xs sm:text-sm">
           <p className="font-bold">
             Specially for all Goju-ryu Karateka to compete globally without leaving their beloved
             Country.
           </p>
           <p className="font-bold">Record your Kata live to compete online.</p>
-          <p className="mt-1 text-neutral-300">
+          <p className="mt-1 text-[10px] leading-tight text-neutral-300 sm:text-xs">
             Organizer:{" "}
             <a
               href="https://www.mixo.io/site/iko-goju-ryu-karate-do-m-sdn-bhd-wt9nk"
@@ -130,10 +130,11 @@ export function SiteFooter() {
             >
               IKO GOJU-RYU KARATE-DO (M) SDN BHD
             </a>
+            {" "}· Copyright © IKO Goju-ryu Karate-do (M) Sdn Bhd - All Rights Reserved.
           </p>
           <Link
             href="/register"
-            className="mt-2 inline-block rounded-md bg-red-700 px-5 py-1.5 font-semibold text-white hover:bg-red-600"
+            className="mt-1.5 inline-block rounded-md bg-red-700 px-5 py-1.5 font-semibold text-white hover:bg-red-600"
           >
             Self Registration
           </Link>
