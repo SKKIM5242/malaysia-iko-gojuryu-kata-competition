@@ -60,13 +60,15 @@ const DEFAULT_WIDTHS: Record<string, number> = {
  * top+bottom synced scrollbar (DualScrollBox) and per-column header
  * filters (ColumnFilterDropdown) — scaled down for this public,
  * read-only, server-paginated list (no CSV export here, and no "#" column
- * filter since it's just a running row count). Drag a column's right edge
- * (or a row's bottom edge, from the "#" cell) to resize it, all the way
- * down to a closed solid-red bar — drag that bar back out to reopen.
- * Widths/heights reset on reload, not persisted. */
+ * filter since it's just a running row count). Click a column's label (or
+ * a row's "#" cell) to select/highlight it. Drag a column's right edge
+ * (or a row's bottom edge) to resize it, all the way down to a closed
+ * solid-red bar — drag that bar back out, or use the "closed" note above
+ * the table to reopen everything at once. */
 export default function ParticipantsTable({ rows }: { rows: ParticipantRow[] }) {
   const [colWidths, setColWidths] = useState<Record<string, number>>({});
   const [filters, setFilters] = useState<Record<string, Set<string>>>({});
+  const [selectedCols, setSelectedCols] = useState<Set<string>>(new Set());
   const resizingRef = useRef<{ key: string; startX: number; startWidth: number } | null>(null);
   const grid = useGridControls();
 
@@ -74,6 +76,15 @@ export default function ParticipantsTable({ rows }: { rows: ParticipantRow[] }) 
     (key: string) => colWidths[key] ?? DEFAULT_WIDTHS[key] ?? 150,
     [colWidths],
   );
+
+  const toggleColSelect = useCallback((key: string) => {
+    setSelectedCols((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
 
   const handleMove = useCallback((e: MouseEvent) => {
     const r = resizingRef.current;
@@ -97,6 +108,21 @@ export default function ParticipantsTable({ rows }: { rows: ParticipantRow[] }) 
       window.addEventListener("mouseup", handleUp);
     },
     [widthOf, handleMove, handleUp],
+  );
+
+  const resetClosedCols = useCallback(() => {
+    setColWidths((prev) => {
+      const next: Record<string, number> = {};
+      for (const [key, w] of Object.entries(prev)) {
+        if (!isClosed(w, w)) next[key] = w;
+      }
+      return next;
+    });
+  }, []);
+
+  const closedColCount = useMemo(
+    () => COLUMNS.filter((c) => isClosed(widthOf(c.key), widthOf(c.key))).length,
+    [widthOf],
   );
 
   const uniqueValues = useMemo(() => {
@@ -151,10 +177,30 @@ export default function ParticipantsTable({ rows }: { rows: ParticipantRow[] }) 
   return (
     <div>
       <p className="mb-2 text-xs text-neutral-400">
-        Showing {filtered.length} of {rows.length}. Drag a column's right edge (or a row's bottom
-        edge) to resize it — drag all the way to close it down to a red bar, then drag that bar
-        back out to reopen.
+        Showing {filtered.length} of {rows.length}. Click a column's label (or a row's "#" cell) to
+        select/highlight it. Drag a column's right edge (or a row's bottom edge) to resize it, all
+        the way to close it down to a red bar.
       </p>
+      {(closedColCount > 0 || grid.closedRowCount > 0) && (
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs text-red-800">
+          <span>
+            {closedColCount > 0 && `${closedColCount} column${closedColCount === 1 ? "" : "s"} closed`}
+            {closedColCount > 0 && grid.closedRowCount > 0 && " · "}
+            {grid.closedRowCount > 0 && `${grid.closedRowCount} row${grid.closedRowCount === 1 ? "" : "s"} closed`}
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              resetClosedCols();
+              grid.resetClosedRows();
+            }}
+            title="Reopen every closed column and row"
+            className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold leading-none text-white hover:bg-red-700"
+          >
+            ×
+          </button>
+        </div>
+      )}
       <DualScrollBox>
         <table className="text-left text-sm" style={{ tableLayout: "fixed", width: totalWidth }}>
           <colgroup>
@@ -167,9 +213,21 @@ export default function ParticipantsTable({ rows }: { rows: ParticipantRow[] }) 
               {COLUMNS.map((c) => {
                 const width = widthOf(c.key);
                 const closed = isClosed(width, width);
+                const selected = selectedCols.has(c.key);
                 return (
-                  <th key={c.key} className={`relative select-none whitespace-nowrap ${closed ? "bg-red-600 p-0" : "px-4 py-3"}`}>
-                    {!closed && <span className="block overflow-hidden text-ellipsis pr-2">{c.label}</span>}
+                  <th
+                    key={c.key}
+                    className={`relative select-none whitespace-nowrap ${closed ? "bg-red-600 p-0" : `px-4 py-3 ${selected ? "bg-amber-100" : ""}`}`}
+                  >
+                    {!closed && (
+                      <span
+                        onClick={() => toggleColSelect(c.key)}
+                        title="Click to select/highlight this column"
+                        className="block cursor-pointer overflow-hidden text-ellipsis pr-2"
+                      >
+                        {c.label}
+                      </span>
+                    )}
                     <span
                       onMouseDown={(e) => handleResizeStart(e, c.key)}
                       title={closed ? "Drag to reopen this column" : "Drag to resize (or close) this column"}
@@ -185,8 +243,9 @@ export default function ParticipantsTable({ rows }: { rows: ParticipantRow[] }) 
               {COLUMNS.map((c) => {
                 const width = widthOf(c.key);
                 const closed = isClosed(width, width);
+                const selected = selectedCols.has(c.key);
                 return (
-                  <th key={c.key} className={closed ? "bg-red-600 p-0" : "px-2 py-1.5"}>
+                  <th key={c.key} className={closed ? "bg-red-600 p-0" : `px-2 py-1.5 ${selected ? "bg-amber-50" : ""}`}>
                     {!closed && c.key !== "no" && c.key !== "reference_id" && (
                       <ColumnFilterDropdown
                         values={uniqueValues[c.key] ?? []}
@@ -210,26 +269,35 @@ export default function ParticipantsTable({ rows }: { rows: ParticipantRow[] }) 
               filtered.map((r) => {
                 const rowHeight = grid.rowHeights[r.id];
                 const rowClosed = rowHeight != null && rowHeight <= CLOSED_SIZE + 1;
+                const rowSelected = grid.selectedRows.has(r.id);
                 return (
-                  <tr key={r.id} className={`group hover:bg-neutral-50 ${grid.rowSizeClass(r.id)}`} style={grid.rowSizeStyle(r.id)}>
+                  <tr
+                    key={r.id}
+                    className={`group hover:bg-neutral-50 ${!rowClosed && rowSelected ? "bg-sky-50" : ""} ${grid.rowSizeClass(r.id)}`}
+                    style={grid.rowSizeStyle(r.id)}
+                  >
                     {COLUMNS.map((c, i) => {
                       const width = widthOf(c.key);
                       const colClosed = isClosed(width, width);
+                      const colSelected = selectedCols.has(c.key);
                       const closed = colClosed || rowClosed;
                       const isHandle = i === 0;
                       const { className, title, content } = cellFor(c, r);
+                      const cellBg = colClosed ? "bg-red-600" : colSelected ? "bg-amber-100" : "";
                       return (
                         <td
                           key={c.key}
-                          className={`${closed ? "p-0" : `truncate px-4 py-3 ${className}`} ${colClosed ? "bg-red-600" : ""} ${
-                            isHandle ? "relative" : ""
+                          className={`${closed ? "p-0" : `truncate px-4 py-3 ${className}`} ${cellBg} ${
+                            isHandle && !closed ? "relative cursor-pointer select-none" : isHandle ? "relative" : ""
                           }`}
-                          title={!closed ? title : undefined}
+                          title={isHandle && !closed ? "Click to select/highlight this row" : !closed ? title : undefined}
+                          onClick={isHandle && !closed ? () => grid.toggleRowSelect(r.id) : undefined}
                         >
                           {!closed && content}
                           {isHandle && (
                             <span
                               onMouseDown={(e) => grid.handleRowResizeStart(e, r.id, rowHeight ?? 40)}
+                              onClick={(e) => e.stopPropagation()}
                               title={rowClosed ? "Drag to reopen this row" : "Drag to resize (or close) this row"}
                               className="absolute bottom-0 left-0 right-0 z-10 h-1 cursor-row-resize touch-none select-none hover:bg-red-300 active:bg-red-500"
                             />
