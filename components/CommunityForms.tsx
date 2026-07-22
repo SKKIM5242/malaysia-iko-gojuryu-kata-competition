@@ -181,6 +181,17 @@ export function RefereeForm({ telegramLink }: { telegramLink: string | null }) {
           </label>
           <input id="invitation_code" name="invitation_code" className={inputCls} />
         </div>
+        <div className="sm:col-span-2">
+          <label htmlFor="referral_source" className={labelCls}>
+            Referral / Where did you hear about this competition?{" "}
+            <span className="font-normal text-neutral-400">(optional)</span>
+          </label>
+          <input id="referral_source" name="referral_source" className={inputCls} placeholder="e.g. a friend's name" />
+          <p className="mt-1 text-xs text-neutral-400">
+            Please don&apos;t name your own Dojo&apos;s PIC or Sensei here — if a friend told you
+            about this competition, give their name instead.
+          </p>
+        </div>
       </div>
       <button type="submit" disabled={pending}
         className="rounded-md bg-red-700 px-5 py-2.5 font-semibold text-white hover:bg-red-600 disabled:opacity-60">
@@ -242,6 +253,17 @@ export function AudienceForm({ telegramLink }: { telegramLink: string | null }) 
           <p className="mt-1 text-xs text-neutral-400">
             Leave blank unless a Participant Support member recommended you sign in — if they did,
             enter their short name or initial here.
+          </p>
+        </div>
+        <div className="sm:col-span-2">
+          <label htmlFor="referral_source" className={labelCls}>
+            Referral / Where did you hear about this competition?{" "}
+            <span className="font-normal text-neutral-400">(optional)</span>
+          </label>
+          <input id="referral_source" name="referral_source" className={inputCls} placeholder="e.g. a friend's name" />
+          <p className="mt-1 text-xs text-neutral-400">
+            Please don&apos;t name your own Dojo&apos;s PIC or Sensei here — if a friend told you
+            about this competition, give their name instead.
           </p>
         </div>
       </div>
@@ -459,6 +481,17 @@ export function StaffForm({
         <div className="sm:col-span-2">
           <label htmlFor="invitation_code" className={labelCls}>Invitation code (optional)</label>
           <input id="invitation_code" name="invitation_code" className={inputCls} />
+        </div>
+        <div className="sm:col-span-2">
+          <label htmlFor="referral_source" className={labelCls}>
+            Referral / Where did you hear about this competition?{" "}
+            <span className="font-normal text-neutral-400">(optional)</span>
+          </label>
+          <input id="referral_source" name="referral_source" className={inputCls} placeholder="e.g. a friend's name" />
+          <p className="mt-1 text-xs text-neutral-400">
+            Please don&apos;t name your own Dojo&apos;s PIC or Sensei here — if a friend told you
+            about this competition, give their name instead.
+          </p>
         </div>
       </div>
       <button type="submit" disabled={pending}

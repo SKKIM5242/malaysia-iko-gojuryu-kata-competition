@@ -25,6 +25,7 @@ interface Referee {
   bank_name: string | null; bank_account_no: string | null; bank_account_name: string | null;
   certificate_path: string | null; international_certificate_paths: string[] | null;
   invitation_code: string | null;
+  referral_source: string | null;
   user_id: string | null;
   payment_status: string; status: string; created_at: string;
 }
@@ -185,6 +186,10 @@ export default async function AdminReferees({
                   <label htmlFor="invitation_code" className={adminLabel}>Invitation code</label>
                   <input id="invitation_code" name="invitation_code" defaultValue={editing?.invitation_code ?? ""} className={adminInput} />
                 </div>
+                <div>
+                  <label htmlFor="referral_source" className={adminLabel}>Referral (optional)</label>
+                  <input id="referral_source" name="referral_source" defaultValue={editing?.referral_source ?? ""} className={adminInput} placeholder="e.g. a friend's name" />
+                </div>
                 <div className="sm:col-span-2">
                   <label htmlFor="home_address" className={adminLabel}>Home address *</label>
                   <input id="home_address" name="home_address" required defaultValue={editing?.home_address ?? ""} className={adminInput} />
@@ -280,6 +285,7 @@ export default async function AdminReferees({
                 { key: "bank", label: "Bank" },
                 { key: "certificates", label: "Certificates" },
                 { key: "invitation_code", label: "Invitation Code" },
+                { key: "referral_source", label: "Referral" },
                 { key: "deposit", label: "Deposit" },
                 { key: "approval", label: "Approval" },
                 ...(isAdminTier ? [{ key: "sign_in_control", label: "Sign-in Control" }] : []),
@@ -304,6 +310,7 @@ export default async function AdminReferees({
                 { key: "bank_account_no", label: "Bank Account No" },
                 { key: "bank_account_name", label: "Bank Account Holder Name" },
                 { key: "invitation_code", label: "Invitation Code" },
+                { key: "referral_source", label: "Referral" },
                 { key: "payment_status", label: "Deposit Status" },
                 { key: "status", label: "Approval Status" },
               ]}
@@ -350,6 +357,7 @@ export default async function AdminReferees({
                   </div>
                 ),
                 invitation_code: r.invitation_code ?? "",
+                referral_source: r.referral_source ?? "",
                 deposit: (
                   <StatusButtons table="referees" id={r.id} field="payment_status" current={r.payment_status}
                     options={["pending", "paid", "waived", "refunded", "forfeited"]} />

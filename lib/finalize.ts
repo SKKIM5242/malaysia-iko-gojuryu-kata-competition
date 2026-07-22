@@ -159,6 +159,7 @@ export async function finalizeStripeSession(sessionId: string): Promise<Finalize
     rank_confirmation: v.rank_confirmation ?? null,
     school_id: v.school_id,
     sensei_id: v.sensei_id,
+    referral_source: v.referral_source || null,
   });
   if (pErr) return { status: "error", message: "Payment received but saving failed — contact the organizer with your Stripe receipt." };
 

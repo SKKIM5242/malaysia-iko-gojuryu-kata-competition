@@ -44,6 +44,7 @@ export async function submitRegistration(
   for (const [key] of REQUIRED) values[key] = String(formData.get(key) ?? "").trim();
   values.competition_id = String(formData.get("competition_id") ?? "").trim();
   values.payment_reference = String(formData.get("payment_reference") ?? "").trim();
+  values.referral_source = String(formData.get("referral_source") ?? "").trim();
 
   const fieldErrors: Record<string, string> = {};
   for (const [key, message] of REQUIRED) {
@@ -282,6 +283,7 @@ export async function submitRegistration(
     rank_confirmation: values.rank_confirmation,
     school_id: values.school_id,
     sensei_id: values.sensei_id,
+    referral_source: values.referral_source || null,
   });
   if (pErr) {
     return { ok: false, error: "Could not save participant. Please try again." };

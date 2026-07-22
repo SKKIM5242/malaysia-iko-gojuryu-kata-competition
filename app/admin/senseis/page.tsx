@@ -194,6 +194,10 @@ export default async function AdminSenseis({
                   <label htmlFor="invitation_code" className={adminLabel}>Invitation code (optional)</label>
                   <input id="invitation_code" name="invitation_code" defaultValue={editing?.invitation_code ?? ""} className={adminInput} />
                 </div>
+                <div>
+                  <label htmlFor="referral_source" className={adminLabel}>Referral (optional)</label>
+                  <input id="referral_source" name="referral_source" defaultValue={editing?.referral_source ?? ""} className={adminInput} placeholder="e.g. a friend's name" />
+                </div>
               </div>
               <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3">
                 <p className="text-xs font-bold uppercase tracking-wide text-neutral-500">Personal Bank Details *</p>

@@ -229,6 +229,10 @@ export default async function AdminSupport({
                   <input id="cs_invitation_code" name="invitation_code" className={adminInput} />
                 </div>
                 <div>
+                  <label htmlFor="cs_referral_source" className={adminLabel}>Referral (optional)</label>
+                  <input id="cs_referral_source" name="referral_source" className={adminInput} placeholder="e.g. a friend's name" />
+                </div>
+                <div>
                   <label htmlFor="cs_highest_education" className={adminLabel}>Highest Education Attended *</label>
                   <select id="cs_highest_education" name="highest_education" required defaultValue="" className={adminInput}>
                     <option value="" disabled>— Select —</option>

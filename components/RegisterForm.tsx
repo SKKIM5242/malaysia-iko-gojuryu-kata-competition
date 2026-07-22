@@ -438,6 +438,17 @@ export default function RegisterForm({
             <input id="payment_reference" name="payment_reference" className={inputCls} placeholder="e.g. MAYB-20250815-123" />
           </div>
         )}
+        <div className="sm:col-span-2">
+          <label htmlFor="referral_source" className={labelCls}>
+            Referral / Where did you hear about this competition?{" "}
+            <span className="font-normal text-neutral-400">(optional)</span>
+          </label>
+          <input id="referral_source" name="referral_source" className={inputCls} placeholder="e.g. a friend's name" />
+          <p className="mt-1 text-xs text-neutral-400">
+            Please don&apos;t name your own Dojo&apos;s PIC or Sensei here — if a friend told you
+            about this competition, give their name instead.
+          </p>
+        </div>
       </div>
 
       <button

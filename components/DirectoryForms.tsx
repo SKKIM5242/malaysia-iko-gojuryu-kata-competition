@@ -207,6 +207,17 @@ export function SchoolForm({ telegramLink, tiers }: { telegramLink: string | nul
           <input id="home_country" name="home_country" required defaultValue="Malaysia" className={inputCls} />
         </div>
       </div>
+      <div>
+        <label htmlFor="referral_source" className={labelCls}>
+          Referral / Where did you hear about this competition?{" "}
+          <span className="font-normal text-neutral-400">(optional)</span>
+        </label>
+        <input id="referral_source" name="referral_source" className={inputCls} placeholder="e.g. a friend's name" />
+        <p className="mt-1 text-xs text-neutral-400">
+          Please don&apos;t name your own Dojo&apos;s PIC or Sensei here — if a friend told you
+          about this competition, give their name instead.
+        </p>
+      </div>
       <button
         type="submit"
         disabled={pending}
@@ -344,6 +355,17 @@ export function SenseiForm({
       <p className="text-xs text-neutral-500">
         School not in the list? <Link href="/register/school" className="underline">Register it first</Link>.
       </p>
+      <div>
+        <label htmlFor="referral_source" className={labelCls}>
+          Referral / Where did you hear about this competition?{" "}
+          <span className="font-normal text-neutral-400">(optional)</span>
+        </label>
+        <input id="referral_source" name="referral_source" className={inputCls} placeholder="e.g. a friend's name" />
+        <p className="mt-1 text-xs text-neutral-400">
+          Please don&apos;t name your own Dojo&apos;s PIC or Sensei here — if a friend told you
+          about this competition, give their name instead.
+        </p>
+      </div>
       <button
         type="submit"
         disabled={pending}

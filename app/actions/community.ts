@@ -56,6 +56,7 @@ export async function registerReferee(
   }
   const school = String(formData.get("school") ?? "").trim();
   const invitation_code = String(formData.get("invitation_code") ?? "").trim();
+  const referral_source = String(formData.get("referral_source") ?? "").trim();
 
   const supabase = await createClient();
 
@@ -128,6 +129,7 @@ export async function registerReferee(
     certificate_path,
     international_certificate_paths,
     invitation_code: invitation_code || null,
+    referral_source: referral_source || null,
     payment_status: paymentStatus,
   });
   if (error) return { ok: false, error: "Could not save your registration. Please try again." };
@@ -177,6 +179,7 @@ export async function registerAudience(
   const phone = String(formData.get("phone") ?? "").trim();
   const invitation_code = String(formData.get("invitation_code") ?? "").trim();
   const support_referral = String(formData.get("support_referral") ?? "").trim();
+  const referral_source = String(formData.get("referral_source") ?? "").trim();
 
   const supabase = await createClient();
 
@@ -199,6 +202,7 @@ export async function registerAudience(
     home_country: values.home_country,
     invitation_code: invitation_code || null,
     support_referral: support_referral || null,
+    referral_source: referral_source || null,
     payment_status: paymentStatus,
   });
   if (error) return { ok: false, error: "Could not save your registration. Please try again." };
@@ -269,6 +273,7 @@ export async function applyStaff(
   const school = String(formData.get("school") ?? "").trim();
   const message = String(formData.get("message") ?? "").trim();
   const invitation_code = String(formData.get("invitation_code") ?? "").trim();
+  const referral_source = String(formData.get("referral_source") ?? "").trim();
   const languages = formData.getAll("languages").map((l) => String(l)).filter(Boolean);
   const support_tier_1_id = String(formData.get("support_tier_1_id") ?? "").trim() || null;
   const support_tier_2_id = String(formData.get("support_tier_2_id") ?? "").trim() || null;
@@ -332,6 +337,7 @@ export async function applyStaff(
     certificate_path,
     international_certificate_paths,
     invitation_code: invitation_code || null,
+    referral_source: referral_source || null,
     role_requested: values.role_requested,
     message: message || null,
     highest_education: values.highest_education,

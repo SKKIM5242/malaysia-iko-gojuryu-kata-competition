@@ -88,6 +88,7 @@ export async function registerSchool(
   const postcode = String(formData.get("postcode") ?? "").trim();
   const home_country = String(formData.get("home_country") ?? "").trim();
   const competition_id = String(formData.get("competition_id") ?? "").trim();
+  const referral_source = String(formData.get("referral_source") ?? "").trim();
   if (!name) return { ok: false, error: "School / dojo name is required." };
   if (!contact_title || !["Mr.", "Ms."].includes(contact_title)) {
     return { ok: false, error: "Person in-charge's title is required." };
@@ -131,6 +132,7 @@ export async function registerSchool(
     city_town,
     postcode,
     home_country,
+    referral_source: referral_source || null,
     registration_competition_id: tier.id,
   });
   if (error) return { ok: false, error: "Could not register the school. Please try again." };
@@ -185,6 +187,7 @@ export async function registerSensei(
   const postcode = String(formData.get("postcode") ?? "").trim();
   const home_country = String(formData.get("home_country") ?? "").trim();
   const competition_id = String(formData.get("competition_id") ?? "").trim();
+  const referral_source = String(formData.get("referral_source") ?? "").trim();
   if (!name) return { ok: false, error: "Sensei / coach name is required." };
   if (!rank) {
     return {
@@ -283,6 +286,7 @@ export async function registerSensei(
     city_town,
     postcode,
     home_country,
+    referral_source: referral_source || null,
     registration_competition_id: tier.id,
   });
   if (error) return { ok: false, error: "Could not register the sensei. Please try again." };

@@ -16,6 +16,7 @@ export const dynamic = "force-dynamic";
 interface Audience {
   id: string; full_name: string; email: string | null; phone: string | null;
   home_country: string | null; invitation_code: string | null; support_referral: string | null;
+  referral_source: string | null;
   user_id: string | null;
   payment_status: string; created_at: string;
 }
@@ -130,6 +131,10 @@ export default async function AdminAudience({
                 <label htmlFor="aud_support_referral" className={adminLabel}>Participant Support referral (optional)</label>
                 <input id="aud_support_referral" name="support_referral" className={adminInput} placeholder="e.g. Amy / KSK" />
               </div>
+              <div>
+                <label htmlFor="aud_referral_source" className={adminLabel}>Referral (optional)</label>
+                <input id="aud_referral_source" name="referral_source" className={adminInput} placeholder="e.g. a friend's name" />
+              </div>
             </div>
             <button type="submit" className={adminBtn}>Add Audience / Spectator</button>
           </form>
@@ -150,6 +155,7 @@ export default async function AdminAudience({
             { key: "home_country", label: "Country" },
             { key: "invitation_code", label: "Code" },
             { key: "support_referral", label: "Support Referral" },
+            { key: "referral_source", label: "Referral" },
             { key: "payment", label: "Payment" },
             { key: "telegram", label: "Telegram" },
             ...(isAdminTier ? [{ key: "sign_in_control", label: "Sign-in Control" }] : []),
@@ -162,6 +168,7 @@ export default async function AdminAudience({
             { key: "home_country", label: "Country" },
             { key: "invitation_code", label: "Code" },
             { key: "support_referral", label: "Support Referral" },
+            { key: "referral_source", label: "Referral" },
             { key: "payment_status", label: "Payment Status" },
           ]}
           rows={(audiences as Audience[]).map((a) => ({
@@ -174,6 +181,7 @@ export default async function AdminAudience({
             home_country: a.home_country ?? "",
             invitation_code: a.invitation_code ?? "",
             support_referral: a.support_referral ?? "",
+            referral_source: a.referral_source ?? "",
             payment_status: a.payment_status,
             payment: (
               <StatusButtons table="audiences" id={a.id} field="payment_status" current={a.payment_status}

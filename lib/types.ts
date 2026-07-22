@@ -45,6 +45,7 @@ export interface School {
   bank_account_no: string | null;
   bank_account_name: string | null;
   invitation_code: string | null;
+  referral_source: string | null;
   payment_status: "pending" | "paid" | "waived";
   created_at: string;
 }
@@ -70,6 +71,7 @@ export interface Sensei {
   bank_account_no: string | null;
   bank_account_name: string | null;
   invitation_code: string | null;
+  referral_source: string | null;
   payment_status: "pending" | "paid" | "waived";
   created_at: string;
   school?: Pick<School, "id" | "name"> | null;
@@ -116,6 +118,7 @@ export interface Participant {
   school_id: string | null;
   sensei_id: string | null;
   invitation_code: string | null;
+  referral_source: string | null;
   created_at: string;
   school?: Pick<School, "id" | "name" | "state"> | null;
   sensei?: Pick<Sensei, "id" | "name" | "rank"> | null;

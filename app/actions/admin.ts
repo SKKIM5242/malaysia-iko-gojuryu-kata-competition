@@ -636,6 +636,7 @@ export async function saveSchool(formData: FormData) {
     bank_account_no: String(formData.get("bank_account_no") ?? "").trim() || null,
     bank_account_name: String(formData.get("bank_account_name") ?? "").trim() || null,
     invitation_code: String(formData.get("invitation_code") ?? "").trim() || null,
+    referral_source: String(formData.get("referral_source") ?? "").trim() || null,
   };
   if (!values.name) backTo(returnTo, { error: "School name is required." });
   if (!values.contact_title || !values.contact_name || !values.contact_karate_title || !values.contact_rank) {
@@ -711,6 +712,7 @@ export async function saveSensei(formData: FormData) {
     bank_account_no: String(formData.get("bank_account_no") ?? "").trim() || null,
     bank_account_name: String(formData.get("bank_account_name") ?? "").trim() || null,
     invitation_code: String(formData.get("invitation_code") ?? "").trim() || null,
+    referral_source: String(formData.get("referral_source") ?? "").trim() || null,
   };
   if (!values.name) backTo(returnTo, { error: "Sensei name is required." });
   if (!values.ic_passport) backTo(returnTo, { error: "IC / Passport is required." });
@@ -826,6 +828,7 @@ export async function createAudienceMember(formData: FormData) {
   const home_country = String(formData.get("home_country") ?? "").trim() || null;
   const invitation_code = String(formData.get("invitation_code") ?? "").trim() || null;
   const support_referral = String(formData.get("support_referral") ?? "").trim() || null;
+  const referral_source = String(formData.get("referral_source") ?? "").trim() || null;
   if (!full_name || !email || !phone) {
     backTo(returnTo, { error: "Name, email, and mobile phone are required." });
   }
@@ -843,7 +846,7 @@ export async function createAudienceMember(formData: FormData) {
 
   const id = crypto.randomUUID();
   const { error } = await supabase.from("audiences").insert({
-    id, full_name, email, phone, home_country, invitation_code, support_referral, payment_status,
+    id, full_name, email, phone, home_country, invitation_code, support_referral, referral_source, payment_status,
   });
   if (error) backTo(returnTo, { error: "Could not add audience member — please try again." });
   await writeAudit(supabase, {
@@ -877,6 +880,7 @@ export async function saveReferee(formData: FormData) {
     bank_account_no: String(formData.get("bank_account_no") ?? "").trim() || null,
     bank_account_name: String(formData.get("bank_account_name") ?? "").trim() || null,
     invitation_code: String(formData.get("invitation_code") ?? "").trim() || null,
+    referral_source: String(formData.get("referral_source") ?? "").trim() || null,
   };
   if (!values.full_name || !values.ic_passport) {
     backTo(returnTo, { error: "Name and IC/passport are required." });
@@ -958,6 +962,7 @@ export async function saveParticipant(formData: FormData) {
     school_id: String(formData.get("school_id") ?? "") || null,
     sensei_id: String(formData.get("sensei_id") ?? "") || null,
     invitation_code: String(formData.get("invitation_code") ?? "").trim() || null,
+    referral_source: String(formData.get("referral_source") ?? "").trim() || null,
   };
   if (!values.full_name || !values.ic_passport) {
     backTo(returnTo, { error: "Name and IC/passport are required." });
@@ -1933,6 +1938,7 @@ export async function createStaffAccount(formData: FormData) {
     bank_account_no: String(formData.get("bank_account_no") ?? "").trim() || null,
     bank_account_name: String(formData.get("bank_account_name") ?? "").trim() || null,
     invitation_code: String(formData.get("invitation_code") ?? "").trim() || null,
+    referral_source: String(formData.get("referral_source") ?? "").trim() || null,
     highest_education: String(formData.get("highest_education") ?? "").trim() || null,
     languages_count: formData.get("languages_count") ? Number(formData.get("languages_count")) : null,
     languages: formData.getAll("languages").map((l) => String(l)).filter(Boolean),
