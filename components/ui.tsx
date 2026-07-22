@@ -113,7 +113,7 @@ export function SiteFooter() {
           while scrolling a long page, mirroring the sticky SiteHeader at
           the top. */}
       <div aria-hidden className="h-28 sm:h-24" />
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-neutral-800 bg-neutral-950 text-white">
+      <div data-mobile-footer className="fixed inset-x-0 bottom-0 z-40 border-t border-neutral-800 bg-neutral-950 text-white">
         <div className="mx-auto max-w-6xl px-4 py-2 text-center text-xs sm:text-sm">
           <p className="font-bold">
             Specially for all Goju-ryu Karateka to compete globally without leaving their beloved
