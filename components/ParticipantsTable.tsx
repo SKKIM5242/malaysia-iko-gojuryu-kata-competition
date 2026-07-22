@@ -90,8 +90,16 @@ export default function ParticipantsTable({ rows }: { rows: ParticipantRow[] }) 
     const r = resizingRef.current;
     if (!r) return;
     const next = Math.max(CLOSED_SIZE, r.startWidth + (e.clientX - r.startX));
-    setColWidths((prev) => ({ ...prev, [r.key]: next }));
-  }, []);
+    setColWidths((prev) => {
+      const updated = { ...prev, [r.key]: next };
+      if (next <= CLOSED_SIZE + 1 && selectedCols.has(r.key) && selectedCols.size > 1) {
+        for (const key of selectedCols) {
+          if (key !== r.key) updated[key] = CLOSED_SIZE;
+        }
+      }
+      return updated;
+    });
+  }, [selectedCols]);
 
   const handleUp = useCallback(() => {
     resizingRef.current = null;
@@ -217,7 +225,7 @@ export default function ParticipantsTable({ rows }: { rows: ParticipantRow[] }) 
                 return (
                   <th
                     key={c.key}
-                    className={`relative select-none whitespace-nowrap ${closed ? "bg-red-600 p-0" : `px-4 py-3 ${selected ? "bg-amber-100" : ""}`}`}
+                    className={`relative select-none whitespace-nowrap ${closed ? "bg-red-600 p-0" : `px-4 py-3 ${selected ? "bg-sky-100" : ""}`}`}
                   >
                     {!closed && (
                       <span
@@ -245,7 +253,7 @@ export default function ParticipantsTable({ rows }: { rows: ParticipantRow[] }) 
                 const closed = isClosed(width, width);
                 const selected = selectedCols.has(c.key);
                 return (
-                  <th key={c.key} className={closed ? "bg-red-600 p-0" : `px-2 py-1.5 ${selected ? "bg-amber-50" : ""}`}>
+                  <th key={c.key} className={closed ? "bg-red-600 p-0" : `px-2 py-1.5 ${selected ? "bg-sky-50" : ""}`}>
                     {!closed && c.key !== "no" && c.key !== "reference_id" && (
                       <ColumnFilterDropdown
                         values={uniqueValues[c.key] ?? []}
@@ -283,7 +291,7 @@ export default function ParticipantsTable({ rows }: { rows: ParticipantRow[] }) 
                       const closed = colClosed || rowClosed;
                       const isHandle = i === 0;
                       const { className, title, content } = cellFor(c, r);
-                      const cellBg = colClosed ? "bg-red-600" : colSelected ? "bg-amber-100" : "";
+                      const cellBg = colClosed ? "bg-red-600" : colSelected ? "bg-sky-50" : "";
                       return (
                         <td
                           key={c.key}

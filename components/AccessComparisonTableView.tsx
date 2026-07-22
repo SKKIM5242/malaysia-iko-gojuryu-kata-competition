@@ -47,8 +47,16 @@ export default function AccessComparisonTableView({ rows }: { rows: ComparisonRo
     const r = resizingRef.current;
     if (!r) return;
     const next = Math.max(CLOSED_SIZE, r.startWidth + (e.clientX - r.startX));
-    setColWidths((prev) => ({ ...prev, [r.key]: next }));
-  }, []);
+    setColWidths((prev) => {
+      const updated = { ...prev, [r.key]: next };
+      if (next <= CLOSED_SIZE + 1 && selectedCols.has(r.key) && selectedCols.size > 1) {
+        for (const key of selectedCols) {
+          if (key !== r.key) updated[key] = CLOSED_SIZE;
+        }
+      }
+      return updated;
+    });
+  }, [selectedCols]);
 
   const handleUp = useCallback(() => {
     resizingRef.current = null;
@@ -147,7 +155,7 @@ export default function AccessComparisonTableView({ rows }: { rows: ComparisonRo
                     key={c.key}
                     className={`relative select-none whitespace-nowrap ${
                       i === 0 ? "sticky left-0 z-10 border-r border-neutral-200" : ""
-                    } ${closed ? "bg-red-600 p-0" : `px-3 py-2 ${selected ? "bg-amber-100" : i === 0 ? "bg-neutral-50" : ""}`}`}
+                    } ${closed ? "bg-red-600 p-0" : `px-3 py-2 ${selected ? "bg-sky-100" : i === 0 ? "bg-neutral-50" : ""}`}`}
                   >
                     {!closed && (
                       <span
@@ -190,11 +198,9 @@ export default function AccessComparisonTableView({ rows }: { rows: ComparisonRo
                     if (i === 0) {
                       const cellBg = colClosed
                         ? "bg-red-600"
-                        : colSelected
-                          ? "bg-amber-100"
-                          : rowSelected
-                            ? "bg-sky-50"
-                            : "bg-white group-hover:bg-neutral-50";
+                        : colSelected || rowSelected
+                          ? "bg-sky-50"
+                          : "bg-white group-hover:bg-neutral-50";
                       return (
                         <td
                           key={c.key}
@@ -214,7 +220,7 @@ export default function AccessComparisonTableView({ rows }: { rows: ComparisonRo
                         </td>
                       );
                     }
-                    const cellBg = colClosed ? "bg-red-600" : colSelected ? "bg-amber-100" : "";
+                    const cellBg = colClosed ? "bg-red-600" : colSelected ? "bg-sky-50" : "";
                     return (
                       <td
                         key={c.key}

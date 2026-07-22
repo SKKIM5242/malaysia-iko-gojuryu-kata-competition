@@ -42,8 +42,19 @@ export function useGridControls() {
     const r = resizingRow.current;
     if (!r) return;
     const next = Math.max(CLOSED_SIZE, r.startHeight + (e.clientY - r.startY));
-    setRowHeights((prev) => ({ ...prev, [r.key]: next }));
-  }, []);
+    setRowHeights((prev) => {
+      const updated = { ...prev, [r.key]: next };
+      // Dragging one row of a multi-row selection closed takes every other
+      // selected row down with it — mirrors how a spreadsheet hides a whole
+      // selected group of rows together, not just the one you dragged.
+      if (next <= CLOSED_SIZE + 1 && selectedRows.has(r.key) && selectedRows.size > 1) {
+        for (const key of selectedRows) {
+          if (key !== r.key) updated[key] = CLOSED_SIZE;
+        }
+      }
+      return updated;
+    });
+  }, [selectedRows]);
 
   const handleRowUp = useCallback(() => {
     resizingRow.current = null;

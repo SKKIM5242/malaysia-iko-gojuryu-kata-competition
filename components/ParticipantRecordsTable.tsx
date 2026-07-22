@@ -280,8 +280,16 @@ export default function ParticipantRecordsTable({
     const r = resizingRef.current;
     if (!r) return;
     const next = Math.max(CLOSED_SIZE, r.startWidth + (e.clientX - r.startX));
-    setColWidths((prev) => ({ ...prev, [r.key]: next }));
-  }, []);
+    setColWidths((prev) => {
+      const updated = { ...prev, [r.key]: next };
+      if (next <= CLOSED_SIZE + 1 && selectedCols.has(r.key) && selectedCols.size > 1) {
+        for (const key of selectedCols) {
+          if (key !== r.key) updated[key] = CLOSED_SIZE;
+        }
+      }
+      return updated;
+    });
+  }, [selectedCols]);
 
   const handleUp = useCallback(() => {
     resizingRef.current = null;
@@ -317,7 +325,7 @@ export default function ParticipantRecordsTable({
       <th
         key={key}
         className={`relative select-none whitespace-nowrap ${sticky ? `sticky left-0 z-10 border-r border-neutral-200` : ""} ${
-          closed ? "bg-red-600 p-0" : `px-3 py-2.5 ${selected ? "bg-amber-100" : sticky ? "bg-neutral-50" : ""}`
+          closed ? "bg-red-600 p-0" : `px-3 py-2.5 ${selected ? "bg-sky-100" : sticky ? "bg-neutral-50" : ""}`
         }`}
       >
         {!closed && (
@@ -441,7 +449,7 @@ export default function ParticipantRecordsTable({
               {COLUMNS.map((c, i) => {
                 const closed = isClosed(widthOf(c.key, c.width), widthOf(c.key, c.width));
                 const selected = selectedCols.has(c.key);
-                const bg = closed ? "bg-red-600" : selected ? "bg-amber-50" : "bg-white";
+                const bg = closed ? "bg-red-600" : selected ? "bg-sky-50" : "bg-white";
                 return (
                   <th
                     key={c.key}
@@ -489,14 +497,13 @@ export default function ParticipantRecordsTable({
                       const closed = colClosed || rowClosed;
                       const { className, title, content } = standardCell(c, row);
                       const isHandle = i === 0;
+                      const highlighted = colSelected || rowSelected;
                       const cellBg = colClosed
                         ? "bg-red-600"
-                        : colSelected
-                          ? "bg-amber-100"
+                        : highlighted
+                          ? "bg-sky-50"
                           : isHandle
-                            ? rowSelected
-                              ? "bg-sky-50"
-                              : "bg-white group-hover:bg-neutral-50"
+                            ? "bg-white group-hover:bg-neutral-50"
                             : "";
                       return (
                         <td

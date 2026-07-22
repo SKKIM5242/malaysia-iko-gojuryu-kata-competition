@@ -32,11 +32,13 @@ const DEFAULT_COL_WIDTH = 150;
  * registrant type (Referees, Audience, Schools, Senseis, Staff Accounts)
  * so each gets its own filterable list without duplicating the table UI.
  * Click a column's label, or a row's leading cell, to select/highlight
- * just that column/row (amber for a column, sky for a row) — click again
- * to deselect. Drag a column's right edge (or a row's bottom edge) to
- * resize it, all the way down to a closed solid-red bar; drag that bar
- * back out to reopen, or use the "closed" note above the table to reopen
- * every closed column/row at once. */
+ * just that column/row (same blue in either direction) — click again to
+ * deselect; select several columns (or rows) and dragging any one of them
+ * closed takes the whole selected group down together. Drag a column's
+ * right edge (or a row's bottom edge) to resize it, all the way down to a
+ * closed solid-red bar; drag that bar back out to reopen, or use the
+ * "closed" note above the table to reopen every closed column/row at
+ * once. */
 export default function FilterableTable({
   columns,
   rows,
@@ -94,8 +96,18 @@ export default function FilterableTable({
     const r = resizingRef.current;
     if (!r) return;
     const next = Math.max(CLOSED_SIZE, r.startWidth + (e.clientX - r.startX));
-    setColWidths((prev) => ({ ...prev, [r.key]: next }));
-  }, []);
+    setColWidths((prev) => {
+      const updated = { ...prev, [r.key]: next };
+      // Dragging one column of a multi-column selection closed takes every
+      // other selected column down with it, same as the row equivalent.
+      if (next <= CLOSED_SIZE + 1 && selectedCols.has(r.key) && selectedCols.size > 1) {
+        for (const key of selectedCols) {
+          if (key !== r.key) updated[key] = CLOSED_SIZE;
+        }
+      }
+      return updated;
+    });
+  }, [selectedCols]);
 
   const handleUp = useCallback(() => {
     resizingRef.current = null;
@@ -230,7 +242,7 @@ export default function FilterableTable({
                     className={`relative select-none whitespace-nowrap ${stickyPosClass(i)} ${
                       closed
                         ? "bg-red-600 p-0"
-                        : `px-3 py-2.5 ${selected ? "bg-amber-100" : i < stickyColumns ? "bg-neutral-50" : ""}`
+                        : `px-3 py-2.5 ${selected ? "bg-sky-100" : i < stickyColumns ? "bg-neutral-50" : ""}`
                     }`}
                     style={stickyLeftStyle(i)}
                   >
@@ -262,7 +274,7 @@ export default function FilterableTable({
                 return (
                   <th
                     key={c.key}
-                    className={`${closed ? "bg-red-600 p-0" : `px-2 py-1.5 ${selected ? "bg-amber-50" : ""}`} ${stickyPosClass(i)}`}
+                    className={`${closed ? "bg-red-600 p-0" : `px-2 py-1.5 ${selected ? "bg-sky-50" : ""}`} ${stickyPosClass(i)}`}
                     style={stickyLeftStyle(i)}
                   >
                     {!closed && (
@@ -305,17 +317,14 @@ export default function FilterableTable({
                       const textCls = c.wrap ? "whitespace-normal break-words" : "truncate";
                       const isHandle = i === 0;
                       const closed = colClosed || rowClosed;
+                      const highlighted = colSelected || rowSelected;
                       const cellBg = colClosed
                         ? "bg-red-600"
-                        : colSelected
-                          ? "bg-amber-100"
-                          : rowSelected
-                            ? i < stickyColumns
-                              ? "bg-sky-50"
-                              : ""
-                            : i < stickyColumns
-                              ? "bg-white group-hover:bg-neutral-50"
-                              : "";
+                        : highlighted
+                          ? "bg-sky-50"
+                          : i < stickyColumns
+                            ? "bg-white group-hover:bg-neutral-50"
+                            : "";
                       return (
                         <td
                           key={c.key}
