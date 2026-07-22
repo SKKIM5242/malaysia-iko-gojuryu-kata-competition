@@ -379,6 +379,44 @@ export default async function KataArenaPage({
       arenas.flatMap((a) => a.arena),
       filterParams,
     );
+
+    // Own-recording nudge for any role that has also linked a paid
+    // registration to their profile (via the "Link a paid registration"
+    // option on My Account) — shown in addition to the normal role-based
+    // arena view below, not instead of it.
+    let ownRecordingPrompt: React.ReactNode = null;
+    if (profile.registration_id) {
+      const { data: myReg } = await supabase
+        .from("registrations")
+        .select("competition:competitions(id, name)")
+        .eq("id", profile.registration_id)
+        .maybeSingle();
+      const myCompetition =
+        (myReg as unknown as { competition: { id: string; name: string } | null } | null)?.competition ?? null;
+      if (myCompetition) {
+        const myArena = await loadKataArena(supabase, myCompetition.id);
+        const hasOwnRecording = myArena.some((a) => a.participantId === profile.participant_id);
+        if (!hasOwnRecording) {
+          ownRecordingPrompt = (
+            <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4">
+              <p className="text-sm font-semibold text-red-900">
+                You haven&apos;t recorded your own kata yet ({myCompetition.name}).
+              </p>
+              <p className="mt-1 text-sm text-red-800">
+                Recording uses your device&apos;s camera, so it happens on the My Account page.
+              </p>
+              <Link
+                href="/account"
+                className="mt-3 inline-block rounded-md bg-red-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-600"
+              >
+                Start Recording
+              </Link>
+            </div>
+          );
+        }
+      }
+    }
+
     return (
       <>
         <SiteHeader />
@@ -407,6 +445,7 @@ export default async function KataArenaPage({
             ages={tools.ages}
             sexes={tools.sexes}
           />
+          {ownRecordingPrompt}
           {arenas.length === 0 ? (
             <p className="text-sm text-neutral-400">No competitions yet.</p>
           ) : (

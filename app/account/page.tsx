@@ -117,6 +117,142 @@ function watermarkText(eventDate: string | null | undefined): string {
   return `Malaysia Open - IKO Goju-ryu Karate-do - Kata Competition ${label}`;
 }
 
+interface RecordingContext {
+  existingVideo: { id: string; storage_path: string } | null;
+  ownVideoUrl: string | null;
+  maxAttempts: number;
+  hasPendingPurchase: boolean;
+  eventDate: string | null;
+  registrationDeadline: string | null;
+  pendingOthers: PendingRegistration[];
+}
+
+/** Everything needed to render the personal recording card for whichever
+ * registration is linked to this profile — shared by every role branch
+ * below so an Admin/Organizer/Referee/Support/Audience account that has
+ * also linked a paid registration (see ClaimForm) sees the same
+ * record/watch experience a plain participant login gets. */
+async function getRecordingContext(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  profile: Pick<ProfileRow, "email" | "registration_id" | "bonus_record_attempts">,
+): Promise<RecordingContext> {
+  const registrationId = profile.registration_id!;
+  const pendingOthers = await getPendingRegistrations(supabase, profile.email, registrationId);
+  const maxAttempts = 3 + (profile.bonus_record_attempts ?? 0);
+  const { data: pendingPurchase } = await supabase
+    .from("attempt_purchases")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("status", "pending")
+    .maybeSingle();
+
+  const { data: existingVideo } = await supabase
+    .from("kata_videos")
+    .select("id, storage_path")
+    .eq("registration_id", registrationId)
+    .maybeSingle();
+
+  const { data: registration } = await supabase
+    .from("registrations")
+    .select("competition:competitions(id, event_date, registration_deadline)")
+    .eq("id", registrationId)
+    .maybeSingle();
+  const competition = (
+    registration as unknown as {
+      competition: { id: string; event_date: string | null; registration_deadline: string | null } | null;
+    } | null
+  )?.competition ?? null;
+
+  let ownVideoUrl: string | null = null;
+  if (existingVideo) {
+    const { data: signed } = await supabase.storage
+      .from("kata-videos")
+      .createSignedUrl(existingVideo.storage_path, 3600);
+    ownVideoUrl = signed?.signedUrl ?? null;
+  }
+
+  return {
+    existingVideo,
+    ownVideoUrl,
+    maxAttempts,
+    hasPendingPurchase: !!pendingPurchase,
+    eventDate: competition?.event_date ?? null,
+    registrationDeadline: competition?.registration_deadline ?? null,
+    pendingOthers,
+  };
+}
+
+function PersonalRecordingSection({
+  profile,
+  ctx,
+}: {
+  profile: Pick<ProfileRow, "registration_id" | "record_attempts">;
+  ctx: RecordingContext;
+}) {
+  return (
+    <div className="mt-6">
+      <h2 className="mb-3 text-lg font-bold">
+        {ctx.existingVideo ? "Your Kata Recording" : "Record Your Kata"}
+      </h2>
+      {ctx.existingVideo ? (
+        <div className="space-y-6">
+          <div className="rounded-lg border border-green-300 bg-green-50 p-6">
+            <p className="font-bold text-green-900">✅ Your kata recording is submitted</p>
+            {ctx.ownVideoUrl ? (
+              <div className="mt-3">
+                <VideoWatchButton
+                  url={ctx.ownVideoUrl}
+                  label="Watch your recording"
+                  className="rounded-md bg-neutral-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-neutral-700"
+                  deletable={{
+                    registrationId: profile.registration_id!,
+                    attemptsUsed: profile.record_attempts,
+                    maxAttempts: ctx.maxAttempts,
+                    hasPendingPurchase: ctx.hasPendingPurchase,
+                  }}
+                />
+              </div>
+            ) : (
+              <p className="mt-2 text-sm text-green-800">Thank you — it is ready for judging.</p>
+            )}
+          </div>
+          <PendingRecordingsList items={ctx.pendingOthers} />
+        </div>
+      ) : (
+        <div className="space-y-6">
+          <KataRecorder
+            initialAttempts={profile.record_attempts}
+            maxAttempts={ctx.maxAttempts}
+            hasPendingPurchase={ctx.hasPendingPurchase}
+            watermark={watermarkText(ctx.eventDate)}
+            recordingStart={ctx.eventDate}
+            recordingEnd={ctx.registrationDeadline}
+          />
+          <PendingRecordingsList items={ctx.pendingOthers} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Shown to every non-participant role that hasn't linked a paid
+ * registration yet — collapsed by default so it doesn't crowd their own
+ * role dashboard, since most staff/referee/audience accounts never need
+ * it. */
+function LinkRegistrationPrompt() {
+  return (
+    <details className="mt-6 rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
+      <summary className="cursor-pointer text-sm font-semibold text-neutral-700">
+        Also competing as a participant? Link your paid registration
+      </summary>
+      <div className="mt-3">
+        <ClaimForm />
+      </div>
+    </details>
+  );
+}
+
 export default async function AccountPage({
   searchParams,
 }: {
@@ -217,6 +353,7 @@ export default async function AccountPage({
 
   // ── Staff / Admin / Organizer / Participant Support ────────────────────────
   if (["staff", "admin", "organizer", "customer_support"].includes(profile.role)) {
+    const recordingCtx = profile.registration_id ? await getRecordingContext(supabase, user.id, profile) : null;
     return (
       <>
         <SiteHeader />
@@ -261,6 +398,11 @@ export default async function AccountPage({
               </p>
             </div>
           )}
+          {recordingCtx ? (
+            <PersonalRecordingSection profile={profile} ctx={recordingCtx} />
+          ) : (
+            <LinkRegistrationPrompt />
+          )}
           <div className="mt-4">{SignOutButton}</div>
         </main>
         <SiteFooter />
@@ -289,6 +431,8 @@ export default async function AccountPage({
         </>
       );
     }
+
+    const recordingCtx = profile.registration_id ? await getRecordingContext(supabase, user.id, profile) : null;
 
     const { data: assignments } = await supabase
       .from("referee_assignments")
@@ -383,6 +527,11 @@ export default async function AccountPage({
           <div className="mt-6">
             <RefereeScoring refereeName={profile.full_name ?? "Judge"} refereeCountry={profile.country} items={items} />
           </div>
+          {recordingCtx ? (
+            <PersonalRecordingSection profile={profile} ctx={recordingCtx} />
+          ) : (
+            <LinkRegistrationPrompt />
+          )}
           <div className="mt-4">{SignOutButton}</div>
         </main>
         <SiteFooter />
@@ -392,6 +541,7 @@ export default async function AccountPage({
 
   // ── Audience / Spectator ─────────────────────────────────────────────────
   if (profile.role === "audience") {
+    const recordingCtx = profile.registration_id ? await getRecordingContext(supabase, user.id, profile) : null;
     return (
       <>
         <SiteHeader />
@@ -413,6 +563,11 @@ export default async function AccountPage({
                 sign-in.
               </p>
             </div>
+          )}
+          {recordingCtx ? (
+            <PersonalRecordingSection profile={profile} ctx={recordingCtx} />
+          ) : (
+            <LinkRegistrationPrompt />
           )}
           <div className="mt-4">{SignOutButton}</div>
         </main>
