@@ -8,7 +8,7 @@ import AdminVideoUploadForm from "@/components/AdminVideoUploadForm";
 import ColumnFilterDropdown from "@/components/ColumnFilterDropdown";
 import DualScrollBox from "@/components/DualScrollBox";
 import { useGridControls, isClosed, CLOSED_SIZE } from "@/lib/useGridControls";
-import { updateRegistrationSlotStatus } from "@/app/actions/admin";
+import { updateRegistrationSlotStatus, linkRegistrationToAccount } from "@/app/actions/admin";
 
 export type SlotStatus = "active" | "unslotted" | "forfeited" | "given_up";
 
@@ -44,6 +44,7 @@ export interface ParticipantRecordRow {
   slotStatusNote: string | null;
   slotStatusChangedBy: string | null;
   slotStatusChangedAt: string | null;
+  linkedAccountEmail: string | null;
 }
 
 const SLOT_STATUS_BADGE: Record<SlotStatus, { label: string; cls: string }> = {
@@ -154,11 +155,12 @@ const COLUMNS: Array<{ key: keyof ParticipantRecordRow; label: string; width: nu
   { key: "attempts", label: "Re-record Attempts", width: 90 },
 ];
 
-/** The 3 trailing columns rendered outside `ParticipantRecordRow` (rich
+/** The trailing columns rendered outside `ParticipantRecordRow` (rich
  * JSX, not a single field) — same resize treatment as every other column. */
 const EXTRA_COLUMNS: Array<{ key: string; label: string; width: number }> = [
   { key: "certificate", label: "Certificate", width: 100 },
   { key: "recording", label: "Recording", width: 170 },
+  { key: "accountLink", label: "Account Link", width: 190 },
   { key: "slotStatus", label: "Slot Status", width: 240 },
 ];
 
@@ -236,7 +238,13 @@ function standardCell(
   }
 }
 
-function extraCell(key: string, row: ParticipantRecordRow, isAdmin: boolean, canManageSlot: boolean): ReactNode {
+function extraCell(
+  key: string,
+  row: ParticipantRecordRow,
+  isAdmin: boolean,
+  canManageSlot: boolean,
+  canLinkAccount: boolean,
+): ReactNode {
   switch (key) {
     case "certificate":
       return row.certificateUrl ? (
@@ -258,20 +266,56 @@ function extraCell(key: string, row: ParticipantRecordRow, isAdmin: boolean, can
           {isAdmin && <AdminVideoUploadForm registrationId={row.registrationId} />}
         </div>
       );
+    case "accountLink":
+      return <AccountLinkCell row={row} canLinkAccount={canLinkAccount} />;
     case "slotStatus":
       return <SlotStatusCell row={row} canManage={canManageSlot} />;
   }
   return null;
 }
 
+/** Whether this registration is claimed by a login account yet — a
+ * participant can't record until it is, whether they self-linked (My
+ * Account → Link Your Paid Registration) or staff linked it for them here.
+ * The "Link to account" button covers the case where self-linking failed
+ * (typo'd reference ID, signed up with a different email, payment status
+ * got out of sync, etc.) without needing a manual database fix. */
+function AccountLinkCell({ row, canLinkAccount }: { row: ParticipantRecordRow; canLinkAccount: boolean }) {
+  if (row.linkedAccountEmail) {
+    return (
+      <span className="text-xs text-green-700" title={`Linked to ${row.linkedAccountEmail}`}>
+        ✅ {row.linkedAccountEmail}
+      </span>
+    );
+  }
+  if (!canLinkAccount) {
+    return <span className="text-xs text-neutral-400">Not linked</span>;
+  }
+  return (
+    <form action={linkRegistrationToAccount}>
+      <input type="hidden" name="registration_id" value={row.registrationId} />
+      <input type="hidden" name="return_to" value="/admin/records" />
+      <button
+        type="submit"
+        title={`Link this registration to whichever account is signed up with ${row.email || "the participant's email"}`}
+        className="rounded border border-blue-300 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 hover:bg-blue-50"
+      >
+        Link to account
+      </button>
+    </form>
+  );
+}
+
 export default function ParticipantRecordsTable({
   rows,
   isAdmin = false,
   canManageSlot = false,
+  canLinkAccount = false,
 }: {
   rows: ParticipantRecordRow[];
   isAdmin?: boolean;
   canManageSlot?: boolean;
+  canLinkAccount?: boolean;
 }) {
   const [filters, setFilters] = useState<Partial<Record<keyof ParticipantRecordRow, Set<string>>>>({});
   const [colWidths, setColWidths] = useState<Record<string, number>>({});
@@ -394,6 +438,7 @@ export default function ParticipantRecordsTable({
       filtered.map((row) => {
         const out: Record<string, string> = {};
         for (const c of COLUMNS) out[c.label] = String(row[c.key] ?? "");
+        out["Account Link"] = row.linkedAccountEmail ?? "Not linked";
         out["Slot Status"] = SLOT_STATUS_CSV_LABEL[row.slotStatus];
         return out;
       }),
@@ -547,7 +592,7 @@ export default function ParticipantRecordsTable({
                       const closed = colClosed || rowClosed;
                       return (
                         <td key={c.key} className={closed ? `p-0 ${colClosed ? "bg-red-600" : ""}` : "px-3 py-2"}>
-                          {!closed && extraCell(c.key, row, isAdmin, canManageSlot)}
+                          {!closed && extraCell(c.key, row, isAdmin, canManageSlot, canLinkAccount)}
                         </td>
                       );
                     })}

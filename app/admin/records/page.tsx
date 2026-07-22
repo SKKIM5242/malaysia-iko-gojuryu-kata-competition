@@ -52,11 +52,16 @@ function certLink(url: string | null) {
   );
 }
 
-export default async function AdminParticipantRecords() {
+export default async function AdminParticipantRecords({
+  searchParams,
+}: {
+  searchParams: Promise<{ ok?: string; error?: string }>;
+}) {
+  const { ok, error } = await searchParams;
   const ready = await schemaReady();
   if (!ready) {
     return (
-      <AdminShell title="Participant Records" active="/admin/records">
+      <AdminShell title="Participant Records" active="/admin/records" flash={{ ok, error }}>
         <SetupNotice />
       </AdminShell>
     );
@@ -80,6 +85,7 @@ export default async function AdminParticipantRecords() {
     : { data: null };
   const isAdmin = myProfile?.role === "admin";
   const canManageSlot = ["admin", "organizer", "staff", "referee"].includes(myProfile?.role ?? "");
+  const canLinkAccount = ["admin", "organizer", "staff", "customer_support", "referee"].includes(myProfile?.role ?? "");
 
   const { data: purchases } = await supabase
     .from("attempt_purchases")
@@ -204,6 +210,7 @@ export default async function AdminParticipantRecords() {
     slotStatusNote: r.slotStatusNote,
     slotStatusChangedBy: r.slotStatusChangedBy,
     slotStatusChangedAt: r.slotStatusChangedAt,
+    linkedAccountEmail: r.linkedAccountEmail,
   }));
 
   const refereeColumns = [
@@ -351,7 +358,7 @@ export default async function AdminParticipantRecords() {
   }));
 
   return (
-    <AdminShell title="Participant Records" active="/admin/records">
+    <AdminShell title="Participant Records" active="/admin/records" flash={{ ok, error }}>
       <p className="mb-6 text-sm text-neutral-500">
         Every registrant type in one place, each with its own filterable table. Recordings and
         certificates play/open in-page for Admin/Organizer, Referee/Judge, and Participant Support here, on{" "}
@@ -395,12 +402,21 @@ export default async function AdminParticipantRecords() {
           A participant who has not submitted a recording by their competition&apos;s deadline is
           automatically marked Unslotted and their payment Forfeited (checked daily). Admin,
           Organizer, and Referee/Judge accounts can also set or reset Unslot / Forfeited / Give Up
-          manually from the Slot Status column, to clean up the list at any time.
+          manually from the Slot Status column, to clean up the list at any time. The Account Link
+          column shows whether the participant has actually claimed their registration with a login
+          — if they can&apos;t (wrong reference ID, signed up with a different email, etc.), Admin,
+          Organizer, Participant Support, or Referee/Judge can link it for them from that column
+          instead of asking a developer to fix it manually.
         </p>
         {participantRows.length === 0 ? (
           <EmptyState>No successful registrations yet.</EmptyState>
         ) : (
-          <ParticipantRecordsTable rows={participantRows} isAdmin={isAdmin} canManageSlot={canManageSlot} />
+          <ParticipantRecordsTable
+            rows={participantRows}
+            isAdmin={isAdmin}
+            canManageSlot={canManageSlot}
+            canLinkAccount={canLinkAccount}
+          />
         )}
       </Section>
 

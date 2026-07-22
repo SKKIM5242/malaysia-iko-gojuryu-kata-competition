@@ -147,6 +147,11 @@ export interface ParticipantRecord {
   slotStatusNote: string | null;
   slotStatusChangedBy: string | null;
   slotStatusChangedAt: string | null;
+  /** Email of the login account this registration is linked to (via
+   * profiles.registration_id), if any — null means nobody has claimed it
+   * yet, so the participant can't record until either they self-link (My
+   * Account → Link Your Paid Registration) or staff link it for them. */
+  linkedAccountEmail: string | null;
 }
 
 /** One row per paid (or slot-actioned) registration, joining participant
@@ -180,7 +185,7 @@ export async function getParticipantRecords(): Promise<ParticipantRecord[]> {
   const changedByIds = [...new Set(regList.map((r) => r.slot_status_changed_by).filter((id): id is string => !!id))];
   const [{ data: videos }, { data: profiles }, { data: changedByProfiles }] = await Promise.all([
     supabase.from("kata_videos").select("registration_id, storage_path, created_at").in("registration_id", regIds),
-    supabase.from("profiles").select("registration_id, record_attempts, bonus_record_attempts").in("registration_id", regIds),
+    supabase.from("profiles").select("registration_id, record_attempts, bonus_record_attempts, email").in("registration_id", regIds),
     changedByIds.length > 0
       ? supabase.from("profiles").select("user_id, full_name, email").in("user_id", changedByIds)
       : Promise.resolve({ data: [] }),
@@ -191,6 +196,9 @@ export async function getParticipantRecords(): Promise<ParticipantRecord[]> {
   const attemptsByReg = new Map((profiles ?? []).map((p) => [p.registration_id as string, p.record_attempts as number]));
   const maxAttemptsByReg = new Map(
     (profiles ?? []).map((p) => [p.registration_id as string, 3 + (p.bonus_record_attempts as number ?? 0)]),
+  );
+  const linkedEmailByReg = new Map(
+    (profiles ?? []).map((p) => [p.registration_id as string, (p.email as string | null) ?? null]),
   );
   const nameByChangedBy = new Map(
     (changedByProfiles ?? []).map((p) => [p.user_id as string, (p.full_name as string) || (p.email as string) || (p.user_id as string)]),
@@ -234,6 +242,7 @@ export async function getParticipantRecords(): Promise<ParticipantRecord[]> {
         slotStatusNote: r.slot_status_note,
         slotStatusChangedBy: r.slot_status_changed_by ? (nameByChangedBy.get(r.slot_status_changed_by) ?? r.slot_status_changed_by) : null,
         slotStatusChangedAt: r.slot_status_changed_at,
+        linkedAccountEmail: linkedEmailByReg.get(r.id) ?? null,
       };
     });
 }

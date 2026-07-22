@@ -2883,6 +2883,32 @@ export async function updateRegistrationSlotStatus(formData: FormData) {
   backTo(returnTo, { ok: `Marked ${SLOT_STATUS_LABEL[newStatus] ?? newStatus}.` });
 }
 
+/** Links a paid registration to its owner's account by matching the
+ * participant's email on file — for when a participant can't self-link
+ * from My Account (typo'd reference ID, signed up with a different email,
+ * etc.). Available to Admin, Organizer, Participant Support, and
+ * Referee/Judge so they can resolve this themselves instead of needing a
+ * manual database fix every time. Delegates to admin_link_registration()
+ * so the matching/validation logic lives in one place, shared with the
+ * self-service claim_registration RPCs' rules. */
+export async function linkRegistrationToAccount(formData: FormData) {
+  const registrationId = String(formData.get("registration_id") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "/admin/records");
+  const { supabase, actorId } = await getActor();
+  const actorRole = await getActorRole(supabase, actorId);
+  if (!["admin", "organizer", "staff", "customer_support", "referee"].includes(actorRole ?? "")) {
+    backTo(returnTo, { error: "Only Admin, Organizer, Participant Support, or Referee/Judge accounts can link a registration." });
+  }
+  const { data, error } = await supabase.rpc("admin_link_registration", { p_registration_id: registrationId });
+  if (error || data !== "OK") {
+    backTo(returnTo, { error: String(data ?? "Could not link that registration — please try again.") });
+  }
+  await writeAudit(supabase, {
+    table_name: "profiles", record_id: registrationId, action: "registration_linked_by_staff", actor_id: actorId,
+  });
+  backTo(returnTo, { ok: "Linked — the participant can now sign in and record their kata." });
+}
+
 // ── Sign-in quota control (Admin/Organizer only) ────────────────────────────
 
 /** Sets how many times a registrant may sign in, which competition tier
