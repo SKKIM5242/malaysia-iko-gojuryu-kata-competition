@@ -18,6 +18,7 @@ export interface ParticipantRow {
 
 const COLUMNS = [
   { key: "no", label: "#" },
+  { key: "reference_id", label: "Reference ID" },
   { key: "name", label: "Name" },
   { key: "category", label: "Category" },
   { key: "division", label: "Division" },
@@ -26,7 +27,7 @@ const COLUMNS = [
   { key: "sensei", label: "Sensei" },
 ] as const;
 
-type FilterableKey = Exclude<(typeof COLUMNS)[number]["key"], "no">;
+type FilterableKey = Exclude<(typeof COLUMNS)[number]["key"], "no" | "reference_id">;
 
 function rawValue(r: ParticipantRow, key: FilterableKey): string {
   switch (key) {
@@ -42,6 +43,7 @@ function rawValue(r: ParticipantRow, key: FilterableKey): string {
 const MIN_COL_WIDTH = 50;
 const DEFAULT_WIDTHS: Record<string, number> = {
   no: 56,
+  reference_id: 110,
   name: 180,
   category: 220,
   division: 100,
@@ -93,7 +95,7 @@ export default function ParticipantsTable({ rows }: { rows: ParticipantRow[] }) 
   const uniqueValues = useMemo(() => {
     const map: Record<string, string[]> = {};
     for (const c of COLUMNS) {
-      if (c.key === "no") continue;
+      if (c.key === "no" || c.key === "reference_id") continue;
       const seen = new Set<string>();
       const values: string[] = [];
       for (const r of rows) {
@@ -144,7 +146,7 @@ export default function ParticipantsTable({ rows }: { rows: ParticipantRow[] }) 
             <tr className="border-t border-neutral-200 bg-white normal-case">
               {COLUMNS.map((c) => (
                 <th key={c.key} className="px-2 py-1.5">
-                  {c.key !== "no" && (
+                  {c.key !== "no" && c.key !== "reference_id" && (
                     <ColumnFilterDropdown
                       values={uniqueValues[c.key] ?? []}
                       selected={filters[c.key] ?? new Set()}
@@ -166,6 +168,7 @@ export default function ParticipantsTable({ rows }: { rows: ParticipantRow[] }) 
               filtered.map((r) => (
                 <tr key={r.id} className="hover:bg-neutral-50">
                   <td className="truncate px-4 py-3 text-neutral-400">{r.no}</td>
+                  <td className="truncate px-4 py-3 font-mono text-xs">{r.id.slice(0, 8).toUpperCase()}</td>
                   <td className="truncate px-4 py-3 font-medium text-neutral-900">{r.name}</td>
                   <td className="truncate px-4 py-3" title={r.categoryName ?? undefined}>
                     <CategoryName name={r.categoryName ?? undefined} />

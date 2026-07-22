@@ -25,10 +25,13 @@ export interface ParticipantRecordRow {
   homeAddress: string;
   country: string;
   cityTown: string;
+  postcode: string;
   email: string;
   phone: string;
   school: string;
   sensei: string;
+  invitationCode: string;
+  referralSource: string;
   bankName: string;
   bankAccountNo: string;
   bankAccountName: string;
@@ -121,10 +124,13 @@ const COLUMNS: Array<{ key: keyof ParticipantRecordRow; label: string; width: nu
   { key: "homeAddress", label: "Home Address", width: 220 },
   { key: "country", label: "Country", width: 110 },
   { key: "cityTown", label: "City/Town", width: 120 },
+  { key: "postcode", label: "Postcode", width: 100 },
   { key: "email", label: "Email", width: 180 },
   { key: "phone", label: "Phone", width: 130 },
   { key: "school", label: "School", width: 160 },
   { key: "sensei", label: "Sensei", width: 160 },
+  { key: "invitationCode", label: "Invitation Code", width: 140 },
+  { key: "referralSource", label: "Referral", width: 160 },
   { key: "bankName", label: "Bank Name", width: 140 },
   { key: "bankAccountNo", label: "Bank Account No", width: 150 },
   { key: "bankAccountName", label: "Bank Account Holder Name", width: 200 },
@@ -327,6 +333,7 @@ export default function ParticipantRecordsTable({
                   </td>
                   <td className="truncate px-3 py-2" title={row.country}>{row.country || "—"}</td>
                   <td className="truncate px-3 py-2" title={row.cityTown}>{row.cityTown || "—"}</td>
+                  <td className="truncate px-3 py-2" title={row.postcode}>{row.postcode || "—"}</td>
                   <td className="truncate px-3 py-2 text-xs" title={row.email}>{row.email || "—"}</td>
                   <td className="truncate px-3 py-2 text-xs" title={row.phone}>{row.phone || "—"}</td>
                   <td className="truncate px-3 py-2" title={row.school}>
@@ -335,6 +342,8 @@ export default function ParticipantRecordsTable({
                   <td className="truncate px-3 py-2" title={row.sensei}>
                     {row.sensei || "—"}
                   </td>
+                  <td className="truncate px-3 py-2 text-xs" title={row.invitationCode}>{row.invitationCode || "—"}</td>
+                  <td className="truncate px-3 py-2 text-xs" title={row.referralSource}>{row.referralSource || "—"}</td>
                   <td className="truncate px-3 py-2 text-xs" title={row.bankName}>{row.bankName || "—"}</td>
                   <td className="truncate px-3 py-2 text-xs" title={row.bankAccountNo}>{row.bankAccountNo || "—"}</td>
                   <td className="truncate px-3 py-2 text-xs" title={row.bankAccountName}>
