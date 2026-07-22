@@ -72,10 +72,11 @@ export default async function AdminBulkRegistrationPreview() {
           <div className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
             <h2 className="text-lg font-bold">Sample Stripe Payment Page</h2>
             <p className="mt-1 mb-3 text-sm text-neutral-600">
-              Bulk registration itself is paid by bank transfer (organizer confirms manually), but
-              Stripe is used elsewhere on the site (tier fees, extra recording attempts). This
-              opens a real, test-mode Stripe Checkout page — USD 1.00, not tied to any real
-              registration — so you can see exactly what participants see.
+              Bulk registration itself is now paid online via Stripe (the &quot;Pay with
+              Stripe&quot; button in Step 1 below creates a real Checkout session for the batch
+              total). This separate sample button opens a real, test-mode Stripe Checkout page —
+              USD 1.00, not tied to any real registration — so you can see exactly what senseis
+              see without needing a live batch.
             </p>
             <SampleStripeCheckoutButton disabled={!canTest} />
           </div>

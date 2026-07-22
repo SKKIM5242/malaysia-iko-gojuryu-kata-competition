@@ -65,14 +65,46 @@ export default async function BulkRegisterPage() {
 
               <section className="mb-10 rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
                 <h2 className="text-lg font-bold">Step 2, Option A — Excel / CSV Upload (Up To 10,000 Pax)</h2>
-                <p className="mt-1 text-sm text-neutral-600">
-                  1. <a href="/bulk-registration-template.csv" download className="font-semibold text-red-700 underline underline-offset-2">
-                    Download the CSV template
-                  </a>{" "}
-                  (opens in Excel). 2. Fill one row per participant — keep the header row and use
-                  dates as YYYY-MM-DD; kata_event must match one of the kata event names. 3. Pick
-                  the tier you paid for above. 4. Save as CSV and upload it below.
-                </p>
+                <ol className="mt-2 list-decimal space-y-2 pl-5 text-sm text-neutral-600">
+                  <li>
+                    <a href="/bulk-registration-template.csv" download className="font-semibold text-red-700 underline underline-offset-2">
+                      Download the CSV template
+                    </a>{" "}
+                    (opens in Excel).
+                  </li>
+                  <li>
+                    Process the CSV template by Select column A (by highlighting the column A) – go
+                    to main menu select -Data - then at sub-menu center find &quot;Text to
+                    column&quot; – click on Text to column – A window – Convert Text to Column
+                    Wizard will appear - choose Delimited button then click Next button at bottom
+                    of the window – Tick Comma (others don&apos;t tick) – Click Next again – Chose
+                    &quot;General&quot; at column data format – Click the finish button at bottom
+                    right. Wa lah ! you get the Excel file to enter the participants data according
+                    to 2 samples.
+                  </li>
+                  <li>
+                    Fill one row per participant start from the 4th row - follow the sample format
+                    (address no comma) — keep the header row and key in dates as DD/MM/YYYY - kata
+                    event must match one of the kata event names (Please copy from listing of{" "}
+                    <a href="/kata-categories" className="font-semibold underline underline-offset-2">Kata Categories</a>{" "}
+                    at home page).
+                  </li>
+                  <li>After finish fill in all participants - Delete the 2 samples given -2nd &amp; 3rd row.</li>
+                  <li>
+                    Save the Excel file at a location – file folder – create a file name - choose –
+                    save as type – Excel Template – Click Save (for your own reference)
+                  </li>
+                  <li>
+                    Again - Save the Excel file at a location – file folder – create a file name -
+                    choose – save as type – CSV (Comma delimited)– Click Save (this file is for you
+                    to upload).
+                  </li>
+                  <li>
+                    Upload the file by going back to the Bulk Registration page – Click the red
+                    button of - Upload CSV and register participants - find the file location you
+                    save – choose the folder or file - click open – it will upload itself.
+                  </li>
+                </ol>
                 <div className="mt-4">
                   <CsvBulkForm competitions={openCompetitions} schools={schools} senseis={senseis} />
                 </div>
