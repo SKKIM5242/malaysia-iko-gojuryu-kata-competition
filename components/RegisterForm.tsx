@@ -2,7 +2,6 @@
 
 import { useActionState, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { submitRegistration, type RegisterState } from "@/app/actions/register";
 import { OrganizerContact } from "@/components/ui";
 import CertificateUploadField from "@/components/CertificateUploadField";
@@ -22,7 +21,6 @@ function FieldError({ message }: { message?: string }) {
 
 export default function RegisterForm({
   competition,
-  competitions,
   categories,
   categoryTaken,
   schools,
@@ -30,14 +28,12 @@ export default function RegisterForm({
   payOnline,
 }: {
   competition: Competition;
-  competitions: Competition[];
   categories: Category[];
   categoryTaken: Record<string, number>;
   schools: School[];
   senseis: Sensei[];
   payOnline: boolean;
 }) {
-  const router = useRouter();
   const [state, formAction, pending] = useActionState(submitRegistration, initialState);
 
   const [dateOfBirth, setDateOfBirth] = useState("");
@@ -184,6 +180,17 @@ export default function RegisterForm({
         </div>
 
         <div>
+          <label htmlFor="age" className={labelCls}>Age (based on D.O.B) *</label>
+          <input
+            id="age"
+            readOnly
+            value={dateOfBirth && !Number.isNaN(Date.parse(dateOfBirth)) ? ageAt(dateOfBirth, competition.event_date) : ""}
+            placeholder="Fill in date of birth first"
+            className={`${inputCls} cursor-not-allowed bg-neutral-100 text-neutral-500`}
+          />
+        </div>
+
+        <div>
           <label htmlFor="gender" className={labelCls}>Gender *</label>
           <select
             id="gender"
@@ -301,26 +308,6 @@ export default function RegisterForm({
             ))}
           </select>
           <FieldError message={err.sensei_id} />
-        </div>
-
-        <div>
-          <label htmlFor="competition_tier" className={labelCls}>Competition Tier</label>
-          <select
-            id="competition_tier"
-            value={competition.id}
-            onChange={(e) => router.push(`/register/participant?competition=${e.target.value}`)}
-            className={inputCls}
-            disabled={competitions.length <= 1}
-          >
-            {competitions.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name} — USD {Number(c.registration_fee_usd ?? 0).toFixed(2)} per event
-              </option>
-            ))}
-          </select>
-          <p className="mt-1 text-xs text-neutral-400">
-            Switching tiers reloads the form — fill in your details again after switching.
-          </p>
         </div>
 
         <div className="sm:col-span-2">
