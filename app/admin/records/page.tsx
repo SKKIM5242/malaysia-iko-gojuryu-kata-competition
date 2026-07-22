@@ -146,6 +146,32 @@ export default async function AdminParticipantRecords() {
     bulkBatches.set(key, list);
   }
 
+  // Paid, still-active registrations with no recording submitted yet — a
+  // focused chase-up list (name, email, deadline) separate from the full
+  // Participants table below, sorted soonest-deadline-first.
+  const pendingRecordingRows = participantRecords
+    .filter((r) => !r.videoCreatedAt && r.slotStatus === "active")
+    .map((r) => {
+      const daysLeft = r.registrationDeadline
+        ? Math.ceil((new Date(r.registrationDeadline).getTime() - new Date().getTime()) / (24 * 60 * 60 * 1000))
+        : null;
+      return {
+        registrationId: r.registrationId,
+        fullName: r.participant.full_name,
+        email: r.participant.email ?? "",
+        competition: r.competitionName ?? "—",
+        deadline: r.registrationDeadline ? formatDate(r.registrationDeadline) : "—",
+        deadlineRaw: r.registrationDeadline ?? "",
+        daysLeft:
+          daysLeft == null
+            ? "—"
+            : daysLeft < 0
+              ? `OVERDUE — ${Math.abs(daysLeft)} day${Math.abs(daysLeft) === 1 ? "" : "s"} ago`
+              : `${daysLeft} day${daysLeft === 1 ? "" : "s"} left`,
+      };
+    })
+    .sort((a, b) => a.deadlineRaw.localeCompare(b.deadlineRaw));
+
   const participantRows: ParticipantRecordRow[] = participantRecords.map((r) => ({
     registrationId: r.registrationId,
     competition: r.competitionName ?? "—",
@@ -333,6 +359,36 @@ export default async function AdminParticipantRecords() {
         <a href="/admin/judging" className="underline">Judging</a>. Participants and Audience accounts
         continue watching recordings only via Kata Arena, per its existing access rules.
       </p>
+
+      <Section id="pending-recordings" title="Pending Recording Submissions (chase-up list)">
+        <p className="mb-3 text-xs text-neutral-400">
+          Paid, still-active registrations with no recording submitted yet — sorted by soonest
+          deadline first, so overdue ones surface at the top.
+        </p>
+        {pendingRecordingRows.length === 0 ? (
+          <EmptyState>Everyone with a paid, active registration has submitted their recording.</EmptyState>
+        ) : (
+          <FilterableTable
+            rowKey="registrationId"
+            downloadName="pending-recording-submissions"
+            columns={[
+              { key: "fullName", label: "Name" },
+              { key: "email", label: "Email" },
+              { key: "competition", label: "Tier" },
+              { key: "deadline", label: "Deadline" },
+              { key: "daysLeft", label: "Time Left" },
+            ]}
+            rows={pendingRecordingRows.map((r) => ({
+              registrationId: r.registrationId,
+              fullName: r.fullName,
+              email: r.email,
+              competition: r.competition,
+              deadline: r.deadline,
+              daysLeft: r.daysLeft,
+            }))}
+          />
+        )}
+      </Section>
 
       <Section id="participants" title="Participants">
         <p className="mb-3 text-xs text-neutral-400">

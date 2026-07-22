@@ -135,6 +135,7 @@ export async function getAllParticipants(): Promise<Participant[]> {
 export interface ParticipantRecord {
   registrationId: string;
   competitionName: string | null;
+  registrationDeadline: string | null;
   categoryName: string | null;
   participant: Participant;
   recordAttempts: number;
@@ -158,7 +159,7 @@ export async function getParticipantRecords(): Promise<ParticipantRecord[]> {
   const { data: regs } = await supabase
     .from("registrations")
     .select(
-      "id, slot_status, slot_status_note, slot_status_changed_by, slot_status_changed_at, participant:participants(*, school:schools(id,name,state), sensei:senseis(id,name,rank), bank:participant_bank_details(bank_name,bank_account_no,bank_account_name)), category:categories(id,name), competition:competitions(id,name)",
+      "id, slot_status, slot_status_note, slot_status_changed_by, slot_status_changed_at, participant:participants(*, school:schools(id,name,state), sensei:senseis(id,name,rank), bank:participant_bank_details(bank_name,bank_account_no,bank_account_name)), category:categories(id,name), competition:competitions(id,name,registration_deadline)",
     )
     .in("payment_status", ["paid", "forfeited"])
     .order("created_at", { ascending: false });
@@ -171,7 +172,7 @@ export async function getParticipantRecords(): Promise<ParticipantRecord[]> {
       slot_status_changed_at: string | null;
       participant: Participant | null;
       category: { id: string; name: string } | null;
-      competition: { id: string; name: string } | null;
+      competition: { id: string; name: string; registration_deadline: string | null } | null;
     }>) ?? [];
   if (regList.length === 0) return [];
 
@@ -221,6 +222,7 @@ export async function getParticipantRecords(): Promise<ParticipantRecord[]> {
       return {
         registrationId: r.id,
         competitionName: r.competition?.name ?? null,
+        registrationDeadline: r.competition?.registration_deadline ?? null,
         categoryName: r.category?.name ?? null,
         participant: r.participant as Participant,
         recordAttempts: attemptsByReg.get(r.id) ?? 0,
