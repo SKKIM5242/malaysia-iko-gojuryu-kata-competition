@@ -2,16 +2,17 @@
 
 import { useActionState } from "react";
 import { bulkRegisterCsv, type CsvBulkState } from "@/app/actions/bulk";
+import { formatUSD } from "@/components/ui";
 import type { Competition, School, Sensei } from "@/lib/types";
 
 const initial: CsvBulkState = { done: false };
 
 export default function CsvBulkForm({
-  competition,
+  competitions,
   schools,
   senseis,
 }: {
-  competition: Competition;
+  competitions: Competition[];
   schools: School[];
   senseis: Sensei[];
 }) {
@@ -61,13 +62,29 @@ export default function CsvBulkForm({
 
   return (
     <form action={formAction} className="space-y-4">
-      <input type="hidden" name="competition_id" value={competition.id} />
       {state.error && (
         <div className="rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
           {state.error}
         </div>
       )}
       <div className="grid gap-4 sm:grid-cols-2">
+        <div className="sm:col-span-2">
+          <label htmlFor="csv_competition_id" className="mb-1 block text-sm font-medium text-neutral-700">
+            Competition tier *
+          </label>
+          <select
+            id="csv_competition_id"
+            name="competition_id"
+            required
+            defaultValue={competitions.length === 1 ? competitions[0].id : ""}
+            className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm"
+          >
+            <option value="" disabled>Select the tier you paid for</option>
+            {competitions.map((c) => (
+              <option key={c.id} value={c.id}>{c.name} — {formatUSD(c.registration_fee_usd)} per event</option>
+            ))}
+          </select>
+        </div>
         <div>
           <label htmlFor="csv_school_id" className="mb-1 block text-sm font-medium text-neutral-700">School / Dojo *</label>
           <select id="csv_school_id" name="school_id" required defaultValue="" className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm">

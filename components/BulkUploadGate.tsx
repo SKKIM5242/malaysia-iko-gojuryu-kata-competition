@@ -1,113 +1,220 @@
 "use client";
 
-import { useActionState } from "react";
-import { requestOrCheckBulkUploadPayment, type BulkPaymentState } from "@/app/actions/bulk";
+import { useActionState, useEffect, useState } from "react";
+import { requestBulkUploadBatch, type BulkBatchState } from "@/app/actions/bulk";
 import { OrganizerContact, formatUSD } from "@/components/ui";
-import type { School, Sensei } from "@/lib/types";
+import type { Competition, School, Sensei } from "@/lib/types";
 
-const initial: BulkPaymentState = { done: false };
+const initial: BulkBatchState = { done: false };
 
 /** Sensei pays for the whole batch upfront (unlike single-participant
- * registration, which registers first and pays after) — request/check a
- * payment for N participants here, then use the SAME School/Sensei in
- * Option A or B below once it shows as paid. */
+ * registration, which registers first and pays after) — a single popup
+ * covers all 3 competition tiers at once. For each tier they intend to
+ * use, they give a participant headcount AND a total event count (fee
+ * scales by events, same up-to-3-per-participant rule as individual
+ * registration); one combined bill covers every tier entered. Once the
+ * organizer confirms the whole batch paid, use the SAME School/Sensei in
+ * Option A or B below (picking the matching tier) to upload — up to
+ * exactly the numbers declared here, no more. */
 export default function BulkUploadGate({
-  competitionId,
-  registrationFeeUsd,
+  competitions,
   schools,
   senseis,
 }: {
-  competitionId: string;
-  registrationFeeUsd: number | null;
+  competitions: Competition[];
   schools: School[];
   senseis: Sensei[];
 }) {
-  const [state, formAction, pending] = useActionState(requestOrCheckBulkUploadPayment, initial);
+  const [open, setOpen] = useState(false);
+  const [state, formAction, pending] = useActionState(requestBulkUploadBatch, initial);
+
+  useEffect(() => {
+    if (state.done) setOpen(false);
+  }, [state]);
 
   return (
     <section className="mb-10 rounded-xl border-2 border-red-700 bg-white p-5 shadow-sm">
-      <h2 className="text-lg font-bold">Step 1 — Pay For Your Bulk Registration</h2>
+      <h2 className="text-lg font-bold">Step 1 — Enquire &amp; Pay For Your Bulk Registration</h2>
       <p className="mt-1 text-sm text-neutral-600">
-        Bulk registration is paid upfront, before you upload: tell us how many participants you're
-        registering, pay the total, and once the organizer confirms it you can upload your CSV or
-        table below — <strong>using this same School and Sensei</strong>.
+        Bulk registration is paid upfront, before you upload. Tell us — for each tier you&apos;re
+        using — how many participants and how many total kata events they&apos;re taking, pay the
+        combined total, and once the organizer confirms it you can upload your CSV or table below
+        using this same School and Sensei.
       </p>
 
-      <form action={formAction} className="mt-4 grid gap-4 sm:grid-cols-3">
-        <input type="hidden" name="competition_id" value={competitionId} />
-        <div>
-          <label htmlFor="gate_school_id" className="mb-1 block text-sm font-medium text-neutral-700">School / Dojo *</label>
-          <select id="gate_school_id" name="school_id" required defaultValue="" className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm">
-            <option value="" disabled>Select school</option>
-            {schools.map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
-          </select>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="mt-4 rounded-md bg-red-700 px-5 py-2.5 font-semibold text-white hover:bg-red-600"
+      >
+        Enquire &amp; pay for bulk registration
+      </button>
+
+      {state.done && state.tiers && (
+        <div className="mt-4 space-y-3">
+          {state.tiers.every((t) => t.status === "paid") ? (
+            <div className="rounded-lg border border-green-300 bg-green-50 p-4">
+              <p className="font-bold text-green-900">✅ Paid — you can upload now</p>
+              <ul className="mt-1 space-y-0.5 text-sm text-green-800">
+                {state.tiers.map((t) => (
+                  <li key={t.competitionId}>
+                    {t.competitionName}: {t.participants} participant{t.participants === 1 ? "" : "s"},{" "}
+                    {t.events} event{t.events === 1 ? "" : "s"} remaining
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-1 text-sm text-green-800">
+                Scroll down and upload using the same School and Sensei you selected — pick the
+                matching tier for each upload.
+              </p>
+            </div>
+          ) : (
+            <div className="rounded-lg border border-amber-300 bg-amber-50 p-4">
+              <p className="font-bold text-amber-900">Payment pending</p>
+              <ul className="mt-1 space-y-0.5 text-sm text-amber-800">
+                {state.tiers.map((t) => (
+                  <li key={t.competitionId}>
+                    {t.competitionName}: {t.participants} participant{t.participants === 1 ? "" : "s"},{" "}
+                    {t.events} event{t.events === 1 ? "" : "s"} — {formatUSD(t.amountUsd)}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-sm text-amber-800">
+                Combined total due: <strong>{formatUSD(state.totalAmountUsd ?? 0)}</strong>. Transfer
+                this amount and send your receipt to the organizer (see below), quoting batch
+                reference{" "}
+                <span className="rounded bg-white px-1.5 py-0.5 font-mono text-xs font-bold">
+                  {state.batchId?.slice(0, 8).toUpperCase()}
+                </span>
+                . Once confirmed, come back and click &quot;Enquire &amp; pay&quot; again with the
+                same School, Sensei, and numbers to unlock the upload.
+              </p>
+              <div className="mt-2 text-amber-900"><OrganizerContact /></div>
+            </div>
+          )}
         </div>
-        <div>
-          <label htmlFor="gate_sensei_id" className="mb-1 block text-sm font-medium text-neutral-700">Sensei / Coach *</label>
-          <select id="gate_sensei_id" name="sensei_id" required defaultValue="" className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm">
-            <option value="" disabled>Select sensei</option>
-            {senseis.map((s) => (
-              <option key={s.id} value={s.id}>{s.name}{s.rank ? ` (${s.rank})` : ""}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label htmlFor="gate_count" className="mb-1 block text-sm font-medium text-neutral-700">No. of participants *</label>
-          <input
-            id="gate_count"
-            name="participant_count"
-            type="number"
-            min={1}
-            required
-            className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm"
-          />
-        </div>
-        <div className="sm:col-span-3">
-          <button
-            type="submit"
-            disabled={pending}
-            className="rounded-md bg-red-700 px-5 py-2.5 font-semibold text-white hover:bg-red-600 disabled:opacity-60"
+      )}
+
+      {open && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setOpen(false)}
+        >
+          <div
+            className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-5 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
           >
-            {pending ? "Checking…" : "Request / check payment"}
-          </button>
+            <div className="mb-3 flex items-start justify-between gap-2">
+              <h3 className="text-lg font-bold text-neutral-900">Bulk registration enquiry</h3>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="text-neutral-400 hover:text-neutral-700"
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="mb-4 text-sm text-neutral-500">
+              Fill in only the tier(s) you&apos;re registering for — leave a tier&apos;s fields at 0
+              to skip it. <strong>The numbers you enter here are the only ones you&apos;ll be
+              allowed to upload</strong> — uploading more participants or events than declared will
+              be rejected by the system.
+            </p>
+            <form action={formAction} className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="gate_school_id" className="mb-1 block text-sm font-medium text-neutral-700">
+                    School / Dojo *
+                  </label>
+                  <select
+                    id="gate_school_id"
+                    name="school_id"
+                    required
+                    defaultValue=""
+                    className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm"
+                  >
+                    <option value="" disabled>Select school</option>
+                    {schools.map((s) => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="gate_sensei_id" className="mb-1 block text-sm font-medium text-neutral-700">
+                    Sensei / Coach *
+                  </label>
+                  <select
+                    id="gate_sensei_id"
+                    name="sensei_id"
+                    required
+                    defaultValue=""
+                    className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm"
+                  >
+                    <option value="" disabled>Select sensei</option>
+                    {senseis.map((s) => (
+                      <option key={s.id} value={s.id}>{s.name}{s.rank ? ` (${s.rank})` : ""}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {competitions.map((c, i) => (
+                <div key={c.id} className="rounded-md border border-neutral-200 bg-neutral-50 p-3">
+                  <input type="hidden" name={`competition_${i + 1}_id`} value={c.id} />
+                  <p className="mb-2 text-sm font-bold text-neutral-800">
+                    {c.name}
+                    <span className="ml-2 font-normal text-neutral-400">
+                      {formatUSD(c.registration_fee_usd)} per event
+                    </span>
+                  </p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label htmlFor={`participants_${i + 1}`} className="mb-1 block text-xs font-medium text-neutral-700">
+                        No. of participants
+                      </label>
+                      <input
+                        id={`participants_${i + 1}`}
+                        name={`participants_${i + 1}`}
+                        type="number"
+                        min={0}
+                        defaultValue={0}
+                        className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor={`events_${i + 1}`} className="mb-1 block text-xs font-medium text-neutral-700">
+                        Total no. of kata events
+                      </label>
+                      <input
+                        id={`events_${i + 1}`}
+                        name={`events_${i + 1}`}
+                        type="number"
+                        min={0}
+                        defaultValue={0}
+                        className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {state.error && (
+                <div className="rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
+                  {state.error}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={pending}
+                className="w-full rounded-md bg-red-700 px-5 py-2.5 font-semibold text-white hover:bg-red-600 disabled:opacity-60 sm:w-auto"
+              >
+                {pending ? "Checking…" : "Submit enquiry"}
+              </button>
+            </form>
+          </div>
         </div>
-      </form>
-
-      {state.error && (
-        <div className="mt-4 rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">{state.error}</div>
-      )}
-
-      {state.done && state.status === "paid" && (
-        <div className="mt-4 rounded-lg border border-green-300 bg-green-50 p-4">
-          <p className="font-bold text-green-900">✅ Paid — you can upload now</p>
-          <p className="mt-1 text-sm text-green-800">
-            Balance remaining on this payment: <strong>{state.remainingParticipants}</strong> participant
-            {state.remainingParticipants === 1 ? "" : "s"}. Scroll down and upload using the same School
-            and Sensei you selected above.
-          </p>
-        </div>
-      )}
-
-      {state.done && state.status === "pending" && (
-        <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-4">
-          <p className="font-bold text-amber-900">Payment pending</p>
-          <p className="mt-1 text-sm text-amber-800">
-            Amount due: <strong>{formatUSD(state.amountUsd ?? 0)}</strong>. Transfer this amount and
-            send your receipt to the organizer (see below), quoting payment reference{" "}
-            <span className="rounded bg-white px-1.5 py-0.5 font-mono text-xs font-bold">{state.paymentId?.slice(0, 8).toUpperCase()}</span>.
-            Once confirmed, come back and click &quot;Request / check payment&quot; again with the
-            same School, Sensei, and participant count to unlock the upload.
-          </p>
-          <div className="mt-2 text-amber-900"><OrganizerContact /></div>
-        </div>
-      )}
-
-      {registrationFeeUsd != null && (
-        <p className="mt-3 text-xs text-neutral-400">
-          Fee is {formatUSD(registrationFeeUsd)} per participant.
-        </p>
       )}
     </section>
   );

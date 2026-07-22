@@ -57,87 +57,210 @@ const ROW_REQUIRED: Array<[keyof BulkRow, string]> = [
   ["bank_account_name", "bank account holder"],
 ];
 
-export interface BulkPaymentState {
-  done: boolean;
-  error?: string;
-  status?: "pending" | "paid";
-  paymentId?: string;
-  amountUsd?: number;
-  remainingParticipants?: number;
+export interface BulkTierState {
+  competitionId: string;
+  competitionName: string;
+  status: "pending" | "paid";
+  paymentId: string;
+  amountUsd: number;
+  participants: number;
+  events: number;
 }
 
-/** Looks up whether this sensei already has enough paid bulk-upload balance
- * for the requested headcount; if not, returns (or creates) a pending
- * request. The sensei pays the organizer manually — bank transfer, same
- * as every other payment in this app — and the organizer confirms it via
- * markBulkUploadPaymentPaid in app/actions/admin.ts. */
-export async function requestOrCheckBulkUploadPayment(
-  _prev: BulkPaymentState,
+export interface BulkBatchState {
+  done: boolean;
+  error?: string;
+  batchId?: string;
+  totalAmountUsd?: number;
+  tiers?: BulkTierState[];
+}
+
+interface ExistingBulkRow {
+  id: string;
+  batch_id: string | null;
+  competition_id: string;
+  participant_count: number;
+  declared_participants: number;
+  amount_usd: number;
+  status: "pending" | "paid" | "consumed";
+}
+
+/** One popup enquiry covers all 3 competition tiers at once: for each
+ * tier the Sensei intends to use, they give a participant headcount AND a
+ * total event count (fee scales by events — same up-to-3-per-participant
+ * rule as individual registration — so 5 participants each taking 2
+ * events pay for 10 events). Creates one bulk_upload_payments row per
+ * tier entered, sharing a batch_id, and returns one combined bill; the
+ * organizer confirms the whole batch at once via markBulkUploadBatchPaid.
+ * Re-submitting the same (or smaller) numbers reuses the existing batch
+ * instead of billing twice. */
+export async function requestBulkUploadBatch(
+  _prev: BulkBatchState,
   formData: FormData,
-): Promise<BulkPaymentState> {
-  const competitionId = String(formData.get("competition_id") ?? "");
+): Promise<BulkBatchState> {
   const schoolId = String(formData.get("school_id") ?? "");
   const senseiId = String(formData.get("sensei_id") ?? "");
-  const participantCount = Number(formData.get("participant_count") ?? 0);
-  if (!competitionId || !schoolId || !senseiId) {
+  if (!schoolId || !senseiId) {
     return { done: false, error: "Select the school / dojo and sensei / coach first." };
   }
-  if (!Number.isInteger(participantCount) || participantCount < 1) {
-    return { done: false, error: "Enter how many participants you're registering (at least 1)." };
+
+  const tierInputs = [1, 2, 3]
+    .map((n) => ({
+      competitionId: String(formData.get(`competition_${n}_id`) ?? ""),
+      participants: Number(formData.get(`participants_${n}`) ?? 0),
+      events: Number(formData.get(`events_${n}`) ?? 0),
+    }))
+    .filter((t) => t.competitionId && (t.participants > 0 || t.events > 0));
+
+  if (tierInputs.length === 0) {
+    return { done: false, error: "Enter a participant count and total event count for at least one tier." };
+  }
+  for (const t of tierInputs) {
+    if (!Number.isInteger(t.participants) || t.participants < 1) {
+      return { done: false, error: "Each tier's participant count must be a whole number of at least 1." };
+    }
+    if (!Number.isInteger(t.events) || t.events < t.participants) {
+      return {
+        done: false,
+        error: "Each tier's total events must be at least its participant count — every participant takes at least 1 event.",
+      };
+    }
   }
 
   const supabase = await createClient();
+  const competitionIds = tierInputs.map((t) => t.competitionId);
+  const { data: competitions } = await supabase
+    .from("competitions")
+    .select("id, name, registration_fee_usd")
+    .in("id", competitionIds);
+  const compById = new Map((competitions ?? []).map((c) => [c.id as string, c]));
+  if (compById.size !== new Set(competitionIds).size) {
+    return { done: false, error: "One of the selected competitions was not found." };
+  }
 
-  const { data: existingPaid } = await supabase
+  // Reuse an already-requested batch with matching (or greater) numbers for
+  // every one of its tiers — same dedupe courtesy as before, just extended
+  // to a whole batch instead of a single tier.
+  const { data: existingRows } = await supabase
     .from("bulk_upload_payments")
-    .select("id, participant_count")
-    .eq("competition_id", competitionId)
+    .select("id, batch_id, competition_id, participant_count, declared_participants, amount_usd, status")
     .eq("school_id", schoolId)
     .eq("sensei_id", senseiId)
-    .eq("status", "paid")
-    .gte("participant_count", participantCount)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-  if (existingPaid) {
+    .not("batch_id", "is", null);
+  const byBatch = new Map<string, ExistingBulkRow[]>();
+  for (const row of (existingRows ?? []) as ExistingBulkRow[]) {
+    const list = byBatch.get(row.batch_id!) ?? [];
+    list.push(row);
+    byBatch.set(row.batch_id!, list);
+  }
+  for (const [batchId, rows] of byBatch) {
+    if (rows.length !== tierInputs.length) continue;
+    const allMatch = tierInputs.every((t) =>
+      rows.some(
+        (r) =>
+          r.competition_id === t.competitionId &&
+          r.declared_participants >= t.participants &&
+          r.participant_count >= t.events,
+      ),
+    );
+    if (!allMatch) continue;
+    const allPaid = rows.every((r) => r.status === "paid" || r.status === "consumed");
+    const allPending = rows.every((r) => r.status === "pending");
+    if (!allPaid && !allPending) continue;
     return {
-      done: true, status: "paid", paymentId: existingPaid.id,
-      remainingParticipants: existingPaid.participant_count,
+      done: true,
+      batchId,
+      totalAmountUsd: rows.reduce((sum, r) => sum + Number(r.amount_usd), 0),
+      tiers: rows.map((r) => ({
+        competitionId: r.competition_id,
+        competitionName: compById.get(r.competition_id)?.name ?? "",
+        status: allPaid ? "paid" : "pending",
+        paymentId: r.id,
+        amountUsd: Number(r.amount_usd),
+        participants: r.declared_participants,
+        events: r.participant_count,
+      })),
     };
   }
 
-  // Don't spam a duplicate pending request for the same headcount.
-  const { data: existingPending } = await supabase
-    .from("bulk_upload_payments")
-    .select("id, amount_usd")
-    .eq("competition_id", competitionId)
-    .eq("school_id", schoolId)
-    .eq("sensei_id", senseiId)
-    .eq("participant_count", participantCount)
-    .eq("status", "pending")
-    .maybeSingle();
-  if (existingPending) {
-    return { done: true, status: "pending", paymentId: existingPending.id, amountUsd: Number(existingPending.amount_usd) };
+  const batchId = crypto.randomUUID();
+  const created: BulkTierState[] = [];
+  for (const t of tierInputs) {
+    const comp = compById.get(t.competitionId)!;
+    const amountUsd = t.events * Number(comp.registration_fee_usd ?? 0);
+    const { data: row, error } = await supabase
+      .from("bulk_upload_payments")
+      .insert({
+        batch_id: batchId,
+        competition_id: t.competitionId,
+        school_id: schoolId,
+        sensei_id: senseiId,
+        participant_count: t.events,
+        declared_participants: t.participants,
+        amount_usd: amountUsd,
+      })
+      .select("id")
+      .single();
+    if (error || !row) return { done: false, error: "Could not create the payment request. Please try again." };
+    created.push({
+      competitionId: t.competitionId,
+      competitionName: comp.name,
+      status: "pending",
+      paymentId: row.id,
+      amountUsd,
+      participants: t.participants,
+      events: t.events,
+    });
   }
 
-  const { data: competition } = await supabase
-    .from("competitions")
-    .select("registration_fee_usd")
-    .eq("id", competitionId)
-    .maybeSingle();
-  if (!competition) return { done: false, error: "Competition not found." };
-  const amountUsd = participantCount * Number(competition.registration_fee_usd ?? 0);
+  return {
+    done: true,
+    batchId,
+    totalAmountUsd: created.reduce((sum, t) => sum + t.amountUsd, 0),
+    tiers: created,
+  };
+}
 
-  const { data: created, error } = await supabase
-    .from("bulk_upload_payments")
-    .insert({
-      competition_id: competitionId, school_id: schoolId, sensei_id: senseiId,
-      participant_count: participantCount, amount_usd: amountUsd,
-    })
-    .select("id")
-    .single();
-  if (error) return { done: false, error: "Could not create the payment request. Please try again." };
-  return { done: true, status: "pending", paymentId: created!.id, amountUsd };
+/** How many of this school+sensei's participants already registered for
+ * this competition are NOT in `incomingIcs` — i.e. distinct headcount
+ * already spent, so a new upload only needs to cover the gap between that
+ * and the tier's declared_participants cap. */
+async function countExistingParticipantIcs(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  schoolId: string,
+  senseiId: string,
+  competitionId: string,
+): Promise<Set<string>> {
+  const { data } = await supabase
+    .from("participants")
+    .select("ic_passport, registrations!inner(competition_id)")
+    .eq("school_id", schoolId)
+    .eq("sensei_id", senseiId)
+    .eq("registrations.competition_id", competitionId);
+  return new Set((data ?? []).map((p) => p.ic_passport as string));
+}
+
+/** Rejects an upload if it would push this tier's distinct participant
+ * headcount past what was declared (and paid for) in the enquiry popup —
+ * independent of the separate event-count cap already enforced via
+ * consume_bulk_upload_payment. A participant re-appearing across rows (a
+ * 2nd/3rd event) or already registered from an earlier upload doesn't
+ * count twice. */
+async function enforceHeadcountCap(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  schoolId: string,
+  senseiId: string,
+  competitionId: string,
+  declaredParticipants: number,
+  incomingIcs: string[],
+): Promise<string | null> {
+  const existingIcs = await countExistingParticipantIcs(supabase, schoolId, senseiId, competitionId);
+  const newIcs = new Set(incomingIcs.filter((ic) => !existingIcs.has(ic)));
+  const totalAfter = existingIcs.size + newIcs.size;
+  if (totalAfter > declaredParticipants) {
+    return `This upload would bring this tier's total participants to ${totalAfter}, exceeding the ${declaredParticipants} you declared and paid for. Reduce the number of new participants, or request a higher headcount first.`;
+  }
+  return null;
 }
 
 /** Sends the sensei one summary email with every participant's Reference
@@ -204,7 +327,7 @@ export async function bulkRegister(_prev: BulkState, formData: FormData): Promis
   // a matching paid, sufficient-balance payment server-side.
   const { data: payment } = await supabase
     .from("bulk_upload_payments")
-    .select("id, participant_count")
+    .select("id, participant_count, declared_participants")
     .eq("competition_id", competitionId)
     .eq("school_id", schoolId)
     .eq("sensei_id", senseiId)
@@ -219,6 +342,11 @@ export async function bulkRegister(_prev: BulkState, formData: FormData): Promis
       error: "Pay for this batch first — request and pay for your bulk registration above, then come back here.",
     };
   }
+  const headcountError = await enforceHeadcountCap(
+    supabase, schoolId, senseiId, competitionId, payment.declared_participants,
+    rows.map((r) => r.ic_passport.trim()),
+  );
+  if (headcountError) return { done: false, error: headcountError };
 
   const { data: catRows } = await supabase
     .from("categories")
@@ -446,7 +574,7 @@ export async function bulkRegisterCsv(_prev: CsvBulkState, formData: FormData): 
   // a matching paid, sufficient-balance payment server-side.
   const { data: payment } = await supabase
     .from("bulk_upload_payments")
-    .select("id, participant_count")
+    .select("id, participant_count, declared_participants")
     .eq("competition_id", competitionId)
     .eq("school_id", schoolId)
     .eq("sensei_id", senseiId)
@@ -589,6 +717,12 @@ export async function bulkRegisterCsv(_prev: CsvBulkState, formData: FormData): 
     existingByIc.set(v.ic, state);
     return true;
   });
+
+  const headcountError = await enforceHeadcountCap(
+    supabase, schoolId, senseiId, competitionId, payment.declared_participants,
+    toInsert.map((v) => v.ic),
+  );
+  if (headcountError) return { done: false, error: headcountError };
 
   // Chunked batch inserts
   let registered = 0;

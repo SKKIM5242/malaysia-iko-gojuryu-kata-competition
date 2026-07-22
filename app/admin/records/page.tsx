@@ -114,21 +114,37 @@ export default async function AdminParticipantRecords() {
 
   const { data: bulkPayments } = await supabase
     .from("bulk_upload_payments")
-    .select("id, sensei_id, school_id, participant_count, amount_usd, status, created_at, paid_at")
+    .select("id, batch_id, sensei_id, school_id, competition_id, participant_count, declared_participants, amount_usd, status, created_at, paid_at")
     .order("created_at", { ascending: false });
   const bulkPaymentList = bulkPayments ?? [];
   const bulkSenseiIds = [...new Set(bulkPaymentList.map((p) => p.sensei_id as string))];
   const bulkSchoolIds = [...new Set(bulkPaymentList.map((p) => p.school_id as string))];
-  const [{ data: bulkSenseis }, { data: bulkSchools }] = await Promise.all([
+  const bulkCompetitionIds = [...new Set(bulkPaymentList.map((p) => p.competition_id as string))];
+  const [{ data: bulkSenseis }, { data: bulkSchools }, { data: bulkCompetitions }] = await Promise.all([
     bulkSenseiIds.length > 0
       ? supabase.from("senseis").select("id, name").in("id", bulkSenseiIds)
       : Promise.resolve({ data: [] }),
     bulkSchoolIds.length > 0
       ? supabase.from("schools").select("id, name").in("id", bulkSchoolIds)
       : Promise.resolve({ data: [] }),
+    bulkCompetitionIds.length > 0
+      ? supabase.from("competitions").select("id, name").in("id", bulkCompetitionIds)
+      : Promise.resolve({ data: [] }),
   ]);
   const senseiNameById = new Map((bulkSenseis ?? []).map((s) => [s.id as string, s.name as string]));
   const schoolNameById = new Map((bulkSchools ?? []).map((s) => [s.id as string, s.name as string]));
+  const bulkCompetitionNameById = new Map((bulkCompetitions ?? []).map((c) => [c.id as string, c.name as string]));
+
+  // One enquiry can cover up to 3 tiers at once, sharing a batch_id with
+  // one combined bill — group siblings together so admin confirms (or
+  // sees) the whole batch as one card, not 3 separate ones.
+  const bulkBatches = new Map<string, typeof bulkPaymentList>();
+  for (const p of bulkPaymentList) {
+    const key = (p.batch_id as string | null) ?? (p.id as string);
+    const list = bulkBatches.get(key) ?? [];
+    list.push(p);
+    bulkBatches.set(key, list);
+  }
 
   const participantRows: ParticipantRecordRow[] = participantRecords.map((r) => ({
     registrationId: r.registrationId,
@@ -414,41 +430,58 @@ export default async function AdminParticipantRecords() {
           <EmptyState>No bulk upload payment requests yet.</EmptyState>
         ) : (
           <div className="space-y-2">
-            {bulkPaymentList.map((p) => (
-              <div
-                key={p.id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-neutral-200 p-3 text-sm"
-              >
-                <div>
-                  <p className="font-semibold text-neutral-900">
-                    {senseiNameById.get(p.sensei_id as string) ?? "—"}
-                    <span className="font-normal text-neutral-400"> · {schoolNameById.get(p.school_id as string) ?? "—"}</span>
-                  </p>
-                  <p className="text-xs text-neutral-400">
-                    {p.status === "pending" ? "Requested for" : "Remaining balance:"} {p.participant_count}{" "}
-                    participant{p.participant_count === 1 ? "" : "s"} · {formatUSD(Number(p.amount_usd))} ·{" "}
-                    Requested {formatDate((p.created_at as string).slice(0, 10))}
-                    {p.paid_at ? ` · Confirmed ${formatDate((p.paid_at as string).slice(0, 10))}` : ""}
-                  </p>
+            {[...bulkBatches.values()].map((rows) => {
+              const first = rows[0];
+              const totalAmount = rows.reduce((sum, r) => sum + Number(r.amount_usd), 0);
+              const allPending = rows.every((r) => r.status === "pending");
+              const allConsumed = rows.every((r) => r.status === "consumed");
+              const batchKey = (first.batch_id as string | null) ?? (first.id as string);
+              return (
+                <div key={batchKey} className="rounded-md border border-neutral-200 p-3 text-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="font-semibold text-neutral-900">
+                        {senseiNameById.get(first.sensei_id as string) ?? "—"}
+                        <span className="font-normal text-neutral-400"> · {schoolNameById.get(first.school_id as string) ?? "—"}</span>
+                      </p>
+                      <p className="text-xs text-neutral-400">
+                        Combined total {formatUSD(totalAmount)} across {rows.length} tier{rows.length === 1 ? "" : "s"} ·{" "}
+                        Requested {formatDate((first.created_at as string).slice(0, 10))}
+                        {first.paid_at ? ` · Confirmed ${formatDate((first.paid_at as string).slice(0, 10))}` : ""}
+                      </p>
+                    </div>
+                    {allPending ? (
+                      <form action={markBulkUploadPaymentPaid}>
+                        <input type="hidden" name="id" value={first.id} />
+                        <button type="submit" className={adminBtnSecondary}>Confirm payment received</button>
+                      </form>
+                    ) : (
+                      <span
+                        className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${
+                          allConsumed
+                            ? "border-neutral-300 bg-neutral-50 text-neutral-600"
+                            : "border-green-300 bg-green-50 text-green-800"
+                        }`}
+                      >
+                        {allConsumed ? "Fully used" : "Paid — ready to upload"}
+                      </span>
+                    )}
+                  </div>
+                  <ul className="mt-2 space-y-1 border-t border-neutral-100 pt-2">
+                    {rows.map((r) => (
+                      <li key={r.id as string} className="flex items-center justify-between text-xs text-neutral-500">
+                        <span>{bulkCompetitionNameById.get(r.competition_id as string) ?? "—"}</span>
+                        <span>
+                          {r.declared_participants} participant{r.declared_participants === 1 ? "" : "s"} ·{" "}
+                          {r.status === "pending" ? "requested for" : "remaining"} {r.participant_count} event
+                          {r.participant_count === 1 ? "" : "s"} · {formatUSD(Number(r.amount_usd))}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-                {p.status === "pending" ? (
-                  <form action={markBulkUploadPaymentPaid}>
-                    <input type="hidden" name="id" value={p.id} />
-                    <button type="submit" className={adminBtnSecondary}>Confirm payment received</button>
-                  </form>
-                ) : (
-                  <span
-                    className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${
-                      p.status === "consumed"
-                        ? "border-neutral-300 bg-neutral-50 text-neutral-600"
-                        : "border-green-300 bg-green-50 text-green-800"
-                    }`}
-                  >
-                    {p.status === "consumed" ? "Fully used" : "Paid — ready to upload"}
-                  </span>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </Section>

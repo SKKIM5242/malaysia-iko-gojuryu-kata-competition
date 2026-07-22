@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useActionState } from "react";
 import Link from "next/link";
 import { bulkRegister, type BulkRow, type BulkState } from "@/app/actions/bulk";
+import { formatUSD } from "@/components/ui";
 import type { Competition, School, Sensei } from "@/lib/types";
 
 const initial: BulkState = { done: false };
@@ -29,12 +30,12 @@ const emptyRow = (): BulkRow => ({
 const cell = "w-full rounded border border-neutral-300 bg-white px-2 py-1.5 text-xs focus:border-red-600 focus:outline-none";
 
 export default function BulkRegisterForm({
-  competition,
+  competitions,
   kataBases,
   schools,
   senseis,
 }: {
-  competition: Competition;
+  competitions: Competition[];
   kataBases: string[];
   schools: School[];
   senseis: Sensei[];
@@ -91,7 +92,6 @@ export default function BulkRegisterForm({
 
   return (
     <form action={formAction} className="space-y-5">
-      <input type="hidden" name="competition_id" value={competition.id} />
       <input type="hidden" name="rows_json" value={JSON.stringify(rows)} />
 
       {state.error && (
@@ -100,7 +100,24 @@ export default function BulkRegisterForm({
         </div>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-3">
+        <div>
+          <label htmlFor="table_competition_id" className="mb-1 block text-sm font-medium text-neutral-700">
+            Competition tier *
+          </label>
+          <select
+            id="table_competition_id"
+            name="competition_id"
+            required
+            defaultValue={competitions.length === 1 ? competitions[0].id : ""}
+            className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm"
+          >
+            <option value="" disabled>Select the tier you paid for</option>
+            {competitions.map((c) => (
+              <option key={c.id} value={c.id}>{c.name} — {formatUSD(c.registration_fee_usd)} per event</option>
+            ))}
+          </select>
+        </div>
         <div>
           <label htmlFor="school_id" className="mb-1 block text-sm font-medium text-neutral-700">School / Dojo *</label>
           <select id="school_id" name="school_id" required defaultValue="" className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm">
