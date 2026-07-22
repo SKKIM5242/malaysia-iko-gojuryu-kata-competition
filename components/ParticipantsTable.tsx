@@ -4,6 +4,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { CategoryName } from "@/components/ui";
 import ColumnFilterDropdown from "@/components/ColumnFilterDropdown";
 import DualScrollBox from "@/components/DualScrollBox";
+import { useGridControls } from "@/lib/useGridControls";
 
 export interface ParticipantRow {
   id: string;
@@ -61,11 +62,15 @@ const DEFAULT_WIDTHS: Record<string, number> = {
  * filters (ColumnFilterDropdown) — scaled down for this public,
  * read-only, server-paginated list (no CSV export here, and no "#" column
  * filter since it's just a running row count). Widths and filters reset
- * on reload, not persisted. */
+ * on reload, not persisted. Click a column header or a row's "#" cell to
+ * select/highlight it; a highlighted column/row can be hidden with the ×
+ * that appears, and rows resize taller/shorter from their bottom edge the
+ * same way columns resize from their right edge. */
 export default function ParticipantsTable({ rows }: { rows: ParticipantRow[] }) {
   const [colWidths, setColWidths] = useState<Record<string, number>>({});
   const [filters, setFilters] = useState<Record<string, Set<string>>>({});
   const resizingRef = useRef<{ key: string; startX: number; startWidth: number } | null>(null);
+  const grid = useGridControls();
 
   const widthOf = useCallback(
     (key: string) => colWidths[key] ?? DEFAULT_WIDTHS[key] ?? 150,
@@ -96,6 +101,8 @@ export default function ParticipantsTable({ rows }: { rows: ParticipantRow[] }) 
     [widthOf, handleMove, handleUp],
   );
 
+  const visibleColumns = useMemo(() => COLUMNS.filter((c) => !grid.hiddenCols.has(c.key)), [grid.hiddenCols]);
+
   const uniqueValues = useMemo(() => {
     const map: Record<string, string[]> = {};
     for (const c of COLUMNS) {
@@ -120,35 +127,86 @@ export default function ParticipantsTable({ rows }: { rows: ParticipantRow[] }) 
     return rows.filter((r) => active.every(([key, values]) => values.has(rawValue(r, key as FilterableKey))));
   }, [rows, filters]);
 
-  const totalWidth = COLUMNS.reduce((sum, c) => sum + widthOf(c.key), 0);
+  const displayedRows = useMemo(
+    () => filtered.filter((r) => !grid.hiddenRows.has(r.id)),
+    [filtered, grid.hiddenRows],
+  );
+
+  const totalWidth = visibleColumns.reduce((sum, c) => sum + widthOf(c.key), 0);
 
   return (
     <div>
       <p className="mb-2 text-xs text-neutral-400">
-        Showing {filtered.length} of {rows.length}. Drag a column's right edge to resize it.
+        Showing {filtered.length} of {rows.length}. Drag a column's right edge to resize it, or
+        click a header/row to select and hide it.
       </p>
+      {(grid.hiddenCols.size > 0 || grid.hiddenRows.size > 0) && (
+        <div className="mb-2 flex flex-wrap items-center gap-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-800">
+          {grid.hiddenCols.size > 0 && (
+            <span>
+              {grid.hiddenCols.size} column{grid.hiddenCols.size === 1 ? "" : "s"} hidden —{" "}
+              <button type="button" onClick={grid.showAllCols} className="font-semibold underline underline-offset-2">
+                show all
+              </button>
+            </span>
+          )}
+          {grid.hiddenRows.size > 0 && (
+            <span>
+              {grid.hiddenRows.size} row{grid.hiddenRows.size === 1 ? "" : "s"} hidden —{" "}
+              <button type="button" onClick={grid.showAllRows} className="font-semibold underline underline-offset-2">
+                show all
+              </button>
+            </span>
+          )}
+        </div>
+      )}
       <DualScrollBox>
         <table className="text-left text-sm" style={{ tableLayout: "fixed", width: totalWidth }}>
           <colgroup>
-            {COLUMNS.map((c) => (
+            {visibleColumns.map((c) => (
               <col key={c.key} style={{ width: widthOf(c.key) }} />
             ))}
           </colgroup>
           <thead className="sticky top-0 z-20 border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
             <tr>
-              {COLUMNS.map((c) => (
-                <th key={c.key} className="relative select-none px-4 py-3">
-                  <span className="block overflow-hidden text-ellipsis pr-2">{c.label}</span>
-                  <span
-                    onMouseDown={(e) => handleResizeStart(e, c.key)}
-                    title="Drag to resize this column"
-                    className="absolute right-0 top-0 z-10 h-full w-2 cursor-col-resize touch-none select-none hover:bg-red-300 active:bg-red-500"
-                  />
-                </th>
-              ))}
+              {visibleColumns.map((c) => {
+                const selected = grid.selectedCols.has(c.key);
+                return (
+                  <th
+                    key={c.key}
+                    className={`relative select-none px-4 py-3 ${selected ? "bg-amber-100" : ""}`}
+                  >
+                    <span
+                      onClick={() => grid.toggleColSelect(c.key)}
+                      title="Click to select/highlight this column"
+                      className="block cursor-pointer overflow-hidden text-ellipsis pr-4"
+                    >
+                      {c.label}
+                    </span>
+                    {selected && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          grid.hideCol(c.key);
+                        }}
+                        title="Hide this column"
+                        className="absolute right-2.5 top-1/2 z-20 flex h-4 w-4 -translate-y-1/2 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold leading-none text-white hover:bg-red-700"
+                      >
+                        ×
+                      </button>
+                    )}
+                    <span
+                      onMouseDown={(e) => handleResizeStart(e, c.key)}
+                      title="Drag to resize this column"
+                      className="absolute right-0 top-0 z-10 h-full w-2 cursor-col-resize touch-none select-none hover:bg-red-300 active:bg-red-500"
+                    />
+                  </th>
+                );
+              })}
             </tr>
             <tr className="border-t border-neutral-200 bg-white normal-case">
-              {COLUMNS.map((c) => (
+              {visibleColumns.map((c) => (
                 <th key={c.key} className="px-2 py-1.5">
                   {c.key !== "no" && c.key !== "reference_id" && (
                     <ColumnFilterDropdown
@@ -162,28 +220,98 @@ export default function ParticipantsTable({ rows }: { rows: ParticipantRow[] }) 
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100">
-            {filtered.length === 0 ? (
+            {displayedRows.length === 0 ? (
               <tr>
-                <td colSpan={COLUMNS.length} className="px-4 py-6 text-center text-neutral-400">
+                <td colSpan={visibleColumns.length} className="px-4 py-6 text-center text-neutral-400">
                   No records match these filters.
                 </td>
               </tr>
             ) : (
-              filtered.map((r) => (
-                <tr key={r.id} className="hover:bg-neutral-50">
-                  <td className="truncate px-4 py-3 text-neutral-400">{r.no}</td>
-                  <td className="truncate px-4 py-3 font-mono text-xs">{r.id.slice(0, 8).toUpperCase()}</td>
-                  <td className="truncate px-4 py-3 font-medium text-neutral-900">{r.name}</td>
-                  <td className="truncate px-4 py-3" title={r.tier ?? undefined}>{r.tier ?? "—"}</td>
-                  <td className="truncate px-4 py-3" title={r.categoryName ?? undefined}>
-                    <CategoryName name={r.categoryName ?? undefined} />
-                  </td>
-                  <td className="truncate px-4 py-3 text-xs">{r.division ?? "—"}</td>
-                  <td className="truncate px-4 py-3" title={r.belt ?? undefined}>{r.belt ?? "—"}</td>
-                  <td className="truncate px-4 py-3" title={r.school ?? undefined}>{r.school ?? "—"}</td>
-                  <td className="truncate px-4 py-3">{r.sensei ?? "—"}</td>
-                </tr>
-              ))
+              displayedRows.map((r) => {
+                const rowSelected = grid.selectedRows.has(r.id);
+                const rowHeight = grid.rowHeights[r.id];
+                return (
+                  <tr
+                    key={r.id}
+                    className={`group hover:bg-neutral-50 ${rowSelected ? "bg-amber-50" : ""} ${grid.rowSizeClass(r.id)}`}
+                    style={grid.rowSizeStyle(r.id)}
+                  >
+                    {visibleColumns.map((c, i) => {
+                      const isHandle = i === 0;
+                      let cellClass = "truncate px-4 py-3";
+                      let cellTitle: string | undefined;
+                      let content: React.ReactNode;
+                      switch (c.key) {
+                        case "no":
+                          cellClass += " text-neutral-400";
+                          content = r.no;
+                          break;
+                        case "reference_id":
+                          cellClass += " font-mono text-xs";
+                          content = r.id.slice(0, 8).toUpperCase();
+                          break;
+                        case "name":
+                          cellClass += " font-medium text-neutral-900";
+                          content = r.name;
+                          break;
+                        case "tier":
+                          cellTitle = r.tier ?? undefined;
+                          content = r.tier ?? "—";
+                          break;
+                        case "category":
+                          cellTitle = r.categoryName ?? undefined;
+                          content = <CategoryName name={r.categoryName ?? undefined} />;
+                          break;
+                        case "division":
+                          cellClass += " text-xs";
+                          content = r.division ?? "—";
+                          break;
+                        case "belt":
+                          cellTitle = r.belt ?? undefined;
+                          content = r.belt ?? "—";
+                          break;
+                        case "school":
+                          cellTitle = r.school ?? undefined;
+                          content = r.school ?? "—";
+                          break;
+                        case "sensei":
+                          content = r.sensei ?? "—";
+                          break;
+                      }
+                      return (
+                        <td
+                          key={c.key}
+                          className={`${cellClass} ${isHandle ? "relative cursor-pointer select-none" : ""}`}
+                          title={isHandle ? "Click to select/highlight this row" : cellTitle}
+                          onClick={isHandle ? () => grid.toggleRowSelect(r.id) : undefined}
+                        >
+                          {content}
+                          {isHandle && rowSelected && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                grid.hideRow(r.id);
+                              }}
+                              title="Hide this row"
+                              className="absolute right-1 top-1/2 z-20 flex h-4 w-4 -translate-y-1/2 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold leading-none text-white hover:bg-red-700"
+                            >
+                              ×
+                            </button>
+                          )}
+                          {isHandle && (
+                            <span
+                              onMouseDown={(e) => grid.handleRowResizeStart(e, r.id, rowHeight ?? 40)}
+                              title="Drag to resize this row"
+                              className="absolute bottom-0 left-0 right-0 z-10 h-1 cursor-row-resize touch-none select-none hover:bg-red-300 active:bg-red-500"
+                            />
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

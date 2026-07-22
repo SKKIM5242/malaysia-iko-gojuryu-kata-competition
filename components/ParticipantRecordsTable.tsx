@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 import { CategoryName, formatDate } from "@/components/ui";
 import VideoWatchButton from "@/components/VideoWatchButton";
 import DownloadCsvButton from "@/components/DownloadCsvButton";
 import AdminVideoUploadForm from "@/components/AdminVideoUploadForm";
 import ColumnFilterDropdown from "@/components/ColumnFilterDropdown";
 import DualScrollBox from "@/components/DualScrollBox";
+import { useGridControls } from "@/lib/useGridControls";
 import { updateRegistrationSlotStatus } from "@/app/actions/admin";
 
 export type SlotStatus = "active" | "unslotted" | "forfeited" | "given_up";
@@ -149,6 +150,107 @@ const EXTRA_COLUMNS: Array<{ key: string; label: string; width: number }> = [
 
 const MIN_COL_WIDTH = 60;
 
+function standardCell(
+  c: (typeof COLUMNS)[number],
+  row: ParticipantRecordRow,
+): { className: string; title?: string; content: ReactNode } {
+  switch (c.key) {
+    case "fullName":
+      return { className: "font-medium", title: row.fullName, content: row.fullName };
+    case "registrationId":
+      return { className: "font-mono text-xs", title: row.registrationId, content: row.registrationId.slice(0, 8).toUpperCase() };
+    case "competition":
+      return { className: "", title: row.competition, content: row.competition };
+    case "category":
+      return { className: "", title: row.category, content: <CategoryName name={row.category} /> };
+    case "icPassport":
+      return { className: "font-mono text-xs", title: row.icPassport, content: row.icPassport };
+    case "dateOfBirth":
+      return { className: "", title: row.dateOfBirth, content: row.dateOfBirth };
+    case "gender":
+      return { className: "capitalize", title: row.gender, content: row.gender };
+    case "beltRank":
+      return { className: "", title: row.beltRank, content: row.beltRank || "—" };
+    case "rankConfirmation":
+      return { className: "text-xs", title: row.rankConfirmation, content: row.rankConfirmation || "—" };
+    case "homeAddress":
+      return { className: "", title: row.homeAddress, content: row.homeAddress || "—" };
+    case "country":
+      return { className: "", title: row.country, content: row.country || "—" };
+    case "cityTown":
+      return { className: "", title: row.cityTown, content: row.cityTown || "—" };
+    case "postcode":
+      return { className: "", title: row.postcode, content: row.postcode || "—" };
+    case "email":
+      return { className: "text-xs", title: row.email, content: row.email || "—" };
+    case "phone":
+      return { className: "text-xs", title: row.phone, content: row.phone || "—" };
+    case "school":
+      return { className: "", title: row.school, content: row.school || "—" };
+    case "sensei":
+      return { className: "", title: row.sensei, content: row.sensei || "—" };
+    case "invitationCode":
+      return { className: "text-xs", title: row.invitationCode, content: row.invitationCode || "—" };
+    case "referralSource":
+      return { className: "text-xs", title: row.referralSource, content: row.referralSource || "—" };
+    case "bankName":
+      return { className: "text-xs", title: row.bankName, content: row.bankName || "—" };
+    case "bankAccountNo":
+      return { className: "text-xs", title: row.bankAccountNo, content: row.bankAccountNo || "—" };
+    case "bankAccountName":
+      return { className: "text-xs", title: row.bankAccountName, content: row.bankAccountName || "—" };
+    case "recordingStatus":
+      return {
+        className: "",
+        content: (
+          <span
+            className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${
+              row.recordingStatus === "Submitted"
+                ? "border-green-300 bg-green-50 text-green-800"
+                : "border-amber-300 bg-amber-50 text-amber-800"
+            }`}
+          >
+            {row.recordingStatus}
+          </span>
+        ),
+      };
+    case "recordingDate":
+      return { className: "text-xs", title: row.recordingDate, content: row.recordingDate || "—" };
+    case "attempts":
+      return { className: "text-xs", title: row.attempts, content: row.attempts };
+    default:
+      return { className: "", content: null };
+  }
+}
+
+function extraCell(key: string, row: ParticipantRecordRow, isAdmin: boolean, canManageSlot: boolean): ReactNode {
+  switch (key) {
+    case "certificate":
+      return row.certificateUrl ? (
+        <a
+          href={row.certificateUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="rounded border border-neutral-300 px-3 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
+        >
+          View
+        </a>
+      ) : (
+        <span className="text-xs text-neutral-400">—</span>
+      );
+    case "recording":
+      return (
+        <div className="flex flex-col items-start gap-1.5">
+          {row.videoUrl ? <VideoWatchButton url={row.videoUrl} /> : !isAdmin && <span className="text-xs text-neutral-400">—</span>}
+          {isAdmin && <AdminVideoUploadForm registrationId={row.registrationId} />}
+        </div>
+      );
+    case "slotStatus":
+      return <SlotStatusCell row={row} canManage={canManageSlot} />;
+  }
+  return null;
+}
+
 export default function ParticipantRecordsTable({
   rows,
   isAdmin = false,
@@ -161,6 +263,7 @@ export default function ParticipantRecordsTable({
   const [filters, setFilters] = useState<Partial<Record<keyof ParticipantRecordRow, Set<string>>>>({});
   const [colWidths, setColWidths] = useState<Record<string, number>>({});
   const resizingRef = useRef<{ key: string; startX: number; startWidth: number } | null>(null);
+  const grid = useGridControls();
 
   const widthOf = useCallback((key: string, fallback: number) => colWidths[key] ?? fallback, [colWidths]);
 
@@ -187,6 +290,47 @@ export default function ParticipantRecordsTable({
     },
     [widthOf, handleMove, handleUp],
   );
+
+  const visibleColumns = useMemo(() => COLUMNS.filter((c) => !grid.hiddenCols.has(c.key)), [grid.hiddenCols]);
+  const visibleExtraColumns = useMemo(() => EXTRA_COLUMNS.filter((c) => !grid.hiddenCols.has(c.key)), [grid.hiddenCols]);
+
+  const renderHeaderCell = (key: string, label: string, width: number, sticky: boolean) => {
+    const selected = grid.selectedCols.has(key);
+    return (
+      <th
+        key={key}
+        className={`relative select-none px-3 py-2.5 whitespace-nowrap ${
+          sticky ? "sticky left-0 z-10 border-r border-neutral-200" : ""
+        } ${selected ? "bg-amber-100" : sticky ? "bg-neutral-50" : ""}`}
+      >
+        <span
+          onClick={() => grid.toggleColSelect(key)}
+          title="Click to select/highlight this column"
+          className="block cursor-pointer overflow-hidden text-ellipsis pr-4"
+        >
+          {label}
+        </span>
+        {selected && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              grid.hideCol(key);
+            }}
+            title="Hide this column"
+            className="absolute right-2.5 top-1/2 z-20 flex h-4 w-4 -translate-y-1/2 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold leading-none text-white hover:bg-red-700"
+          >
+            ×
+          </button>
+        )}
+        <span
+          onMouseDown={(e) => handleResizeStart(e, key, width)}
+          title="Drag to resize this column"
+          className="absolute right-0 top-0 z-10 h-full w-2 cursor-col-resize touch-none select-none hover:bg-red-300 active:bg-red-500"
+        />
+      </th>
+    );
+  };
 
   const uniqueValues = useMemo(() => {
     const map: Partial<Record<keyof ParticipantRecordRow, string[]>> = {};
@@ -215,6 +359,11 @@ export default function ParticipantRecordsTable({
     );
   }, [rows, filters]);
 
+  const displayedRows = useMemo(
+    () => filtered.filter((row) => !grid.hiddenRows.has(row.registrationId)),
+    [filtered, grid.hiddenRows],
+  );
+
   const csvRows = useMemo(
     () =>
       filtered.map((row) => {
@@ -230,58 +379,56 @@ export default function ParticipantRecordsTable({
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-neutral-400">
           Showing {filtered.length} of {rows.length} successful registrations. Type in any column&apos;s filter
-          box to narrow the list — filters combine (AND). Drag a column&apos;s right edge to resize it.
+          box to narrow the list — filters combine (AND). Drag a column&apos;s right edge to resize it, or
+          click a header/row to select and hide it.
         </p>
         <DownloadCsvButton rows={csvRows} filename="participants" />
       </div>
+      {(grid.hiddenCols.size > 0 || grid.hiddenRows.size > 0) && (
+        <div className="mb-3 flex flex-wrap items-center gap-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-800">
+          {grid.hiddenCols.size > 0 && (
+            <span>
+              {grid.hiddenCols.size} column{grid.hiddenCols.size === 1 ? "" : "s"} hidden —{" "}
+              <button type="button" onClick={grid.showAllCols} className="font-semibold underline underline-offset-2">
+                show all
+              </button>
+            </span>
+          )}
+          {grid.hiddenRows.size > 0 && (
+            <span>
+              {grid.hiddenRows.size} row{grid.hiddenRows.size === 1 ? "" : "s"} hidden —{" "}
+              <button type="button" onClick={grid.showAllRows} className="font-semibold underline underline-offset-2">
+                show all
+              </button>
+            </span>
+          )}
+        </div>
+      )}
       <DualScrollBox>
         <table
           className="text-left text-sm"
           style={{
             tableLayout: "fixed",
             width:
-              COLUMNS.reduce((sum, c) => sum + widthOf(c.key, c.width), 0) +
-              EXTRA_COLUMNS.reduce((sum, c) => sum + widthOf(c.key, c.width), 0),
+              visibleColumns.reduce((sum, c) => sum + widthOf(c.key, c.width), 0) +
+              visibleExtraColumns.reduce((sum, c) => sum + widthOf(c.key, c.width), 0),
           }}
         >
           <colgroup>
-            {COLUMNS.map((c) => (
+            {visibleColumns.map((c) => (
               <col key={c.key} style={{ width: widthOf(c.key, c.width) }} />
             ))}
-            {EXTRA_COLUMNS.map((c) => (
+            {visibleExtraColumns.map((c) => (
               <col key={c.key} style={{ width: widthOf(c.key, c.width) }} />
             ))}
           </colgroup>
           <thead className="sticky top-0 z-20 border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
             <tr>
-              {COLUMNS.map((c, i) => (
-                <th
-                  key={c.key}
-                  className={`relative select-none px-3 py-2.5 whitespace-nowrap ${
-                    i === 0 ? "sticky left-0 z-10 border-r border-neutral-200 bg-neutral-50" : ""
-                  }`}
-                >
-                  <span className="block overflow-hidden text-ellipsis pr-2">{c.label}</span>
-                  <span
-                    onMouseDown={(e) => handleResizeStart(e, c.key, c.width)}
-                    title="Drag to resize this column"
-                    className="absolute right-0 top-0 z-10 h-full w-2 cursor-col-resize touch-none select-none hover:bg-red-300 active:bg-red-500"
-                  />
-                </th>
-              ))}
-              {EXTRA_COLUMNS.map((c) => (
-                <th key={c.key} className="relative select-none px-3 py-2.5 whitespace-nowrap">
-                  <span className="block overflow-hidden text-ellipsis pr-2">{c.label}</span>
-                  <span
-                    onMouseDown={(e) => handleResizeStart(e, c.key, c.width)}
-                    title="Drag to resize this column"
-                    className="absolute right-0 top-0 z-10 h-full w-2 cursor-col-resize touch-none select-none hover:bg-red-300 active:bg-red-500"
-                  />
-                </th>
-              ))}
+              {visibleColumns.map((c, i) => renderHeaderCell(c.key, c.label, c.width, i === 0))}
+              {visibleExtraColumns.map((c) => renderHeaderCell(c.key, c.label, c.width, false))}
             </tr>
             <tr className="border-t border-neutral-200 bg-white normal-case">
-              {COLUMNS.map((c, i) => (
+              {visibleColumns.map((c, i) => (
                 <th
                   key={c.key}
                   className={`px-2 py-1.5 ${i === 0 ? "sticky left-0 z-10 border-r border-neutral-200 bg-white" : ""}`}
@@ -293,104 +440,73 @@ export default function ParticipantRecordsTable({
                   />
                 </th>
               ))}
-              <th className="px-2 py-1.5" />
-              <th className="px-2 py-1.5" />
-              <th className="px-2 py-1.5" />
+              {visibleExtraColumns.map((c) => (
+                <th key={c.key} className="px-2 py-1.5" />
+              ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100">
-            {filtered.length === 0 ? (
+            {displayedRows.length === 0 ? (
               <tr>
-                <td colSpan={COLUMNS.length + 3} className="px-3 py-6 text-center text-neutral-400">
+                <td colSpan={visibleColumns.length + visibleExtraColumns.length} className="px-3 py-6 text-center text-neutral-400">
                   No records match these filters.
                 </td>
               </tr>
             ) : (
-              filtered.map((row) => (
-                <tr key={row.registrationId} className="group hover:bg-neutral-50">
-                  <td
-                    className="sticky left-0 z-10 truncate border-r border-neutral-200 bg-white px-3 py-2 font-medium group-hover:bg-neutral-50"
-                    title={row.fullName}
+              displayedRows.map((row) => {
+                const rowSelected = grid.selectedRows.has(row.registrationId);
+                const rowHeight = grid.rowHeights[row.registrationId];
+                return (
+                  <tr
+                    key={row.registrationId}
+                    className={`group hover:bg-neutral-50 ${rowSelected ? "bg-amber-50" : ""} ${grid.rowSizeClass(row.registrationId)}`}
+                    style={grid.rowSizeStyle(row.registrationId)}
                   >
-                    {row.fullName}
-                  </td>
-                  <td className="truncate px-3 py-2 font-mono text-xs" title={row.registrationId}>
-                    {row.registrationId.slice(0, 8).toUpperCase()}
-                  </td>
-                  <td className="truncate px-3 py-2" title={row.competition}>
-                    {row.competition}
-                  </td>
-                  <td className="truncate px-3 py-2" title={row.category}>
-                    <CategoryName name={row.category} />
-                  </td>
-                  <td className="truncate px-3 py-2 font-mono text-xs" title={row.icPassport}>{row.icPassport}</td>
-                  <td className="truncate px-3 py-2" title={row.dateOfBirth}>{row.dateOfBirth}</td>
-                  <td className="truncate px-3 py-2 capitalize" title={row.gender}>{row.gender}</td>
-                  <td className="truncate px-3 py-2" title={row.beltRank}>{row.beltRank || "—"}</td>
-                  <td className="truncate px-3 py-2 text-xs" title={row.rankConfirmation}>{row.rankConfirmation || "—"}</td>
-                  <td className="truncate px-3 py-2" title={row.homeAddress}>
-                    {row.homeAddress || "—"}
-                  </td>
-                  <td className="truncate px-3 py-2" title={row.country}>{row.country || "—"}</td>
-                  <td className="truncate px-3 py-2" title={row.cityTown}>{row.cityTown || "—"}</td>
-                  <td className="truncate px-3 py-2" title={row.postcode}>{row.postcode || "—"}</td>
-                  <td className="truncate px-3 py-2 text-xs" title={row.email}>{row.email || "—"}</td>
-                  <td className="truncate px-3 py-2 text-xs" title={row.phone}>{row.phone || "—"}</td>
-                  <td className="truncate px-3 py-2" title={row.school}>
-                    {row.school || "—"}
-                  </td>
-                  <td className="truncate px-3 py-2" title={row.sensei}>
-                    {row.sensei || "—"}
-                  </td>
-                  <td className="truncate px-3 py-2 text-xs" title={row.invitationCode}>{row.invitationCode || "—"}</td>
-                  <td className="truncate px-3 py-2 text-xs" title={row.referralSource}>{row.referralSource || "—"}</td>
-                  <td className="truncate px-3 py-2 text-xs" title={row.bankName}>{row.bankName || "—"}</td>
-                  <td className="truncate px-3 py-2 text-xs" title={row.bankAccountNo}>{row.bankAccountNo || "—"}</td>
-                  <td className="truncate px-3 py-2 text-xs" title={row.bankAccountName}>
-                    {row.bankAccountName || "—"}
-                  </td>
-                  <td className="truncate px-3 py-2">
-                    <span
-                      className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${
-                        row.recordingStatus === "Submitted"
-                          ? "border-green-300 bg-green-50 text-green-800"
-                          : "border-amber-300 bg-amber-50 text-amber-800"
-                      }`}
-                    >
-                      {row.recordingStatus}
-                    </span>
-                  </td>
-                  <td className="truncate px-3 py-2 text-xs" title={row.recordingDate}>{row.recordingDate || "—"}</td>
-                  <td className="truncate px-3 py-2 text-xs" title={row.attempts}>{row.attempts}</td>
-                  <td className="px-3 py-2">
-                    {row.certificateUrl ? (
-                      <a
-                        href={row.certificateUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="rounded border border-neutral-300 px-3 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
-                      >
-                        View
-                      </a>
-                    ) : (
-                      <span className="text-xs text-neutral-400">—</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2">
-                    <div className="flex flex-col items-start gap-1.5">
-                      {row.videoUrl ? (
-                        <VideoWatchButton url={row.videoUrl} />
-                      ) : (
-                        !isAdmin && <span className="text-xs text-neutral-400">—</span>
-                      )}
-                      {isAdmin && <AdminVideoUploadForm registrationId={row.registrationId} />}
-                    </div>
-                  </td>
-                  <td className="px-3 py-2">
-                    <SlotStatusCell row={row} canManage={canManageSlot} />
-                  </td>
-                </tr>
-              ))
+                    {visibleColumns.map((c, i) => {
+                      const { className, title, content } = standardCell(c, row);
+                      const isHandle = i === 0;
+                      const handleBg = rowSelected ? "bg-amber-50" : "bg-white group-hover:bg-neutral-50";
+                      return (
+                        <td
+                          key={c.key}
+                          className={`truncate px-3 py-2 ${className} ${
+                            isHandle ? `relative sticky left-0 z-10 cursor-pointer select-none border-r border-neutral-200 ${handleBg}` : ""
+                          }`}
+                          title={isHandle ? "Click to select/highlight this row" : title}
+                          onClick={isHandle ? () => grid.toggleRowSelect(row.registrationId) : undefined}
+                        >
+                          {content}
+                          {isHandle && rowSelected && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                grid.hideRow(row.registrationId);
+                              }}
+                              title="Hide this row"
+                              className="absolute right-1 top-1/2 z-20 flex h-4 w-4 -translate-y-1/2 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold leading-none text-white hover:bg-red-700"
+                            >
+                              ×
+                            </button>
+                          )}
+                          {isHandle && (
+                            <span
+                              onMouseDown={(e) => grid.handleRowResizeStart(e, row.registrationId, rowHeight ?? 36)}
+                              title="Drag to resize this row"
+                              className="absolute bottom-0 left-0 right-0 z-10 h-1 cursor-row-resize touch-none select-none hover:bg-red-300 active:bg-red-500"
+                            />
+                          )}
+                        </td>
+                      );
+                    })}
+                    {visibleExtraColumns.map((c) => (
+                      <td key={c.key} className="px-3 py-2">
+                        {extraCell(c.key, row, isAdmin, canManageSlot)}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
