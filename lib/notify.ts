@@ -171,3 +171,41 @@ export async function notifyAnnouncementPublished(title: string, body: string | 
     ANNOUNCEMENT_TELEGRAM_CATEGORIES.map((cat) => postAnnouncementToGroup(cat, title, body)),
   );
 }
+
+const WINNER_TELEGRAM_CATEGORIES: TelegramCategory[] = [
+  "participant", "school", "referee", "audience", "staff",
+];
+
+/** Posts to one group's "Winners" topic — same no-op-until-configured
+ * pattern as postAnnouncementToGroup, but reads TELEGRAM_TOPIC_WINNER_
+ * <CATEGORY> instead (falls back to the group's General topic if that
+ * specific topic id isn't set yet). */
+async function postWinnerNoticeToGroup(category: TelegramCategory, competitionName: string): Promise<void> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env[`TELEGRAM_CHAT_ID_${category.toUpperCase()}`];
+  if (!token || !chatId) return;
+  const threadId = process.env[`TELEGRAM_TOPIC_WINNER_${category.toUpperCase()}`];
+  const url = `${appUrl()}/winners`;
+  try {
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        ...(threadId ? { message_thread_id: Number(threadId) } : {}),
+        text: `🏆 Winners announced — ${competitionName}!\n\nView recordings and judge scores: ${url}`,
+      }),
+    });
+  } catch {
+    // Best-effort — the public Winners page already has the data either way.
+  }
+}
+
+/** Fires once per competition, the first time the daily cron notices
+ * today has reached its winners_announce_date — posts into every group's
+ * Winners topic. */
+export async function notifyWinnersAnnounced(competitionName: string): Promise<void> {
+  await Promise.allSettled(
+    WINNER_TELEGRAM_CATEGORIES.map((cat) => postWinnerNoticeToGroup(cat, competitionName)),
+  );
+}

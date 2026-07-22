@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { writeAudit } from "@/lib/audit";
-import { notifyRefereeAssignment } from "@/lib/notify";
+import { notifyRefereeAssignment, notifyWinnersAnnounced } from "@/lib/notify";
+import { winnersRevealed } from "@/lib/winners";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -45,7 +46,7 @@ async function handle(request: Request) {
 
   const { data: competitions } = await admin
     .from("competitions")
-    .select("id, name, registration_deadline")
+    .select("id, name, registration_deadline, winners_announce_date, winners_notified_at")
     .not("registration_deadline", "is", null);
 
   const { data: refereesPool } = await admin
@@ -206,10 +207,27 @@ async function handle(request: Request) {
     }
   }
 
+  const winnerNotices: Array<Record<string, unknown>> = [];
+  for (const comp of competitions ?? []) {
+    if (comp.winners_notified_at) continue;
+    if (!winnersRevealed(comp.registration_deadline, comp.winners_announce_date)) continue;
+    await notifyWinnersAnnounced(comp.name);
+    await admin.from("competitions").update({ winners_notified_at: new Date().toISOString() }).eq("id", comp.id);
+    await writeAudit(admin, {
+      table_name: "competitions",
+      record_id: comp.id,
+      action: "winners_announced_notified",
+      new_value: { name: comp.name },
+      actor_id: null,
+    });
+    winnerNotices.push({ competition: comp.name });
+  }
+
   return NextResponse.json({
     ok: true,
     changed: report.length + slotReport.length,
     report,
     slotReport,
+    winnerNotices,
   });
 }
