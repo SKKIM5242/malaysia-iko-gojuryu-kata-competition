@@ -19,6 +19,7 @@ const FULL_NAV: Array<[string, string]> = [
   ["Support", "/admin/support"],
   ["Judging", "/admin/judging"],
   ["Score Recordings", "/admin/scoring"],
+  ["Recording Preview", "/admin/recording-preview"],
   ["Kata Categories", "/kata-categories"],
   ["Kata Arena", "/kata-arena"],
   ["Participant Records", "/admin/records"],

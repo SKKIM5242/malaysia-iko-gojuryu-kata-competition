@@ -481,6 +481,7 @@ export default async function AccountPage({
     } | null
   )?.competition ?? null;
   const eventDate = competition?.event_date ?? null;
+  const registrationDeadline = competition?.registration_deadline ?? null;
 
   let ownVideoUrl: string | null = null;
   if (existingVideo) {
@@ -541,6 +542,8 @@ export default async function AccountPage({
               maxAttempts={maxAttempts}
               hasPendingPurchase={hasPendingPurchase}
               watermark={watermarkText(eventDate)}
+              recordingStart={eventDate}
+              recordingEnd={registrationDeadline}
             />
             <div>
               <p className="mb-2 text-sm text-neutral-500">

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRecordAttempt, submitKataVideo } from "@/app/actions/account";
 import BuyExtraAttemptsButton from "@/components/BuyExtraAttemptsButton";
+import { formatDate } from "@/components/ui";
 
 const MAX_SECONDS = 5 * 60;
 
@@ -66,16 +67,24 @@ function drawFrame(
   ctx.restore();
 }
 
+function daysBetween(from: Date, to: Date): number {
+  return Math.ceil((to.getTime() - from.getTime()) / (24 * 60 * 60 * 1000));
+}
+
 export default function KataRecorder({
   initialAttempts,
   maxAttempts,
   hasPendingPurchase,
   watermark,
+  recordingStart,
+  recordingEnd,
 }: {
   initialAttempts: number;
   maxAttempts: number;
   hasPendingPurchase: boolean;
   watermark: string;
+  recordingStart?: string | null;
+  recordingEnd?: string | null;
 }) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [attempts, setAttempts] = useState(initialAttempts);
@@ -96,6 +105,11 @@ export default function KataRecorder({
 
   const attemptsLeft = Math.max(0, maxAttempts - attempts);
   const canReRecord = attemptsLeft > 0;
+
+  const totalDays = recordingStart && recordingEnd
+    ? daysBetween(new Date(recordingStart + "T00:00:00"), new Date(recordingEnd + "T00:00:00"))
+    : null;
+  const daysLeft = recordingEnd ? daysBetween(new Date(), new Date(recordingEnd + "T23:59:59")) : null;
 
   useEffect(() => {
     return () => {
@@ -258,6 +272,16 @@ export default function KataRecorder({
         You have <strong>{attemptsLeft}</strong> of {maxAttempts} delete-and-re-record chances left.
         Recording is limited to <strong>5 minutes</strong>. No file upload or editing is allowed — only
         this in-app camera recorder.
+        {(recordingStart || recordingEnd) && (
+          <p className="mt-1 text-[10px] text-neutral-400">
+            Recording started {recordingStart ? formatDate(recordingStart) : "—"} · ends{" "}
+            {recordingEnd ? formatDate(recordingEnd) : "—"}
+            {totalDays != null && ` · ${totalDays} day${totalDays === 1 ? "" : "s"} total`}
+            {daysLeft != null && (daysLeft >= 0
+              ? ` · ${daysLeft} day${daysLeft === 1 ? "" : "s"} left`
+              : " · recording window closed")}
+          </p>
+        )}
         {attemptsLeft <= 0 && (
           <div className="mt-2">
             <BuyExtraAttemptsButton hasPendingPurchase={hasPendingPurchase} />
