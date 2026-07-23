@@ -122,42 +122,89 @@ function RibbonV({ size }: { size: number }) {
     <svg width={vbW} height={vbH} viewBox={`0 0 ${vbW} ${vbH}`}>
       {strip(-angle, ["#DC2626", "#FFFFFF", "#1D4ED8"])}
       {strip(angle, ["#1D4ED8", "#FFFFFF", "#DC2626"])}
-      {/* Hook/clasp the ribbon threads through, sitting on the medal's rim. */}
+      {/* Hook the ribbon threads through -- a real ring (stroke only), not
+       * a filled blob, sitting right on the medal's rim. */}
       <ellipse
         cx={vertexX}
-        cy={vertexY - Math.round(size * 0.015)}
-        rx={Math.round(size * 0.095)}
-        ry={Math.round(size * 0.06)}
-        fill="#9CA3AF"
+        cy={vertexY - Math.round(size * 0.02)}
+        rx={Math.round(size * 0.075)}
+        ry={Math.round(size * 0.05)}
+        fill="none"
         stroke="#4B5563"
-        strokeWidth={2.5}
+        strokeWidth={Math.round(size * 0.018)}
       />
     </svg>
   );
 }
 
+/** A small laurel-leaf arc wrapping the lower half of the disc, mirrored
+ * left/right, like the engraved wreath on a real medal. Positions are
+ * plain trigonometry (not SVG rotate groups) since each leaf needs both a
+ * different position AND a different own rotation. */
+function laurelArc(cx: number, cy: number, r: number, color: string, side: 1 | -1) {
+  const leaves = [];
+  const count = 5;
+  const startDeg = 8;
+  const endDeg = 82;
+  for (let i = 0; i < count; i++) {
+    const t = i / (count - 1);
+    const deg = startDeg + t * (endDeg - startDeg);
+    const rad = (deg * Math.PI) / 180;
+    const x = cx + side * r * Math.cos(rad);
+    const y = cy + r * Math.sin(rad);
+    const leafRotate = side === 1 ? 90 - deg : -(90 - deg);
+    const leafSize = r * (0.34 - t * 0.1);
+    leaves.push(
+      <ellipse
+        key={`${side}-${i}`}
+        cx={x}
+        cy={y}
+        rx={leafSize}
+        ry={leafSize * 0.4}
+        fill={color}
+        opacity={0.75}
+        transform={`rotate(${leafRotate} ${x} ${y})`}
+      />,
+    );
+  }
+  return leaves;
+}
+
 function Medal({ rank, size }: { rank: 1 | 2 | 3; size: number }) {
   const t = MEDAL_THEME[rank];
+  const r = size / 2;
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
       <div style={{ display: "flex", marginBottom: `-${Math.round(size * 0.185)}px` }}>
         <RibbonV size={size} />
       </div>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          width: size,
-          height: size,
-          borderRadius: "999px",
-          backgroundImage: `radial-gradient(circle at 32% 28%, ${t.discLight}, ${t.discMid} 55%, ${t.discDark} 100%)`,
-          border: `${Math.round(size * 0.045)}px solid ${t.discDark}`,
-        }}
-      >
-        <span style={{ display: "flex", fontSize: Math.round(size * 0.24), fontWeight: 900, color: "#ffffff" }}>
-          {t.label}
-        </span>
+      <div style={{ display: "flex", position: "relative", width: size, height: size }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: size,
+            height: size,
+            borderRadius: "999px",
+            backgroundImage: `radial-gradient(circle at 32% 28%, ${t.discLight}, ${t.discMid} 55%, ${t.discDark} 100%)`,
+            border: `${Math.round(size * 0.045)}px solid ${t.discDark}`,
+          }}
+        >
+          <span style={{ display: "flex", fontSize: Math.round(size * 0.24), fontWeight: 900, color: "#ffffff" }}>
+            {t.label}
+          </span>
+        </div>
+        <svg
+          width={size}
+          height={size}
+          viewBox={`0 0 ${size} ${size}`}
+          style={{ position: "absolute", top: 0, left: 0 }}
+        >
+          <circle cx={r} cy={r} r={r * 0.82} fill="none" stroke={t.discDark} strokeWidth={Math.max(2, r * 0.02)} opacity={0.55} />
+          {laurelArc(r, r, r * 0.66, t.discDark, 1)}
+          {laurelArc(r, r, r * 0.66, t.discDark, -1)}
+        </svg>
       </div>
     </div>
   );
@@ -260,7 +307,7 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
 
           <div
             style={{
-              marginTop: "14px",
+              marginTop: "-6px",
               display: "flex",
               fontSize: 88,
               fontWeight: 900,
@@ -273,11 +320,11 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
 
           <div
             style={{
-              marginTop: "4px",
+              marginTop: "-8px",
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
-              gap: "4px",
+              gap: "0px",
             }}
           >
             <div
