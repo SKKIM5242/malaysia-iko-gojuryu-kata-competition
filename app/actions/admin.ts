@@ -322,8 +322,10 @@ export async function deleteCategory(formData: FormData) {
  * Merges a Male or Female sub-category into a Mix (Male & Female) category
  * for the same kata + belt group + age bracket — creating the Mix category
  * on first use. Every registration currently in the Male and/or Female
- * sub-category for that slot is moved onto the Mix category; the Male/Female
- * rows are left in place (now empty) for the record.
+ * sub-category for that slot is moved onto the Mix category (no
+ * resubmission needed — same registration/recording rows, just repointed),
+ * then the now-empty Male/Female categories are deleted so only the merged
+ * Mix category remains — mirrors mergeCategoryAgeGroup's behavior below.
  */
 export async function mergeCategoryToMix(formData: FormData) {
   const categoryId = String(formData.get("category_id") ?? "");
@@ -393,12 +395,22 @@ export async function mergeCategoryToMix(formData: FormData) {
     .in("category_id", mergeIds);
   if (moveErr) backTo(returnTo, { error: "Could not move registrations into the Mix category." });
 
+  // mergeIds only ever holds the Male/Female sibling ids (never mixCategoryId,
+  // whose gender is "mix") — safe to delete now that every registration
+  // pointing at them has been moved onto the Mix category above.
+  const { error: deleteErr } = await supabase.from("categories").delete().in("id", mergeIds);
+  if (deleteErr) {
+    backTo(returnTo, {
+      error: `Registrations moved into “${mixName}”, but the old Male/Female categories could not be removed.`,
+    });
+  }
+
   await writeAudit(supabase, {
     table_name: "registrations", record_id: null, action: "registrations_merged_to_mix",
-    new_value: { from_category_ids: mergeIds, to_category_id: mixCategoryId }, actor_id: actorId,
+    new_value: { from_category_ids: mergeIds, to_category_id: mixCategoryId, deleted_source_categories: true }, actor_id: actorId,
   });
   revalidatePath("/");
-  backTo(returnTo, { ok: `Merged into “${mixName}”.` });
+  backTo(returnTo, { ok: `Merged into “${mixName}” — the old Male/Female categories have been removed.` });
 }
 
 /**
