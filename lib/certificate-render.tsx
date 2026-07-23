@@ -91,35 +91,47 @@ function logoDataUri(): string | null {
   return cachedLogo;
 }
 
-/** Two tricolor (red/white/blue) strips fanning out in a V from a shared
- * point at the top of the medal disc — like a ribbon threaded through a
- * clip and folded, the classic look used by real medal-ribbon icons.
- * Built from real SVG rects/rotation, not CSS transforms — Satori doesn't
- * miter CSS border-triangles into real triangles (tried that first; it
- * just rendered a rectangle), but native SVG transform="rotate(...)" on
- * <g> is core SVG and renders correctly. */
+/** Two ribbon tails fanning out in a wide V from a small clasp/hook on top
+ * of the medal — like a single ribbon threaded through that hook, each
+ * tail striped red/white/blue running ALONG its own length (three
+ * parallel bars), with the second tail's stripe order mirrored
+ * (blue/white/red) the way the far side of a single folded ribbon reads
+ * in reverse. Built from real SVG rects/rotation, not CSS transforms —
+ * Satori doesn't miter CSS border-triangles into real triangles (tried
+ * that first; it just rendered a rectangle), but native SVG
+ * transform="rotate(...)" on <g> is core SVG and renders correctly. */
 function RibbonV({ size }: { size: number }) {
   const vbW = size;
-  const vbH = Math.round(size * 0.58);
-  const stripW = Math.round(size * 0.24);
+  const vbH = Math.round(size * 0.62);
+  const stripW = Math.round(size * 0.26);
   const stripLen = Math.round(vbH * 1.05);
-  const angle = 34;
+  const angle = 40;
   const vertexX = vbW / 2;
   const vertexY = vbH;
-  const bandH = stripLen / 3;
+  const bandW = stripW / 3;
 
-  const strip = (rotate: number) => (
-    <g transform={`translate(${vertexX}, ${vertexY}) rotate(${rotate})`} stroke="#374151" strokeWidth={3}>
-      <rect x={-stripW / 2} y={-bandH} width={stripW} height={bandH + 1} fill="#DC2626" />
-      <rect x={-stripW / 2} y={-2 * bandH} width={stripW} height={bandH + 1} fill="#FFFFFF" />
-      <rect x={-stripW / 2} y={-stripLen} width={stripW} height={bandH + 1} fill="#1D4ED8" />
+  const strip = (rotate: number, order: [string, string, string]) => (
+    <g transform={`translate(${vertexX}, ${vertexY}) rotate(${rotate})`} stroke="#374151" strokeWidth={2.5}>
+      <rect x={-stripW / 2} y={-stripLen} width={bandW + 1} height={stripLen} fill={order[0]} />
+      <rect x={-stripW / 2 + bandW} y={-stripLen} width={bandW + 1} height={stripLen} fill={order[1]} />
+      <rect x={-stripW / 2 + 2 * bandW} y={-stripLen} width={bandW + 1} height={stripLen} fill={order[2]} />
     </g>
   );
 
   return (
     <svg width={vbW} height={vbH} viewBox={`0 0 ${vbW} ${vbH}`}>
-      {strip(-angle)}
-      {strip(angle)}
+      {strip(-angle, ["#DC2626", "#FFFFFF", "#1D4ED8"])}
+      {strip(angle, ["#1D4ED8", "#FFFFFF", "#DC2626"])}
+      {/* Hook/clasp the ribbon threads through, sitting on the medal's rim. */}
+      <ellipse
+        cx={vertexX}
+        cy={vertexY - Math.round(size * 0.015)}
+        rx={Math.round(size * 0.095)}
+        ry={Math.round(size * 0.06)}
+        fill="#9CA3AF"
+        stroke="#4B5563"
+        strokeWidth={2.5}
+      />
     </svg>
   );
 }
