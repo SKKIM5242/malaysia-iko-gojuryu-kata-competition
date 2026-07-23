@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 export default async function AdminCompetitions({
   searchParams,
 }: {
-  searchParams: Promise<{ edit?: string; editcat?: string; ok?: string; error?: string }>;
+  searchParams: Promise<{ edit?: string; editcat?: string; addcat?: string; ok?: string; error?: string }>;
 }) {
   const params = await searchParams;
   const ready = await schemaReady();
@@ -55,11 +55,14 @@ export default async function AdminCompetitions({
   const editingCategory = params.editcat
     ? allCategories.find((c) => c.id === params.editcat)
     : undefined;
-  const editing = params.edit
-    ? competitions.find((c) => c.id === params.edit)
-    : editingCategory
-      ? competitions.find((c) => c.id === editingCategory.competition_id)
-      : undefined;
+  const addingToCompetition = params.addcat
+    ? competitions.find((c) => c.id === params.addcat)
+    : undefined;
+  const categoryModalCompetition = editingCategory
+    ? competitions.find((c) => c.id === editingCategory.competition_id)
+    : addingToCompetition;
+  const categoryModalCloseHref = params.edit ? `/admin/competitions?edit=${params.edit}` : "/admin/competitions";
+  const editing = params.edit ? competitions.find((c) => c.id === params.edit) : undefined;
 
   return (
     <AdminShell
@@ -67,154 +70,82 @@ export default async function AdminCompetitions({
       active="/admin/competitions"
       flash={{ ok: params.ok, error: params.error }}
     >
-      <div className="grid gap-8 lg:grid-cols-2">
-        <div>
-          {canManageCompetition && (
-            <>
-              <h2 className="mb-3 text-lg font-bold">{editing ? "Edit Competition" : "Create Competition"}</h2>
-              <Card>
-                <form action={saveCompetition} className="space-y-4">
-                  {editing && <input type="hidden" name="id" value={editing.id} />}
+      <div className="space-y-8">
+        {canManageCompetition && (
+          <div>
+            <h2 className="mb-3 text-lg font-bold">{editing ? "Edit Competition" : "Create Competition"}</h2>
+            <Card>
+              <form action={saveCompetition} className="space-y-4">
+                {editing && <input type="hidden" name="id" value={editing.id} />}
+                <div>
+                  <label htmlFor="name" className={adminLabel}>Name *</label>
+                  <input id="name" name="name" required defaultValue={editing?.name ?? ""} className={adminInput} />
+                </div>
+                <div>
+                  <label htmlFor="venue" className={adminLabel}>Venue</label>
+                  <input id="venue" name="venue" defaultValue={editing?.venue ?? ""} className={adminInput} />
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <label htmlFor="name" className={adminLabel}>Name *</label>
-                    <input id="name" name="name" required defaultValue={editing?.name ?? ""} className={adminInput} />
-                  </div>
-                  <div>
-                    <label htmlFor="venue" className={adminLabel}>Venue</label>
-                    <input id="venue" name="venue" defaultValue={editing?.venue ?? ""} className={adminInput} />
-                  </div>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div>
-                      <label htmlFor="event_date" className={adminLabel}>Event date</label>
-                      <input id="event_date" name="event_date" type="date" defaultValue={editing?.event_date ?? ""} className={adminInput} />
-                    </div>
-                    <div>
-                      <label htmlFor="registration_deadline" className={adminLabel}>Registration deadline</label>
-                      <input id="registration_deadline" name="registration_deadline" type="date" defaultValue={editing?.registration_deadline ?? ""} className={adminInput} />
-                    </div>
-                    <div>
-                      <label htmlFor="winners_announce_date" className={adminLabel}>
-                        Winners announce date{" "}
-                        <span className="font-normal text-neutral-400">(blank = deadline + 30 days rule)</span>
-                      </label>
-                      <input id="winners_announce_date" name="winners_announce_date" type="date" defaultValue={editing?.winners_announce_date ?? ""} className={adminInput} />
-                    </div>
-                    <div>
-                      <label htmlFor="audience_signin_date" className={adminLabel}>
-                        Audience recommended sign-in date
-                      </label>
-                      <input id="audience_signin_date" name="audience_signin_date" type="date" defaultValue={editing?.audience_signin_date ?? ""} className={adminInput} />
-                    </div>
-                    <p className="text-xs text-neutral-400 sm:col-span-2">
-                      Event date → Registration deadline is the participants&apos; recording-submission
-                      timeline; referees start scoring only after the deadline. Setting a Winners
-                      announce date makes this tier &quot;special&quot; — it overrides the default
-                      &quot;deadline + 30 days, next Malaysia working day&quot; rule everywhere
-                      (Winners page, audience score reveal, and the registration page).
-                    </p>
-                    <div>
-                      <label htmlFor="registration_fee_usd" className={adminLabel}>Fee (USD)</label>
-                      <input id="registration_fee_usd" name="registration_fee_usd" type="number" step="0.01" min="0" defaultValue={editing?.registration_fee_usd ?? ""} className={adminInput} />
-                    </div>
-                    <div>
-                      <label htmlFor="status" className={adminLabel}>Status</label>
-                      <select id="status" name="status" defaultValue={editing?.status ?? "draft"} className={adminInput}>
-                        <option value="draft">Draft</option>
-                        <option value="open">Open (registration live)</option>
-                        <option value="closed">Closed</option>
-                        <option value="completed">Completed</option>
-                      </select>
-                    </div>
+                    <label htmlFor="event_date" className={adminLabel}>Event date</label>
+                    <input id="event_date" name="event_date" type="date" defaultValue={editing?.event_date ?? ""} className={adminInput} />
                   </div>
                   <div>
-                    <label htmlFor="description" className={adminLabel}>Description</label>
-                    <textarea id="description" name="description" rows={3} defaultValue={editing?.description ?? ""} className={adminInput} />
+                    <label htmlFor="registration_deadline" className={adminLabel}>Registration deadline</label>
+                    <input id="registration_deadline" name="registration_deadline" type="date" defaultValue={editing?.registration_deadline ?? ""} className={adminInput} />
                   </div>
-                  <div className="flex gap-2">
-                    <button type="submit" className={adminBtn}>
-                      {editing ? "Save changes" : "Create competition"}
-                    </button>
-                    {editing && (
-                      <Link href="/admin/competitions" className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-semibold text-neutral-600 hover:bg-neutral-50">
-                        Cancel
-                      </Link>
-                    )}
-                  </div>
-                </form>
-              </Card>
-            </>
-          )}
-
-          {editing && (
-            <div className={canManageCompetition ? "mt-6" : ""}>
-              <h2 className="mb-3 text-lg font-bold">
-                {editingCategory ? `Edit Category “${editingCategory.name}”` : `Add Category To “${editing.name}”`}
-              </h2>
-              <Card>
-                <form action={saveCategory} className="space-y-4">
-                  <input type="hidden" name="competition_id" value={editing.id} />
-                  {editingCategory && <input type="hidden" name="id" value={editingCategory.id} />}
                   <div>
-                    <label htmlFor="cat_name" className={adminLabel}>Category name *</label>
-                    <input id="cat_name" name="name" required defaultValue={editingCategory?.name ?? ""} className={adminInput} placeholder="e.g. Kata Saifa" />
+                    <label htmlFor="winners_announce_date" className={adminLabel}>
+                      Winners announce date{" "}
+                      <span className="font-normal text-neutral-400">(blank = deadline + 30 days rule)</span>
+                    </label>
+                    <input id="winners_announce_date" name="winners_announce_date" type="date" defaultValue={editing?.winners_announce_date ?? ""} className={adminInput} />
                   </div>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div>
-                      <label htmlFor="age_min" className={adminLabel}>Min age</label>
-                      <input id="age_min" name="age_min" type="number" min="0" defaultValue={editingCategory?.age_min ?? ""} className={adminInput} />
-                    </div>
-                    <div>
-                      <label htmlFor="age_max" className={adminLabel}>Max age</label>
-                      <input id="age_max" name="age_max" type="number" min="0" defaultValue={editingCategory?.age_max ?? ""} className={adminInput} />
-                    </div>
-                    <div>
-                      <label htmlFor="belt_group" className={adminLabel}>Belt group</label>
-                      <select id="belt_group" name="belt_group" defaultValue={editingCategory?.belt_group ?? ""} className={adminInput}>
-                        <option value="">Any</option>
-                        <option value="open">Open (divisions auto-split Kyu/Dan)</option>
-                        <option value="kyu">Kyu</option>
-                        <option value="dan">Dan</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label htmlFor="cat_gender" className={adminLabel}>Gender</label>
-                      <select id="cat_gender" name="gender" defaultValue={editingCategory?.gender ?? "male"} className={adminInput}>
-                        <option value="male">Male</option>
-                        <option value="female">Female</option>
-                        <option value="mix">Mix (Male & Female)</option>
-                      </select>
-                    </div>
-                    <div className="sm:col-span-2">
-                      <label htmlFor="cat_max_participants" className={adminLabel}>
-                        Max participants <span className="font-normal text-neutral-400">(blank = no cap)</span>
-                      </label>
-                      <input
-                        id="cat_max_participants"
-                        name="max_participants"
-                        type="number"
-                        step="1"
-                        min="1"
-                        defaultValue={editingCategory?.max_participants ?? ""}
-                        className={adminInput}
-                        placeholder="e.g. 20"
-                      />
-                    </div>
+                  <div>
+                    <label htmlFor="audience_signin_date" className={adminLabel}>
+                      Audience recommended sign-in date
+                    </label>
+                    <input id="audience_signin_date" name="audience_signin_date" type="date" defaultValue={editing?.audience_signin_date ?? ""} className={adminInput} />
                   </div>
-                  <div className="flex gap-2">
-                    <button type="submit" className={adminBtn}>
-                      {editingCategory ? "Save category" : "Add category"}
-                    </button>
-                    {editingCategory && (
-                      <Link href={`/admin/competitions?edit=${editing.id}`} className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-semibold text-neutral-600 hover:bg-neutral-50">
-                        Cancel
-                      </Link>
-                    )}
+                  <p className="text-xs text-neutral-400 sm:col-span-2">
+                    Event date → Registration deadline is the participants&apos; recording-submission
+                    timeline; referees start scoring only after the deadline. Setting a Winners
+                    announce date makes this tier &quot;special&quot; — it overrides the default
+                    &quot;deadline + 30 days, next Malaysia working day&quot; rule everywhere
+                    (Winners page, audience score reveal, and the registration page).
+                  </p>
+                  <div>
+                    <label htmlFor="registration_fee_usd" className={adminLabel}>Fee (USD)</label>
+                    <input id="registration_fee_usd" name="registration_fee_usd" type="number" step="0.01" min="0" defaultValue={editing?.registration_fee_usd ?? ""} className={adminInput} />
                   </div>
-                </form>
-              </Card>
-            </div>
-          )}
-        </div>
+                  <div>
+                    <label htmlFor="status" className={adminLabel}>Status</label>
+                    <select id="status" name="status" defaultValue={editing?.status ?? "draft"} className={adminInput}>
+                      <option value="draft">Draft</option>
+                      <option value="open">Open (registration live)</option>
+                      <option value="closed">Closed</option>
+                      <option value="completed">Completed</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label htmlFor="description" className={adminLabel}>Description</label>
+                  <textarea id="description" name="description" rows={3} defaultValue={editing?.description ?? ""} className={adminInput} />
+                </div>
+                <div className="flex gap-2">
+                  <button type="submit" className={adminBtn}>
+                    {editing ? "Save changes" : "Create competition"}
+                  </button>
+                  {editing && (
+                    <Link href="/admin/competitions" className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-semibold text-neutral-600 hover:bg-neutral-50">
+                      Cancel
+                    </Link>
+                  )}
+                </div>
+              </form>
+            </Card>
+          </div>
+        )}
 
         <div>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -236,7 +167,7 @@ export default async function AdminCompetitions({
             )}
           </div>
           {competitions.length === 0 ? (
-            <EmptyState>No competitions yet — create one on the left.</EmptyState>
+            <EmptyState>No competitions yet — create one above.</EmptyState>
           ) : (
             <div className="space-y-4">
               {/* Tiers listed cheapest first (USD 10 → 100 → 200), newly
@@ -248,7 +179,11 @@ export default async function AdminCompetitions({
                     a.created_at.localeCompare(b.created_at),
                 )
                 .map((c) => (
-                <details key={c.id} className="rounded-lg border border-neutral-200 bg-white shadow-sm" open={editing?.id === c.id}>
+                <details
+                  key={c.id}
+                  className="rounded-lg border border-neutral-200 bg-white shadow-sm"
+                  open={editing?.id === c.id || categoryModalCompetition?.id === c.id}
+                >
                   <summary className="flex cursor-pointer flex-wrap items-start justify-between gap-2 px-4 py-3 hover:bg-neutral-50">
                     <div>
                       <p className="font-bold text-neutral-900">▾ {c.name}</p>
@@ -277,9 +212,20 @@ export default async function AdminCompetitions({
                     )}
                   </summary>
                   <div className="border-t border-neutral-100 px-4 pb-4 pt-3">
-                    <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-neutral-400">Categories</p>
+                    <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">Categories</p>
+                      {canManageCompetition && (
+                        <Link
+                          href={`/admin/competitions?addcat=${c.id}`}
+                          scroll={false}
+                          className="rounded border border-neutral-300 px-2 py-0.5 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
+                        >
+                          + Add category
+                        </Link>
+                      )}
+                    </div>
                     {(categoriesByCompetition.get(c.id) ?? []).length === 0 ? (
-                      <p className="text-sm text-neutral-400">None yet — edit this competition to add categories.</p>
+                      <p className="text-sm text-neutral-400">None yet — click &quot;+ Add category&quot; above to add one.</p>
                     ) : (
                       <div className="space-y-2">
                         {groupByKata(categoriesByCompetition.get(c.id) ?? []).map(([base, cats]) => (
@@ -341,6 +287,7 @@ export default async function AdminCompetitions({
                                         </form>
                                         <Link
                                           href={`/admin/competitions?editcat=${cat.id}`}
+                                          scroll={false}
                                           className="rounded border border-neutral-300 px-2 py-0.5 text-xs text-neutral-600 hover:bg-neutral-50"
                                         >
                                           Edit
@@ -373,6 +320,88 @@ export default async function AdminCompetitions({
           )}
         </div>
       </div>
+
+      {categoryModalCompetition && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 pt-10 sm:pt-16">
+          <div className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl">
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <h2 className="text-lg font-bold">
+                {editingCategory ? `Edit Category “${editingCategory.name}”` : `Add Category To “${categoryModalCompetition.name}”`}
+              </h2>
+              <Link
+                href={categoryModalCloseHref}
+                scroll={false}
+                aria-label="Close"
+                className="shrink-0 rounded p-1 text-xl leading-none text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600"
+              >
+                ✕
+              </Link>
+            </div>
+            <form action={saveCategory} className="space-y-4">
+              <input type="hidden" name="competition_id" value={categoryModalCompetition.id} />
+              {editingCategory && <input type="hidden" name="id" value={editingCategory.id} />}
+              <div>
+                <label htmlFor="cat_name" className={adminLabel}>Category name *</label>
+                <input id="cat_name" name="name" required defaultValue={editingCategory?.name ?? ""} className={adminInput} placeholder="e.g. Kata Saifa" />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="age_min" className={adminLabel}>Min age</label>
+                  <input id="age_min" name="age_min" type="number" min="0" defaultValue={editingCategory?.age_min ?? ""} className={adminInput} />
+                </div>
+                <div>
+                  <label htmlFor="age_max" className={adminLabel}>Max age</label>
+                  <input id="age_max" name="age_max" type="number" min="0" defaultValue={editingCategory?.age_max ?? ""} className={adminInput} />
+                </div>
+                <div>
+                  <label htmlFor="belt_group" className={adminLabel}>Belt group</label>
+                  <select id="belt_group" name="belt_group" defaultValue={editingCategory?.belt_group ?? ""} className={adminInput}>
+                    <option value="">Any</option>
+                    <option value="open">Open (divisions auto-split Kyu/Dan)</option>
+                    <option value="kyu">Kyu</option>
+                    <option value="dan">Dan</option>
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="cat_gender" className={adminLabel}>Gender</label>
+                  <select id="cat_gender" name="gender" defaultValue={editingCategory?.gender ?? "male"} className={adminInput}>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                    <option value="mix">Mix (Male & Female)</option>
+                  </select>
+                </div>
+                <div className="sm:col-span-2">
+                  <label htmlFor="cat_max_participants" className={adminLabel}>
+                    Max participants <span className="font-normal text-neutral-400">(blank = no cap)</span>
+                  </label>
+                  <input
+                    id="cat_max_participants"
+                    name="max_participants"
+                    type="number"
+                    step="1"
+                    min="1"
+                    defaultValue={editingCategory?.max_participants ?? ""}
+                    className={adminInput}
+                    placeholder="e.g. 20"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button type="submit" className={adminBtn}>
+                  {editingCategory ? "Save category" : "Add category"}
+                </button>
+                <Link
+                  href={categoryModalCloseHref}
+                  scroll={false}
+                  className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-semibold text-neutral-600 hover:bg-neutral-50"
+                >
+                  Cancel
+                </Link>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </AdminShell>
   );
 }
