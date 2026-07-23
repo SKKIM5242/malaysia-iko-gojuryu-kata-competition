@@ -56,10 +56,11 @@ export async function submitRegistration(
     if (!values[key]) fieldErrors[key] = message;
   }
 
-  // Up to 3 competition tiers may be registered for in one submission — tier
-  // 0 is required, tiers 1/2 are entirely optional extra tiers a Sensei or
-  // participant can pick up in the same sitting (each still gets its own set
-  // of up to 3 kata events).
+  // Up to 3 competition tiers may be registered for in one submission —
+  // every tier is entirely optional (a participant can register for just
+  // USD 100 or USD 200 without ever registering for USD 10), so long as at
+  // least one kata is picked somewhere across all of them (checked once
+  // resolvedEvents is built, below).
   const tierCompetitionIds = [0, 1, 2]
     .map((i) => String(formData.get(`competition_id_${i}`) ?? "").trim())
     .filter(Boolean);
@@ -71,9 +72,6 @@ export async function submitRegistration(
     String(formData.get(`kata_${i}_2`) ?? "").trim(),
     String(formData.get(`kata_${i}_3`) ?? "").trim(),
   ]);
-  if (!tierKatas[0][0]) {
-    fieldErrors.kata_base = "Kata event is required";
-  }
   if (values.date_of_birth && Number.isNaN(Date.parse(values.date_of_birth))) {
     fieldErrors.date_of_birth = "Enter a valid date of birth";
   }

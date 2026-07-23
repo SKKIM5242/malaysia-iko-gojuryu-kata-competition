@@ -66,13 +66,13 @@ const ACCENT: Record<Exclude<CertificateKind, "winner">, string> = {
 
 const RANK_ACCENT: Record<1 | 2 | 3, string> = { 1: "#B8860B", 2: "#64748B", 3: "#A15C2E" };
 
-const MEDAL_THEME: Record<
-  1 | 2 | 3,
-  { discLight: string; discMid: string; discDark: string; ribbon: string; ribbonDark: string; label: string }
-> = {
-  1: { discLight: "#FFF1C2", discMid: "#D4AF37", discDark: "#8B6914", ribbon: "#DC2626", ribbonDark: "#7F1D1D", label: "1ST" },
-  2: { discLight: "#F5F5F5", discMid: "#C0C0C0", discDark: "#79797F", ribbon: "#2563EB", ribbonDark: "#1E3A8A", label: "2ND" },
-  3: { discLight: "#EAC094", discMid: "#CD7F32", discDark: "#7A4A1E", ribbon: "#16A34A", ribbonDark: "#14532D", label: "3RD" },
+/** Ribbon color is the same red/white/blue for every rank (like a real
+ * medal ribbon, e.g. the standard 🥇🥈🥉 icon set) — only the disc color
+ * changes with placement. */
+const MEDAL_THEME: Record<1 | 2 | 3, { discLight: string; discMid: string; discDark: string; label: string }> = {
+  1: { discLight: "#FFF1C2", discMid: "#D4AF37", discDark: "#8B6914", label: "1ST" },
+  2: { discLight: "#F5F5F5", discMid: "#C0C0C0", discDark: "#79797F", label: "2ND" },
+  3: { discLight: "#EAC094", discMid: "#CD7F32", discDark: "#7A4A1E", label: "3RD" },
 };
 
 function readAsDataUri(relPath: string, mime: string): string | null {
@@ -91,30 +91,45 @@ function logoDataUri(): string | null {
   return cachedLogo;
 }
 
+/** Two tricolor (red/white/blue) strips fanning out in a V from a shared
+ * point at the top of the medal disc — like a ribbon threaded through a
+ * clip and folded, the classic look used by real medal-ribbon icons.
+ * Built from real SVG rects/rotation, not CSS transforms — Satori doesn't
+ * miter CSS border-triangles into real triangles (tried that first; it
+ * just rendered a rectangle), but native SVG transform="rotate(...)" on
+ * <g> is core SVG and renders correctly. */
+function RibbonV({ size }: { size: number }) {
+  const vbW = size;
+  const vbH = Math.round(size * 0.58);
+  const stripW = Math.round(size * 0.24);
+  const stripLen = Math.round(vbH * 1.05);
+  const angle = 34;
+  const vertexX = vbW / 2;
+  const vertexY = vbH;
+  const bandH = stripLen / 3;
+
+  const strip = (rotate: number) => (
+    <g transform={`translate(${vertexX}, ${vertexY}) rotate(${rotate})`} stroke="#374151" strokeWidth={3}>
+      <rect x={-stripW / 2} y={-bandH} width={stripW} height={bandH + 1} fill="#DC2626" />
+      <rect x={-stripW / 2} y={-2 * bandH} width={stripW} height={bandH + 1} fill="#FFFFFF" />
+      <rect x={-stripW / 2} y={-stripLen} width={stripW} height={bandH + 1} fill="#1D4ED8" />
+    </g>
+  );
+
+  return (
+    <svg width={vbW} height={vbH} viewBox={`0 0 ${vbW} ${vbH}`}>
+      {strip(-angle)}
+      {strip(angle)}
+    </svg>
+  );
+}
+
 function Medal({ rank, size }: { rank: 1 | 2 | 3; size: number }) {
   const t = MEDAL_THEME[rank];
-  const ribbonW = Math.round(size * 0.38);
-  const ribbonH = Math.round(size * 0.5);
-  const notchDepth = Math.round(ribbonH * 0.4);
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-      {/* Ribbon: a V-notch cut into the bottom edge (two pointed tails),
-       * drawn as a real SVG polygon -- CSS border-triangle tricks don't
-       * miter correctly under Satori, so this needs actual SVG geometry. */}
-      <div
-        style={{
-          display: "flex",
-          marginBottom: `-${Math.round(size * 0.16)}px`,
-        }}
-      >
-        <svg width={ribbonW} height={ribbonH} viewBox={`0 0 ${ribbonW} ${ribbonH}`}>
-          <polygon
-            points={`0,0 ${ribbonW},0 ${ribbonW},${ribbonH} ${ribbonW / 2},${ribbonH - notchDepth} 0,${ribbonH}`}
-            fill={t.ribbon}
-            stroke={t.ribbonDark}
-            strokeWidth={2}
-          />
-        </svg>
+      <div style={{ display: "flex", marginBottom: `-${Math.round(size * 0.185)}px` }}>
+        <RibbonV size={size} />
       </div>
       <div
         style={{
@@ -218,7 +233,7 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
             </div>
             <div
               style={{
-                marginTop: "10px",
+                marginTop: "4px",
                 display: "flex",
                 fontSize: 34,
                 fontWeight: 900,
@@ -233,7 +248,7 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
 
           <div
             style={{
-              marginTop: "24px",
+              marginTop: "14px",
               display: "flex",
               fontSize: 88,
               fontWeight: 900,
@@ -246,11 +261,11 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
 
           <div
             style={{
-              marginTop: "8px",
+              marginTop: "4px",
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
-              gap: "10px",
+              gap: "4px",
             }}
           >
             <div
@@ -279,7 +294,6 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
             </div>
             <div
               style={{
-                marginTop: "6px",
                 display: "flex",
                 fontSize: 46,
                 fontWeight: 700,
@@ -338,21 +352,15 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
               )}
             </div>
 
-            <div style={{ position: "absolute", left: 0, bottom: 0, display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
-              <div
-                style={{
-                  display: "flex",
-                  fontSize: 44,
-                  fontWeight: 800,
-                  color: "#44403c",
-                  borderBottom: "3px solid #a8a29e",
-                  paddingBottom: "10px",
-                }}
-              >
-                {input.dateLabel}
-              </div>
-              <div style={{ marginTop: "8px", display: "flex", fontSize: 20, color: "#78716c" }}>
-                {input.kind === "winner" ? "Winner Announcement Date" : "Certificate Issue Date"}
+            <div style={{ position: "absolute", left: 0, bottom: 0, display: "flex" }}>
+              <div style={{ display: "flex", flexDirection: "column", width: "380px" }}>
+                <div style={{ display: "flex", fontSize: 44, fontWeight: 800, color: "#44403c", paddingBottom: "10px" }}>
+                  {input.dateLabel}
+                </div>
+                <div style={{ display: "flex", width: "100%", borderTop: "3px solid #a8a29e" }} />
+                <div style={{ marginTop: "8px", display: "flex", fontSize: 26, fontWeight: 600, color: "#78716c" }}>
+                  {input.kind === "winner" ? "Winner Announcement Date" : "Certificate Issue Date"}
+                </div>
               </div>
             </div>
           </div>

@@ -16,34 +16,34 @@ const VALID_KINDS: CertificateKind[] = ["winner", "participant", "referee", "sen
 const SAMPLE_DATA: Record<CertificateKind, Omit<CertificateInput, "signerName" | "signerTitle" | "signatureUrl" | "stampUrl">> = {
   winner: {
     kind: "winner", recipientName: "Jane Doe",
-    competitionName: "Malaysia Open IKO Goju-ryu Kata Championship 2026 — USD 100 Tier",
+    competitionName: "Malaysia Open Virtual Karate-do Kata Championship 2026 — USD 100 Tier",
     categoryName: "Color/Kyu Belt — Age 15–40 — Male", kataName: "Kata Saifa", rank: 1,
     dateLabel: "12/09/2026",
   },
   participant: {
     kind: "participant", recipientName: "John Tan",
-    competitionName: "Malaysia Open IKO Goju-ryu Kata Championship 2026 — USD 10 Tier",
+    competitionName: "Malaysia Open Virtual Karate-do Kata Championship 2026 — USD 10 Tier",
     categoryName: "Color/Kyu Belt — Age 4–14 — Female", kataName: "Kata Gekisai Dai Ichi", rank: null,
     dateLabel: "12/09/2026",
   },
   referee: {
     kind: "referee", recipientName: "Ahmad Zulkifli",
-    competitionName: "Malaysia Open IKO Goju-ryu Kata Championship 2026",
+    competitionName: "Malaysia Open Virtual Karate-do Kata Championship 2026",
     categoryName: null, kataName: null, rank: null, dateLabel: "12/09/2026",
   },
   sensei: {
     kind: "sensei", recipientName: "Sensei Lim Wei Chen",
-    competitionName: "Malaysia Open IKO Goju-ryu Kata Championship 2026",
+    competitionName: "Malaysia Open Virtual Karate-do Kata Championship 2026",
     categoryName: null, kataName: null, rank: null, dateLabel: "12/09/2026",
   },
   school: {
     kind: "school", recipientName: "Goju-ryu Karate Academy KL",
-    competitionName: "Malaysia Open IKO Goju-ryu Kata Championship 2026",
+    competitionName: "Malaysia Open Virtual Karate-do Kata Championship 2026",
     categoryName: null, kataName: null, rank: null, dateLabel: "12/09/2026",
   },
   support: {
     kind: "support", recipientName: "Nurul Huda",
-    competitionName: "Malaysia Open IKO Goju-ryu Kata Championship 2026",
+    competitionName: "Malaysia Open Virtual Karate-do Kata Championship 2026",
     categoryName: null, kataName: null, rank: null, dateLabel: "12/09/2026",
   },
 };
@@ -292,7 +292,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ kind
     const image = await renderCertificatePng({
       kind: "support",
       recipientName: profRow.full_name ?? "Support Team Member",
-      competitionName: "Malaysia Open IKO Goju-ryu Kata Championship",
+      competitionName: "Malaysia Open Virtual Karate-do Kata Championship",
       categoryName: null,
       kataName: null,
       rank: null,

@@ -129,12 +129,11 @@ export default function RegisterForm({
   }, [eligibleByTier, competitions]);
 
   const tierEventCounts = competitions.map((c) => (tierKatas[c.id] ?? ["", "", ""]).filter(Boolean).length);
-  const tier1Events = tierEventCounts[0] ?? 0;
-  const totalFee = competitions.reduce((sum, c, i) => {
-    const events = i === 0 ? Math.max(1, tierEventCounts[i] ?? 0) : (tierEventCounts[i] ?? 0);
-    return sum + events * Number(c.registration_fee_usd ?? 0);
-  }, 0);
-  const totalEvents = competitions.reduce((sum, _c, i) => sum + (i === 0 ? Math.max(1, tierEventCounts[i] ?? 0) : (tierEventCounts[i] ?? 0)), 0);
+  const totalFee = competitions.reduce(
+    (sum, c, i) => sum + (tierEventCounts[i] ?? 0) * Number(c.registration_fee_usd ?? 0),
+    0,
+  );
+  const totalEvents = tierEventCounts.reduce((sum, n) => sum + n, 0);
 
   if (state.ok && state.referenceIds && state.referenceIds.length > 0) {
     return (
@@ -351,13 +350,12 @@ export default function RegisterForm({
             Kata event{competitions.length > 1 ? "s" : ""} *{" "}
             <span className="font-normal text-neutral-400">
               {competitions.length > 1
-                ? "— tier 1 is required; registering for extra tiers here saves you filling this form again"
+                ? "— pick a kata in whichever tier(s) you want to register for; every tier below is optional, register for just one or as many as you like"
                 : ""}
             </span>
           </p>
           <div className="grid gap-4 sm:grid-cols-3">
             {competitions.map((c, i) => {
-              const isRequiredTier = i === 0;
               const katas = tierKatas[c.id] ?? ["", "", ""];
               const eligible = eligibleByTier[c.id] ?? [];
               const eligible2 = eligible.filter((k) => k !== katas[0]);
@@ -365,7 +363,7 @@ export default function RegisterForm({
               return (
                 <div key={c.id} className="rounded-md border border-neutral-200 bg-neutral-50 p-3">
                   <label className="mb-1 block text-xs font-medium text-neutral-700">
-                    Competition Tier{isRequiredTier ? " *" : " (optional)"}
+                    Competition Tier (optional)
                   </label>
                   <input
                     readOnly
@@ -374,25 +372,22 @@ export default function RegisterForm({
                   />
 
                   <label htmlFor={`kata_${i}_1`} className="mb-1 block text-xs font-medium text-neutral-700">
-                    1st Kata event{isRequiredTier ? " *" : " (optional)"}
+                    1st Kata event (optional)
                   </label>
                   <select
                     id={`kata_${i}_1`}
                     name={`kata_${i}_1`}
-                    required={isRequiredTier}
                     className={`${inputCls} mb-2 text-sm`}
                     value={katas[0]}
                     onChange={(e) => setTierKata(c.id, 0, e.target.value)}
                     disabled={!detailsComplete}
                   >
-                    <option value="" disabled={isRequiredTier}>
+                    <option value="">
                       {!detailsComplete
                         ? "Fill in belt rank, date of birth & gender first"
                         : eligible.length === 0
                           ? "No kata currently available for your belt / age / gender"
-                          : isRequiredTier
-                            ? "Select kata"
-                            : "— None — skip this tier —"}
+                          : "— None — skip this tier —"}
                     </option>
                     {eligible.map((k) => (
                       <option key={k} value={k}>{k}</option>
@@ -441,9 +436,9 @@ export default function RegisterForm({
             (Color/Kyu Belt or Black Belt &amp; Dan Holders), age group (4–14, 15–40, 41–65, 66–99)
             and gender — and that still has room.
           </p>
-          {detailsComplete && (eligibleByTier[competitions[0]?.id] ?? []).length === 0 && (
+          {detailsComplete && competitions.every((c) => (eligibleByTier[c.id] ?? []).length === 0) && (
             <p className="mt-1 text-xs text-amber-600">
-              No open kata matches your belt rank, age and gender right now for tier 1 — every
+              No open kata matches your belt rank, age and gender right now in any tier — every
               matching sub-category may be full, or none exists for this combination yet. Contact
               the organizer if this seems wrong.
             </p>
@@ -453,8 +448,8 @@ export default function RegisterForm({
 
         <div className="sm:col-span-2 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
           Registering for {totalEvents} kata event{totalEvents === 1 ? "" : "s"} across{" "}
-          {tierEventCounts.filter((n, i) => (i === 0 ? true : n > 0)).length} tier
-          {tierEventCounts.filter((n, i) => (i === 0 ? true : n > 0)).length === 1 ? "" : "s"} — total fee USD{" "}
+          {tierEventCounts.filter((n) => n > 0).length} tier
+          {tierEventCounts.filter((n) => n > 0).length === 1 ? "" : "s"} — total fee USD{" "}
           {totalFee.toFixed(2)}.
         </div>
 
@@ -535,7 +530,7 @@ export default function RegisterForm({
 
       <button
         type="submit"
-        disabled={pending || tier1Events === 0}
+        disabled={pending || totalEvents === 0}
         className="w-full rounded-md bg-red-700 px-4 py-2.5 font-semibold text-white hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
       >
         {pending
