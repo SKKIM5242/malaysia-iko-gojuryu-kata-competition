@@ -48,7 +48,7 @@ async function CompetitionPreview({
   }
 
   return (
-    <section className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
+    <section id={competition.id} className="scroll-mt-4 rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">
       <div className="mb-1 flex flex-wrap items-center gap-2">
         <h2 className="text-lg font-bold">{competition.name}</h2>
         {revealed ? (

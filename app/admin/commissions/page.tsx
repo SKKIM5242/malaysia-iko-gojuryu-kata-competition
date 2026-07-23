@@ -142,7 +142,7 @@ export default async function AdminCommissions({
         {payable.length} of {rows.length} currently qualify for a non-zero commission.
       </p>
 
-      <h2 className="mt-10 mb-2 text-lg font-bold text-neutral-900">Rewards — Top 3 Winners Payout</h2>
+      <h2 id="rewards" className="mt-10 mb-2 scroll-mt-4 text-lg font-bold text-neutral-900">Rewards — Top 3 Winners Payout</h2>
       <p className="mb-6 max-w-3xl text-sm text-neutral-500">
         Top 3 per category, for every competition whose Winners have already been announced —
         computed live from the same scores shown on the public{" "}

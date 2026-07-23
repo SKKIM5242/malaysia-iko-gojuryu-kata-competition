@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getAllCompetitions } from "@/lib/admin-data";
 import { schemaReady } from "@/lib/data";
@@ -570,6 +571,20 @@ export default async function AdminJudging({
                     <input type="hidden" name="competition_id" value={c.id} />
                     <button className={adminBtn}>Auto-assign referees</button>
                   </form>
+                  <Link
+                    href={`/admin/winners#${c.id}`}
+                    className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50"
+                    title="Preview how the Winners announcement will look for this tier, before the public reveal date"
+                  >
+                    Preview winners →
+                  </Link>
+                  <Link
+                    href="/admin/commissions#rewards"
+                    className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50"
+                    title="Mark Top-3 prize money as paid once transferred"
+                  >
+                    Reward payouts →
+                  </Link>
                 </div>
               ) : (
                 <span className="text-xs text-neutral-400">
