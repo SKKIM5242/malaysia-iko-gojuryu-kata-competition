@@ -11,6 +11,12 @@ export interface FullViewJudge {
   country: string | null;
   total: number | null;
   criteria: number[] | null;
+  /** This judge's own disqualification reason, if their score was 0. */
+  reason: string | null;
+  /** True when this "judge" slot is really an Admin/Organizer/Staff
+   * override rather than a genuine referee — surfaced separately in the
+   * participant info block below instead of blending in as a 4th judge. */
+  isOverride: boolean;
 }
 
 /**
@@ -49,6 +55,7 @@ export default function FullViewButton({
   if (!url) return null;
 
   const scoredCount = judges.filter((j) => j.total != null).length;
+  const override = judges.find((j) => j.isOverride && j.total != null);
 
   return (
     <>
@@ -94,7 +101,13 @@ export default function FullViewButton({
                               Even split of the total — per-row detail wasn&apos;t recorded for this score.
                             </p>
                           )}
-                          <RubricTable values={values} rubric={rubricFor(values)} readOnly />
+                          <RubricTable values={values} rubric={rubricFor(values)} readOnly dense />
+                          {j.total === 0 && (
+                            <p className="mt-1.5 rounded-md border border-red-200 bg-red-50 px-2 py-1.5 text-xs text-red-800">
+                              <strong>Disqualification reason:</strong>{" "}
+                              {j.reason || "Not recorded (submitted before this was required)."}
+                            </p>
+                          )}
                         </>
                       )}
                     </div>
@@ -118,6 +131,12 @@ export default function FullViewButton({
                 {queuePosition != null ? ` · Winner-in-line position #${queuePosition}` : ""}
               </p>
               <p className="mt-1 text-[11px] text-neutral-400">View only — nothing here can be edited.</p>
+              {override && (
+                <p className="mt-1 text-xs font-semibold text-purple-700">
+                  Admin/Organizer override — {override.judgeName}: Score {override.total!.toFixed(1)}
+                  {override.total === 0 ? ` · Disqualified: ${override.reason || "No reason recorded"}` : ""}
+                </p>
+              )}
             </div>
           </div>
         </FloatingWindow>

@@ -95,6 +95,8 @@ async function computeWinners(
           country: refereeCountry.get(uid) ?? null,
           total: scoreByKey.get(`${e.videoId}:${uid}`) ?? null,
           criteria: criteriaByKey.get(`${e.videoId}:${uid}`) ?? null,
+          reason: null,
+          isOverride: false,
         })),
       })),
     );

@@ -73,8 +73,8 @@ export default async function AdminJudging({
   const allowAdvancedControls = ["admin", "organizer", "staff"].includes(myRole ?? "");
 
   const [
-    competitions, { data: videos }, { data: directory }, { data: refereeProfiles }, { data: assignments }, { data: scores },
-    { data: criteria },
+    competitions, { data: videos }, { data: directory }, { data: refereeProfiles }, { data: staffProfiles },
+    { data: assignments }, { data: scores }, { data: criteria },
   ] =
     await Promise.all([
       getAllCompetitions(),
@@ -90,6 +90,10 @@ export default async function AdminJudging({
         .eq("status", "approved")
         .order("full_name"),
       supabase.from("profiles").select("user_id, full_name, email, country").eq("role", "referee").eq("approved", true),
+      // Admin/Organizer/Staff who used "take over or override score" self-assign
+      // via the same referee_assignments/video_scores rows as a real judge — this
+      // is how Full View tells an override apart from a genuine judge's score.
+      supabase.from("profiles").select("user_id, full_name, email").in("role", ["admin", "organizer", "staff"]),
       supabase.from("referee_assignments").select("video_id, referee_user_id"),
       supabase.from("video_scores").select("video_id, referee_user_id, score, criteria, disqualification_reason"),
       supabase.from("auto_assign_criteria").select("*").order("position"),
@@ -121,6 +125,13 @@ export default async function AdminJudging({
     refereeCountry.set(r.user_id, r.country ?? null);
   }
   const refereeTelegramLink = getTelegramLink("referee");
+
+  // Admin/Organizer/Staff who self-assigned via "take over or override
+  // score" — Full View surfaces these separately from genuine judges.
+  const staffName = new Map<string, string>();
+  for (const p of staffProfiles ?? []) {
+    staffName.set(p.user_id, p.full_name || p.email || p.user_id.slice(0, 8));
+  }
 
   const assignedByVideo = new Map<string, string[]>();
   for (const a of assignments ?? []) {
@@ -188,10 +199,12 @@ export default async function AdminJudging({
               categoryName={v.registration?.category?.name ?? null}
               competitionName={competitions.find((c) => c.id === v.registration?.competition_id)?.name ?? null}
               judges={assigned.map((uid) => ({
-                judgeName: refereeName.get(uid) ?? uid.slice(0, 8),
+                judgeName: staffName.get(uid) ?? refereeName.get(uid) ?? uid.slice(0, 8),
                 country: refereeCountry.get(uid) ?? null,
                 total: scoreByKey.get(`${v.id}:${uid}`) ?? null,
                 criteria: criteriaByKey.get(`${v.id}:${uid}`) ?? null,
+                reason: reasonByKey.get(`${v.id}:${uid}`) ?? null,
+                isOverride: staffName.has(uid),
               }))}
               judgesRequired={judgesRequired}
               queuePosition={queuePosition}

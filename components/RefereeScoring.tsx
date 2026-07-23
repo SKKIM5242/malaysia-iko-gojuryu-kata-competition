@@ -38,34 +38,41 @@ export function RubricTable({
   onChange,
   readOnly,
   rubric = SHEET2_CRITERIA,
+  dense,
 }: {
   values: number[];
   onChange?: (i: number, raw: string) => void;
   readOnly?: boolean;
   rubric?: RubricCriterion[];
+  /** Shrinks row height (~40%) for space-constrained read-only views like
+   * Full View's 3-judge-tables-side-by-side layout. */
+  dense?: boolean;
 }) {
   const total = useMemo(() => Math.round(values.reduce((a, b) => a + b, 0) * 10) / 10, [values]);
   const disqualifying = total === 0;
   const overMax = total > TOTAL_MAX;
+  const cellPad = dense ? "px-2 py-0.5" : "px-2 py-1.5";
+  const totalPad = dense ? "px-2 py-1" : "px-2 py-2";
+  const textSize = dense ? "text-xs" : "text-sm";
   return (
     <>
       <div className="overflow-x-auto rounded-md border border-neutral-200">
-        <table className="w-full min-w-[420px] text-left text-sm">
+        <table className={`w-full min-w-[420px] text-left ${textSize}`}>
           <thead className="border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
             <tr>
-              <th className="px-2 py-1.5">No.</th>
-              <th className="px-2 py-1.5">Criteria</th>
-              <th className="px-2 py-1.5">Score</th>
-              <th className="px-2 py-1.5">{readOnly ? "Points" : "Your score"}</th>
+              <th className={cellPad}>No.</th>
+              <th className={cellPad}>Criteria</th>
+              <th className={cellPad}>Score</th>
+              <th className={cellPad}>{readOnly ? "Points" : "Your score"}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100">
             {rubric.map((c, i) => (
               <tr key={c.label}>
-                <td className="px-2 py-1.5 text-neutral-400">{i + 1}.</td>
-                <td className="px-2 py-1.5">{c.label}</td>
-                <td className="px-2 py-1.5 text-neutral-400">0–{c.max}</td>
-                <td className="px-2 py-1.5">
+                <td className={`${cellPad} text-neutral-400`}>{i + 1}.</td>
+                <td className={cellPad}>{c.label}</td>
+                <td className={`${cellPad} text-neutral-400`}>0–{c.max}</td>
+                <td className={cellPad}>
                   {readOnly ? (
                     <span className="font-semibold text-neutral-800">{(values[i] ?? 0).toFixed(2)}</span>
                   ) : (
@@ -83,9 +90,9 @@ export function RubricTable({
               </tr>
             ))}
             <tr className="bg-neutral-50 font-semibold">
-              <td colSpan={2} className="px-2 py-2 text-right">Total Score</td>
-              <td className="px-2 py-2 text-neutral-400">0–{TOTAL_MAX}</td>
-              <td className={`px-2 py-2 ${disqualifying || overMax ? "text-red-700" : "text-neutral-900"}`}>
+              <td colSpan={2} className={`${totalPad} text-right`}>Total Score</td>
+              <td className={`${totalPad} text-neutral-400`}>0–{TOTAL_MAX}</td>
+              <td className={`${totalPad} ${disqualifying || overMax ? "text-red-700" : "text-neutral-900"}`}>
                 {total.toFixed(1)}
               </td>
             </tr>
