@@ -105,6 +105,11 @@ export default async function BulkRegisterPage() {
                     save – choose the folder or file - click open – it will upload itself.
                   </li>
                 </ol>
+                <p className="mt-3 text-xs text-neutral-400">
+                  To register the same student for more than one tier, include them again as their
+                  own row in that other tier&apos;s CSV file — same IC/passport and details each
+                  time — and upload each tier&apos;s file separately below (one tier per upload).
+                </p>
                 <div className="mt-4">
                   <CsvBulkForm competitions={openCompetitions} schools={schools} senseis={senseis} />
                 </div>

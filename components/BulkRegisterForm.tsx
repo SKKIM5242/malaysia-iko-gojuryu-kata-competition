@@ -239,7 +239,9 @@ export default function BulkRegisterForm({
           Empty rows are skipped. Each participant gets their own reference ID. Rank confirmation:
           choose <strong>Sensei Confirmed</strong> if you vouch for the stated rank, or{" "}
           <strong>Pending Confirmation</strong> — the participant uploads or photographs their
-          certificate later.
+          certificate later. To register the same student for more than one tier, submit this
+          table again with that other tier selected above and the student&apos;s row repeated —
+          same IC/passport and details each time.
         </span>
       </div>
     </form>
