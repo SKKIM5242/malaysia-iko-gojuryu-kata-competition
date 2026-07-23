@@ -479,6 +479,63 @@ export async function mergeCategoryAgeGroup(formData: FormData) {
   backTo(returnTo, { ok: `Merged “${neighbor!.name}” into “${newName}”.` });
 }
 
+// ── Certificates ─────────────────────────────────────────────────────────────
+
+async function uploadBrandingIfPresent(
+  supabase: SupabaseClient,
+  formData: FormData,
+  fieldName: string,
+  prefix: string,
+  returnTo: string,
+): Promise<string | null> {
+  const file = formData.get(fieldName);
+  if (!(file instanceof File) || file.size === 0) return null;
+  if (file.size > 5 * 1024 * 1024) {
+    backTo(returnTo, { error: `${prefix === "signature" ? "Signature" : "Stamp"} image is too large (max 5 MB).` });
+  }
+  const ext = (file.name.split(".").pop() || "png").toLowerCase().slice(0, 5);
+  const path = `${prefix}-${crypto.randomUUID()}.${ext}`;
+  const { error } = await supabase.storage
+    .from("branding")
+    .upload(path, file, { contentType: file.type || "image/png" });
+  if (error) {
+    backTo(returnTo, { error: `Could not upload the ${prefix === "signature" ? "signature" : "stamp"} image. Please try again.` });
+  }
+  return path;
+}
+
+/** Org-wide branding used on every generated certificate (see
+ * lib/certificate-render.tsx) — signer name/title plus signature and
+ * stamp/seal images, stored once in the certificate_settings singleton row
+ * and the "branding" storage bucket. Leaving an image field blank on
+ * re-save keeps whatever was uploaded before. */
+export async function saveCertificateSettings(formData: FormData) {
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/certificates";
+  const { supabase, actorId } = await getActor();
+  await requireCompetitionManager(supabase, actorId, returnTo);
+
+  const signerName = String(formData.get("signer_name") ?? "").trim() || null;
+  const signerTitle = String(formData.get("signer_title") ?? "").trim() || null;
+  const signaturePath = await uploadBrandingIfPresent(supabase, formData, "signature", "signature", returnTo);
+  const stampPath = await uploadBrandingIfPresent(supabase, formData, "stamp", "stamp", returnTo);
+
+  const update: Record<string, unknown> = {
+    signer_name: signerName, signer_title: signerTitle, updated_at: new Date().toISOString(),
+  };
+  if (signaturePath) update.signature_path = signaturePath;
+  if (stampPath) update.stamp_path = stampPath;
+
+  const { error } = await supabase.from("certificate_settings").update(update).eq("id", true);
+  if (error) backTo(returnTo, { error: "Could not save certificate settings." });
+
+  await writeAudit(supabase, {
+    table_name: "certificate_settings", record_id: null, action: "certificate_settings_updated",
+    new_value: update, actor_id: actorId,
+  });
+  revalidatePath("/admin/certificates");
+  backTo(returnTo, { ok: "Certificate settings saved." });
+}
+
 // ── Announcements ────────────────────────────────────────────────────────────
 
 export async function saveAnnouncement(formData: FormData) {

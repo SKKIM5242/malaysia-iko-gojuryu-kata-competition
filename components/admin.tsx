@@ -27,6 +27,7 @@ const FULL_NAV: Array<[string, string]> = [
   ["Participant Records", "/admin/records"],
   ["Winners", "/admin/winners"],
   ["Commissions", "/admin/commissions"],
+  ["Certificates", "/admin/certificates"],
   ["Telegram Links", "/admin/telegram"],
   ["Classes", "/admin/classes"],
   ["Content", "/admin/content"],
