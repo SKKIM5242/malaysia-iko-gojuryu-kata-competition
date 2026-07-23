@@ -195,13 +195,13 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
             <div
               style={{
                 display: "flex",
-                fontSize: 72,
-                fontWeight: 800,
-                letterSpacing: 1,
+                fontSize: 56,
+                fontWeight: 900,
+                letterSpacing: 0.5,
                 textTransform: "uppercase",
                 color: "#57534e",
                 textAlign: "center",
-                maxWidth: "1550px",
+                whiteSpace: "nowrap",
               }}
             >
               2026 Malaysia Open Virtual Karate-do Kata Championship
@@ -210,11 +210,11 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
               style={{
                 marginTop: "10px",
                 display: "flex",
-                fontSize: 40,
-                fontWeight: 600,
+                fontSize: 34,
+                fontWeight: 900,
                 color: "#a8a29e",
-                maxWidth: "1650px",
                 textAlign: "center",
+                whiteSpace: "nowrap",
               }}
             >
               Goju-ryu Version &amp; IKO Goju-ryu Version Only — Open Version for Kobudo (Weapon) Kata

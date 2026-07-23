@@ -52,9 +52,13 @@ export default async function RegisterSuccessPage({
 
               <div>
                 <p className="text-sm font-semibold text-green-900">2) Create your login account</p>
+                <p className="mt-0.5 text-xs text-green-700">
+                  Do this now — you need this account to sign in later, even if you&apos;re not ready to
+                  record yet.
+                </p>
                 <div className="mt-1.5 text-center">
                   <Link
-                    href="/kata-arena?mode=signup"
+                    href="/account?mode=signup"
                     className="inline-block rounded-md bg-red-700 px-6 py-2.5 font-semibold text-white hover:bg-red-600"
                   >
                     Create login Account
@@ -68,18 +72,21 @@ export default async function RegisterSuccessPage({
                 </p>
                 <div className="mt-1.5 flex flex-wrap items-center justify-center gap-3">
                   <Link
-                    href="/kata-arena?mode=signup"
+                    href="/account?mode=signup"
                     className="rounded-md bg-red-700 px-6 py-2.5 font-semibold text-white hover:bg-red-600"
                   >
                     Start Recording Kata
                   </Link>
                   <Link
-                    href="/kata-arena"
+                    href="/account"
                     className="rounded-md border border-green-300 bg-white px-6 py-2.5 font-semibold text-green-800 hover:bg-green-50"
                   >
                     Sign in later for Recording
                   </Link>
                 </div>
+                <p className="mt-1.5 text-xs text-green-700">
+                  &quot;Sign in later&quot; only works once you&apos;ve created your login account in Step 2 above.
+                </p>
               </div>
             </div>
 

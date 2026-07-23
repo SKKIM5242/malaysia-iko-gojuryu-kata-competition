@@ -7,13 +7,15 @@ import CertificateUploadField from "@/components/CertificateUploadField";
 
 export const dynamic = "force-dynamic";
 
-const CERT_KINDS: Array<{ kind: string; label: string; note: string }> = [
-  { kind: "winner", label: "Winner", note: "Top 3 finishers — rank badge + gold accent." },
-  { kind: "participant", label: "Participant", note: "Every other paid, non-winning participant." },
-  { kind: "referee", label: "Referee / Judge", note: "For judging a competition tier." },
-  { kind: "sensei", label: "Sensei", note: "For a sensei whose students competed." },
-  { kind: "school", label: "School / Dojo", note: "For a school whose students competed." },
-  { kind: "support", label: "Support", note: "Flat certificate of appreciation, not tier-specific." },
+const CERT_KINDS: Array<{ key: string; kind: string; label: string; note: string; query?: string }> = [
+  { key: "winner-1", kind: "winner", label: "Winner — 1st Place", note: "Gold accent + gold medal.", query: "?rank=1" },
+  { key: "winner-2", kind: "winner", label: "Winner — 2nd Place", note: "Silver accent + silver medal.", query: "?rank=2" },
+  { key: "winner-3", kind: "winner", label: "Winner — 3rd Place", note: "Bronze accent + bronze medal.", query: "?rank=3" },
+  { key: "participant", kind: "participant", label: "Participant", note: "Every other paid, non-winning participant." },
+  { key: "referee", kind: "referee", label: "Referee / Judge", note: "For judging a competition tier." },
+  { key: "sensei", kind: "sensei", label: "Sensei", note: "For a sensei whose students competed." },
+  { key: "school", kind: "school", label: "School / Dojo", note: "For a school whose students competed." },
+  { key: "support", kind: "support", label: "Support", note: "Flat certificate of appreciation, not tier-specific." },
 ];
 
 export default async function AdminCertificates({
@@ -121,12 +123,12 @@ export default async function AdminCertificates({
           </p>
           <div className="grid gap-6 sm:grid-cols-2">
             {CERT_KINDS.map((c) => (
-              <div key={c.kind} className="rounded-lg border border-neutral-200 bg-white p-3 shadow-sm">
+              <div key={c.key} className="rounded-lg border border-neutral-200 bg-white p-3 shadow-sm">
                 <p className="mb-2 text-sm font-bold text-neutral-800">{c.label}</p>
                 <p className="mb-2 text-xs text-neutral-400">{c.note}</p>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={`/api/certificates/${c.kind}/sample`}
+                  src={`/api/certificates/${c.kind}/sample${c.query ?? ""}`}
                   alt={`${c.label} certificate sample`}
                   className="w-full rounded border border-neutral-100"
                 />
