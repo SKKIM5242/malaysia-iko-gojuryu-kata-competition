@@ -81,7 +81,7 @@ export async function notifyRefereeAssignment(notice: AssignmentNotice): Promise
   await Promise.allSettled([sendAssignmentEmail(notice), sendAssignmentTelegram(notice)]);
 }
 
-interface ConfirmationEmailInput {
+export interface ConfirmationEmailInput {
   toEmail: string | null;
   recipientName: string;
   subject: string;
@@ -93,15 +93,7 @@ interface ConfirmationEmailInput {
   telegramCategory?: TelegramCategory | null;
 }
 
-/**
- * Record-purpose confirmation sent right after any registration (participant,
- * referee, audience, staff, school, sensei) is created. Every email includes
- * the Kata Arena log-in link, the app link, and — when applicable — the
- * relevant category's Telegram group link, in addition to whatever detail
- * lines the caller supplies to mirror that flow's on-screen confirmation.
- */
-export async function sendConfirmationEmail(input: ConfirmationEmailInput): Promise<void> {
-  if (!input.toEmail) return;
+function buildConfirmationBody(input: ConfirmationEmailInput): string {
   const telegramUrl = input.telegramCategory ? getTelegramLink(input.telegramCategory) : null;
   const lines: string[] = [`Hi ${input.recipientName},`, "", ...input.bodyLines];
   if (input.referenceId) lines.push("", `Reference ID: ${input.referenceId}`);
@@ -120,7 +112,58 @@ export async function sendConfirmationEmail(input: ConfirmationEmailInput): Prom
     );
   }
   lines.push("", "— Malaysia Open IKO Goju-ryu Kata Championship");
-  await sendEmail(input.toEmail, input.subject, lines.join("\n"));
+  return lines.join("\n");
+}
+
+/**
+ * Record-purpose confirmation sent right after any registration (participant,
+ * referee, audience, staff, school, sensei) is created. Every email includes
+ * the Kata Arena log-in link, the app link, and — when applicable — the
+ * relevant category's Telegram group link, in addition to whatever detail
+ * lines the caller supplies to mirror that flow's on-screen confirmation.
+ */
+export async function sendConfirmationEmail(input: ConfirmationEmailInput): Promise<void> {
+  if (!input.toEmail) return;
+  await sendEmail(input.toEmail, input.subject, buildConfirmationBody(input));
+}
+
+const RESEND_BATCH_SIZE = 100;
+
+/**
+ * Same confirmation email as sendConfirmationEmail, but for many recipients
+ * at once (bulk registration — up to 10,000 rows) — uses Resend's Batch API
+ * (up to 100 emails per HTTP request) instead of one request per recipient.
+ * Sending one-request-per-email in parallel blew straight through Resend's
+ * 10 req/s account rate limit past ~10 participants, silently 429-ing every
+ * confirmation after that; batching keeps this to one request per 100
+ * participants, sent one chunk at a time (never in parallel) to stay well
+ * under the limit regardless of batch size.
+ */
+export async function sendConfirmationEmailBatch(inputs: ConfirmationEmailInput[]): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return;
+  const from = process.env.EMAIL_FROM || "onboarding@resend.dev";
+  const emails = inputs
+    .filter((i): i is ConfirmationEmailInput & { toEmail: string } => !!i.toEmail)
+    .map((i) => ({ from, to: i.toEmail, subject: i.subject, text: buildConfirmationBody(i) }));
+  if (emails.length === 0) return;
+
+  for (let i = 0; i < emails.length; i += RESEND_BATCH_SIZE) {
+    const chunk = emails.slice(i, i + RESEND_BATCH_SIZE);
+    try {
+      const res = await fetch("https://api.resend.com/emails/batch", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify(chunk),
+      });
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        console.error(`[notify] Resend batch send failed (${res.status}) for ${chunk.length} recipients: ${body.slice(0, 500)}`);
+      }
+    } catch (err) {
+      console.error(`[notify] Resend batch send threw for ${chunk.length} recipients:`, err);
+    }
+  }
 }
 
 /** Sent once per new account, right after signup — same no-op-until-

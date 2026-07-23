@@ -6,7 +6,7 @@ import { writeAudit } from "@/lib/audit";
 import { resolveCategory, ageAt } from "@/lib/division";
 import { parseCsv } from "@/lib/csv";
 import { parseDDMMYYYY } from "@/lib/csv-bulk";
-import { sendConfirmationEmail } from "@/lib/notify";
+import { sendConfirmationEmail, sendConfirmationEmailBatch, type ConfirmationEmailInput } from "@/lib/notify";
 import { getStripe, paymentsEnabled } from "@/lib/payments";
 import { formatUSD } from "@/components/ui";
 import type { Category } from "@/lib/types";
@@ -444,7 +444,7 @@ export async function bulkRegister(_prev: BulkState, formData: FormData): Promis
   const categories = (catRows as Category[]) ?? [];
 
   const results: BulkRowResult[] = [];
-  const emailJobs: Array<() => Promise<void>> = [];
+  const confirmationEmails: ConfirmationEmailInput[] = [];
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
@@ -557,22 +557,20 @@ export async function bulkRegister(_prev: BulkState, formData: FormData): Promis
     });
     const referenceId = registrationId.slice(0, 8).toUpperCase();
     results.push({ row: i + 1, name: label, ok: true, referenceId });
-    emailJobs.push(() =>
-      sendConfirmationEmail({
-        toEmail: row.email.trim(),
-        recipientName: row.full_name.trim(),
-        subject: `Registration confirmed — ${competition.name}`,
-        referenceId,
-        telegramCategory: "participant",
-        bodyLines: [
-          `This confirms your registration for ${competition.name} (${row.kata_base}), submitted via bulk registration.`,
-          "Your registration fee has already been paid by your school/sensei — no further payment is needed from you.",
-        ],
-      }),
-    );
+    confirmationEmails.push({
+      toEmail: row.email.trim(),
+      recipientName: row.full_name.trim(),
+      subject: `Registration confirmed — ${competition.name}`,
+      referenceId,
+      telegramCategory: "participant",
+      bodyLines: [
+        `This confirms your registration for ${competition.name} (${row.kata_base}), submitted via bulk registration.`,
+        "Your registration fee has already been paid by your school/sensei — no further payment is needed from you.",
+      ],
+    });
   }
 
-  await Promise.allSettled(emailJobs.map((job) => job()));
+  await sendConfirmationEmailBatch(confirmationEmails);
   await supabase.rpc("consume_bulk_upload_payment", { p_id: payment.id, p_rows_uploaded: results.filter((r) => r.ok).length });
   await sendSenseiSummaryEmail(
     supabase,
@@ -902,20 +900,18 @@ export async function bulkRegisterCsv(_prev: CsvBulkState, formData: FormData): 
     }
     registered += chunk.length;
 
-    await Promise.allSettled(
-      withIds.map((v) =>
-        sendConfirmationEmail({
-          toEmail: v.email,
-          recipientName: v.full_name,
-          subject: `Registration confirmed — ${competition.name}`,
-          referenceId: v.registrationId.slice(0, 8).toUpperCase(),
-          telegramCategory: "participant",
-          bodyLines: [
-            `This confirms your registration for ${competition.name} (${v.kataBase}), submitted via CSV bulk upload.`,
-            "Your registration fee has already been paid by your school/sensei — no further payment is needed from you.",
-          ],
-        }),
-      ),
+    await sendConfirmationEmailBatch(
+      withIds.map((v) => ({
+        toEmail: v.email,
+        recipientName: v.full_name,
+        subject: `Registration confirmed — ${competition.name}`,
+        referenceId: v.registrationId.slice(0, 8).toUpperCase(),
+        telegramCategory: "participant" as const,
+        bodyLines: [
+          `This confirms your registration for ${competition.name} (${v.kataBase}), submitted via CSV bulk upload.`,
+          "Your registration fee has already been paid by your school/sensei — no further payment is needed from you.",
+        ],
+      })),
     );
     for (const v of withIds) {
       senseiSummaryEntries.push({ name: v.full_name, referenceId: v.registrationId.slice(0, 8).toUpperCase() });
