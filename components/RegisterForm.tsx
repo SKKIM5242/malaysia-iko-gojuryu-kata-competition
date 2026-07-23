@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { submitRegistration, type RegisterState } from "@/app/actions/register";
-import { OrganizerContact } from "@/components/ui";
+import { OrganizerContact, formatUSD } from "@/components/ui";
 import CertificateUploadField from "@/components/CertificateUploadField";
 import { NoCommaTextarea } from "@/components/NoCommaAddressField";
 import { ageAt, beltGroup, genderCode, kataBaseOf, kataBases as allKataBasesOf } from "@/lib/division";
@@ -20,17 +20,24 @@ function FieldError({ message }: { message?: string }) {
   return <p className="mt-1 text-xs text-red-600">{message}</p>;
 }
 
+/** Per-tier 1st/2nd/3rd kata event picks, keyed by that tier's own
+ * competition id. Tier 1 (the first entry in `competitions`) is the only
+ * one where the 1st event is required — every other tier is entirely
+ * optional (a Sensei/participant registering for extra tiers to save a
+ * second trip through this form). */
+type TierKatas = [string, string, string];
+
 export default function RegisterForm({
-  competition,
-  categories,
-  categoryTaken,
+  competitions,
+  categoriesByCompetition,
+  categoryTakenByCompetition,
   schools,
   senseis,
   payOnline,
 }: {
-  competition: Competition;
-  categories: Category[];
-  categoryTaken: Record<string, number>;
+  competitions: Competition[];
+  categoriesByCompetition: Record<string, Category[]>;
+  categoryTakenByCompetition: Record<string, Record<string, number>>;
   schools: School[];
   senseis: Sensei[];
   payOnline: boolean;
@@ -40,9 +47,9 @@ export default function RegisterForm({
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [gender, setGender] = useState("");
   const [beltRank, setBeltRank] = useState("");
-  const [kataBase, setKataBase] = useState("");
-  const [kataBase2, setKataBase2] = useState("");
-  const [kataBase3, setKataBase3] = useState("");
+  const [tierKatas, setTierKatas] = useState<Record<string, TierKatas>>(() =>
+    Object.fromEntries(competitions.map((c) => [c.id, ["", "", ""] as TierKatas])),
+  );
   const [fullName, setFullName] = useState("");
   const [otherBankName, setOtherBankName] = useState(false);
   const [bankAccountName, setBankAccountName] = useState("");
@@ -54,54 +61,79 @@ export default function RegisterForm({
     if (!otherBankName) setBankAccountName(fullName);
   }, [fullName, otherBankName]);
 
-  // Only shows kata events with a matching, non-full sub-category for the
-  // belt rank / date of birth / gender entered so far — resolveCategory()
-  // (server-side) uses the exact same matching rules.
-  const eligibleKataBases = useMemo(() => {
-    if (!beltRank.trim() || !dateOfBirth || !gender || Number.isNaN(Date.parse(dateOfBirth))) return [];
-    const age = ageAt(dateOfBirth, competition.event_date);
-    const grp = beltGroup(beltRank);
-    const genderVal = genderCode(gender);
-    const matching = categories.filter(
-      (c) =>
-        c.belt_group === grp &&
-        c.gender === genderVal &&
-        c.age_min != null &&
-        c.age_max != null &&
-        age >= c.age_min &&
-        age <= c.age_max &&
-        (c.max_participants == null || (categoryTaken[c.id] ?? 0) < c.max_participants),
-    );
-    const bases = new Set(matching.map((c) => kataBaseOf(c.name)));
-    return allKataBasesOf(categories).filter((k) => bases.has(k));
-  }, [beltRank, dateOfBirth, gender, categories, categoryTaken, competition.event_date]);
-
-  // Each additional event must be a kata not already picked for an earlier
-  // one — a participant can't compete twice in the same kata.
-  const eligibleKataBases2 = useMemo(
-    () => eligibleKataBases.filter((k) => k !== kataBase),
-    [eligibleKataBases, kataBase],
-  );
-  const eligibleKataBases3 = useMemo(
-    () => eligibleKataBases.filter((k) => k !== kataBase && k !== kataBase2),
-    [eligibleKataBases, kataBase, kataBase2],
-  );
-
   const detailsComplete = beltRank.trim() !== "" && dateOfBirth !== "" && gender !== "";
 
-  useEffect(() => {
-    if (kataBase && !eligibleKataBases.includes(kataBase)) setKataBase("");
-  }, [eligibleKataBases, kataBase]);
-  useEffect(() => {
-    if (kataBase2 && !eligibleKataBases2.includes(kataBase2)) setKataBase2("");
-  }, [eligibleKataBases2, kataBase2]);
-  useEffect(() => {
-    if (kataBase3 && !eligibleKataBases3.includes(kataBase3)) setKataBase3("");
-  }, [eligibleKataBases3, kataBase3]);
+  const setTierKata = (competitionId: string, slot: 0 | 1 | 2, value: string) =>
+    setTierKatas((prev) => {
+      const next: TierKatas = [...(prev[competitionId] ?? ["", "", ""])] as TierKatas;
+      next[slot] = value;
+      return { ...prev, [competitionId]: next };
+    });
 
-  const eventsChosen = [kataBase, kataBase2, kataBase3].filter(Boolean);
-  const feePerEvent = Number(competition.registration_fee_usd ?? 0);
-  const totalFee = feePerEvent * Math.max(1, eventsChosen.length);
+  // Only shows kata events with a matching, non-full sub-category for the
+  // belt rank / date of birth / gender entered so far — resolveCategory()
+  // (server-side) uses the exact same matching rules — computed separately
+  // per tier since each tier has its own category set/room.
+  const eligibleByTier = useMemo(() => {
+    const result: Record<string, string[]> = {};
+    if (!detailsComplete || Number.isNaN(Date.parse(dateOfBirth))) {
+      for (const c of competitions) result[c.id] = [];
+      return result;
+    }
+    const grp = beltGroup(beltRank);
+    const genderVal = genderCode(gender);
+    for (const c of competitions) {
+      const categories = categoriesByCompetition[c.id] ?? [];
+      const categoryTaken = categoryTakenByCompetition[c.id] ?? {};
+      const age = ageAt(dateOfBirth, c.event_date);
+      const matching = categories.filter(
+        (cat) =>
+          cat.belt_group === grp &&
+          cat.gender === genderVal &&
+          cat.age_min != null &&
+          cat.age_max != null &&
+          age >= cat.age_min &&
+          age <= cat.age_max &&
+          (cat.max_participants == null || (categoryTaken[cat.id] ?? 0) < cat.max_participants),
+      );
+      const bases = new Set(matching.map((cat) => kataBaseOf(cat.name)));
+      result[c.id] = allKataBasesOf(categories).filter((k) => bases.has(k));
+    }
+    return result;
+  }, [detailsComplete, dateOfBirth, gender, beltRank, competitions, categoriesByCompetition, categoryTakenByCompetition]);
+
+  // Reset a tier's picks that are no longer eligible (belt/DOB/gender
+  // changed) or that have become a duplicate within the same tier.
+  useEffect(() => {
+    setTierKatas((prev) => {
+      let changed = false;
+      const next: Record<string, TierKatas> = { ...prev };
+      for (const c of competitions) {
+        const eligible = eligibleByTier[c.id] ?? [];
+        const current = prev[c.id] ?? ["", "", ""];
+        const fixed: TierKatas = ["", "", ""];
+        const seen = new Set<string>();
+        for (let i = 0; i < 3; i++) {
+          const v = current[i];
+          if (v && eligible.includes(v) && !seen.has(v)) {
+            fixed[i] = v;
+            seen.add(v);
+          }
+        }
+        if (fixed.some((v, i) => v !== current[i])) changed = true;
+        next[c.id] = fixed;
+      }
+      return changed ? next : prev;
+    });
+  }, [eligibleByTier, competitions]);
+
+  const tierEventCounts = competitions.map((c) => (tierKatas[c.id] ?? ["", "", ""]).filter(Boolean).length);
+  const tier1Events = tierEventCounts[0] ?? 0;
+  const totalFee = competitions.reduce((sum, c, i) => {
+    const events = i === 0 ? Math.max(1, tierEventCounts[i] ?? 0) : (tierEventCounts[i] ?? 0);
+    return sum + events * Number(c.registration_fee_usd ?? 0);
+  }, 0);
+  const totalEvents = competitions.reduce((sum, _c, i) => sum + (i === 0 ? Math.max(1, tierEventCounts[i] ?? 0) : (tierEventCounts[i] ?? 0)), 0);
 
   if (state.ok && state.referenceIds && state.referenceIds.length > 0) {
     return (
@@ -132,7 +164,9 @@ export default function RegisterForm({
 
   return (
     <form action={formAction} className="space-y-5">
-      <input type="hidden" name="competition_id" value={competition.id} />
+      {competitions.map((c, i) => (
+        <input key={c.id} type="hidden" name={`competition_id_${i}`} value={c.id} />
+      ))}
 
       {state.error && (
         <div className="rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
@@ -185,7 +219,7 @@ export default function RegisterForm({
           <input
             id="age"
             readOnly
-            value={dateOfBirth && !Number.isNaN(Date.parse(dateOfBirth)) ? ageAt(dateOfBirth, competition.event_date) : ""}
+            value={dateOfBirth && !Number.isNaN(Date.parse(dateOfBirth)) ? ageAt(dateOfBirth, null) : ""}
             placeholder="Fill in date of birth first"
             className={`${inputCls} cursor-not-allowed bg-neutral-100 text-neutral-500`}
           />
@@ -315,80 +349,115 @@ export default function RegisterForm({
         </div>
 
         <div className="sm:col-span-2">
-          <label htmlFor="kata_base" className={labelCls}>Kata event *</label>
-          <select
-            id="kata_base"
-            name="kata_base"
-            required
-            className={inputCls}
-            value={kataBase}
-            onChange={(e) => setKataBase(e.target.value)}
-            disabled={!detailsComplete}
-          >
-            <option value="" disabled>
-              {!detailsComplete
-                ? "Fill in belt rank, date of birth and gender first"
-                : eligibleKataBases.length === 0
-                  ? "No kata currently available for your belt / age / gender"
-                  : "Select kata"}
-            </option>
-            {eligibleKataBases.map((k) => (
-              <option key={k} value={k}>{k}</option>
-            ))}
-          </select>
-          <p className="mt-1 text-xs text-neutral-400">
+          <p className={labelCls}>
+            Kata event{competitions.length > 1 ? "s" : ""} *{" "}
+            <span className="font-normal text-neutral-400">
+              {competitions.length > 1
+                ? "— tier 1 is required; registering for extra tiers here saves you filling this form again"
+                : ""}
+            </span>
+          </p>
+          <div className="grid gap-4 sm:grid-cols-3">
+            {competitions.map((c, i) => {
+              const isRequiredTier = i === 0;
+              const katas = tierKatas[c.id] ?? ["", "", ""];
+              const eligible = eligibleByTier[c.id] ?? [];
+              const eligible2 = eligible.filter((k) => k !== katas[0]);
+              const eligible3 = eligible.filter((k) => k !== katas[0] && k !== katas[1]);
+              return (
+                <div key={c.id} className="rounded-md border border-neutral-200 bg-neutral-50 p-3">
+                  <label className="mb-1 block text-xs font-medium text-neutral-700">
+                    Competition Tier{isRequiredTier ? " *" : " (optional)"}
+                  </label>
+                  <input
+                    readOnly
+                    value={`${c.name} — ${formatUSD(c.registration_fee_usd)}/event`}
+                    className="mb-3 w-full rounded-md border border-neutral-300 bg-neutral-100 px-2 py-1.5 text-xs text-neutral-600"
+                  />
+
+                  <label htmlFor={`kata_${i}_1`} className="mb-1 block text-xs font-medium text-neutral-700">
+                    1st Kata event{isRequiredTier ? " *" : " (optional)"}
+                  </label>
+                  <select
+                    id={`kata_${i}_1`}
+                    name={`kata_${i}_1`}
+                    required={isRequiredTier}
+                    className={`${inputCls} mb-2 text-sm`}
+                    value={katas[0]}
+                    onChange={(e) => setTierKata(c.id, 0, e.target.value)}
+                    disabled={!detailsComplete}
+                  >
+                    <option value="" disabled={isRequiredTier}>
+                      {!detailsComplete
+                        ? "Fill in belt rank, date of birth & gender first"
+                        : eligible.length === 0
+                          ? "No kata currently available for your belt / age / gender"
+                          : isRequiredTier
+                            ? "Select kata"
+                            : "— None — skip this tier —"}
+                    </option>
+                    {eligible.map((k) => (
+                      <option key={k} value={k}>{k}</option>
+                    ))}
+                  </select>
+
+                  <label htmlFor={`kata_${i}_2`} className="mb-1 block text-xs font-medium text-neutral-700">
+                    2nd Kata event (optional)
+                  </label>
+                  <select
+                    id={`kata_${i}_2`}
+                    name={`kata_${i}_2`}
+                    className={`${inputCls} mb-2 text-sm`}
+                    value={katas[1]}
+                    onChange={(e) => setTierKata(c.id, 1, e.target.value)}
+                    disabled={!detailsComplete || !katas[0]}
+                  >
+                    <option value="">— None —</option>
+                    {eligible2.map((k) => (
+                      <option key={k} value={k}>{k}</option>
+                    ))}
+                  </select>
+
+                  <label htmlFor={`kata_${i}_3`} className="mb-1 block text-xs font-medium text-neutral-700">
+                    3rd Kata event (optional)
+                  </label>
+                  <select
+                    id={`kata_${i}_3`}
+                    name={`kata_${i}_3`}
+                    className={`${inputCls} text-sm`}
+                    value={katas[2]}
+                    onChange={(e) => setTierKata(c.id, 2, e.target.value)}
+                    disabled={!detailsComplete || !katas[1]}
+                  >
+                    <option value="">— None —</option>
+                    {eligible3.map((k) => (
+                      <option key={k} value={k}>{k}</option>
+                    ))}
+                  </select>
+                </div>
+              );
+            })}
+          </div>
+          <p className="mt-2 text-xs text-neutral-400">
             Only shows kata events with an open sub-category matching your belt rank
             (Color/Kyu Belt or Black Belt &amp; Dan Holders), age group (4–14, 15–40, 41–65, 66–99)
             and gender — and that still has room.
           </p>
-          {detailsComplete && eligibleKataBases.length === 0 && (
+          {detailsComplete && (eligibleByTier[competitions[0]?.id] ?? []).length === 0 && (
             <p className="mt-1 text-xs text-amber-600">
-              No open kata matches your belt rank, age and gender right now — every matching
-              sub-category may be full, or none exists for this combination yet. Contact the
-              organizer if this seems wrong.
+              No open kata matches your belt rank, age and gender right now for tier 1 — every
+              matching sub-category may be full, or none exists for this combination yet. Contact
+              the organizer if this seems wrong.
             </p>
           )}
           <FieldError message={err.kata_base} />
         </div>
 
-        <div>
-          <label htmlFor="kata_base_2" className={labelCls}>2nd Kata event (optional)</label>
-          <select
-            id="kata_base_2"
-            name="kata_base_2"
-            className={inputCls}
-            value={kataBase2}
-            onChange={(e) => setKataBase2(e.target.value)}
-            disabled={!detailsComplete || !kataBase}
-          >
-            <option value="">— None — register for 1 event only —</option>
-            {eligibleKataBases2.map((k) => (
-              <option key={k} value={k}>{k}</option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label htmlFor="kata_base_3" className={labelCls}>3rd Kata event (optional)</label>
-          <select
-            id="kata_base_3"
-            name="kata_base_3"
-            className={inputCls}
-            value={kataBase3}
-            onChange={(e) => setKataBase3(e.target.value)}
-            disabled={!detailsComplete || !kataBase2}
-          >
-            <option value="">— None —</option>
-            {eligibleKataBases3.map((k) => (
-              <option key={k} value={k}>{k}</option>
-            ))}
-          </select>
-        </div>
-
         <div className="sm:col-span-2 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
-          Registering for {eventsChosen.length || 1} kata event{(eventsChosen.length || 1) === 1 ? "" : "s"} —
-          fee is USD {feePerEvent.toFixed(2)} per event, USD {totalFee.toFixed(2)} total
-          {eventsChosen.length > 0 && ` (${eventsChosen.join(", ")})`}.
+          Registering for {totalEvents} kata event{totalEvents === 1 ? "" : "s"} across{" "}
+          {tierEventCounts.filter((n, i) => (i === 0 ? true : n > 0)).length} tier
+          {tierEventCounts.filter((n, i) => (i === 0 ? true : n > 0)).length === 1 ? "" : "s"} — total fee USD{" "}
+          {totalFee.toFixed(2)}.
         </div>
 
         <div className="sm:col-span-2 mt-2 rounded-md border border-neutral-200 bg-neutral-50 p-4">
@@ -468,13 +537,13 @@ export default function RegisterForm({
 
       <button
         type="submit"
-        disabled={pending}
+        disabled={pending || tier1Events === 0}
         className="w-full rounded-md bg-red-700 px-4 py-2.5 font-semibold text-white hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
       >
         {pending
           ? payOnline ? "Redirecting to payment…" : "Submitting…"
           : payOnline
-            ? `Proceed to secure payment — USD ${totalFee.toFixed(2)} (${eventsChosen.length || 1} event${(eventsChosen.length || 1) === 1 ? "" : "s"})`
+            ? `Proceed to secure payment — USD ${totalFee.toFixed(2)} (${totalEvents} event${totalEvents === 1 ? "" : "s"})`
             : "Submit registration"}
       </button>
       {payOnline && (

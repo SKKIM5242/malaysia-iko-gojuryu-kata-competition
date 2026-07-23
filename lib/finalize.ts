@@ -181,13 +181,14 @@ export async function finalizeStripeSession(sessionId: string): Promise<Finalize
   }
 
   const v = draft.payload as Record<string, string>;
-  // events_json (up to 3 kata events picked in one submission) is the
-  // current format; fall back to the single category_id/kata_base a draft
-  // written before multi-event support would still carry.
-  type DraftEvent = { kata_base: string; category_id: string };
+  // events_json (up to 3 kata events per tier, across up to 3 competition
+  // tiers, picked in one submission) is the current format; fall back to
+  // the single category_id/kata_base/competition_id a draft written before
+  // multi-tier support would still carry.
+  type DraftEvent = { kata_base: string; category_id: string; competition_id: string };
   const events: DraftEvent[] = v.events_json
     ? (JSON.parse(v.events_json) as DraftEvent[])
-    : [{ kata_base: v.kata_base ?? "", category_id: v.category_id }];
+    : [{ kata_base: v.kata_base ?? "", category_id: v.category_id, competition_id: v.competition_id }];
 
   const participantId = crypto.randomUUID();
 
@@ -226,7 +227,7 @@ export async function finalizeStripeSession(sessionId: string): Promise<Finalize
     const registrationId = crypto.randomUUID();
     const { error: rErr } = await admin.from("registrations").insert({
       id: registrationId,
-      competition_id: v.competition_id,
+      competition_id: ev.competition_id,
       participant_id: participantId,
       category_id: ev.category_id,
       division: v.division ?? null,
@@ -247,6 +248,7 @@ export async function finalizeStripeSession(sessionId: string): Promise<Finalize
         participant_id: participantId,
         category_id: ev.category_id,
         kata_base: ev.kata_base,
+        competition_id: ev.competition_id,
         payment_status: "paid",
         stripe_session: sessionId,
       },
@@ -256,12 +258,23 @@ export async function finalizeStripeSession(sessionId: string): Promise<Finalize
 
   await admin.from("registration_drafts").delete().eq("id", draftId);
 
-  const { data: competitionRow } = await admin
+  // Events may span more than one competition tier in a single paid
+  // submission — group by tier for a readable confirmation email.
+  const competitionIds = [...new Set(events.map((e) => e.competition_id))];
+  const { data: competitionRows } = await admin
     .from("competitions")
-    .select("name")
-    .eq("id", v.competition_id)
-    .maybeSingle();
-  const competitionName = competitionRow?.name ?? "the competition";
+    .select("id, name")
+    .in("id", competitionIds);
+  const competitionNameById = new Map((competitionRows ?? []).map((c) => [c.id, c.name as string]));
+  const eventsByCompetition = new Map<string, DraftEvent[]>();
+  for (const ev of events) {
+    const list = eventsByCompetition.get(ev.competition_id) ?? [];
+    list.push(ev);
+    eventsByCompetition.set(ev.competition_id, list);
+  }
+  const tierSummary = [...eventsByCompetition.entries()]
+    .map(([compId, evs]) => `${competitionNameById.get(compId) ?? "the competition"} — ${evs.map((e) => e.kata_base).join(", ")}`)
+    .join("; ");
   // Best-effort: if an account with this email already exists, it picks up
   // the "participant" role right away — one account can hold more than one role.
   if (v.email) {
@@ -270,10 +283,10 @@ export async function finalizeStripeSession(sessionId: string): Promise<Finalize
   await sendConfirmationEmail({
     toEmail: v.email ?? null,
     recipientName: v.full_name,
-    subject: `Payment successful — registration confirmed — ${competitionName}`,
+    subject: `Payment successful — registration confirmed — ${events.length} event${events.length === 1 ? "" : "s"}`,
     telegramCategory: "participant",
     bodyLines: [
-      `This confirms your paid registration for ${competitionName} — ${events.length} kata event${events.length === 1 ? "" : "s"}: ${events.map((e) => e.kata_base).join(", ")}.`,
+      `This confirms your paid registration — ${events.length} kata event${events.length === 1 ? "" : "s"}: ${tierSummary}.`,
       `Your reference ID${referenceIds.length > 1 ? "s" : ""}: ${referenceIds.join(", ")}.`,
       "Payment received — your slot is confirmed and your name will appear on the participants list. A Stripe receipt was also sent to the email you entered at checkout.",
       "Keep your reference ID and the IC/passport you registered with — you'll need both to link your account when you're ready to record your kata.",
