@@ -93,19 +93,29 @@ function logoDataUri(): string | null {
 
 function Medal({ rank, size }: { rank: 1 | 2 | 3; size: number }) {
   const t = MEDAL_THEME[rank];
-  const ribbonW = Math.round(size * 0.34);
-  const ribbonH = Math.round(size * 0.46);
+  const ribbonW = Math.round(size * 0.38);
+  const ribbonH = Math.round(size * 0.5);
+  const notchDepth = Math.round(ribbonH * 0.4);
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+      {/* Ribbon: a V-notch cut into the bottom edge (two pointed tails),
+       * drawn as a real SVG polygon -- CSS border-triangle tricks don't
+       * miter correctly under Satori, so this needs actual SVG geometry. */}
       <div
         style={{
           display: "flex",
-          width: ribbonW,
-          height: ribbonH,
-          backgroundImage: `linear-gradient(180deg, ${t.ribbon}, ${t.ribbonDark})`,
           marginBottom: `-${Math.round(size * 0.16)}px`,
         }}
-      />
+      >
+        <svg width={ribbonW} height={ribbonH} viewBox={`0 0 ${ribbonW} ${ribbonH}`}>
+          <polygon
+            points={`0,0 ${ribbonW},0 ${ribbonW},${ribbonH} ${ribbonW / 2},${ribbonH - notchDepth} 0,${ribbonH}`}
+            fill={t.ribbon}
+            stroke={t.ribbonDark}
+            strokeWidth={2}
+          />
+        </svg>
+      </div>
       <div
         style={{
           display: "flex",
@@ -236,7 +246,7 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
 
           <div
             style={{
-              marginTop: "90px",
+              marginTop: "8px",
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
@@ -304,25 +314,25 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
               position: "relative",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "40px" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "50px" }}>
               {input.signatureUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={input.signatureUrl} width={190} height={70} style={{ objectFit: "contain" }} alt="" />
+                <img src={input.signatureUrl} width={240} height={90} style={{ objectFit: "contain" }} alt="" />
               ) : (
-                <div style={{ height: "70px", display: "flex" }} />
+                <div style={{ height: "90px", display: "flex" }} />
               )}
               {input.stampUrl && (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={input.stampUrl} width={110} height={110} style={{ objectFit: "contain" }} alt="" />
+                <img src={input.stampUrl} width={140} height={140} style={{ objectFit: "contain" }} alt="" />
               )}
             </div>
-            <div style={{ display: "flex", width: "460px", borderTop: "3px solid #a8a29e", marginTop: "14px" }} />
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: "10px" }}>
-              <div style={{ display: "flex", fontSize: 24, fontWeight: 700, color: "#1c1917" }}>
+            <div style={{ display: "flex", width: "500px", borderTop: "3px solid #a8a29e", marginTop: "18px" }} />
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: "12px" }}>
+              <div style={{ display: "flex", fontSize: 28, fontWeight: 700, color: "#1c1917" }}>
                 {input.signerName ?? "Organizer"}
               </div>
               {input.signerTitle && (
-                <div style={{ display: "flex", fontSize: 20, color: "#57534e", textAlign: "center", maxWidth: "520px" }}>
+                <div style={{ display: "flex", fontSize: 22, color: "#57534e", textAlign: "center", maxWidth: "560px" }}>
                   {input.signerTitle}
                 </div>
               )}
