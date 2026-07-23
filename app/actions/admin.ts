@@ -265,6 +265,41 @@ export async function saveCompetition(formData: FormData) {
   backTo(returnTo, { ok: id ? "Competition updated." : "Competition created." });
 }
 
+/**
+ * One-click override of a competition's winners_announce_date to today --
+ * the same manual-override column saveCompetition already lets an admin
+ * set by hand (see winners_announce_date above), just without having to
+ * open Edit Competition and type a date. Immediately unlocks the public
+ * Winners page and every eligible certificate for this tier, since both
+ * gate on winnersRevealed()/winnersRevealDateFor() reading this same
+ * column (lib/winners.ts) -- lets the organizer announce early once
+ * judging is finished, instead of waiting for the automatic
+ * deadline+30-days rule.
+ */
+export async function publishWinnersNow(formData: FormData) {
+  const competitionId = String(formData.get("competition_id") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/winners";
+  const { supabase, actorId } = await getActor();
+  await requireCompetitionManager(supabase, actorId, returnTo);
+
+  const today = new Date().toISOString().slice(0, 10);
+  const { data: before } = await supabase
+    .from("competitions").select("name, winners_announce_date").eq("id", competitionId).maybeSingle();
+  if (!before) backTo(returnTo, { error: "Competition not found." });
+
+  const { error } = await supabase
+    .from("competitions").update({ winners_announce_date: today }).eq("id", competitionId);
+  if (error) backTo(returnTo, { error: "Could not publish winners." });
+
+  await writeAudit(supabase, {
+    table_name: "competitions", record_id: competitionId, action: "winners_published_manually",
+    old_value: { winners_announce_date: before!.winners_announce_date }, new_value: { winners_announce_date: today },
+    actor_id: actorId,
+  });
+  revalidatePath("/");
+  backTo(returnTo, { ok: `Winners published for “${before!.name}” -- live on the public Winners page and certificates now.` });
+}
+
 // ── Categories ───────────────────────────────────────────────────────────────
 
 export async function saveCategory(formData: FormData) {

@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCategories, schemaReady } from "@/lib/data";
-import { AdminShell } from "@/components/admin";
+import { publishWinnersNow } from "@/app/actions/admin";
+import { AdminShell, adminBtn } from "@/components/admin";
 import { EmptyState, NoTranslate, SetupNotice, formatDate } from "@/components/ui";
 import { groupByKata } from "@/lib/division";
 import { computeCategoryRankings } from "@/lib/winners-ranking";
@@ -14,9 +15,11 @@ const MEDALS = ["🥇", "🥈", "🥉"];
 async function CompetitionPreview({
   competition,
   supabase,
+  canManage,
 }: {
   competition: Competition;
   supabase: Awaited<ReturnType<typeof createClient>>;
+  canManage: boolean;
 }) {
   if (!competition.registration_deadline) {
     return (
@@ -60,11 +63,24 @@ async function CompetitionPreview({
             Preview only — not yet public
           </span>
         )}
+        {!revealed && canManage && (
+          <form action={publishWinnersNow}>
+            <input type="hidden" name="competition_id" value={competition.id} />
+            <input type="hidden" name="return_to" value="/admin/winners" />
+            <button
+              className={adminBtn}
+              title="Publish this tier's winners right now — unlocks the public Winners page and every eligible certificate immediately, instead of waiting for the automatic reveal date"
+            >
+              Publish winners now
+            </button>
+          </form>
+        )}
       </div>
       <p className="mb-4 text-sm text-neutral-500">
         {revealed ? "Announced" : "Public reveal date"} {formatDate(revealDate.toISOString().slice(0, 10))}. This
         preview always reflects the current standings from submitted scores, whether or not it has been
-        publicly announced yet.
+        publicly announced yet.{" "}
+        {!revealed && canManage && "Ready early? Use “Publish winners now” above to announce before that date."}
       </p>
       {withWinners.length === 0 ? (
         <p className="text-sm text-neutral-400">No scored recordings yet.</p>
@@ -118,7 +134,12 @@ async function CompetitionPreview({
   );
 }
 
-export default async function AdminWinners() {
+export default async function AdminWinners({
+  searchParams,
+}: {
+  searchParams: Promise<{ ok?: string; error?: string }>;
+}) {
+  const params = await searchParams;
   const ready = await schemaReady();
   if (!ready) {
     return (
@@ -129,6 +150,14 @@ export default async function AdminWinners() {
   }
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { data: myProfile } = user
+    ? await supabase.from("profiles").select("role").eq("user_id", user.id).maybeSingle()
+    : { data: null };
+  const canManage = ["admin", "organizer", "staff"].includes(myProfile?.role ?? "");
+
   const { data: competitionsData } = await supabase
     .from("competitions")
     .select("*")
@@ -136,7 +165,7 @@ export default async function AdminWinners() {
   const competitions = (competitionsData as Competition[]) ?? [];
 
   return (
-    <AdminShell title="Winners" active="/admin/winners">
+    <AdminShell title="Winners" active="/admin/winners" flash={{ ok: params.ok, error: params.error }}>
       <p className="mb-6 max-w-3xl text-sm text-neutral-500">
         Same Top-3-per-category ranking and layout as the public{" "}
         <a href="/winners" target="_blank" rel="noopener noreferrer" className="font-semibold text-red-700 underline underline-offset-2">
@@ -150,7 +179,7 @@ export default async function AdminWinners() {
       ) : (
         <div className="space-y-8">
           {competitions.map((c) => (
-            <CompetitionPreview key={c.id} competition={c} supabase={supabase} />
+            <CompetitionPreview key={c.id} competition={c} supabase={supabase} canManage={canManage} />
           ))}
         </div>
       )}

@@ -10,6 +10,7 @@ import ClaimForm from "@/components/ClaimForm";
 import KataRecorder from "@/components/KataRecorder";
 import VideoWatchButton from "@/components/VideoWatchButton";
 import RefereeScoring, { type ScoringItem } from "@/components/RefereeScoring";
+import CertificatesSection from "@/components/CertificatesSection";
 import { getAllTelegramLinks, getTelegramBotConnectUrl } from "@/lib/telegram";
 import { isWithinSignInQuota } from "@/lib/sign-in-quota";
 import SubscriptionBlocked from "@/components/SubscriptionBlocked";
@@ -22,13 +23,15 @@ export const metadata = { title: "My account" };
 
 interface ProfileRow {
   user_id: string;
-  role: "participant" | "referee" | "staff" | "admin" | "organizer" | "customer_support" | "audience";
+  role: "participant" | "referee" | "staff" | "admin" | "organizer" | "customer_support" | "audience" | "school" | "sensei";
   full_name: string | null;
   country: string | null;
   email: string | null;
   approved: boolean;
   participant_id: string | null;
   registration_id: string | null;
+  sensei_id: string | null;
+  school_id: string | null;
   record_attempts: number;
   bonus_record_attempts: number;
   telegram_chat_id: string | null;
@@ -403,6 +406,13 @@ export default async function AccountPage({
           ) : (
             <LinkRegistrationPrompt />
           )}
+          <CertificatesSection
+            userId={user.id}
+            registrationId={profile.registration_id}
+            senseiId={profile.sensei_id}
+            schoolId={profile.school_id}
+            isSupport={profile.role === "customer_support"}
+          />
           <div className="mt-4">{SignOutButton}</div>
         </main>
         <SiteFooter />
@@ -532,6 +542,13 @@ export default async function AccountPage({
           ) : (
             <LinkRegistrationPrompt />
           )}
+          <CertificatesSection
+            userId={user.id}
+            registrationId={profile.registration_id}
+            senseiId={profile.sensei_id}
+            schoolId={profile.school_id}
+            isSupport={false}
+          />
           <div className="mt-4">{SignOutButton}</div>
         </main>
         <SiteFooter />
@@ -569,6 +586,74 @@ export default async function AccountPage({
           ) : (
             <LinkRegistrationPrompt />
           )}
+          <CertificatesSection
+            userId={user.id}
+            registrationId={profile.registration_id}
+            senseiId={profile.sensei_id}
+            schoolId={profile.school_id}
+            isSupport={false}
+          />
+          <div className="mt-4">{SignOutButton}</div>
+        </main>
+        <SiteFooter />
+      </>
+    );
+  }
+
+  // ── School / Dojo & Sensei ───────────────────────────────────────────────
+  if (profile.role === "school" || profile.role === "sensei") {
+    const recordId = profile.role === "sensei" ? profile.sensei_id : profile.school_id;
+    const { data: record } = recordId
+      ? await supabase
+          .from(profile.role === "sensei" ? "senseis" : "schools")
+          .select("name, payment_status")
+          .eq("id", recordId)
+          .maybeSingle()
+      : { data: null };
+    const label = profile.role === "sensei" ? "Sensei" : "School / Dojo";
+    const recordingCtx = profile.registration_id ? await getRecordingContext(supabase, user.id, profile) : null;
+    const paid = record?.payment_status === "paid" || record?.payment_status === "waived";
+    return (
+      <>
+        <SiteHeader />
+        <main className="mx-auto max-w-2xl px-4 py-10">
+          <h1 className="text-2xl font-bold">{label}</h1>
+          {record ? (
+            <p className="mt-1 mb-4 text-sm text-neutral-500">Signed in as {record.name} ({label}).</p>
+          ) : (
+            <p className="mt-1 mb-4 text-sm text-neutral-500">
+              Signed in as {profile.full_name ?? user.email}. Your account isn&apos;t linked to a{" "}
+              {label.toLowerCase()} record yet — contact the organizer.
+            </p>
+          )}
+          {paid ? (
+            <div className="mt-4 rounded-lg border border-green-300 bg-green-50 p-6">
+              <p className="font-semibold text-green-900">Your account is approved.</p>
+              <p className="mt-1 text-sm text-green-800">
+                Watch your students&apos; submitted kata recordings in{" "}
+                <Link href="/kata-arena" className="underline font-semibold">Kata Arena</Link>.
+              </p>
+            </div>
+          ) : (
+            <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-6">
+              <p className="font-semibold text-amber-900">Waiting for approval.</p>
+              <p className="mt-1 text-sm text-amber-800">
+                Your {label} account activates once the organizer confirms payment.
+              </p>
+            </div>
+          )}
+          {recordingCtx ? (
+            <PersonalRecordingSection profile={profile} ctx={recordingCtx} />
+          ) : (
+            <LinkRegistrationPrompt />
+          )}
+          <CertificatesSection
+            userId={user.id}
+            registrationId={profile.registration_id}
+            senseiId={profile.sensei_id}
+            schoolId={profile.school_id}
+            isSupport={false}
+          />
           <div className="mt-4">{SignOutButton}</div>
         </main>
         <SiteFooter />
@@ -715,6 +800,13 @@ export default async function AccountPage({
             <PendingRecordingsList items={pendingOthers} />
           </div>
         )}
+        <CertificatesSection
+          userId={user.id}
+          registrationId={profile.registration_id}
+          senseiId={profile.sensei_id}
+          schoolId={profile.school_id}
+          isSupport={false}
+        />
         <div className="mt-6">{SignOutButton}</div>
       </main>
       <SiteFooter />

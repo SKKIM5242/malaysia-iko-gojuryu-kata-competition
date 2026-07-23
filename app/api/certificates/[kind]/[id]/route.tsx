@@ -70,7 +70,7 @@ function pngResponse(image: Awaited<ReturnType<typeof renderCertificatePng>>, fi
   return new Response(image.body, { status: image.status, headers });
 }
 
-export async function GET(_request: Request, { params }: { params: Promise<{ kind: string; id: string }> }) {
+export async function GET(request: Request, { params }: { params: Promise<{ kind: string; id: string }> }) {
   const { kind, id: registrationId } = await params;
   if (!VALID_KINDS.includes(kind as CertificateKind)) {
     return new Response("Unknown certificate type.", { status: 400 });
@@ -84,7 +84,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ kin
 
   const { data: myProfile } = await supabase
     .from("profiles")
-    .select("role, registration_id")
+    .select("role, registration_id, sensei_id, school_id")
     .eq("user_id", user.id)
     .maybeSingle();
   const isManager = ["admin", "organizer", "staff"].includes((myProfile?.role as string) ?? "");
@@ -92,7 +92,14 @@ export async function GET(_request: Request, { params }: { params: Promise<{ kin
 
   if (registrationId === "sample") {
     if (!isManager) return new Response("Not authorized.", { status: 403 });
-    const image = await renderCertificatePng({ ...SAMPLE_DATA[kind as CertificateKind], ...settings });
+    const sampleRankParam = Number(new URL(request.url).searchParams.get("rank"));
+    const sampleRank = ([1, 2, 3] as const).includes(sampleRankParam as 1 | 2 | 3) ? (sampleRankParam as 1 | 2 | 3) : 1;
+    const sample = SAMPLE_DATA[kind as CertificateKind];
+    const image = await renderCertificatePng({
+      ...sample,
+      rank: kind === "winner" ? sampleRank : sample.rank,
+      ...settings,
+    });
     return pngResponse(image, `${kind}-certificate-sample.png`);
   }
 
@@ -165,6 +172,134 @@ export async function GET(_request: Request, { params }: { params: Promise<{ kin
       ...settings,
     });
     return pngResponse(image, `${kind}-certificate.png`);
+  }
+
+  if (kind === "referee") {
+    const refereeUserId = registrationId;
+    const competitionId = new URL(request.url).searchParams.get("competition_id");
+    if (!competitionId) return new Response("Missing competition_id.", { status: 400 });
+
+    const isOwner = user!.id === refereeUserId;
+    if (!isOwner && !isManager) return new Response("Not authorized for this certificate.", { status: 403 });
+
+    const { data: comp } = await supabase
+      .from("competitions")
+      .select("name, event_date, registration_deadline, winners_announce_date")
+      .eq("id", competitionId)
+      .maybeSingle();
+    if (!comp) return new Response("Competition not found.", { status: 404 });
+    if (!isManager && !winnersRevealed(comp.registration_deadline as string | null, comp.winners_announce_date as string | null)) {
+      return new Response("Certificates unlock once winners are announced for this tier.", { status: 403 });
+    }
+
+    const { data: refRow } = await supabase.from("referees").select("full_name").eq("user_id", refereeUserId).maybeSingle();
+    const { data: profRow } = await supabase.from("profiles").select("full_name").eq("user_id", refereeUserId).maybeSingle();
+    const recipientName = (refRow?.full_name as string | null) ?? (profRow?.full_name as string | null) ?? "Referee / Judge";
+
+    const { data: assignments } = await supabase.from("referee_assignments").select("video_id").eq("referee_user_id", refereeUserId);
+    const videoIds = (assignments ?? []).map((a) => a.video_id as string);
+    let judgedThisComp = false;
+    if (videoIds.length > 0) {
+      const { data: videos } = await supabase
+        .from("kata_videos")
+        .select("registration:registrations(competition_id)")
+        .in("id", videoIds);
+      judgedThisComp = (videos ?? []).some(
+        (v) => (v.registration as unknown as { competition_id: string } | null)?.competition_id === competitionId,
+      );
+    }
+    if (!judgedThisComp) return new Response("No judging record found for this competition.", { status: 404 });
+
+    const image = await renderCertificatePng({
+      kind: "referee",
+      recipientName,
+      competitionName: comp.name as string,
+      categoryName: null,
+      kataName: null,
+      rank: null,
+      dateLabel: formatDate(comp.event_date as string | null),
+      ...settings,
+    });
+    return pngResponse(image, "referee-certificate.png");
+  }
+
+  if (kind === "sensei" || kind === "school") {
+    const recordId = registrationId;
+    const competitionId = new URL(request.url).searchParams.get("competition_id");
+    if (!competitionId) return new Response("Missing competition_id.", { status: 400 });
+
+    const table = kind === "sensei" ? "senseis" : "schools";
+    const linkField = kind === "sensei" ? "sensei_id" : "school_id";
+    const myLinkedId = kind === "sensei" ? myProfile?.sensei_id : myProfile?.school_id;
+    const isOwner = myLinkedId === recordId;
+    if (!isOwner && !isManager) return new Response("Not authorized for this certificate.", { status: 403 });
+
+    const { data: comp } = await supabase
+      .from("competitions")
+      .select("name, event_date, registration_deadline, winners_announce_date")
+      .eq("id", competitionId)
+      .maybeSingle();
+    if (!comp) return new Response("Competition not found.", { status: 404 });
+    if (!isManager && !winnersRevealed(comp.registration_deadline as string | null, comp.winners_announce_date as string | null)) {
+      return new Response("Certificates unlock once winners are announced for this tier.", { status: 403 });
+    }
+
+    const { data: recordRow } = await supabase.from(table).select("name").eq("id", recordId).maybeSingle();
+    if (!recordRow) return new Response(`${kind === "sensei" ? "Sensei" : "School"} not found.`, { status: 404 });
+
+    const { data: myParticipants } = await supabase.from("participants").select("id").eq(linkField, recordId);
+    const participantIds = (myParticipants ?? []).map((p) => p.id as string);
+    let hasStudent = false;
+    if (participantIds.length > 0) {
+      const { count } = await supabase
+        .from("registrations")
+        .select("id", { count: "exact", head: true })
+        .eq("competition_id", competitionId)
+        .eq("payment_status", "paid")
+        .in("participant_id", participantIds);
+      hasStudent = (count ?? 0) > 0;
+    }
+    if (!hasStudent) return new Response("No students found for this competition.", { status: 404 });
+
+    const image = await renderCertificatePng({
+      kind,
+      recipientName: recordRow.name as string,
+      competitionName: comp.name as string,
+      categoryName: null,
+      kataName: null,
+      rank: null,
+      dateLabel: formatDate(comp.event_date as string | null),
+      ...settings,
+    });
+    return pngResponse(image, `${kind}-certificate.png`);
+  }
+
+  if (kind === "support") {
+    const targetUserId = registrationId;
+    const isOwner = user!.id === targetUserId;
+    if (!isOwner && !isManager) return new Response("Not authorized for this certificate.", { status: 403 });
+
+    const { data: profRow } = await supabase
+      .from("profiles")
+      .select("full_name, role, roles, approved")
+      .eq("user_id", targetUserId)
+      .maybeSingle();
+    const roles = (profRow?.roles as string[] | undefined)?.length ? (profRow!.roles as string[]) : [profRow?.role as string];
+    if (!profRow || !roles.includes("customer_support") || !profRow.approved) {
+      return new Response("Not eligible for a Support certificate.", { status: 404 });
+    }
+
+    const image = await renderCertificatePng({
+      kind: "support",
+      recipientName: profRow.full_name ?? "Support Team Member",
+      competitionName: "Malaysia Open IKO Goju-ryu Kata Championship",
+      categoryName: null,
+      kataName: null,
+      rank: null,
+      dateLabel: formatDate(new Date().toISOString().slice(0, 10)),
+      ...settings,
+    });
+    return pngResponse(image, "support-certificate.png");
   }
 
   return new Response("This certificate type isn't available yet.", { status: 501 });
