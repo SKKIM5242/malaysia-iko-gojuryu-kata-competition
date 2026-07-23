@@ -64,7 +64,7 @@ const ACCENT: Record<Exclude<CertificateKind, "winner">, string> = {
   support: "#B45309",
 };
 
-const RANK_ACCENT: Record<1 | 2 | 3, string> = { 1: "#B8860B", 2: "#8A8D93", 3: "#A15C2E" };
+const RANK_ACCENT: Record<1 | 2 | 3, string> = { 1: "#B8860B", 2: "#64748B", 3: "#A15C2E" };
 
 const MEDAL_THEME: Record<
   1 | 2 | 3,
@@ -185,7 +185,7 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
 
           <div
             style={{
-              marginTop: "26px",
+              marginTop: "20px",
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
@@ -195,23 +195,25 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
             <div
               style={{
                 display: "flex",
-                fontSize: 27,
-                fontWeight: 700,
-                letterSpacing: 2,
+                fontSize: 72,
+                fontWeight: 800,
+                letterSpacing: 1,
                 textTransform: "uppercase",
                 color: "#57534e",
+                textAlign: "center",
+                maxWidth: "1550px",
               }}
             >
               2026 Malaysia Open Virtual Karate-do Kata Championship
             </div>
             <div
               style={{
-                marginTop: "8px",
+                marginTop: "10px",
                 display: "flex",
-                fontSize: 19,
-                fontWeight: 500,
+                fontSize: 40,
+                fontWeight: 600,
                 color: "#a8a29e",
-                maxWidth: "1500px",
+                maxWidth: "1650px",
                 textAlign: "center",
               }}
             >
@@ -221,9 +223,9 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
 
           <div
             style={{
-              marginTop: "34px",
+              marginTop: "24px",
               display: "flex",
-              fontSize: 54,
+              fontSize: 88,
               fontWeight: 900,
               letterSpacing: 1,
               color: accent,
@@ -234,11 +236,11 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
 
           <div
             style={{
-              marginTop: "44px",
+              marginTop: "90px",
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
-              gap: "14px",
+              gap: "10px",
             }}
           >
             <div
@@ -267,7 +269,7 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
             </div>
             <div
               style={{
-                marginTop: "10px",
+                marginTop: "6px",
                 display: "flex",
                 fontSize: 46,
                 fontWeight: 700,
@@ -299,19 +301,10 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
               flexDirection: "column",
               alignItems: "center",
               width: "100%",
+              position: "relative",
             }}
           >
-            <div style={{ display: "flex", fontSize: 40, fontWeight: 800, color: "#44403c" }}>{input.dateLabel}</div>
-            <div style={{ display: "flex", width: "620px", borderTop: "3px solid #a8a29e", marginTop: "16px" }} />
-            <div
-              style={{
-                marginTop: "18px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "40px",
-              }}
-            >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "40px" }}>
               {input.signatureUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={input.signatureUrl} width={190} height={70} style={{ objectFit: "contain" }} alt="" />
@@ -323,9 +316,34 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
                 <img src={input.stampUrl} width={110} height={110} style={{ objectFit: "contain" }} alt="" />
               )}
             </div>
-            <div style={{ marginTop: "12px", display: "flex", fontSize: 22, color: "#44403c" }}>
-              {input.signerName ?? "Organizer"}
-              {input.signerTitle ? ` — ${input.signerTitle}` : ""}
+            <div style={{ display: "flex", width: "460px", borderTop: "3px solid #a8a29e", marginTop: "14px" }} />
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: "10px" }}>
+              <div style={{ display: "flex", fontSize: 24, fontWeight: 700, color: "#1c1917" }}>
+                {input.signerName ?? "Organizer"}
+              </div>
+              {input.signerTitle && (
+                <div style={{ display: "flex", fontSize: 20, color: "#57534e", textAlign: "center", maxWidth: "520px" }}>
+                  {input.signerTitle}
+                </div>
+              )}
+            </div>
+
+            <div style={{ position: "absolute", left: 0, bottom: 0, display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
+              <div
+                style={{
+                  display: "flex",
+                  fontSize: 44,
+                  fontWeight: 800,
+                  color: "#44403c",
+                  borderBottom: "3px solid #a8a29e",
+                  paddingBottom: "10px",
+                }}
+              >
+                {input.dateLabel}
+              </div>
+              <div style={{ marginTop: "8px", display: "flex", fontSize: 20, color: "#78716c" }}>
+                {input.kind === "winner" ? "Winner Announcement Date" : "Certificate Issue Date"}
+              </div>
             </div>
           </div>
         </div>
