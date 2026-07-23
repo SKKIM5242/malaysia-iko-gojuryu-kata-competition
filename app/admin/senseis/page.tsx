@@ -11,6 +11,7 @@ import SignInControlBox from "@/components/SignInControlBox";
 import InvitationCodeForm from "@/components/InvitationCodeForm";
 import InvitationCodeList from "@/components/InvitationCodeList";
 import { NoCommaInput } from "@/components/NoCommaAddressField";
+import DateOfBirthField from "@/components/DateOfBirthField";
 
 export const dynamic = "force-dynamic";
 
@@ -137,8 +138,8 @@ export default async function AdminSenseis({
                   <input id="ic_passport" name="ic_passport" required defaultValue={editing?.ic_passport ?? ""} className={adminInput} />
                 </div>
                 <div>
-                  <label htmlFor="date_of_birth" className={adminLabel}>Date of birth *</label>
-                  <input id="date_of_birth" name="date_of_birth" type="date" required defaultValue={editing?.date_of_birth ?? ""} className={adminInput} />
+                  <label htmlFor="date_of_birth" className={adminLabel}>Date of Birth: DD/MM/YYYY *</label>
+                  <DateOfBirthField id="date_of_birth" name="date_of_birth" defaultValueISO={editing?.date_of_birth ?? ""} className={adminInput} />
                 </div>
                 <div>
                   <label htmlFor="rank" className={adminLabel}>Rank *</label>

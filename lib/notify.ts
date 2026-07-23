@@ -23,7 +23,7 @@ async function sendEmail(to: string, subject: string, text: string): Promise<voi
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) return;
   try {
-    await fetch("https://api.resend.com/emails", {
+    const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -33,7 +33,15 @@ async function sendEmail(to: string, subject: string, text: string): Promise<voi
         text,
       }),
     });
-  } catch {
+    if (!res.ok) {
+      // fetch() only rejects on network failure — a 4xx/5xx from Resend
+      // (bad/expired key, unverified sender domain, sandbox-mode recipient
+      // restriction, etc.) would otherwise fail completely silently.
+      const body = await res.text().catch(() => "");
+      console.error(`[notify] Resend send failed (${res.status}) to ${to}: ${body.slice(0, 500)}`);
+    }
+  } catch (err) {
+    console.error(`[notify] Resend send threw for ${to}:`, err);
     // Best-effort — the underlying action already succeeded either way.
   }
 }

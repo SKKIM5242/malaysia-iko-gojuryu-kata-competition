@@ -24,10 +24,10 @@ export default async function RegisterSuccessPage({
       <SiteHeader />
       <main className="mx-auto max-w-3xl px-4 py-10">
         {result.status === "paid" ? (
-          <div className="rounded-lg border border-green-300 bg-green-50 p-8 text-center">
+          <div className="rounded-lg border border-green-300 bg-green-50 p-6 text-center">
             <p className="text-3xl">✅</p>
-            <h1 className="mt-2 text-xl font-bold text-green-900">Payment Successful — Registration Confirmed!</h1>
-            <p className="mt-2 text-green-800">
+            <h1 className="mt-1.5 text-xl font-bold text-green-900">Payment Successful — Registration Confirmed!</h1>
+            <p className="mt-1.5 text-green-800">
               Your registration reference ID{result.referenceIds.length > 1 ? "s are" : " is"}{" "}
               {result.referenceIds.map((id, i) => (
                 <span key={id}>
@@ -36,13 +36,13 @@ export default async function RegisterSuccessPage({
                 </span>
               ))}
             </p>
-            <p className="mx-auto mt-3 max-w-md text-sm text-green-800">
+            <p className="mx-auto mt-2 max-w-md text-sm text-green-800">
               Your payment has been received and your slot is confirmed. Your name now appears on the{" "}
               <Link href="/participants" className="underline">participants list</Link>. A Stripe receipt
               has been sent to the email you entered at checkout.
             </p>
 
-            <div className="mx-auto mt-6 max-w-md space-y-6 text-left">
+            <div className="mx-auto mt-4 max-w-md space-y-4 text-left">
               <p className="text-center text-sm font-bold text-green-900">Next steps</p>
 
               <div>
@@ -52,7 +52,7 @@ export default async function RegisterSuccessPage({
 
               <div>
                 <p className="text-sm font-semibold text-green-900">2) Create your login account</p>
-                <div className="mt-2 text-center">
+                <div className="mt-1.5 text-center">
                   <Link
                     href="/kata-arena?mode=signup"
                     className="inline-block rounded-md bg-red-700 px-6 py-2.5 font-semibold text-white hover:bg-red-600"
@@ -66,7 +66,7 @@ export default async function RegisterSuccessPage({
                 <p className="text-sm font-semibold text-green-900">
                   3) Start recording your kata — or come back and log in later
                 </p>
-                <div className="mt-2 flex flex-wrap items-center justify-center gap-3">
+                <div className="mt-1.5 flex flex-wrap items-center justify-center gap-3">
                   <Link
                     href="/kata-arena?mode=signup"
                     className="rounded-md bg-red-700 px-6 py-2.5 font-semibold text-white hover:bg-red-600"
@@ -83,7 +83,7 @@ export default async function RegisterSuccessPage({
               </div>
             </div>
 
-            <p className="mx-auto mt-6 max-w-md text-xs text-green-700">
+            <p className="mx-auto mt-4 max-w-md text-xs text-green-700">
               Keep your reference ID{result.referenceIds.length > 1 ? "s" : ""}{" "}
               <strong>{result.referenceIds.join(", ")}</strong> and the IC/passport you registered
               with — you&apos;ll need both to link your account when you&apos;re ready to record.

@@ -10,6 +10,7 @@ import {
 import { TelegramJoinButton, formatUSD } from "@/components/ui";
 import CertificateUploadField from "@/components/CertificateUploadField";
 import { NoCommaTextarea } from "@/components/NoCommaAddressField";
+import DateOfBirthField from "@/components/DateOfBirthField";
 import { EDUCATION_LEVELS, SPOKEN_LANGUAGES } from "@/lib/reference-data";
 import type { Competition } from "@/lib/types";
 
@@ -79,8 +80,8 @@ export function RefereeForm({ telegramLink }: { telegramLink: string | null }) {
           <Err m={e.ic_passport} />
         </div>
         <div>
-          <label htmlFor="date_of_birth" className={labelCls}>Date of birth *</label>
-          <input id="date_of_birth" name="date_of_birth" type="date" required className={inputCls} />
+          <label htmlFor="date_of_birth" className={labelCls}>Date of Birth: DD/MM/YYYY *</label>
+          <DateOfBirthField id="date_of_birth" name="date_of_birth" className={inputCls} />
           <Err m={e.date_of_birth} />
         </div>
         <div>
@@ -326,8 +327,8 @@ export function StaffForm({
           <Err m={e.ic_passport} />
         </div>
         <div>
-          <label htmlFor="date_of_birth" className={labelCls}>Date of birth *</label>
-          <input id="date_of_birth" name="date_of_birth" type="date" required className={inputCls} />
+          <label htmlFor="date_of_birth" className={labelCls}>Date of Birth: DD/MM/YYYY *</label>
+          <DateOfBirthField id="date_of_birth" name="date_of_birth" className={inputCls} />
           <Err m={e.date_of_birth} />
         </div>
         <div>

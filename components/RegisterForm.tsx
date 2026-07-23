@@ -6,6 +6,7 @@ import { submitRegistration, type RegisterState } from "@/app/actions/register";
 import { OrganizerContact, formatUSD } from "@/components/ui";
 import CertificateUploadField from "@/components/CertificateUploadField";
 import { NoCommaTextarea } from "@/components/NoCommaAddressField";
+import DateOfBirthField from "@/components/DateOfBirthField";
 import { ageAt, beltGroup, genderCode, kataBaseOf, kataBases as allKataBasesOf } from "@/lib/division";
 import type { Category, Competition, School, Sensei } from "@/lib/types";
 
@@ -201,14 +202,11 @@ export default function RegisterForm({
         </div>
 
         <div>
-          <label htmlFor="date_of_birth" className={labelCls}>Date of birth *</label>
-          <input
+          <label htmlFor="date_of_birth" className={labelCls}>Date of Birth: DD/MM/YYYY *</label>
+          <DateOfBirthField
             id="date_of_birth"
             name="date_of_birth"
-            type="date"
-            required
-            value={dateOfBirth}
-            onChange={(e) => setDateOfBirth(e.target.value)}
+            onISOChange={setDateOfBirth}
             className={inputCls}
           />
           <FieldError message={err.date_of_birth} />

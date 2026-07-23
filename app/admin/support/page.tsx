@@ -14,6 +14,7 @@ import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
 import SignInControlBox from "@/components/SignInControlBox";
 import { NoCommaInput } from "@/components/NoCommaAddressField";
+import DateOfBirthField from "@/components/DateOfBirthField";
 import InvitationCodeForm from "@/components/InvitationCodeForm";
 import InvitationCodeList from "@/components/InvitationCodeList";
 import { EDUCATION_LEVELS, SPOKEN_LANGUAGES } from "@/lib/reference-data";
@@ -186,8 +187,8 @@ export default async function AdminSupport({
                   <input id="cs_ic_passport" name="ic_passport" required className={adminInput} />
                 </div>
                 <div>
-                  <label htmlFor="cs_date_of_birth" className={adminLabel}>Date of birth *</label>
-                  <input id="cs_date_of_birth" name="date_of_birth" type="date" required className={adminInput} />
+                  <label htmlFor="cs_date_of_birth" className={adminLabel}>Date of Birth: DD/MM/YYYY *</label>
+                  <DateOfBirthField id="cs_date_of_birth" name="date_of_birth" className={adminInput} />
                 </div>
                 <div>
                   <label htmlFor="cs_gender" className={adminLabel}>Gender *</label>

@@ -9,6 +9,7 @@ import CsvUploadForm from "@/components/CsvUploadForm";
 import InvitationCodeForm from "@/components/InvitationCodeForm";
 import InvitationCodeList from "@/components/InvitationCodeList";
 import { NoCommaInput } from "@/components/NoCommaAddressField";
+import DateOfBirthField from "@/components/DateOfBirthField";
 
 export const dynamic = "force-dynamic";
 
@@ -79,8 +80,8 @@ export default async function AdminOrganizers({
                   <input id="org_ic_passport" name="ic_passport" required className={adminInput} />
                 </div>
                 <div>
-                  <label htmlFor="org_date_of_birth" className={adminLabel}>Date of birth *</label>
-                  <input id="org_date_of_birth" name="date_of_birth" type="date" required className={adminInput} />
+                  <label htmlFor="org_date_of_birth" className={adminLabel}>Date of Birth: DD/MM/YYYY *</label>
+                  <DateOfBirthField id="org_date_of_birth" name="date_of_birth" className={adminInput} />
                 </div>
                 <div>
                   <label htmlFor="org_gender" className={adminLabel}>Gender *</label>

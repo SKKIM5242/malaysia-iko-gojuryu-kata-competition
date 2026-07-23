@@ -13,6 +13,7 @@ import { EmptyState, SetupNotice, formatDate } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
 import { NoCommaInput } from "@/components/NoCommaAddressField";
+import DateOfBirthField from "@/components/DateOfBirthField";
 import type { ClassEnrollment, ClassInvoice, FeePlan, Student } from "@/lib/types";
 import { WORLD_CURRENCIES } from "@/lib/reference-data";
 
@@ -194,8 +195,8 @@ export default async function AdminClasses({
                     <input id="ic_passport" name="ic_passport" defaultValue={editingStudent?.ic_passport ?? ""} className={adminInput} />
                   </div>
                   <div>
-                    <label htmlFor="date_of_birth" className={adminLabel}>Date of birth</label>
-                    <input id="date_of_birth" name="date_of_birth" type="date" defaultValue={editingStudent?.date_of_birth ?? ""} className={adminInput} />
+                    <label htmlFor="date_of_birth" className={adminLabel}>Date of Birth: DD/MM/YYYY</label>
+                    <DateOfBirthField id="date_of_birth" name="date_of_birth" required={false} defaultValueISO={editingStudent?.date_of_birth ?? ""} className={adminInput} />
                   </div>
                   <div>
                     <label htmlFor="gender" className={adminLabel}>Gender</label>
