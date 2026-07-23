@@ -2923,6 +2923,61 @@ export async function linkRegistrationToAccount(formData: FormData) {
   backTo(returnTo, { ok: "Linked — the participant can now sign in and record their kata." });
 }
 
+/** Manually resends a registration's confirmation email — for when the
+ * automatic one never arrived (e.g. an email-provider misconfiguration) and
+ * the organizer wants to get the participant their reference ID without
+ * waiting on a fix. Rebuilds the same content the original would have sent,
+ * from this one registration's current data. Admin/Organizer/Staff only. */
+export async function resendRegistrationConfirmation(formData: FormData) {
+  const registrationId = String(formData.get("registration_id") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "/admin/records");
+  const { supabase, actorId } = await getActor();
+  const actorRole = await getActorRole(supabase, actorId);
+  if (!["admin", "organizer", "staff"].includes(actorRole ?? "")) {
+    backTo(returnTo, { error: "Only Admin/Organizer can resend a confirmation email." });
+  }
+
+  const { data: reg } = await supabase
+    .from("registrations")
+    .select(
+      "id, payment_status, participant:participants(full_name, email, ic_passport), category:categories(name), competition:competitions(name)",
+    )
+    .eq("id", registrationId)
+    .maybeSingle();
+  if (!reg || !reg.participant) {
+    backTo(returnTo, { error: "Registration not found." });
+  }
+  const participant = reg!.participant as unknown as { full_name: string; email: string | null; ic_passport: string };
+  if (!participant.email) {
+    backTo(returnTo, { error: "This participant has no email address on file." });
+  }
+  const category = reg!.category as unknown as { name: string } | null;
+  const competition = reg!.competition as unknown as { name: string } | null;
+  const kataBase = category?.name ? kataBaseOf(category.name) : "your kata event";
+  const competitionName = competition?.name ?? "the competition";
+  const referenceId = registrationId.slice(0, 8).toUpperCase();
+
+  await sendConfirmationEmail({
+    toEmail: participant.email,
+    recipientName: participant.full_name,
+    subject: `Registration confirmed (resent) — ${competitionName}`,
+    telegramCategory: "participant",
+    bodyLines: [
+      `This confirms your registration for ${competitionName} (${kataBase}).`,
+      reg!.payment_status === "paid"
+        ? "Payment received — your slot is confirmed and your name appears on the participants list."
+        : "Payment status: pending — transfer the registration fee and send your receipt to the organizer to confirm your slot.",
+      `Your reference ID: ${referenceId}.`,
+      `Keep your reference ID and the IC/passport (${participant.ic_passport}) you registered with — you'll need both to link your account when you're ready to record your kata.`,
+    ],
+  });
+
+  await writeAudit(supabase, {
+    table_name: "registrations", record_id: registrationId, action: "confirmation_email_resent", actor_id: actorId,
+  });
+  backTo(returnTo, { ok: `Confirmation email resent to ${participant.email}.` });
+}
+
 // ── Sign-in quota control (Admin/Organizer only) ────────────────────────────
 
 /** Sets how many times a registrant may sign in, which competition tier

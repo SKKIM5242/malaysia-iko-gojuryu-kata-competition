@@ -8,7 +8,7 @@ import AdminVideoUploadForm from "@/components/AdminVideoUploadForm";
 import ColumnFilterDropdown from "@/components/ColumnFilterDropdown";
 import DualScrollBox from "@/components/DualScrollBox";
 import { useGridControls, isClosed, CLOSED_SIZE } from "@/lib/useGridControls";
-import { updateRegistrationSlotStatus, linkRegistrationToAccount } from "@/app/actions/admin";
+import { updateRegistrationSlotStatus, linkRegistrationToAccount, resendRegistrationConfirmation } from "@/app/actions/admin";
 
 export type SlotStatus = "active" | "unslotted" | "forfeited" | "given_up";
 
@@ -164,6 +164,7 @@ const EXTRA_COLUMNS: Array<{ key: string; label: string; width: number }> = [
   { key: "recording", label: "Recording", width: 170 },
   { key: "accountLink", label: "Account Link", width: 190 },
   { key: "slotStatus", label: "Slot Status", width: 240 },
+  { key: "resendEmail", label: "Confirmation Email", width: 150 },
 ];
 
 
@@ -248,6 +249,7 @@ function extraCell(
   isAdmin: boolean,
   canManageSlot: boolean,
   canLinkAccount: boolean,
+  canResendEmail: boolean,
 ): ReactNode {
   switch (key) {
     case "certificate":
@@ -274,6 +276,8 @@ function extraCell(
       return <AccountLinkCell row={row} canLinkAccount={canLinkAccount} />;
     case "slotStatus":
       return <SlotStatusCell row={row} canManage={canManageSlot} />;
+    case "resendEmail":
+      return <ResendEmailCell row={row} canResendEmail={canResendEmail} />;
   }
   return null;
 }
@@ -310,16 +314,43 @@ function AccountLinkCell({ row, canLinkAccount }: { row: ParticipantRecordRow; c
   );
 }
 
+/** Manual re-send for when the automatic confirmation never arrived (email
+ * provider misconfiguration, participant lost it, etc.) — sends one email
+ * for this single registration, rebuilt from its current data. */
+function ResendEmailCell({ row, canResendEmail }: { row: ParticipantRecordRow; canResendEmail: boolean }) {
+  if (!row.email) {
+    return <span className="text-xs text-neutral-400">No email on file</span>;
+  }
+  if (!canResendEmail) {
+    return <span className="text-xs text-neutral-400">—</span>;
+  }
+  return (
+    <form action={resendRegistrationConfirmation}>
+      <input type="hidden" name="registration_id" value={row.registrationId} />
+      <input type="hidden" name="return_to" value="/admin/records" />
+      <button
+        type="submit"
+        title={`Resend the registration confirmation email to ${row.email}`}
+        className="rounded border border-blue-300 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 hover:bg-blue-50"
+      >
+        Resend confirmation
+      </button>
+    </form>
+  );
+}
+
 export default function ParticipantRecordsTable({
   rows,
   isAdmin = false,
   canManageSlot = false,
   canLinkAccount = false,
+  canResendEmail = false,
 }: {
   rows: ParticipantRecordRow[];
   isAdmin?: boolean;
   canManageSlot?: boolean;
   canLinkAccount?: boolean;
+  canResendEmail?: boolean;
 }) {
   const [filters, setFilters] = useState<Partial<Record<keyof ParticipantRecordRow, Set<string>>>>({});
   const [colWidths, setColWidths] = useState<Record<string, number>>({});
@@ -600,7 +631,7 @@ export default function ParticipantRecordsTable({
                       const closed = colClosed || rowClosed;
                       return (
                         <td key={c.key} className={closed ? `p-0 ${colClosed ? "bg-red-600" : ""}` : "px-3 py-2"}>
-                          {!closed && extraCell(c.key, row, isAdmin, canManageSlot, canLinkAccount)}
+                          {!closed && extraCell(c.key, row, isAdmin, canManageSlot, canLinkAccount, canResendEmail)}
                         </td>
                       );
                     })}
