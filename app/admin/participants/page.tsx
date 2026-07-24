@@ -12,6 +12,8 @@ import InvitationCodeList from "@/components/InvitationCodeList";
 import DobAgeField from "@/components/DobAgeField";
 import { NoCommaInput } from "@/components/NoCommaAddressField";
 import { ageAt } from "@/lib/division";
+import IbanInput from "@/components/IbanInput";
+import { IBAN_CSV_NOTE } from "@/lib/bank";
 
 export const dynamic = "force-dynamic";
 
@@ -73,7 +75,7 @@ export default async function AdminParticipants({
             action={bulkUploadParticipants}
             templateHref="/participants-template.csv"
             entityLabel="participant"
-            note="School and sensei names must match existing records exactly. Certificates can't be uploaded via CSV — add one later via Edit."
+            note={`School and sensei names must match existing records exactly. Certificates can't be uploaded via CSV — add one later via Edit. ${IBAN_CSV_NOTE}`}
           />
         </div>
       )}
@@ -183,8 +185,8 @@ export default async function AdminParticipants({
                     <input id="bank_name" name="bank_name" required defaultValue={editing?.bank?.bank_name ?? ""} className={adminInput} placeholder="e.g. Maybank" />
                   </div>
                   <div>
-                    <label htmlFor="bank_account_no" className={adminLabel}>Account no. *</label>
-                    <input id="bank_account_no" name="bank_account_no" required defaultValue={editing?.bank?.bank_account_no ?? ""} className={adminInput} />
+                    <label htmlFor="bank_account_no" className={adminLabel}>International Bank Account No. (IBAN) *</label>
+                    <IbanInput id="bank_account_no" name="bank_account_no" required defaultValue={editing?.bank?.bank_account_no ?? ""} className={adminInput} />
                   </div>
                   <div className="sm:col-span-2">
                     <label htmlFor="bank_account_name" className={adminLabel}>Account holder name *</label>
@@ -233,7 +235,7 @@ export default async function AdminParticipants({
                 { key: "home_country", label: "Country" },
                 { key: "school", label: "School" },
                 { key: "bank_name", label: "Bank Name" },
-                { key: "bank_account_no", label: "Bank Account No" },
+                { key: "bank_account_no", label: "International Bank Account No. (IBAN)" },
                 { key: "bank_account_name", label: "Bank Account Holder Name" },
               ]}
               rows={participants.map((p) => ({

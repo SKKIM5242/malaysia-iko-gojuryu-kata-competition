@@ -6,6 +6,7 @@ import { writeAudit } from "@/lib/audit";
 import { resolveCategory, ageAt } from "@/lib/division";
 import { parseCsv } from "@/lib/csv";
 import { parseDDMMYYYY } from "@/lib/csv-bulk";
+import { normalizeIban } from "@/lib/bank";
 import { sendConfirmationEmail, sendConfirmationEmailBatch, type ConfirmationEmailInput } from "@/lib/notify";
 import { getStripe, paymentsEnabled } from "@/lib/payments";
 import { formatUSD } from "@/components/ui";
@@ -57,7 +58,7 @@ const ROW_REQUIRED: Array<[keyof BulkRow, string]> = [
   ["home_country", "home country"],
   ["kata_base", "kata event"],
   ["bank_name", "bank name"],
-  ["bank_account_no", "bank account no."],
+  ["bank_account_no", "International Bank Account No. (IBAN)"],
   ["bank_account_name", "bank account holder"],
 ];
 
@@ -530,7 +531,7 @@ export async function bulkRegister(_prev: BulkState, formData: FormData): Promis
     await supabase.from("participant_bank_details").insert({
       participant_id: participantId,
       bank_name: row.bank_name.trim(),
-      bank_account_no: row.bank_account_no.trim(),
+      bank_account_no: normalizeIban(row.bank_account_no),
       bank_account_name: row.bank_account_name.trim(),
     });
     const { error: rErr } = await supabase.from("registrations").insert({
@@ -778,7 +779,7 @@ export async function bulkRegisterCsv(_prev: CsvBulkState, formData: FormData): 
       categoryId: resolved.category.id,
       categoryMax: resolved.category.max_participants,
       kataBase,
-      bank: [get(r, "bank_name"), get(r, "bank_account_no"), get(r, "bank_account_name")],
+      bank: [get(r, "bank_name"), normalizeIban(get(r, "bank_account_no")), get(r, "bank_account_name")],
     });
   });
 

@@ -115,7 +115,7 @@ export default async function AdminCommissions({
             { key: "total_fees", label: "Total Fees USD (Paid)" },
             { key: "commission", label: "Commission USD (10%)" },
             { key: "bank_name", label: "Bank Name" },
-            { key: "bank_account_no", label: "Bank Account No" },
+            { key: "bank_account_no", label: "International Bank Account No. (IBAN)" },
             { key: "bank_account_name", label: "Bank Account Holder Name" },
             { key: "payout_status", label: "Payout Status" },
           ]}
@@ -174,7 +174,7 @@ export default async function AdminCommissions({
             { key: "name", label: "Participant" },
             { key: "score", label: "Score" },
             { key: "bank_name", label: "Bank Name" },
-            { key: "bank_account_no", label: "Bank Account No" },
+            { key: "bank_account_no", label: "International Bank Account No. (IBAN)" },
             { key: "bank_account_name", label: "Bank Account Holder Name" },
             { key: "payout_status", label: "Payout Status" },
           ]}

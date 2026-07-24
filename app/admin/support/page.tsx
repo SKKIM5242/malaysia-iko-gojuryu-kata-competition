@@ -17,6 +17,8 @@ import { NoCommaInput } from "@/components/NoCommaAddressField";
 import DateOfBirthField from "@/components/DateOfBirthField";
 import InvitationCodeForm from "@/components/InvitationCodeForm";
 import InvitationCodeList from "@/components/InvitationCodeList";
+import IbanInput from "@/components/IbanInput";
+import { IBAN_CSV_NOTE } from "@/lib/bank";
 import { EDUCATION_LEVELS, SPOKEN_LANGUAGES } from "@/lib/reference-data";
 
 export const dynamic = "force-dynamic";
@@ -155,7 +157,7 @@ export default async function AdminSupport({
                 action={bulkUploadSupport}
                 templateHref="/support-template.csv"
                 entityLabel="account"
-                note="Each row creates a real login instantly and emails a temporary password — max 200 rows per upload."
+                note={`Each row creates a real login instantly and emails a temporary password — max 200 rows per upload. ${IBAN_CSV_NOTE}`}
               />
             </div>
           )}
@@ -292,8 +294,8 @@ export default async function AdminSupport({
                     <input id="cs_bank_name" name="bank_name" required className={adminInput} />
                   </div>
                   <div>
-                    <label htmlFor="cs_bank_account_no" className={adminLabel}>Account no. *</label>
-                    <input id="cs_bank_account_no" name="bank_account_no" required className={adminInput} />
+                    <label htmlFor="cs_bank_account_no" className={adminLabel}>International Bank Account No. (IBAN) *</label>
+                    <IbanInput id="cs_bank_account_no" name="bank_account_no" required className={adminInput} />
                   </div>
                   <div className="sm:col-span-2">
                     <label htmlFor="cs_bank_account_name" className={adminLabel}>Account holder name *</label>

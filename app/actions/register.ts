@@ -7,6 +7,7 @@ import { writeAudit } from "@/lib/audit";
 import { getStripe, paymentsEnabled } from "@/lib/payments";
 import { resolveCategory } from "@/lib/division";
 import { sendConfirmationEmail } from "@/lib/notify";
+import { normalizeIban } from "@/lib/bank";
 import type { Category } from "@/lib/types";
 
 export interface RegisterState {
@@ -341,7 +342,7 @@ export async function submitRegistration(
   const { error: bErr } = await supabase.from("participant_bank_details").insert({
     participant_id: participantId,
     bank_name: values.bank_name,
-    bank_account_no: values.bank_account_no,
+    bank_account_no: normalizeIban(values.bank_account_no),
     bank_account_name: values.bank_account_name,
   });
   if (bErr) {

@@ -5,6 +5,8 @@ import Link from "next/link";
 import { submitRegistration, type RegisterState } from "@/app/actions/register";
 import { OrganizerContact, formatUSD } from "@/components/ui";
 import CertificateUploadField from "@/components/CertificateUploadField";
+import IbanInput from "@/components/IbanInput";
+import IbanConfirmCheckbox from "@/components/IbanConfirmCheckbox";
 import { NoCommaTextarea } from "@/components/NoCommaAddressField";
 import DateOfBirthField from "@/components/DateOfBirthField";
 import { ageAt, beltGroup, genderCode, kataBaseOf, kataBases as allKataBasesOf } from "@/lib/division";
@@ -459,6 +461,11 @@ export default function RegisterForm({
             Winnings are transferred to this account after 1 month of the winner announcement. Kept
             private — visible to the organizer only.
           </p>
+          <p className="mt-1 text-xs text-neutral-500">
+            Note: participants outside Malaysia — please provide your IBAN, SWIFT code, BIC, BBAN, or
+            ACH number. If you don&apos;t know your IBAN, please call your bank to check. This ensures
+            smooth processing with no delay in receiving any reward or commission.
+          </p>
           <div className="mt-3 grid gap-4 sm:grid-cols-2">
             <div>
               <label htmlFor="bank_name" className={labelCls}>Bank name *</label>
@@ -466,9 +473,10 @@ export default function RegisterForm({
               <FieldError message={err.bank_name} />
             </div>
             <div>
-              <label htmlFor="bank_account_no" className={labelCls}>Bank account no. *</label>
-              <input id="bank_account_no" name="bank_account_no" required className={inputCls} placeholder="e.g. 5121-2345-6789" />
+              <label htmlFor="bank_account_no" className={labelCls}>International Bank Account No. (IBAN) *</label>
+              <IbanInput id="bank_account_no" name="bank_account_no" required className={inputCls} />
               <FieldError message={err.bank_account_no} />
+              <IbanConfirmCheckbox id="bank_account_no_confirmed" />
             </div>
             <div className="sm:col-span-2">
               <label htmlFor="bank_account_name" className={labelCls}>Bank account holder name *</label>

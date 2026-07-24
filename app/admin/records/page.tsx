@@ -234,7 +234,7 @@ export default async function AdminParticipantRecords({
     { key: "email", label: "Email" },
     { key: "phone", label: "Phone" },
     { key: "bank_name", label: "Bank Name" },
-    { key: "bank_account_no", label: "Bank Account No" },
+    { key: "bank_account_no", label: "International Bank Account No. (IBAN)" },
     { key: "bank_account_name", label: "Bank Account Holder Name" },
     { key: "certificateUrl", label: "Certificate" },
     { key: "payment_status", label: "Deposit Status" },

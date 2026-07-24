@@ -150,7 +150,7 @@ const COLUMNS: Array<{ key: keyof ParticipantRecordRow; label: string; width: nu
   { key: "invitationCode", label: "Invitation Code", width: 140 },
   { key: "referralSource", label: "Referral", width: 160 },
   { key: "bankName", label: "Bank Name", width: 140 },
-  { key: "bankAccountNo", label: "Bank Account No", width: 150 },
+  { key: "bankAccountNo", label: "International Bank Account No. (IBAN)", width: 220 },
   { key: "bankAccountName", label: "Bank Account Holder Name", width: 200 },
   { key: "recordingStatus", label: "Recording Status", width: 130 },
   { key: "recordingDate", label: "Recording Date", width: 130 },

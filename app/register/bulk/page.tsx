@@ -110,6 +110,11 @@ export default async function BulkRegisterPage() {
                   own row in that other tier&apos;s CSV file — same IC/passport and details each
                   time — and upload each tier&apos;s file separately below (one tier per upload).
                 </p>
+                <p className="mt-2 text-xs text-neutral-400">
+                  Note: for participants outside Malaysia, provide their IBAN, SWIFT code, BIC, BBAN,
+                  or ACH number in the bank_account_no column. If unsure, ask them to call their bank
+                  to check — this ensures smooth processing with no delay in receiving any reward.
+                </p>
                 <div className="mt-4">
                   <CsvBulkForm competitions={openCompetitions} schools={schools} senseis={senseis} />
                 </div>

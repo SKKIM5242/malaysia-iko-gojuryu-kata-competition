@@ -140,6 +140,12 @@ export default function BulkRegisterForm({
         </div>
       </div>
 
+      <p className="mb-2 text-xs text-neutral-500">
+        Note: for participants outside Malaysia, provide their IBAN, SWIFT code, BIC, BBAN, or ACH
+        number in the International Bank Account No. (IBAN) column. If unsure, ask them to call their
+        bank to check — this ensures smooth processing with no delay in receiving any reward.
+      </p>
+
       <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white shadow-sm">
         <table className="w-full min-w-[2000px] text-left">
           <thead className="border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
@@ -159,7 +165,7 @@ export default function BulkRegisterForm({
               <th className="px-2 py-2">Country *</th>
               <th className="px-2 py-2">Kata event *</th>
               <th className="px-2 py-2">Bank name *</th>
-              <th className="px-2 py-2">Bank account no. *</th>
+              <th className="px-2 py-2">International Bank Account No. (IBAN) *</th>
               <th className="px-2 py-2">Account holder *</th>
               <th className="px-2 py-2 w-8"></th>
             </tr>
@@ -211,7 +217,7 @@ export default function BulkRegisterForm({
                   </select>
                 </td>
                 <td className="px-2 py-1.5"><input aria-label={`Row ${i + 1} bank name`} className={cell} value={row.bank_name} onChange={(e) => update(i, "bank_name", e.target.value)} /></td>
-                <td className="px-2 py-1.5"><input aria-label={`Row ${i + 1} bank account no`} className={cell} value={row.bank_account_no} onChange={(e) => update(i, "bank_account_no", e.target.value)} /></td>
+                <td className="px-2 py-1.5"><input aria-label={`Row ${i + 1} IBAN`} className={cell} value={row.bank_account_no} onChange={(e) => update(i, "bank_account_no", e.target.value)} /></td>
                 <td className="px-2 py-1.5"><input aria-label={`Row ${i + 1} account holder`} className={cell} value={row.bank_account_name} onChange={(e) => update(i, "bank_account_name", e.target.value)} /></td>
                 <td className="px-2 py-1.5">
                   <button

@@ -10,6 +10,8 @@ import InvitationCodeForm from "@/components/InvitationCodeForm";
 import InvitationCodeList from "@/components/InvitationCodeList";
 import { NoCommaInput } from "@/components/NoCommaAddressField";
 import DateOfBirthField from "@/components/DateOfBirthField";
+import IbanInput from "@/components/IbanInput";
+import { IBAN_CSV_NOTE } from "@/lib/bank";
 
 export const dynamic = "force-dynamic";
 
@@ -59,7 +61,7 @@ export default async function AdminOrganizers({
               action={bulkUploadOrganizers}
               templateHref="/organizers-template.csv"
               entityLabel="account"
-              note="Each row creates a real login instantly and emails a temporary password — max 200 rows per upload."
+              note={`Each row creates a real login instantly and emails a temporary password — max 200 rows per upload. ${IBAN_CSV_NOTE}`}
             />
           </div>
           <h2 className="mb-3 text-lg font-bold">Create An Admin / Organizer Account</h2>
@@ -135,8 +137,8 @@ export default async function AdminOrganizers({
                     <input id="org_bank_name" name="bank_name" required className={adminInput} />
                   </div>
                   <div>
-                    <label htmlFor="org_bank_account_no" className={adminLabel}>Account no. *</label>
-                    <input id="org_bank_account_no" name="bank_account_no" required className={adminInput} />
+                    <label htmlFor="org_bank_account_no" className={adminLabel}>International Bank Account No. (IBAN) *</label>
+                    <IbanInput id="org_bank_account_no" name="bank_account_no" required className={adminInput} />
                   </div>
                   <div className="sm:col-span-2">
                     <label htmlFor="org_bank_account_name" className={adminLabel}>Account holder name *</label>

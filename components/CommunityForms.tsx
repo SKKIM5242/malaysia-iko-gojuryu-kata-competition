@@ -9,6 +9,8 @@ import {
 } from "@/app/actions/community";
 import { TelegramJoinButton, formatUSD } from "@/components/ui";
 import CertificateUploadField from "@/components/CertificateUploadField";
+import IbanInput from "@/components/IbanInput";
+import IbanConfirmCheckbox from "@/components/IbanConfirmCheckbox";
 import { NoCommaTextarea } from "@/components/NoCommaAddressField";
 import DateOfBirthField from "@/components/DateOfBirthField";
 import { EDUCATION_LEVELS, SPOKEN_LANGUAGES } from "@/lib/reference-data";
@@ -161,6 +163,11 @@ export function RefereeForm({ telegramLink }: { telegramLink: string | null }) {
           <p className="text-sm font-bold text-neutral-800">
             Bank details — for return of the USD 100 deposit &amp; referee/judge reward *
           </p>
+          <p className="mt-0.5 text-xs text-neutral-500">
+            Note: participants outside Malaysia — please provide your IBAN, SWIFT code, BIC, BBAN, or
+            ACH number. If you don&apos;t know your IBAN, please call your bank to check. This ensures
+            smooth processing with no delay in receiving any reward or commission.
+          </p>
           <div className="mt-3 grid gap-4 sm:grid-cols-2">
             <div>
               <label htmlFor="bank_name" className={labelCls}>Bank name *</label>
@@ -168,9 +175,10 @@ export function RefereeForm({ telegramLink }: { telegramLink: string | null }) {
               <Err m={e.bank_name} />
             </div>
             <div>
-              <label htmlFor="bank_account_no" className={labelCls}>Bank account no. *</label>
-              <input id="bank_account_no" name="bank_account_no" required className={inputCls} />
+              <label htmlFor="bank_account_no" className={labelCls}>International Bank Account No. (IBAN) *</label>
+              <IbanInput id="bank_account_no" name="bank_account_no" required className={inputCls} />
               <Err m={e.bank_account_no} />
+              <IbanConfirmCheckbox id="bank_account_no_confirmed" />
             </div>
             <div className="sm:col-span-2">
               <label htmlFor="bank_account_name" className={labelCls}>Account holder name *</label>
@@ -400,6 +408,11 @@ export function StaffForm({
 
         <div className="sm:col-span-2 rounded-md border border-neutral-200 bg-neutral-50 p-4">
           <p className="text-sm font-bold text-neutral-800">Bank details *</p>
+          <p className="mt-0.5 text-xs text-neutral-500">
+            Note: participants outside Malaysia — please provide your IBAN, SWIFT code, BIC, BBAN, or
+            ACH number. If you don&apos;t know your IBAN, please call your bank to check. This ensures
+            smooth processing with no delay in receiving any reward or commission.
+          </p>
           <div className="mt-3 grid gap-4 sm:grid-cols-2">
             <div>
               <label htmlFor="bank_name" className={labelCls}>Bank name *</label>
@@ -407,9 +420,10 @@ export function StaffForm({
               <Err m={e.bank_name} />
             </div>
             <div>
-              <label htmlFor="bank_account_no" className={labelCls}>Bank account no. *</label>
-              <input id="bank_account_no" name="bank_account_no" required className={inputCls} />
+              <label htmlFor="bank_account_no" className={labelCls}>International Bank Account No. (IBAN) *</label>
+              <IbanInput id="bank_account_no" name="bank_account_no" required className={inputCls} />
               <Err m={e.bank_account_no} />
+              <IbanConfirmCheckbox id="bank_account_no_confirmed" />
             </div>
             <div className="sm:col-span-2">
               <label htmlFor="bank_account_name" className={labelCls}>Account holder name *</label>

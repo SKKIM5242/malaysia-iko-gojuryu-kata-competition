@@ -13,6 +13,8 @@ import CsvUploadForm from "@/components/CsvUploadForm";
 import SignInControlBox from "@/components/SignInControlBox";
 import InvitationCodeForm from "@/components/InvitationCodeForm";
 import InvitationCodeList from "@/components/InvitationCodeList";
+import IbanInput from "@/components/IbanInput";
+import { IBAN_CSV_NOTE } from "@/lib/bank";
 import { NoCommaInput } from "@/components/NoCommaAddressField";
 import DateOfBirthField from "@/components/DateOfBirthField";
 
@@ -124,7 +126,7 @@ export default async function AdminReferees({
             action={bulkUploadReferees}
             templateHref="/referees-template.csv"
             entityLabel="referee"
-            note="Certificates can't be uploaded via CSV — add one later via Edit."
+            note={`Certificates can't be uploaded via CSV — add one later via Edit. ${IBAN_CSV_NOTE}`}
           />
         </div>
       )}
@@ -222,8 +224,8 @@ export default async function AdminReferees({
                     <input id="bank_name" name="bank_name" required defaultValue={editing?.bank_name ?? ""} className={adminInput} />
                   </div>
                   <div>
-                    <label htmlFor="bank_account_no" className={adminLabel}>Account no. *</label>
-                    <input id="bank_account_no" name="bank_account_no" required defaultValue={editing?.bank_account_no ?? ""} className={adminInput} />
+                    <label htmlFor="bank_account_no" className={adminLabel}>International Bank Account No. (IBAN) *</label>
+                    <IbanInput id="bank_account_no" name="bank_account_no" required defaultValue={editing?.bank_account_no ?? ""} className={adminInput} />
                   </div>
                   <div className="sm:col-span-2">
                     <label htmlFor="bank_account_name" className={adminLabel}>Account holder name *</label>
@@ -312,7 +314,7 @@ export default async function AdminReferees({
                 { key: "email", label: "Email" },
                 { key: "phone", label: "Phone" },
                 { key: "bank_name", label: "Bank Name" },
-                { key: "bank_account_no", label: "Bank Account No" },
+                { key: "bank_account_no", label: "International Bank Account No. (IBAN)" },
                 { key: "bank_account_name", label: "Bank Account Holder Name" },
                 { key: "invitation_code", label: "Invitation Code" },
                 { key: "referral_source", label: "Referral" },

@@ -10,6 +10,7 @@ import { kataBaseOf, ageAt } from "@/lib/division";
 import { notifyRefereeAssignment, sendConfirmationEmail, notifyAnnouncementPublished } from "@/lib/notify";
 import type { PaymentStatus } from "@/lib/types";
 import { parseCsvWithHeader, parseDDMMYYYY, type CsvUploadResult } from "@/lib/csv-bulk";
+import { normalizeIban } from "@/lib/bank";
 import { ACCESS_MATRIX, accessMatrixToMarkdown } from "@/lib/access-matrix";
 import { DEFAULT_COMPARISON_ROWS } from "@/components/AccessComparisonTable";
 import { DEFAULT_AUTO_ASSIGN_CRITERIA } from "@/lib/auto-assign-criteria";
@@ -741,7 +742,7 @@ export async function saveSchool(formData: FormData) {
     email: String(formData.get("email") ?? "").trim() || null,
     phone: String(formData.get("phone") ?? "").trim() || null,
     bank_name: String(formData.get("bank_name") ?? "").trim() || null,
-    bank_account_no: String(formData.get("bank_account_no") ?? "").trim() || null,
+    bank_account_no: normalizeIban(String(formData.get("bank_account_no") ?? "")) || null,
     bank_account_name: String(formData.get("bank_account_name") ?? "").trim() || null,
     invitation_code: String(formData.get("invitation_code") ?? "").trim() || null,
     referral_source: String(formData.get("referral_source") ?? "").trim() || null,
@@ -817,7 +818,7 @@ export async function saveSensei(formData: FormData) {
     email: String(formData.get("email") ?? "").trim() || null,
     phone: String(formData.get("phone") ?? "").trim() || null,
     bank_name: String(formData.get("bank_name") ?? "").trim() || null,
-    bank_account_no: String(formData.get("bank_account_no") ?? "").trim() || null,
+    bank_account_no: normalizeIban(String(formData.get("bank_account_no") ?? "")) || null,
     bank_account_name: String(formData.get("bank_account_name") ?? "").trim() || null,
     invitation_code: String(formData.get("invitation_code") ?? "").trim() || null,
     referral_source: String(formData.get("referral_source") ?? "").trim() || null,
@@ -985,7 +986,7 @@ export async function saveReferee(formData: FormData) {
     postcode: String(formData.get("postcode") ?? "").trim() || null,
     home_country: String(formData.get("home_country") ?? "").trim() || null,
     bank_name: String(formData.get("bank_name") ?? "").trim() || null,
-    bank_account_no: String(formData.get("bank_account_no") ?? "").trim() || null,
+    bank_account_no: normalizeIban(String(formData.get("bank_account_no") ?? "")) || null,
     bank_account_name: String(formData.get("bank_account_name") ?? "").trim() || null,
     invitation_code: String(formData.get("invitation_code") ?? "").trim() || null,
     referral_source: String(formData.get("referral_source") ?? "").trim() || null,
@@ -1089,7 +1090,7 @@ export async function saveParticipant(formData: FormData) {
   }
   const bank = {
     bank_name: String(formData.get("bank_name") ?? "").trim(),
-    bank_account_no: String(formData.get("bank_account_no") ?? "").trim(),
+    bank_account_no: normalizeIban(String(formData.get("bank_account_no") ?? "")),
     bank_account_name: String(formData.get("bank_account_name") ?? "").trim(),
   };
   if (!bank.bank_name || !bank.bank_account_no || !bank.bank_account_name) {
@@ -2043,7 +2044,7 @@ export async function createStaffAccount(formData: FormData) {
     country: String(formData.get("country") ?? "").trim() || null,
     phone: String(formData.get("phone") ?? "").trim() || null,
     bank_name: String(formData.get("bank_name") ?? "").trim() || null,
-    bank_account_no: String(formData.get("bank_account_no") ?? "").trim() || null,
+    bank_account_no: normalizeIban(String(formData.get("bank_account_no") ?? "")) || null,
     bank_account_name: String(formData.get("bank_account_name") ?? "").trim() || null,
     invitation_code: String(formData.get("invitation_code") ?? "").trim() || null,
     referral_source: String(formData.get("referral_source") ?? "").trim() || null,
@@ -2168,7 +2169,7 @@ export async function bulkUploadSchools(_prev: CsvUploadResult, formData: FormDa
       email: get(r, "email") || null,
       phone: get(r, "phone") || null,
       bank_name: get(r, "bank_name") || null,
-      bank_account_no: get(r, "bank_account_no") || null,
+      bank_account_no: normalizeIban(get(r, "bank_account_no")) || null,
       bank_account_name: get(r, "bank_account_name") || null,
     };
     if (!record.name) { failures.push({ row: rowNo, name, error: "School name is required" }); continue; }
@@ -2261,7 +2262,7 @@ export async function bulkUploadSenseis(_prev: CsvUploadResult, formData: FormDa
       email: get(r, "email") || null,
       phone: get(r, "phone") || null,
       bank_name: get(r, "bank_name") || null,
-      bank_account_no: get(r, "bank_account_no") || null,
+      bank_account_no: normalizeIban(get(r, "bank_account_no")) || null,
       bank_account_name: get(r, "bank_account_name") || null,
     };
     if (!record.name) { failures.push({ row: rowNo, name, error: "Sensei name is required" }); continue; }
@@ -2346,7 +2347,7 @@ export async function bulkUploadReferees(_prev: CsvUploadResult, formData: FormD
       city_town: get(r, "city_town") || null,
       home_country: get(r, "home_country") || null,
       bank_name: get(r, "bank_name") || null,
-      bank_account_no: get(r, "bank_account_no") || null,
+      bank_account_no: normalizeIban(get(r, "bank_account_no")) || null,
       bank_account_name: get(r, "bank_account_name") || null,
     };
     if (!record.full_name || !record.ic_passport) {
@@ -2522,7 +2523,7 @@ export async function bulkUploadParticipants(_prev: CsvUploadResult, formData: F
     }
     const bank = {
       bank_name: get(r, "bank_name"),
-      bank_account_no: get(r, "bank_account_no"),
+      bank_account_no: normalizeIban(get(r, "bank_account_no")),
       bank_account_name: get(r, "bank_account_name"),
     };
     if (!bank.bank_name || !bank.bank_account_no || !bank.bank_account_name) {
@@ -2660,7 +2661,7 @@ async function bulkCreateStaffAccounts(formData: FormData, role: "organizer" | "
     const country = get(r, "country");
     const phone = get(r, "phone");
     const bank_name = get(r, "bank_name");
-    const bank_account_no = get(r, "bank_account_no");
+    const bank_account_no = normalizeIban(get(r, "bank_account_no"));
     const bank_account_name = get(r, "bank_account_name");
     if (!full_name || !email || !ic_passport || !date_of_birth || !gender) {
       failures.push({ row: rowNo, name: full_name, error: "Full name, email, IC/Passport, date of birth, and gender are required" });

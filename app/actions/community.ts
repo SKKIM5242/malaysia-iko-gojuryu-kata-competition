@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { writeAudit } from "@/lib/audit";
 import { sendConfirmationEmail } from "@/lib/notify";
+import { normalizeIban } from "@/lib/bank";
 
 export interface CommunityState {
   ok: boolean;
@@ -124,7 +125,7 @@ export async function registerReferee(
     postcode: values.postcode,
     home_country: values.home_country,
     bank_name: values.bank_name,
-    bank_account_no: values.bank_account_no,
+    bank_account_no: normalizeIban(values.bank_account_no),
     bank_account_name: values.bank_account_name,
     certificate_path,
     international_certificate_paths,
@@ -332,7 +333,7 @@ export async function applyStaff(
     postcode: values.postcode,
     home_country: values.home_country,
     bank_name: values.bank_name,
-    bank_account_no: values.bank_account_no,
+    bank_account_no: normalizeIban(values.bank_account_no),
     bank_account_name: values.bank_account_name,
     certificate_path,
     international_certificate_paths,
