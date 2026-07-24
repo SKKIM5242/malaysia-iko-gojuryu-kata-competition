@@ -68,13 +68,13 @@ const ACCENT: Record<Exclude<CertificateKind, "winner">, string> = {
 
 const RANK_ACCENT: Record<1 | 2 | 3, string> = { 1: "#B8860B", 2: "#64748B", 3: "#A15C2E" };
 
-/** Ribbon color is the same red/white/blue for every rank (like a real
- * medal ribbon, e.g. the standard 🥇🥈🥉 icon set) — only the disc color
- * changes with placement. */
-const MEDAL_THEME: Record<1 | 2 | 3, { discLight: string; discMid: string; discDark: string }> = {
-  1: { discLight: "#FFF1C2", discMid: "#D4AF37", discDark: "#8B6914" },
-  2: { discLight: "#F5F5F5", discMid: "#C0C0C0", discDark: "#79797F" },
-  3: { discLight: "#EAC094", discMid: "#CD7F32", discDark: "#7A4A1E" },
+/** Rank label text color -- the medal artwork's own dark tone for that
+ * rank, not a fixed white, per "wreath & rank text must be the medal
+ * color." */
+const MEDAL_THEME: Record<1 | 2 | 3, { discDark: string; label: string }> = {
+  1: { discDark: "#8B6914", label: "1ST" },
+  2: { discDark: "#6B6E73", label: "2ND" },
+  3: { discDark: "#7A4A1E", label: "3RD" },
 };
 
 function readAsDataUri(relPath: string, mime: string): string | null {
@@ -93,17 +93,6 @@ function logoDataUri(): string | null {
   return cachedLogo;
 }
 
-let cachedLogoTransparent: string | null | undefined;
-function logoTransparentDataUri(): string | null {
-  // Same crest with a transparent background (not white) -- used inside the
-  // medal disc so it reads as embossed on the metal instead of a white
-  // sticker patch.
-  if (cachedLogoTransparent === undefined) {
-    cachedLogoTransparent = readAsDataUri("M Logo 400x400px Transparent.png", "image/png");
-  }
-  return cachedLogoTransparent;
-}
-
 let cachedLogo2: string | null | undefined;
 function logo2DataUri(): string | null {
   // Second org crest (IKO International / All Japan), shown on the right of
@@ -114,85 +103,61 @@ function logo2DataUri(): string | null {
   return cachedLogo2;
 }
 
-/** Two ribbon tails fanning out in a wide V from a small clasp/hook on top
- * of the medal — like a single ribbon threaded through that hook, each
- * tail striped red/white/blue running ALONG its own length (three
- * parallel bars), with the second tail's stripe order mirrored
- * (blue/white/red) the way the far side of a single folded ribbon reads
- * in reverse. Built from real SVG rects/rotation, not CSS transforms —
- * Satori doesn't miter CSS border-triangles into real triangles (tried
- * that first; it just rendered a rectangle), but native SVG
- * transform="rotate(...)" on <g> is core SVG and renders correctly. */
-function RibbonV({ size }: { size: number }) {
-  const vbW = size;
-  const vbH = Math.round(size * 0.62);
-  const stripW = Math.round(size * 0.26);
-  const stripLen = Math.round(vbH * 1.05);
-  const angle = 40;
-  const vertexX = vbW / 2;
-  const vertexY = vbH;
-  const bandW = stripW / 3;
+/** Pre-made medal artwork (ribbon + wreath-rim disc), one PNG per rank
+ * color -- sourced from the organizer's own reference image with its
+ * baked-in "1st" text erased (clone-stamped over from the neighboring
+ * gradient, see scripts used to produce these), so a fresh rank label can
+ * be rendered on top for whichever ordinal actually applies. Silver and
+ * bronze are the same artwork re-toned (grayscale+tint, hue-shift) rather
+ * than separate assets, so all three stay perfectly in sync. */
+const MEDAL_IMAGE_FILE: Record<1 | 2 | 3, string> = {
+  1: "Medal Gold.png",
+  2: "Medal Silver.png",
+  3: "Medal Bronze.png",
+};
+const MEDAL_NATURAL_W = 511;
+const MEDAL_NATURAL_H = 488;
+// Bounding box (in the source image's own pixel coordinates) of the blank
+// patch left after erasing "1st" -- where the rank label gets rendered.
+const MEDAL_LABEL_BOX = { x: 180, y: 278, w: 160, h: 82 };
 
-  const strip = (rotate: number, order: [string, string, string]) => (
-    <g transform={`translate(${vertexX}, ${vertexY}) rotate(${rotate})`} stroke="#374151" strokeWidth={2.5}>
-      <rect x={-stripW / 2} y={-stripLen} width={bandW + 1} height={stripLen} fill={order[0]} />
-      <rect x={-stripW / 2 + bandW} y={-stripLen} width={bandW + 1} height={stripLen} fill={order[1]} />
-      <rect x={-stripW / 2 + 2 * bandW} y={-stripLen} width={bandW + 1} height={stripLen} fill={order[2]} />
-    </g>
-  );
-
-  return (
-    <svg width={vbW} height={vbH} viewBox={`0 0 ${vbW} ${vbH}`}>
-      {strip(-angle, ["#DC2626", "#FFFFFF", "#1D4ED8"])}
-      {strip(angle, ["#1D4ED8", "#FFFFFF", "#DC2626"])}
-      {/* Hook the ribbon threads through -- a real ring (stroke only), not
-       * a filled blob, sitting right on the medal's rim. */}
-      <ellipse
-        cx={vertexX}
-        cy={vertexY - Math.round(size * 0.02)}
-        rx={Math.round(size * 0.075)}
-        ry={Math.round(size * 0.05)}
-        fill="none"
-        stroke="#4B5563"
-        strokeWidth={Math.round(size * 0.018)}
-      />
-    </svg>
-  );
+const cachedMedalImage: Partial<Record<1 | 2 | 3, string | null>> = {};
+function medalImageDataUri(rank: 1 | 2 | 3): string | null {
+  if (!(rank in cachedMedalImage)) {
+    cachedMedalImage[rank] = readAsDataUri(MEDAL_IMAGE_FILE[rank], "image/png");
+  }
+  return cachedMedalImage[rank] ?? null;
 }
 
-/** The medal disc, with the Malaysia IKO crest embossed in the center
- * (in place of a rank number or an engraved wreath) -- like a real medal's
- * flat "custom insert" center stage, just holding the org's own logo. */
-function Medal({ rank, size }: { rank: 1 | 2 | 3; size: number }) {
+/** The medal: the pre-made ribbon+wreath artwork for this rank's color,
+ * with the rank label ("1ST"/"2ND"/"3RD") rendered fresh on top, in the
+ * medal's own dark tone, positioned over the artwork's blank center. */
+function Medal({ rank, width }: { rank: 1 | 2 | 3; width: number }) {
   const t = MEDAL_THEME[rank];
-  const logo = logoTransparentDataUri();
+  const img = medalImageDataUri(rank);
+  const scale = width / MEDAL_NATURAL_W;
+  const height = Math.round(MEDAL_NATURAL_H * scale);
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-      <div style={{ display: "flex", marginBottom: `-${Math.round(size * 0.185)}px` }}>
-        <RibbonV size={size} />
-      </div>
+    <div style={{ display: "flex", position: "relative", width, height }}>
+      {img && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={img} width={width} height={height} alt="" />
+      )}
       <div
         style={{
+          position: "absolute",
+          left: Math.round(MEDAL_LABEL_BOX.x * scale),
+          top: Math.round(MEDAL_LABEL_BOX.y * scale),
+          width: Math.round(MEDAL_LABEL_BOX.w * scale),
+          height: Math.round(MEDAL_LABEL_BOX.h * scale),
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          width: size,
-          height: size,
-          borderRadius: "999px",
-          backgroundImage: `radial-gradient(circle at 32% 28%, ${t.discLight}, ${t.discMid} 55%, ${t.discDark} 100%)`,
-          border: `${Math.round(size * 0.045)}px solid ${t.discDark}`,
         }}
       >
-        {logo && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={logo}
-            width={Math.round(size * 0.64)}
-            height={Math.round(size * 0.64)}
-            style={{ objectFit: "contain" }}
-            alt=""
-          />
-        )}
+        <span style={{ display: "flex", fontSize: Math.round(width * 0.13), fontWeight: 900, color: t.discDark }}>
+          {t.label}
+        </span>
       </div>
     </div>
   );
@@ -261,10 +226,12 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
   const logo = logoDataUri();
   const logo2 = logo2DataUri();
   const GOLD_LOGO_SIZE = 420;
-  // The medal's disc is a full-bleed circle with no internal padding, so
-  // at the same box size it visually reads bigger than the logo (which
-  // has margin baked into its square canvas) -- sized down to match.
-  const MEDAL_SIZE = 330;
+  // Second (right-hand) crest reads ~25% bigger than the primary one.
+  const LOGO2_SIZE = Math.round(GOLD_LOGO_SIZE * 1.25);
+  // Width of the whole medal image (ribbon + disc together); the disc
+  // itself is about 62% of that, so this reads at roughly the same disc
+  // diameter as the logo crest beside it.
+  const MEDAL_WIDTH = 530;
 
   return new ImageResponse(
     (
@@ -310,22 +277,16 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
           />
 
           {isWinner ? (
-            <div style={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
-              <div style={{ display: "flex", width: `${GOLD_LOGO_SIZE}px`, height: `${GOLD_LOGO_SIZE}px`, alignItems: "center", justifyContent: "flex-start" }}>
-                {logo && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={logo} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} alt="" />
-                )}
-              </div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <Medal rank={input.rank!} size={MEDAL_SIZE} />
-              </div>
-              <div style={{ display: "flex", width: `${GOLD_LOGO_SIZE}px`, height: `${GOLD_LOGO_SIZE}px`, alignItems: "center", justifyContent: "flex-end" }}>
-                {logo2 && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={logo2} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} alt="" />
-                )}
-              </div>
+            <div style={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: "22px" }}>
+              {logo && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={logo} width={GOLD_LOGO_SIZE} height={GOLD_LOGO_SIZE} style={{ objectFit: "contain" }} alt="" />
+              )}
+              <Medal rank={input.rank!} width={MEDAL_WIDTH} />
+              {logo2 && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={logo2} width={LOGO2_SIZE} height={LOGO2_SIZE} style={{ objectFit: "contain" }} alt="" />
+              )}
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: "56px" }}>
@@ -335,7 +296,7 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
               )}
               {logo2 && (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={logo2} width={GOLD_LOGO_SIZE} height={GOLD_LOGO_SIZE} style={{ objectFit: "contain" }} alt="" />
+                <img src={logo2} width={LOGO2_SIZE} height={LOGO2_SIZE} style={{ objectFit: "contain" }} alt="" />
               )}
             </div>
           )}
