@@ -139,30 +139,28 @@ function RibbonV({ size }: { size: number }) {
   );
 }
 
-/** A classic two-branch laurel wreath climbing from a tied knot at the
- * bottom pole up around each side to an opening near the top -- like the
- * full laurel-wreath badge/emblem shape (pointed lens-shaped leaves with a
- * center vein, shaded with the medal's own light/mid/dark gradient so it
- * reads as engraved metal rather than a flat color). Mirrored left/right.
- * Positions are plain trigonometry (not SVG rotate groups) since each leaf
- * needs both a different position AND a different own rotation. */
-function laurelArc(cx: number, cy: number, r: number, gradientId: string, outline: string, side: 1 | -1) {
+/** A continuous laurel-leaf ring running the full inner rim of the disc --
+ * like the engraved wreath border on a real medal (a photo of one, not a
+ * standalone wreath badge, is what this now matches): even-sized pointed
+ * leaves all the way around, no top opening, no stars/berries. Mirrored
+ * left/right, meeting near the top and bottom poles. Positions are plain
+ * trigonometry (not SVG rotate groups) since each leaf needs both a
+ * different position AND a different own rotation. */
+function laurelArc(cx: number, cy: number, ringR: number, leafLen: number, gradientId: string, outline: string, side: 1 | -1) {
   const leaves = [];
-  const count = 14;
-  const startDeg = -70;
-  const endDeg = 86;
+  const count = 17;
+  const startDeg = -87;
+  const endDeg = 87;
+  const halfL = leafLen / 2;
+  const bulge = leafLen * 0.15;
   for (let i = 0; i < count; i++) {
     const t = i / (count - 1);
     const deg = startDeg + t * (endDeg - startDeg);
     const rad = (deg * Math.PI) / 180;
-    const branchR = r * (0.74 + t * 0.18);
-    const x = cx + side * branchR * Math.cos(rad);
-    const y = cy + branchR * Math.sin(rad);
-    // Leaves point outward from the branch, angled forward along its curve.
+    const x = cx + side * ringR * Math.cos(rad);
+    const y = cy + ringR * Math.sin(rad);
+    // Leaves point outward from the ring, angled forward along its curve.
     const leafRotate = side === 1 ? -(deg + 30) : deg + 30;
-    const leafLen = r * (0.17 + t * 0.19);
-    const halfL = leafLen / 2;
-    const bulge = leafLen * 0.16;
     leaves.push(
       <g key={`${side}-${i}`} transform={`translate(${x} ${y}) rotate(${leafRotate})`}>
         <path
@@ -185,74 +183,6 @@ function laurelArc(cx: number, cy: number, r: number, gradientId: string, outlin
     );
   }
   return leaves;
-}
-
-function starPoints(cx: number, cy: number, outerR: number, innerR: number): string {
-  const points: string[] = [];
-  for (let i = 0; i < 10; i++) {
-    const angle = ((-90 + i * 36) * Math.PI) / 180;
-    const rad = i % 2 === 0 ? outerR : innerR;
-    points.push(`${cx + rad * Math.cos(angle)},${cy + rad * Math.sin(angle)}`);
-  }
-  return points.join(" ");
-}
-
-/** A small 3-star cluster at the wreath's top opening, like the classic
- * reference badges that mark the gap between the two branches with a
- * bigger center star flanked by two smaller ones. */
-function starCluster(cx: number, cy: number, r: number, color: string, outline: string) {
-  const big = { x: cx, y: cy - r * 0.32, outerR: r * 0.055, innerR: r * 0.021 };
-  const small = { outerR: r * 0.036, innerR: r * 0.014 };
-  return (
-    <g>
-      <polygon
-        points={starPoints(big.x, big.y, big.outerR, big.innerR)}
-        fill={color}
-        stroke={outline}
-        strokeWidth={Math.max(1, r * 0.006)}
-        strokeOpacity={0.5}
-      />
-      <polygon
-        points={starPoints(cx - r * 0.19, cy - r * 0.27, small.outerR, small.innerR)}
-        fill={color}
-        stroke={outline}
-        strokeWidth={Math.max(1, r * 0.005)}
-        strokeOpacity={0.5}
-      />
-      <polygon
-        points={starPoints(cx + r * 0.19, cy - r * 0.27, small.outerR, small.innerR)}
-        fill={color}
-        stroke={outline}
-        strokeWidth={Math.max(1, r * 0.005)}
-        strokeOpacity={0.5}
-      />
-    </g>
-  );
-}
-
-/** A small berry cluster branching off near the base knot, like the
- * classic reference wreaths that pair a couple of round berries with the
- * crossed tie at the bottom. */
-function berryCluster(cx: number, cy: number, r: number, color: string, outline: string, side: 1 | -1) {
-  const berries = [];
-  const stems: Array<[number, number, number]> = [
-    [0.075, -0.045, 0.038],
-    [0.12, 0.015, 0.045],
-    [0.085, 0.085, 0.038],
-  ];
-  for (let i = 0; i < stems.length; i++) {
-    const [dxF, dyF, brF] = stems[i];
-    const bx = cx + side * dxF * r;
-    const by = cy + dyF * r;
-    const br = brF * r;
-    berries.push(
-      <line key={`stem-${side}-${i}`} x1={cx} y1={cy} x2={bx} y2={by} stroke={outline} strokeOpacity={0.6} strokeWidth={1.5} />,
-    );
-    berries.push(
-      <circle key={`berry-${side}-${i}`} cx={bx} cy={by} r={br} fill={color} stroke={outline} strokeWidth={1} strokeOpacity={0.5} />,
-    );
-  }
-  return berries;
 }
 
 function Medal({ rank, size }: { rank: 1 | 2 | 3; size: number }) {
@@ -294,12 +224,8 @@ function Medal({ rank, size }: { rank: 1 | 2 | 3; size: number }) {
             </linearGradient>
           </defs>
           <circle cx={r} cy={r} r={r * 0.82} fill="none" stroke={t.discDark} strokeWidth={Math.max(2, r * 0.02)} opacity={0.55} />
-          {laurelArc(r, r, r * 0.7, "leafGrad", t.discDark, 1)}
-          {laurelArc(r, r, r * 0.7, "leafGrad", t.discDark, -1)}
-          {berryCluster(r, r + r * 0.63, r, t.discMid, t.discDark, 1)}
-          {berryCluster(r, r + r * 0.63, r, t.discMid, t.discDark, -1)}
-          <ellipse cx={r} cy={r + r * 0.67} rx={r * 0.09} ry={r * 0.065} fill={t.discMid} stroke={t.discDark} strokeWidth={Math.max(1, r * 0.02)} strokeOpacity={0.6} />
-          {starCluster(r, r, r, t.discMid, t.discDark)}
+          {laurelArc(r, r, r * 0.76, r * 0.15, "leafGrad", t.discDark, 1)}
+          {laurelArc(r, r, r * 0.76, r * 0.15, "leafGrad", t.discDark, -1)}
         </svg>
       </div>
     </div>
