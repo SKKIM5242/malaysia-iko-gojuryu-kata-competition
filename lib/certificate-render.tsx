@@ -205,8 +205,8 @@ function Medal({ rank, size }: { rank: 1 | 2 | 3; size: number }) {
           style={{ position: "absolute", top: 0, left: 0 }}
         >
           <circle cx={r} cy={r} r={r * 0.82} fill="none" stroke={t.discDark} strokeWidth={Math.max(2, r * 0.02)} opacity={0.55} />
-          {laurelArc(r, r, r * 0.66, t.discDark, 1)}
-          {laurelArc(r, r, r * 0.66, t.discDark, -1)}
+          {laurelArc(r, r, r * 0.66, t.discMid, 1)}
+          {laurelArc(r, r, r * 0.66, t.discMid, -1)}
         </svg>
       </div>
     </div>
