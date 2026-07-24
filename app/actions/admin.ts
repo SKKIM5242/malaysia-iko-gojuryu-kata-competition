@@ -551,11 +551,15 @@ export async function saveCertificateSettings(formData: FormData) {
 
   const signerName = String(formData.get("signer_name") ?? "").trim() || null;
   const signerTitle = String(formData.get("signer_title") ?? "").trim() || null;
+  const signerName2 = String(formData.get("signer_name_2") ?? "").trim() || null;
+  const signerTitle2 = String(formData.get("signer_title_2") ?? "").trim() || null;
   const signaturePath = await uploadBrandingIfPresent(supabase, formData, "signature", "signature", returnTo);
   const stampPath = await uploadBrandingIfPresent(supabase, formData, "stamp", "stamp", returnTo);
 
   const update: Record<string, unknown> = {
-    signer_name: signerName, signer_title: signerTitle, updated_at: new Date().toISOString(),
+    signer_name: signerName, signer_title: signerTitle,
+    signer_name_2: signerName2, signer_title_2: signerTitle2,
+    updated_at: new Date().toISOString(),
   };
   if (signaturePath) update.signature_path = signaturePath;
   if (stampPath) update.stamp_path = stampPath;

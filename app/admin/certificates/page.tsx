@@ -82,6 +82,27 @@ export default async function AdminCertificates({
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
+                  <label htmlFor="signer_name_2" className={adminLabel}>Signer 2 name (optional)</label>
+                  <input
+                    id="signer_name_2" name="signer_name_2" defaultValue={settings?.signer_name_2 ?? ""}
+                    className={adminInput} placeholder="e.g. Sensei Wong Kah Meng"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="signer_title_2" className={adminLabel}>Signer 2 title</label>
+                  <input
+                    id="signer_title_2" name="signer_title_2" defaultValue={settings?.signer_title_2 ?? ""}
+                    className={adminInput} placeholder="e.g. Head Referee"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-neutral-400">
+                Leave Signer 2 blank to show only one signer. When set, it appears bottom-right on every
+                certificate (Winner, Participant, Referee/Judge, Sensei, School/Dojo, Support), using the
+                same signature and stamp images above.
+              </p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
                   <label htmlFor="signature" className={adminLabel}>Signature image</label>
                   <CertificateUploadField id="signature" name="signature" />
                   <div className="mt-1 flex items-center gap-3">

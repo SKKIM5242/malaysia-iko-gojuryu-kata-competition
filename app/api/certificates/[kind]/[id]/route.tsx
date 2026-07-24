@@ -13,7 +13,10 @@ const VALID_KINDS: CertificateKind[] = ["winner", "participant", "referee", "sen
  * — lets Admin/Organizer/Staff see exactly how every certificate kind looks
  * without needing a real qualifying registration/assignment on file yet.
  * Requested via id="sample", gated to managers only (see GET below). */
-const SAMPLE_DATA: Record<CertificateKind, Omit<CertificateInput, "signerName" | "signerTitle" | "signatureUrl" | "stampUrl">> = {
+const SAMPLE_DATA: Record<
+  CertificateKind,
+  Omit<CertificateInput, "signerName" | "signerTitle" | "signerName2" | "signerTitle2" | "signatureUrl" | "stampUrl">
+> = {
   winner: {
     kind: "winner", recipientName: "Jane Doe",
     competitionName: "Malaysia Open Virtual Karate-do Kata Championship 2026 — USD 100 Tier",
@@ -59,6 +62,8 @@ async function certificateSettings(supabase: Awaited<ReturnType<typeof createCli
   return {
     signerName: (data?.signer_name as string | null) ?? null,
     signerTitle: (data?.signer_title as string | null) ?? null,
+    signerName2: (data?.signer_name_2 as string | null) ?? null,
+    signerTitle2: (data?.signer_title_2 as string | null) ?? null,
     signatureUrl,
     stampUrl,
   };

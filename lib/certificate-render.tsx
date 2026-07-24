@@ -21,6 +21,8 @@ export interface CertificateInput {
   dateLabel: string;
   signerName: string | null;
   signerTitle: string | null;
+  signerName2?: string | null;
+  signerTitle2?: string | null;
   signatureUrl: string | null;
   stampUrl: string | null;
 }
@@ -139,42 +141,75 @@ function RibbonV({ size }: { size: number }) {
 
 /** A classic two-branch laurel wreath climbing from a tied knot at the
  * bottom pole up around each side to an opening near the top -- like the
- * full laurel-wreath badge/emblem shape (not just a small engraved sprig).
- * Mirrored left/right, built from slender pointed-leaf shapes along a
- * curved branch. Positions are plain trigonometry (not SVG rotate groups)
- * since each leaf needs both a different position AND a different own
- * rotation. */
-function laurelArc(cx: number, cy: number, r: number, color: string, outline: string, side: 1 | -1) {
+ * full laurel-wreath badge/emblem shape (pointed lens-shaped leaves with a
+ * center vein, shaded with the medal's own light/mid/dark gradient so it
+ * reads as engraved metal rather than a flat color). Mirrored left/right.
+ * Positions are plain trigonometry (not SVG rotate groups) since each leaf
+ * needs both a different position AND a different own rotation. */
+function laurelArc(cx: number, cy: number, r: number, gradientId: string, outline: string, side: 1 | -1) {
   const leaves = [];
-  const count = 13;
-  const startDeg = -68;
-  const endDeg = 84;
+  const count = 14;
+  const startDeg = -70;
+  const endDeg = 86;
   for (let i = 0; i < count; i++) {
     const t = i / (count - 1);
     const deg = startDeg + t * (endDeg - startDeg);
     const rad = (deg * Math.PI) / 180;
-    const branchR = r * (0.76 + t * 0.16);
+    const branchR = r * (0.74 + t * 0.18);
     const x = cx + side * branchR * Math.cos(rad);
     const y = cy + branchR * Math.sin(rad);
     // Leaves point outward from the branch, angled forward along its curve.
-    const leafRotate = side === 1 ? -(deg + 32) : deg + 32;
-    const leafLen = r * (0.15 + t * 0.19);
+    const leafRotate = side === 1 ? -(deg + 30) : deg + 30;
+    const leafLen = r * (0.17 + t * 0.19);
+    const halfL = leafLen / 2;
+    const bulge = leafLen * 0.16;
     leaves.push(
-      <ellipse
-        key={`${side}-${i}`}
-        cx={x}
-        cy={y}
-        rx={leafLen}
-        ry={leafLen * 0.3}
-        fill={color}
-        stroke={outline}
-        strokeWidth={Math.max(1, leafLen * 0.05)}
-        strokeOpacity={0.4}
-        transform={`rotate(${leafRotate} ${x} ${y})`}
-      />,
+      <g key={`${side}-${i}`} transform={`translate(${x} ${y}) rotate(${leafRotate})`}>
+        <path
+          d={`M ${-halfL} 0 Q 0 ${-bulge} ${halfL} 0 Q 0 ${bulge} ${-halfL} 0 Z`}
+          fill={`url(#${gradientId})`}
+          stroke={outline}
+          strokeWidth={Math.max(1, leafLen * 0.045)}
+          strokeOpacity={0.5}
+        />
+        <line
+          x1={-halfL * 0.75}
+          y1={0}
+          x2={halfL * 0.75}
+          y2={0}
+          stroke={outline}
+          strokeOpacity={0.4}
+          strokeWidth={Math.max(1, leafLen * 0.03)}
+        />
+      </g>,
     );
   }
   return leaves;
+}
+
+/** A small berry cluster branching off near the base knot, like the
+ * classic reference wreaths that pair a couple of round berries with the
+ * crossed tie at the bottom. */
+function berryCluster(cx: number, cy: number, r: number, color: string, outline: string, side: 1 | -1) {
+  const berries = [];
+  const stems: Array<[number, number, number]> = [
+    [0.075, -0.045, 0.038],
+    [0.12, 0.015, 0.045],
+    [0.085, 0.085, 0.038],
+  ];
+  for (let i = 0; i < stems.length; i++) {
+    const [dxF, dyF, brF] = stems[i];
+    const bx = cx + side * dxF * r;
+    const by = cy + dyF * r;
+    const br = brF * r;
+    berries.push(
+      <line key={`stem-${side}-${i}`} x1={cx} y1={cy} x2={bx} y2={by} stroke={outline} strokeOpacity={0.6} strokeWidth={1.5} />,
+    );
+    berries.push(
+      <circle key={`berry-${side}-${i}`} cx={bx} cy={by} r={br} fill={color} stroke={outline} strokeWidth={1} strokeOpacity={0.5} />,
+    );
+  }
+  return berries;
 }
 
 function Medal({ rank, size }: { rank: 1 | 2 | 3; size: number }) {
@@ -208,11 +243,77 @@ function Medal({ rank, size }: { rank: 1 | 2 | 3; size: number }) {
           viewBox={`0 0 ${size} ${size}`}
           style={{ position: "absolute", top: 0, left: 0 }}
         >
+          <defs>
+            <linearGradient id="leafGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor={t.discLight} />
+              <stop offset="55%" stopColor={t.discMid} />
+              <stop offset="100%" stopColor={t.discDark} />
+            </linearGradient>
+          </defs>
           <circle cx={r} cy={r} r={r * 0.82} fill="none" stroke={t.discDark} strokeWidth={Math.max(2, r * 0.02)} opacity={0.55} />
-          {laurelArc(r, r, r * 0.7, t.discMid, t.discDark, 1)}
-          {laurelArc(r, r, r * 0.7, t.discMid, t.discDark, -1)}
+          {laurelArc(r, r, r * 0.7, "leafGrad", t.discDark, 1)}
+          {laurelArc(r, r, r * 0.7, "leafGrad", t.discDark, -1)}
+          {berryCluster(r, r + r * 0.63, r, t.discMid, t.discDark, 1)}
+          {berryCluster(r, r + r * 0.63, r, t.discMid, t.discDark, -1)}
           <ellipse cx={r} cy={r + r * 0.67} rx={r * 0.09} ry={r * 0.065} fill={t.discMid} stroke={t.discDark} strokeWidth={Math.max(1, r * 0.02)} strokeOpacity={0.6} />
         </svg>
+      </div>
+    </div>
+  );
+}
+
+/** One signature block: signature image with the stamp overlapping its
+ * trailing edge by ~10% (rather than sitting fully apart), an hr, then the
+ * signer's name/title. Reused for both the primary (center) and second
+ * (bottom-right) signer, at different scales. */
+function SignerBlock({
+  name,
+  title,
+  signatureUrl,
+  stampUrl,
+  sigW,
+  sigH,
+  stampSize,
+  hrWidth,
+}: {
+  name: string | null;
+  title: string | null;
+  signatureUrl: string | null;
+  stampUrl: string | null;
+  sigW: number;
+  sigH: number;
+  stampSize: number;
+  hrWidth: number;
+}) {
+  const overlap = Math.round(sigW * 0.1);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+        {signatureUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={signatureUrl} width={sigW} height={sigH} style={{ objectFit: "contain" }} alt="" />
+        ) : (
+          <div style={{ width: `${sigW}px`, height: `${sigH}px`, display: "flex" }} />
+        )}
+        {stampUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={stampUrl}
+            width={stampSize}
+            height={stampSize}
+            style={{ objectFit: "contain", marginLeft: `-${overlap}px` }}
+            alt=""
+          />
+        )}
+      </div>
+      <div style={{ display: "flex", width: `${hrWidth}px`, borderTop: "3px solid #a8a29e", marginTop: "18px" }} />
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: "12px" }}>
+        <div style={{ display: "flex", fontSize: 28, fontWeight: 700, color: "#1c1917" }}>{name ?? "Organizer"}</div>
+        {title && (
+          <div style={{ display: "flex", fontSize: 22, color: "#57534e", textAlign: "center", maxWidth: `${hrWidth + 60}px` }}>
+            {title}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -399,29 +500,16 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
               position: "relative",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "50px" }}>
-              {input.signatureUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={input.signatureUrl} width={240} height={90} style={{ objectFit: "contain" }} alt="" />
-              ) : (
-                <div style={{ height: "90px", display: "flex" }} />
-              )}
-              {input.stampUrl && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={input.stampUrl} width={140} height={140} style={{ objectFit: "contain" }} alt="" />
-              )}
-            </div>
-            <div style={{ display: "flex", width: "500px", borderTop: "3px solid #a8a29e", marginTop: "18px" }} />
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: "12px" }}>
-              <div style={{ display: "flex", fontSize: 28, fontWeight: 700, color: "#1c1917" }}>
-                {input.signerName ?? "Organizer"}
-              </div>
-              {input.signerTitle && (
-                <div style={{ display: "flex", fontSize: 22, color: "#57534e", textAlign: "center", maxWidth: "560px" }}>
-                  {input.signerTitle}
-                </div>
-              )}
-            </div>
+            <SignerBlock
+              name={input.signerName}
+              title={input.signerTitle}
+              signatureUrl={input.signatureUrl}
+              stampUrl={input.stampUrl}
+              sigW={240}
+              sigH={90}
+              stampSize={140}
+              hrWidth={500}
+            />
 
             <div style={{ position: "absolute", left: 0, bottom: 0, display: "flex" }}>
               <div style={{ display: "flex", flexDirection: "column", width: "380px" }}>
@@ -434,6 +522,21 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
                 </div>
               </div>
             </div>
+
+            {input.signerName2 && (
+              <div style={{ position: "absolute", right: 0, bottom: 0, display: "flex" }}>
+                <SignerBlock
+                  name={input.signerName2}
+                  title={input.signerTitle2 ?? null}
+                  signatureUrl={input.signatureUrl}
+                  stampUrl={input.stampUrl}
+                  sigW={180}
+                  sigH={68}
+                  stampSize={105}
+                  hrWidth={380}
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>
