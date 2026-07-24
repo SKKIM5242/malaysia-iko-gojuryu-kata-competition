@@ -187,6 +187,49 @@ function laurelArc(cx: number, cy: number, r: number, gradientId: string, outlin
   return leaves;
 }
 
+function starPoints(cx: number, cy: number, outerR: number, innerR: number): string {
+  const points: string[] = [];
+  for (let i = 0; i < 10; i++) {
+    const angle = ((-90 + i * 36) * Math.PI) / 180;
+    const rad = i % 2 === 0 ? outerR : innerR;
+    points.push(`${cx + rad * Math.cos(angle)},${cy + rad * Math.sin(angle)}`);
+  }
+  return points.join(" ");
+}
+
+/** A small 3-star cluster at the wreath's top opening, like the classic
+ * reference badges that mark the gap between the two branches with a
+ * bigger center star flanked by two smaller ones. */
+function starCluster(cx: number, cy: number, r: number, color: string, outline: string) {
+  const big = { x: cx, y: cy - r * 0.32, outerR: r * 0.055, innerR: r * 0.021 };
+  const small = { outerR: r * 0.036, innerR: r * 0.014 };
+  return (
+    <g>
+      <polygon
+        points={starPoints(big.x, big.y, big.outerR, big.innerR)}
+        fill={color}
+        stroke={outline}
+        strokeWidth={Math.max(1, r * 0.006)}
+        strokeOpacity={0.5}
+      />
+      <polygon
+        points={starPoints(cx - r * 0.19, cy - r * 0.27, small.outerR, small.innerR)}
+        fill={color}
+        stroke={outline}
+        strokeWidth={Math.max(1, r * 0.005)}
+        strokeOpacity={0.5}
+      />
+      <polygon
+        points={starPoints(cx + r * 0.19, cy - r * 0.27, small.outerR, small.innerR)}
+        fill={color}
+        stroke={outline}
+        strokeWidth={Math.max(1, r * 0.005)}
+        strokeOpacity={0.5}
+      />
+    </g>
+  );
+}
+
 /** A small berry cluster branching off near the base knot, like the
  * classic reference wreaths that pair a couple of round berries with the
  * crossed tie at the bottom. */
@@ -256,6 +299,7 @@ function Medal({ rank, size }: { rank: 1 | 2 | 3; size: number }) {
           {berryCluster(r, r + r * 0.63, r, t.discMid, t.discDark, 1)}
           {berryCluster(r, r + r * 0.63, r, t.discMid, t.discDark, -1)}
           <ellipse cx={r} cy={r + r * 0.67} rx={r * 0.09} ry={r * 0.065} fill={t.discMid} stroke={t.discDark} strokeWidth={Math.max(1, r * 0.02)} strokeOpacity={0.6} />
+          {starCluster(r, r, r, t.discMid, t.discDark)}
         </svg>
       </div>
     </div>
