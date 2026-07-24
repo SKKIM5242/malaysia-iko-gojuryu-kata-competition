@@ -199,19 +199,49 @@ function laurelArc(cx: number, cy: number, ringR: number, leafLen: number, gradi
 /** A stylized, sharp "V" silhouette woven into the base of the leaf
  * pattern, where the two wreath halves meet at the bottom -- the classic
  * "V for Victory" motif seen on Malaysian wreath-medal designs, distinct
- * from (and bolder than) the surrounding leaves. */
+ * from (and bolder than) the surrounding leaves -- framed by its own
+ * ring (a thicker medallion-style band, not the thin leaf-vein strokes). */
 function victoryV(cx: number, cy: number, r: number, color: string) {
   const vertexY = cy + r * 0.85;
   const armY = cy + r * 0.6;
   const armX = r * 0.17;
+  const ringCy = cy + r * 0.725;
+  const ringR = r * 0.24;
   return (
-    <path
-      d={`M ${cx - armX} ${armY} L ${cx} ${vertexY} L ${cx + armX} ${armY}`}
-      fill="none"
-      stroke={color}
-      strokeWidth={Math.max(2, r * 0.055)}
-      strokeLinecap="round"
-      strokeLinejoin="round"
+    <g>
+      <circle cx={cx} cy={ringCy} r={ringR} fill="none" stroke={color} strokeWidth={Math.max(2, r * 0.05)} />
+      <path
+        d={`M ${cx - armX} ${armY} L ${cx} ${vertexY} L ${cx + armX} ${armY}`}
+        fill="none"
+        stroke={color}
+        strokeWidth={Math.max(2, r * 0.055)}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </g>
+  );
+}
+
+function starPoints(cx: number, cy: number, outerR: number, innerR: number): string {
+  const points: string[] = [];
+  for (let i = 0; i < 10; i++) {
+    const angle = ((-90 + i * 36) * Math.PI) / 180;
+    const rad = i % 2 === 0 ? outerR : innerR;
+    points.push(`${cx + rad * Math.cos(angle)},${cy + rad * Math.sin(angle)}`);
+  }
+  return points.join(" ");
+}
+
+/** A single small star filling the ~5% gap left at the top of the wreath
+ * ring, where the two halves don't quite meet. */
+function topStar(cx: number, cy: number, r: number, color: string, outline: string) {
+  return (
+    <polygon
+      points={starPoints(cx, cy - r * 0.76, r * 0.07, r * 0.028)}
+      fill={color}
+      stroke={outline}
+      strokeWidth={Math.max(1, r * 0.008)}
+      strokeOpacity={0.5}
     />
   );
 }
@@ -258,6 +288,7 @@ function Medal({ rank, size }: { rank: 1 | 2 | 3; size: number }) {
           {laurelArc(r, r, r * 0.76, r * 0.15, "leafGrad", t.discDark, 1)}
           {laurelArc(r, r, r * 0.76, r * 0.15, "leafGrad", t.discDark, -1)}
           {victoryV(r, r, r, t.discDark)}
+          {topStar(r, r, r, t.discMid, t.discDark)}
         </svg>
       </div>
     </div>

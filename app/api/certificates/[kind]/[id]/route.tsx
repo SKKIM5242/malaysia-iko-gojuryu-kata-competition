@@ -72,6 +72,11 @@ async function certificateSettings(supabase: Awaited<ReturnType<typeof createCli
 function pngResponse(image: Awaited<ReturnType<typeof renderCertificatePng>>, filename: string) {
   const headers = new Headers(image.headers);
   headers.set("Content-Disposition", `attachment; filename="${filename}"`);
+  // next/og's ImageResponse defaults to a 1-year Cache-Control, which made the
+  // admin Template Preview page (and social-style thumbnails) show stale
+  // designs after every code change. Every certificate here is meant to be
+  // "computed live" (see lib/certificate-render.tsx), so never cache it.
+  headers.set("Cache-Control", "no-store");
   return new Response(image.body, { status: image.status, headers });
 }
 
