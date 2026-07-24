@@ -137,35 +137,39 @@ function RibbonV({ size }: { size: number }) {
   );
 }
 
-/** A classic two-branch laurel wreath wrapping the lower ~2/3 of the disc,
- * mirrored left/right, built from slender pointed-leaf shapes along a
- * curved branch -- like the engraved wreath on a real medal (gold laurel
- * branches, not a full leafy ring). Positions are plain trigonometry (not
- * SVG rotate groups) since each leaf needs both a different position AND
- * a different own rotation. */
-function laurelArc(cx: number, cy: number, r: number, color: string, side: 1 | -1) {
+/** A classic two-branch laurel wreath climbing from a tied knot at the
+ * bottom pole up around each side to an opening near the top -- like the
+ * full laurel-wreath badge/emblem shape (not just a small engraved sprig).
+ * Mirrored left/right, built from slender pointed-leaf shapes along a
+ * curved branch. Positions are plain trigonometry (not SVG rotate groups)
+ * since each leaf needs both a different position AND a different own
+ * rotation. */
+function laurelArc(cx: number, cy: number, r: number, color: string, outline: string, side: 1 | -1) {
   const leaves = [];
-  const count = 9;
-  const startDeg = 4;
-  const endDeg = 96;
+  const count = 13;
+  const startDeg = -68;
+  const endDeg = 84;
   for (let i = 0; i < count; i++) {
     const t = i / (count - 1);
     const deg = startDeg + t * (endDeg - startDeg);
     const rad = (deg * Math.PI) / 180;
-    const branchR = r * (0.92 - t * 0.06);
+    const branchR = r * (0.76 + t * 0.16);
     const x = cx + side * branchR * Math.cos(rad);
     const y = cy + branchR * Math.sin(rad);
     // Leaves point outward from the branch, angled forward along its curve.
-    const leafRotate = side === 1 ? -(deg - 55) : deg - 55;
-    const leafLen = r * (0.3 - t * 0.13);
+    const leafRotate = side === 1 ? -(deg + 32) : deg + 32;
+    const leafLen = r * (0.15 + t * 0.19);
     leaves.push(
       <ellipse
         key={`${side}-${i}`}
         cx={x}
         cy={y}
         rx={leafLen}
-        ry={leafLen * 0.24}
+        ry={leafLen * 0.3}
         fill={color}
+        stroke={outline}
+        strokeWidth={Math.max(1, leafLen * 0.05)}
+        strokeOpacity={0.4}
         transform={`rotate(${leafRotate} ${x} ${y})`}
       />,
     );
@@ -205,8 +209,9 @@ function Medal({ rank, size }: { rank: 1 | 2 | 3; size: number }) {
           style={{ position: "absolute", top: 0, left: 0 }}
         >
           <circle cx={r} cy={r} r={r * 0.82} fill="none" stroke={t.discDark} strokeWidth={Math.max(2, r * 0.02)} opacity={0.55} />
-          {laurelArc(r, r, r * 0.66, t.discMid, 1)}
-          {laurelArc(r, r, r * 0.66, t.discMid, -1)}
+          {laurelArc(r, r, r * 0.7, t.discMid, t.discDark, 1)}
+          {laurelArc(r, r, r * 0.7, t.discMid, t.discDark, -1)}
+          <ellipse cx={r} cy={r + r * 0.67} rx={r * 0.09} ry={r * 0.065} fill={t.discMid} stroke={t.discDark} strokeWidth={Math.max(1, r * 0.02)} strokeOpacity={0.6} />
         </svg>
       </div>
     </div>
