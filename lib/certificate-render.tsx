@@ -137,32 +137,35 @@ function RibbonV({ size }: { size: number }) {
   );
 }
 
-/** A small laurel-leaf arc wrapping the lower half of the disc, mirrored
- * left/right, like the engraved wreath on a real medal. Positions are
- * plain trigonometry (not SVG rotate groups) since each leaf needs both a
- * different position AND a different own rotation. */
+/** A classic two-branch laurel wreath wrapping the lower ~2/3 of the disc,
+ * mirrored left/right, built from slender pointed-leaf shapes along a
+ * curved branch -- like the engraved wreath on a real medal (gold laurel
+ * branches, not a full leafy ring). Positions are plain trigonometry (not
+ * SVG rotate groups) since each leaf needs both a different position AND
+ * a different own rotation. */
 function laurelArc(cx: number, cy: number, r: number, color: string, side: 1 | -1) {
   const leaves = [];
-  const count = 5;
-  const startDeg = 8;
-  const endDeg = 82;
+  const count = 9;
+  const startDeg = 4;
+  const endDeg = 96;
   for (let i = 0; i < count; i++) {
     const t = i / (count - 1);
     const deg = startDeg + t * (endDeg - startDeg);
     const rad = (deg * Math.PI) / 180;
-    const x = cx + side * r * Math.cos(rad);
-    const y = cy + r * Math.sin(rad);
-    const leafRotate = side === 1 ? 90 - deg : -(90 - deg);
-    const leafSize = r * (0.34 - t * 0.1);
+    const branchR = r * (0.92 - t * 0.06);
+    const x = cx + side * branchR * Math.cos(rad);
+    const y = cy + branchR * Math.sin(rad);
+    // Leaves point outward from the branch, angled forward along its curve.
+    const leafRotate = side === 1 ? -(deg - 55) : deg - 55;
+    const leafLen = r * (0.3 - t * 0.13);
     leaves.push(
       <ellipse
         key={`${side}-${i}`}
         cx={x}
         cy={y}
-        rx={leafSize}
-        ry={leafSize * 0.4}
+        rx={leafLen}
+        ry={leafLen * 0.24}
         fill={color}
-        opacity={0.75}
         transform={`rotate(${leafRotate} ${x} ${y})`}
       />,
     );
@@ -215,6 +218,10 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
   const accent = isWinner ? RANK_ACCENT[input.rank!] : ACCENT[input.kind as Exclude<CertificateKind, "winner">];
   const logo = logoDataUri();
   const GOLD_LOGO_SIZE = 420;
+  // The medal's disc is a full-bleed circle with no internal padding, so
+  // at the same box size it visually reads bigger than the logo (which
+  // has margin baked into its square canvas) -- sized down to match.
+  const MEDAL_SIZE = 330;
 
   return new ImageResponse(
     (
@@ -264,12 +271,12 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
               // eslint-disable-next-line @next/next/no-img-element
               <img src={logo} width={GOLD_LOGO_SIZE} height={GOLD_LOGO_SIZE} alt="" />
             )}
-            {isWinner && <Medal rank={input.rank!} size={GOLD_LOGO_SIZE} />}
+            {isWinner && <Medal rank={input.rank!} size={MEDAL_SIZE} />}
           </div>
 
           <div
             style={{
-              marginTop: "20px",
+              marginTop: "6px",
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
