@@ -152,14 +152,15 @@ function RibbonV({ size }: { size: number }) {
 /** A continuous laurel-leaf ring running the full inner rim of the disc --
  * like the engraved wreath border on a real medal (a photo of one, not a
  * standalone wreath badge, is what this now matches): even-sized pointed
- * leaves all the way around, no top opening, no stars/berries. Mirrored
- * left/right, meeting near the top and bottom poles. Positions are plain
- * trigonometry (not SVG rotate groups) since each leaf needs both a
- * different position AND a different own rotation. */
+ * leaves spreading almost all the way to the top, leaving only a small
+ * ~5% gap there, and meeting the V-for-Victory motif at the bottom.
+ * Mirrored left/right. Positions are plain trigonometry (not SVG rotate
+ * groups) since each leaf needs both a different position AND a
+ * different own rotation. */
 function laurelArc(cx: number, cy: number, ringR: number, leafLen: number, gradientId: string, outline: string, side: 1 | -1) {
   const leaves = [];
   const count = 17;
-  const startDeg = -87;
+  const startDeg = -81;
   const endDeg = 87;
   const halfL = leafLen / 2;
   const bulge = leafLen * 0.15;
@@ -542,9 +543,11 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
                   {input.dateLabel}
                 </div>
                 <div style={{ display: "flex", width: "100%", borderTop: "3px solid #a8a29e" }} />
-                <div style={{ marginTop: "8px", display: "flex", fontSize: 26, fontWeight: 600, color: "#78716c" }}>
-                  {input.kind === "winner" ? "Winner Announcement Date" : "Certificate Issue Date"}
-                </div>
+                {input.kind === "winner" && (
+                  <div style={{ marginTop: "8px", display: "flex", fontSize: 26, fontWeight: 600, color: "#78716c" }}>
+                    Winner Announcement Date
+                  </div>
+                )}
               </div>
             </div>
 
