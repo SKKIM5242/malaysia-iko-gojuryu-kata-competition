@@ -93,6 +93,16 @@ function logoDataUri(): string | null {
   return cachedLogo;
 }
 
+let cachedLogo2: string | null | undefined;
+function logo2DataUri(): string | null {
+  // Second org crest (IKO International / All Japan), shown on the right of
+  // every certificate, mirroring the primary crest on the left. Optional --
+  // renders as an empty slot until "IKO International Logo.png" is added to
+  // /public, so the layout doesn't break in the meantime.
+  if (cachedLogo2 === undefined) cachedLogo2 = readAsDataUri("IKO International Logo.png", "image/png");
+  return cachedLogo2;
+}
+
 /** Two ribbon tails fanning out in a wide V from a small clasp/hook on top
  * of the medal — like a single ribbon threaded through that hook, each
  * tail striped red/white/blue running ALONG its own length (three
@@ -293,6 +303,7 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
   const isWinner = input.kind === "winner" && input.rank;
   const accent = isWinner ? RANK_ACCENT[input.rank!] : ACCENT[input.kind as Exclude<CertificateKind, "winner">];
   const logo = logoDataUri();
+  const logo2 = logo2DataUri();
   const GOLD_LOGO_SIZE = 420;
   // The medal's disc is a full-bleed circle with no internal padding, so
   // at the same box size it visually reads bigger than the logo (which
@@ -342,12 +353,22 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
             }}
           />
 
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "56px" }}>
-            {logo && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={logo} width={GOLD_LOGO_SIZE} height={GOLD_LOGO_SIZE} alt="" />
-            )}
-            {isWinner && <Medal rank={input.rank!} size={MEDAL_SIZE} />}
+          <div style={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
+            <div style={{ display: "flex", width: `${GOLD_LOGO_SIZE}px`, height: `${GOLD_LOGO_SIZE}px`, alignItems: "center", justifyContent: "flex-start" }}>
+              {logo && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={logo} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} alt="" />
+              )}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+              {isWinner && <Medal rank={input.rank!} size={MEDAL_SIZE} />}
+            </div>
+            <div style={{ display: "flex", width: `${GOLD_LOGO_SIZE}px`, height: `${GOLD_LOGO_SIZE}px`, alignItems: "center", justifyContent: "flex-end" }}>
+              {logo2 && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={logo2} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} alt="" />
+              )}
+            </div>
           </div>
 
           <div
