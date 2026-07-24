@@ -71,10 +71,10 @@ const RANK_ACCENT: Record<1 | 2 | 3, string> = { 1: "#B8860B", 2: "#64748B", 3: 
 /** Ribbon color is the same red/white/blue for every rank (like a real
  * medal ribbon, e.g. the standard 🥇🥈🥉 icon set) — only the disc color
  * changes with placement. */
-const MEDAL_THEME: Record<1 | 2 | 3, { discLight: string; discMid: string; discDark: string; label: string }> = {
-  1: { discLight: "#FFF1C2", discMid: "#D4AF37", discDark: "#8B6914", label: "1ST" },
-  2: { discLight: "#F5F5F5", discMid: "#C0C0C0", discDark: "#79797F", label: "2ND" },
-  3: { discLight: "#EAC094", discMid: "#CD7F32", discDark: "#7A4A1E", label: "3RD" },
+const MEDAL_THEME: Record<1 | 2 | 3, { discLight: string; discMid: string; discDark: string }> = {
+  1: { discLight: "#FFF1C2", discMid: "#D4AF37", discDark: "#8B6914" },
+  2: { discLight: "#F5F5F5", discMid: "#C0C0C0", discDark: "#79797F" },
+  3: { discLight: "#EAC094", discMid: "#CD7F32", discDark: "#7A4A1E" },
 };
 
 function readAsDataUri(relPath: string, mime: string): string | null {
@@ -91,6 +91,17 @@ function logoDataUri(): string | null {
   // Square crest (not the wider logo.jpg banner) so a circular crop doesn't clip it.
   if (cachedLogo === undefined) cachedLogo = readAsDataUri("M Logo 400x400px.png", "image/png");
   return cachedLogo;
+}
+
+let cachedLogoTransparent: string | null | undefined;
+function logoTransparentDataUri(): string | null {
+  // Same crest with a transparent background (not white) -- used inside the
+  // medal disc so it reads as embossed on the metal instead of a white
+  // sticker patch.
+  if (cachedLogoTransparent === undefined) {
+    cachedLogoTransparent = readAsDataUri("M Logo 400x400px Transparent.png", "image/png");
+  }
+  return cachedLogoTransparent;
 }
 
 let cachedLogo2: string | null | undefined;
@@ -149,147 +160,39 @@ function RibbonV({ size }: { size: number }) {
   );
 }
 
-/** A continuous laurel-leaf ring running the full inner rim of the disc --
- * like the engraved wreath border on a real medal (a photo of one, not a
- * standalone wreath badge, is what this now matches): even-sized pointed
- * leaves spreading almost all the way to the top, leaving only a small
- * ~5% gap there, and meeting the V-for-Victory motif at the bottom.
- * Mirrored left/right. Positions are plain trigonometry (not SVG rotate
- * groups) since each leaf needs both a different position AND a
- * different own rotation. */
-function laurelArc(cx: number, cy: number, ringR: number, leafLen: number, gradientId: string, outline: string, side: 1 | -1) {
-  const leaves = [];
-  const count = 17;
-  const startDeg = -81;
-  const endDeg = 87;
-  const halfL = leafLen / 2;
-  const bulge = leafLen * 0.15;
-  for (let i = 0; i < count; i++) {
-    const t = i / (count - 1);
-    const deg = startDeg + t * (endDeg - startDeg);
-    const rad = (deg * Math.PI) / 180;
-    const x = cx + side * ringR * Math.cos(rad);
-    const y = cy + ringR * Math.sin(rad);
-    // Leaves point outward from the ring, angled forward along its curve.
-    const leafRotate = side === 1 ? -(deg + 30) : deg + 30;
-    leaves.push(
-      <g key={`${side}-${i}`} transform={`translate(${x} ${y}) rotate(${leafRotate})`}>
-        <path
-          d={`M ${-halfL} 0 Q 0 ${-bulge} ${halfL} 0 Q 0 ${bulge} ${-halfL} 0 Z`}
-          fill={`url(#${gradientId})`}
-          stroke={outline}
-          strokeWidth={Math.max(1, leafLen * 0.045)}
-          strokeOpacity={0.5}
-        />
-        <line
-          x1={-halfL * 0.75}
-          y1={0}
-          x2={halfL * 0.75}
-          y2={0}
-          stroke={outline}
-          strokeOpacity={0.4}
-          strokeWidth={Math.max(1, leafLen * 0.03)}
-        />
-      </g>,
-    );
-  }
-  return leaves;
-}
-
-/** A stylized, sharp "V" silhouette woven into the base of the leaf
- * pattern, where the two wreath halves meet at the bottom -- the classic
- * "V for Victory" motif seen on Malaysian wreath-medal designs, distinct
- * from (and bolder than) the surrounding leaves -- framed by its own
- * ring (a thicker medallion-style band, not the thin leaf-vein strokes). */
-function victoryV(cx: number, cy: number, r: number, color: string) {
-  const vertexY = cy + r * 0.85;
-  const armY = cy + r * 0.6;
-  const armX = r * 0.17;
-  const ringCy = cy + r * 0.725;
-  const ringR = r * 0.24;
-  return (
-    <g>
-      <circle cx={cx} cy={ringCy} r={ringR} fill="none" stroke={color} strokeWidth={Math.max(2, r * 0.05)} />
-      <path
-        d={`M ${cx - armX} ${armY} L ${cx} ${vertexY} L ${cx + armX} ${armY}`}
-        fill="none"
-        stroke={color}
-        strokeWidth={Math.max(2, r * 0.055)}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </g>
-  );
-}
-
-function starPoints(cx: number, cy: number, outerR: number, innerR: number): string {
-  const points: string[] = [];
-  for (let i = 0; i < 10; i++) {
-    const angle = ((-90 + i * 36) * Math.PI) / 180;
-    const rad = i % 2 === 0 ? outerR : innerR;
-    points.push(`${cx + rad * Math.cos(angle)},${cy + rad * Math.sin(angle)}`);
-  }
-  return points.join(" ");
-}
-
-/** A single small star filling the ~5% gap left at the top of the wreath
- * ring, where the two halves don't quite meet. */
-function topStar(cx: number, cy: number, r: number, color: string, outline: string) {
-  return (
-    <polygon
-      points={starPoints(cx, cy - r * 0.76, r * 0.07, r * 0.028)}
-      fill={color}
-      stroke={outline}
-      strokeWidth={Math.max(1, r * 0.008)}
-      strokeOpacity={0.5}
-    />
-  );
-}
-
+/** The medal disc, with the Malaysia IKO crest embossed in the center
+ * (in place of a rank number or an engraved wreath) -- like a real medal's
+ * flat "custom insert" center stage, just holding the org's own logo. */
 function Medal({ rank, size }: { rank: 1 | 2 | 3; size: number }) {
   const t = MEDAL_THEME[rank];
-  const r = size / 2;
+  const logo = logoTransparentDataUri();
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
       <div style={{ display: "flex", marginBottom: `-${Math.round(size * 0.185)}px` }}>
         <RibbonV size={size} />
       </div>
-      <div style={{ display: "flex", position: "relative", width: size, height: size }}>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: size,
-            height: size,
-            borderRadius: "999px",
-            backgroundImage: `radial-gradient(circle at 32% 28%, ${t.discLight}, ${t.discMid} 55%, ${t.discDark} 100%)`,
-            border: `${Math.round(size * 0.045)}px solid ${t.discDark}`,
-          }}
-        >
-          <span style={{ display: "flex", fontSize: Math.round(size * 0.24), fontWeight: 900, color: "#ffffff" }}>
-            {t.label}
-          </span>
-        </div>
-        <svg
-          width={size}
-          height={size}
-          viewBox={`0 0 ${size} ${size}`}
-          style={{ position: "absolute", top: 0, left: 0 }}
-        >
-          <defs>
-            <linearGradient id="leafGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor={t.discLight} />
-              <stop offset="55%" stopColor={t.discMid} />
-              <stop offset="100%" stopColor={t.discDark} />
-            </linearGradient>
-          </defs>
-          <circle cx={r} cy={r} r={r * 0.82} fill="none" stroke={t.discDark} strokeWidth={Math.max(2, r * 0.02)} opacity={0.55} />
-          {laurelArc(r, r, r * 0.76, r * 0.15, "leafGrad", t.discDark, 1)}
-          {laurelArc(r, r, r * 0.76, r * 0.15, "leafGrad", t.discDark, -1)}
-          {victoryV(r, r, r, t.discDark)}
-          {topStar(r, r, r, t.discMid, t.discDark)}
-        </svg>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: size,
+          height: size,
+          borderRadius: "999px",
+          backgroundImage: `radial-gradient(circle at 32% 28%, ${t.discLight}, ${t.discMid} 55%, ${t.discDark} 100%)`,
+          border: `${Math.round(size * 0.045)}px solid ${t.discDark}`,
+        }}
+      >
+        {logo && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={logo}
+            width={Math.round(size * 0.64)}
+            height={Math.round(size * 0.64)}
+            style={{ objectFit: "contain" }}
+            alt=""
+          />
+        )}
       </div>
     </div>
   );
