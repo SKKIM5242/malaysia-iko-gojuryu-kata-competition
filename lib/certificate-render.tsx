@@ -195,6 +195,26 @@ function laurelArc(cx: number, cy: number, ringR: number, leafLen: number, gradi
   return leaves;
 }
 
+/** A stylized, sharp "V" silhouette woven into the base of the leaf
+ * pattern, where the two wreath halves meet at the bottom -- the classic
+ * "V for Victory" motif seen on Malaysian wreath-medal designs, distinct
+ * from (and bolder than) the surrounding leaves. */
+function victoryV(cx: number, cy: number, r: number, color: string) {
+  const vertexY = cy + r * 0.85;
+  const armY = cy + r * 0.6;
+  const armX = r * 0.17;
+  return (
+    <path
+      d={`M ${cx - armX} ${armY} L ${cx} ${vertexY} L ${cx + armX} ${armY}`}
+      fill="none"
+      stroke={color}
+      strokeWidth={Math.max(2, r * 0.055)}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  );
+}
+
 function Medal({ rank, size }: { rank: 1 | 2 | 3; size: number }) {
   const t = MEDAL_THEME[rank];
   const r = size / 2;
@@ -236,6 +256,7 @@ function Medal({ rank, size }: { rank: 1 | 2 | 3; size: number }) {
           <circle cx={r} cy={r} r={r * 0.82} fill="none" stroke={t.discDark} strokeWidth={Math.max(2, r * 0.02)} opacity={0.55} />
           {laurelArc(r, r, r * 0.76, r * 0.15, "leafGrad", t.discDark, 1)}
           {laurelArc(r, r, r * 0.76, r * 0.15, "leafGrad", t.discDark, -1)}
+          {victoryV(r, r, r, t.discDark)}
         </svg>
       </div>
     </div>
@@ -353,23 +374,36 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
             }}
           />
 
-          <div style={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
-            <div style={{ display: "flex", width: `${GOLD_LOGO_SIZE}px`, height: `${GOLD_LOGO_SIZE}px`, alignItems: "center", justifyContent: "flex-start" }}>
+          {isWinner ? (
+            <div style={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
+              <div style={{ display: "flex", width: `${GOLD_LOGO_SIZE}px`, height: `${GOLD_LOGO_SIZE}px`, alignItems: "center", justifyContent: "flex-start" }}>
+                {logo && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={logo} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} alt="" />
+                )}
+              </div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Medal rank={input.rank!} size={MEDAL_SIZE} />
+              </div>
+              <div style={{ display: "flex", width: `${GOLD_LOGO_SIZE}px`, height: `${GOLD_LOGO_SIZE}px`, alignItems: "center", justifyContent: "flex-end" }}>
+                {logo2 && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={logo2} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} alt="" />
+                )}
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: "56px" }}>
               {logo && (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={logo} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} alt="" />
+                <img src={logo} width={GOLD_LOGO_SIZE} height={GOLD_LOGO_SIZE} style={{ objectFit: "contain" }} alt="" />
               )}
-            </div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
-              {isWinner && <Medal rank={input.rank!} size={MEDAL_SIZE} />}
-            </div>
-            <div style={{ display: "flex", width: `${GOLD_LOGO_SIZE}px`, height: `${GOLD_LOGO_SIZE}px`, alignItems: "center", justifyContent: "flex-end" }}>
               {logo2 && (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={logo2} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} alt="" />
+                <img src={logo2} width={GOLD_LOGO_SIZE} height={GOLD_LOGO_SIZE} style={{ objectFit: "contain" }} alt="" />
               )}
             </div>
-          </div>
+          )}
 
           <div
             style={{
