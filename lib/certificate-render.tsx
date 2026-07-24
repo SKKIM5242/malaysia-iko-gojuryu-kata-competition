@@ -163,10 +163,16 @@ function Medal({ rank, width }: { rank: 1 | 2 | 3; width: number }) {
   );
 }
 
+/** Shared height for every footer column's "top" zone (signature+stamp
+ * images, or the date number) -- bottom-anchored within it, so the hr line
+ * that follows sits at the exact same y for the date and both signers,
+ * regardless of how tall each column's own top content actually is. */
+const FOOTER_TOP_H = 140;
+
 /** One signature block: signature image with the stamp overlapping its
  * trailing edge by ~10% (rather than sitting fully apart), an hr, then the
- * signer's name/title. Reused for both the primary (center) and second
- * (bottom-right) signer, at different scales. */
+ * signer's name/title. Reused for both the primary and second signer, at
+ * different scales. */
 function SignerBlock({
   name,
   title,
@@ -189,7 +195,7 @@ function SignerBlock({
   const overlap = Math.round(sigW * 0.1);
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ display: "flex", height: `${FOOTER_TOP_H}px`, alignItems: "flex-end", justifyContent: "center" }}>
         {signatureUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={signatureUrl} width={sigW} height={sigH} style={{ objectFit: "contain" }} alt="" />
@@ -215,6 +221,22 @@ function SignerBlock({
             {title}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+/** The date column: mirrors SignerBlock's structure (fixed-height top
+ * zone, hr, caption below) so its hr lines up with both signers'. */
+function DateBlock({ dateLabel, caption, width }: { dateLabel: string; caption: string; width: number }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: `${width}px` }}>
+      <div style={{ display: "flex", height: `${FOOTER_TOP_H}px`, alignItems: "flex-end", justifyContent: "center" }}>
+        <div style={{ display: "flex", fontSize: 55, fontWeight: 800, color: "#44403c" }}>{dateLabel}</div>
+      </div>
+      <div style={{ display: "flex", width: "100%", borderTop: "3px solid #a8a29e", marginTop: "18px" }} />
+      <div style={{ marginTop: "12px", display: "flex", fontSize: 33, fontWeight: 600, color: "#78716c" }}>
+        {caption}
       </div>
     </div>
   );
@@ -415,12 +437,19 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
             style={{
               marginTop: "auto",
               display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
+              flexDirection: "row",
+              alignItems: "flex-start",
+              justifyContent: "space-between",
               width: "100%",
-              position: "relative",
+              paddingRight: "16%",
             }}
           >
+            <DateBlock
+              dateLabel={input.dateLabel}
+              caption={input.kind === "winner" ? "Winner Announcement Date" : "Announcement Date"}
+              width={380}
+            />
+
             <SignerBlock
               name={input.signerName}
               title={input.signerTitle}
@@ -432,33 +461,17 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
               hrWidth={500}
             />
 
-            <div style={{ position: "absolute", left: 0, bottom: 0, display: "flex" }}>
-              <div style={{ display: "flex", flexDirection: "column", width: "380px" }}>
-                <div style={{ display: "flex", fontSize: 44, fontWeight: 800, color: "#44403c", paddingBottom: "10px" }}>
-                  {input.dateLabel}
-                </div>
-                <div style={{ display: "flex", width: "100%", borderTop: "3px solid #a8a29e" }} />
-                {input.kind === "winner" && (
-                  <div style={{ marginTop: "8px", display: "flex", fontSize: 26, fontWeight: 600, color: "#78716c" }}>
-                    Winner Announcement Date
-                  </div>
-                )}
-              </div>
-            </div>
-
             {input.signerName2 && (
-              <div style={{ position: "absolute", right: 0, bottom: 0, display: "flex" }}>
-                <SignerBlock
-                  name={input.signerName2}
-                  title={input.signerTitle2 ?? null}
-                  signatureUrl={input.signatureUrl}
-                  stampUrl={input.stampUrl}
-                  sigW={180}
-                  sigH={68}
-                  stampSize={105}
-                  hrWidth={380}
-                />
-              </div>
+              <SignerBlock
+                name={input.signerName2}
+                title={input.signerTitle2 ?? null}
+                signatureUrl={input.signatureUrl}
+                stampUrl={input.stampUrl}
+                sigW={220}
+                sigH={84}
+                stampSize={130}
+                hrWidth={460}
+              />
             )}
           </div>
         </div>
