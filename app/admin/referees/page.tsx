@@ -224,7 +224,10 @@ export default async function AdminReferees({
                     <input id="bank_name" name="bank_name" required defaultValue={editing?.bank_name ?? ""} className={adminInput} />
                   </div>
                   <div>
-                    <label htmlFor="bank_account_no" className={adminLabel}>International Bank Account No. (IBAN) *</label>
+                    <label htmlFor="bank_account_no" className={adminLabel}>
+                      <span className="block font-normal text-neutral-500">For Malaysian only - Local Bank Account No.*</span>
+                      International Bank Account No. (IBAN/SWIFT/BIC/ACH)*
+                    </label>
                     <IbanInput id="bank_account_no" name="bank_account_no" required defaultValue={editing?.bank_account_no ?? ""} className={adminInput} />
                   </div>
                   <div className="sm:col-span-2">
@@ -469,7 +472,7 @@ export default async function AdminReferees({
               firstColumnWidth={56}
               columns={[
                 { key: "no", label: "No." },
-                { key: "content", label: "Terms & Conditions" },
+                { key: "content", label: "Terms & Conditions", width: 600, wrap: true },
                 { key: "actions", label: "Actions" },
               ]}
               csvColumns={[

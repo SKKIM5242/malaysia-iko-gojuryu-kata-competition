@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { writeAudit } from "@/lib/audit";
 import { kataBaseOf, ageAt } from "@/lib/division";
-import { notifyRefereeAssignment, sendConfirmationEmail, notifyAnnouncementPublished } from "@/lib/notify";
+import { notifyRefereeAssignment, notifyRefereeUnassigned, sendConfirmationEmail, notifyAnnouncementPublished, notifyCertificatesPublished, notifyInvitationCodeIssued } from "@/lib/notify";
 import type { PaymentStatus } from "@/lib/types";
 import { parseCsvWithHeader, parseDDMMYYYY, type CsvUploadResult } from "@/lib/csv-bulk";
 import { normalizeIban } from "@/lib/bank";
@@ -131,7 +131,12 @@ async function requireJudgingManager(
 
 function backTo(path: string, params: Record<string, string>) {
   const q = new URLSearchParams(params).toString();
-  redirect(`${path}${q ? `?${q}` : ""}`);
+  // path can itself already carry a query string (e.g. "/admin/schools?edit=…"
+  // from generateRecordInvitationCode, so the redirect lands back on the same
+  // record's edit view instead of the bare list) — append with "&" in that
+  // case instead of blindly using "?" twice, which would corrupt the URL.
+  const separator = path.includes("?") ? "&" : "?";
+  redirect(`${path}${q ? `${separator}${q}` : ""}`);
 }
 
 /** Uploads an optional "certificate" file field to the private bucket; returns
@@ -285,7 +290,10 @@ export async function publishWinnersNow(formData: FormData) {
 
   const today = new Date().toISOString().slice(0, 10);
   const { data: before } = await supabase
-    .from("competitions").select("name, winners_announce_date").eq("id", competitionId).maybeSingle();
+    .from("competitions")
+    .select("name, winners_announce_date, certificates_notified_at")
+    .eq("id", competitionId)
+    .maybeSingle();
   if (!before) backTo(returnTo, { error: "Competition not found." });
 
   const { error } = await supabase
@@ -297,8 +305,77 @@ export async function publishWinnersNow(formData: FormData) {
     old_value: { winners_announce_date: before!.winners_announce_date }, new_value: { winners_announce_date: today },
     actor_id: actorId,
   });
+
+  // Best-effort — publish already succeeded regardless of whether this
+  // notice goes out. certificates_notified_at guards it from firing twice
+  // if the automatic cron reveal (judging-timeline route) later notices
+  // the same competition is now revealed.
+  if (!before!.certificates_notified_at) {
+    try {
+      await notifyCertificatesPublished(before!.name, await paidParticipantRecipients(supabase, competitionId));
+      await supabase
+        .from("competitions")
+        .update({ certificates_notified_at: new Date().toISOString() })
+        .eq("id", competitionId);
+    } catch {
+      // Best-effort — the publish itself already succeeded regardless.
+    }
+  }
+
   revalidatePath("/");
   backTo(returnTo, { ok: `Winners published for “${before!.name}” -- live on the public Winners page and certificates now.` });
+}
+
+/**
+ * Sets the date printed on every certificate for a tier (see
+ * lib/certificate-render.tsx's dateLabel and certificate_date in
+ * app/api/certificates/[kind]/[id]/route.tsx) — independent of publishing,
+ * so the organizer can set or correct it before or after the tier is live.
+ * Blank clears it back to falling through to event_date.
+ */
+export async function saveCertificateDate(formData: FormData) {
+  const competitionId = String(formData.get("competition_id") ?? "");
+  const certificateDate = String(formData.get("certificate_date") ?? "").trim() || null;
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/certificates";
+  const { supabase, actorId } = await getActor();
+  await requireCompetitionManager(supabase, actorId, returnTo);
+
+  const { data: before } = await supabase
+    .from("competitions")
+    .select("name, certificate_date")
+    .eq("id", competitionId)
+    .maybeSingle();
+  if (!before) backTo(returnTo, { error: "Competition not found." });
+
+  const { error } = await supabase
+    .from("competitions").update({ certificate_date: certificateDate }).eq("id", competitionId);
+  if (error) backTo(returnTo, { error: "Could not save the certificate date." });
+
+  await writeAudit(supabase, {
+    table_name: "competitions", record_id: competitionId, action: "certificate_date_changed",
+    old_value: { certificate_date: before!.certificate_date }, new_value: { certificate_date: certificateDate },
+    actor_id: actorId,
+  });
+
+  backTo(returnTo, { ok: `Certificate date saved for “${before!.name}”.` });
+}
+
+/** Every paid participant's name + email for a competition — the audience
+ * for notifyCertificatesPublished (see lib/notify.ts), shared by
+ * publishWinnersNow above and the automatic reveal in
+ * app/api/cron/judging-timeline/route.ts. */
+async function paidParticipantRecipients(
+  supabase: Awaited<ReturnType<typeof createClient>> | ReturnType<typeof createAdminClient>,
+  competitionId: string,
+) {
+  const { data: regs } = await supabase
+    .from("registrations")
+    .select("participant:participants(full_name, email)")
+    .eq("competition_id", competitionId)
+    .eq("payment_status", "paid");
+  return ((regs ?? []) as unknown as Array<{ participant: { full_name: string; email: string | null } | null }>)
+    .filter((r) => r.participant)
+    .map((r) => ({ name: r.participant!.full_name, email: r.participant!.email }));
 }
 
 // ── Categories ───────────────────────────────────────────────────────────────
@@ -1226,6 +1303,9 @@ export async function createInvitationCode(formData: FormData) {
     table_name: "invitation_codes", record_id: data!.id, action: "invitation_code_created",
     new_value: fields, actor_id: actorId,
   });
+  // Best-effort — the code itself already exists regardless of whether this
+  // notice goes out.
+  await notifyInvitationCodeIssued({ email: fields.email, role: fields.role, code: fields.code }).catch(() => {});
   backTo(returnTo, { ok: `Invitation code created: ${fields.code}` });
 }
 
@@ -1623,12 +1703,72 @@ export async function bulkUploadAutoAssignTerms(_prev: CsvUploadResult, formData
 
 const RECORD_CODE_TABLES: Record<string, string> = { school: "schools", sensei: "senseis" };
 
+/** Lenient partial-save of a School/Sensei record's other editable fields
+ * (everything except file uploads) — used only by
+ * generateRecordInvitationCode below, so clicking Generate/Regenerate
+ * personal code never discards whatever the organizer already typed
+ * elsewhere on the same shared form (e.g. Bank Details still mid-entry)
+ * before they've clicked the real Save button. Unlike saveSchool/
+ * saveSensei, nothing here is rejected for being blank — this is a draft,
+ * not the final save; `name` is left untouched (undefined, so Supabase
+ * drops it from the update) if blank, so a cleared name can never
+ * accidentally wipe the record. */
+function draftRecordFields(role: string, formData: FormData): Record<string, unknown> | null {
+  const str = (key: string) => String(formData.get(key) ?? "").trim() || null;
+  const name = String(formData.get("name") ?? "").trim() || undefined;
+  const iban = normalizeIban(String(formData.get("bank_account_no") ?? "")) || null;
+  const shared = {
+    home_address: str("home_address"),
+    city_town: str("city_town"),
+    postcode: str("postcode"),
+    home_country: str("home_country"),
+    email: str("email"),
+    phone: str("phone"),
+    bank_name: str("bank_name"),
+    bank_account_no: iban,
+    bank_account_name: str("bank_account_name"),
+    referral_source: str("referral_source"),
+  };
+  if (role === "school") {
+    const contact_title = str("contact_title");
+    return {
+      name, ...shared,
+      state: str("state"),
+      contact_title,
+      contact_name: str("contact_name"),
+      contact_karate_title: str("contact_karate_title"),
+      contact_rank: str("contact_rank"),
+      gender: contact_title === "Mr." ? "male" : contact_title === "Ms." ? "female" : undefined,
+    };
+  }
+  if (role === "sensei") {
+    return {
+      name, ...shared,
+      ic_passport: str("ic_passport"),
+      date_of_birth: str("date_of_birth"),
+      rank: str("rank"),
+      gender: str("gender"),
+      school_id: str("school_id"),
+    };
+  }
+  return null;
+}
+
 /** Generates a personal, single-use invitation code for one already-saved
  * School/Sensei record, bound to that record's own email (only that email
  * can redeem it) — auto-recorded onto the record's own invitation_code
  * column so it stays visible without having to look it up separately. This
  * is additive to createInvitationCode's generic shared codes above, not a
- * replacement for them. */
+ * replacement for them.
+ *
+ * Competition Tier / Valid from / Valid until / Sign-in limit are required
+ * here (validated server-side, not via HTML `required`, since this button
+ * shares its form with Save changes via `formAction` + `formNoValidate` —
+ * the other fields on that form must NOT block this submission). max_uses
+ * stays fixed at 1: the code is single-use for creating the login itself;
+ * ongoing sign-in access after that is governed entirely by Valid from/
+ * until and Sign-in limit, copied onto the resulting profile at signup
+ * (see handle_new_user). */
 export async function generateRecordInvitationCode(formData: FormData) {
   const role = String(formData.get("role") ?? "");
   const id = String(formData.get("id") ?? "");
@@ -1636,7 +1776,21 @@ export async function generateRecordInvitationCode(formData: FormData) {
   const table = RECORD_CODE_TABLES[role];
   if (!table || !id) backTo(returnTo, { error: "Invalid request." });
 
+  const competitionId = String(formData.get("pic_competition_id") ?? "").trim();
+  const validFrom = String(formData.get("pic_valid_from") ?? "").trim();
+  const validUntil = String(formData.get("pic_valid_until") ?? "").trim();
+  const signInLimitRaw = String(formData.get("pic_sign_in_limit") ?? "").trim();
+  if (!competitionId || !validFrom || !validUntil || !signInLimitRaw || Number(signInLimitRaw) < 1) {
+    backTo(returnTo, {
+      error: "Competition Tier, Valid from, Valid until, and Sign-in limit are all required to generate a personal code.",
+    });
+  }
+
   const { supabase, actorId } = await getActor();
+
+  const draft = draftRecordFields(role, formData);
+  if (draft) await supabase.from(table).update(draft).eq("id", id);
+
   const { data: record } = await supabase.from(table).select("email").eq("id", id).maybeSingle();
   if (!record?.email) {
     backTo(returnTo, { error: "This record needs an email address before a code can be generated." });
@@ -1652,6 +1806,8 @@ export async function generateRecordInvitationCode(formData: FormData) {
     .from("invitation_codes")
     .insert({
       code, role, email: record!.email, max_uses: 1, generated_by, for_record_id: id,
+      competition_id: competitionId, valid_from: validFrom, valid_until: validUntil,
+      sign_in_limit: Number(signInLimitRaw),
       note: `Personal code for ${role} record ${id.slice(0, 8).toUpperCase()}`,
     })
     .select("id")
@@ -1661,7 +1817,12 @@ export async function generateRecordInvitationCode(formData: FormData) {
   await supabase.from(table).update({ invitation_code: code }).eq("id", id);
   await writeAudit(supabase, {
     table_name: "invitation_codes", record_id: inserted!.id, action: "invitation_code_created",
-    new_value: { code, role, email: record!.email, for_table: table, for_id: id }, actor_id: actorId,
+    new_value: {
+      code, role, email: record!.email, competition_id: competitionId,
+      valid_from: validFrom, valid_until: validUntil, sign_in_limit: Number(signInLimitRaw),
+      for_table: table, for_id: id,
+    },
+    actor_id: actorId,
   });
   backTo(returnTo, { ok: `Invitation code generated: ${code}` });
 }
@@ -1680,6 +1841,38 @@ export async function toggleInvitationCode(formData: FormData) {
   backTo(returnTo, { ok: "Invitation code updated." });
 }
 
+/** Looks up what any referee/video notification needs — shared by both the
+ * assignment and unassignment notices below. */
+async function refereeVideoNotice(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  videoId: string,
+  refereeUserId: string,
+) {
+  const [{ data: referee }, { data: video }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("full_name, email, telegram_chat_id")
+      .eq("user_id", refereeUserId)
+      .maybeSingle(),
+    supabase
+      .from("kata_videos")
+      .select("participant:participants(full_name), registration:registrations(category:categories(name))")
+      .eq("id", videoId)
+      .maybeSingle(),
+  ]);
+  const v = video as unknown as {
+    participant: { full_name: string } | null;
+    registration: { category: { name: string } | null } | null;
+  } | null;
+  return {
+    refereeEmail: referee?.email ?? null,
+    refereeName: referee?.full_name ?? null,
+    refereeTelegramChatId: referee?.telegram_chat_id ?? null,
+    participantName: v?.participant?.full_name ?? "a participant",
+    categoryName: v?.registration?.category?.name ?? null,
+  };
+}
+
 /** Fetches what the notification needs and fires it off (best-effort — never
  * throws, so a notification hiccup can't undo a successful assignment). */
 async function notifyVideoAssignment(
@@ -1688,31 +1881,24 @@ async function notifyVideoAssignment(
   refereeUserId: string,
 ) {
   try {
-    const [{ data: referee }, { data: video }] = await Promise.all([
-      supabase
-        .from("profiles")
-        .select("full_name, email, telegram_chat_id")
-        .eq("user_id", refereeUserId)
-        .maybeSingle(),
-      supabase
-        .from("kata_videos")
-        .select("participant:participants(full_name), registration:registrations(category:categories(name))")
-        .eq("id", videoId)
-        .maybeSingle(),
-    ]);
-    const v = video as unknown as {
-      participant: { full_name: string } | null;
-      registration: { category: { name: string } | null } | null;
-    } | null;
-    await notifyRefereeAssignment({
-      refereeEmail: referee?.email ?? null,
-      refereeName: referee?.full_name ?? null,
-      refereeTelegramChatId: referee?.telegram_chat_id ?? null,
-      participantName: v?.participant?.full_name ?? "a participant",
-      categoryName: v?.registration?.category?.name ?? null,
-    });
+    await notifyRefereeAssignment(await refereeVideoNotice(supabase, videoId, refereeUserId));
   } catch {
     // Best-effort — assignment already succeeded regardless.
+  }
+}
+
+/** Same lookup as notifyVideoAssignment, for the referee losing the
+ * assignment instead — fired by unassignRefereeFromVideo. Best-effort —
+ * never throws, so a notification hiccup can't undo a successful removal. */
+async function notifyVideoUnassignment(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  videoId: string,
+  refereeUserId: string,
+) {
+  try {
+    await notifyRefereeUnassigned(await refereeVideoNotice(supabase, videoId, refereeUserId));
+  } catch {
+    // Best-effort — removal already succeeded regardless.
   }
 }
 
@@ -1759,6 +1945,7 @@ export async function unassignRefereeFromVideo(formData: FormData) {
     table_name: "referee_assignments", record_id: videoId,
     action: "referee_unassigned", new_value: { referee_user_id: refereeUserId }, actor_id: actorId,
   });
+  await notifyVideoUnassignment(supabase, videoId, refereeUserId);
   backTo(returnTo, { ok: "Referee removed." });
 }
 

@@ -24,9 +24,15 @@ async function participantLinks(
 
   const rankings = await computeCategoryRankings(supabase, reg.competition_id as string);
   const isWinner = [...rankings.values()].flat().some((e) => e.registrationId === registrationId);
+  const participationLink = {
+    label: `Certificate of Participation — ${competition.name}`,
+    href: `/api/certificates/participant/${registrationId}`,
+  };
+  // Winners get both — the achievement certificate on top of, not instead
+  // of, the same participation certificate every other paid entrant gets.
   return isWinner
-    ? [{ label: `Winner Certificate — ${competition.name}`, href: `/api/certificates/winner/${registrationId}` }]
-    : [{ label: `Certificate of Participation — ${competition.name}`, href: `/api/certificates/participant/${registrationId}` }];
+    ? [{ label: `Winner Certificate — ${competition.name}`, href: `/api/certificates/winner/${registrationId}` }, participationLink]
+    : [participationLink];
 }
 
 async function refereeLinks(supabase: Awaited<ReturnType<typeof createClient>>, userId: string): Promise<CertLink[]> {
@@ -86,6 +92,23 @@ async function roleRecordLinks(
     }));
 }
 
+/** Every revealed competition gets its own Support certificate — Support
+ * isn't linked to any specific participant/registration the way
+ * sensei/school are, so (unlike roleRecordLinks) this doesn't filter by
+ * "did this person's students compete here," just by whether the tier
+ * itself has revealed winners yet, same gate every other kind uses. */
+async function supportLinks(supabase: Awaited<ReturnType<typeof createClient>>, userId: string): Promise<CertLink[]> {
+  const { data: competitions } = await supabase
+    .from("competitions")
+    .select("id, name, registration_deadline, winners_announce_date");
+  return ((competitions ?? []) as unknown as Array<CompetitionRow & { id: string }>)
+    .filter((c) => winnersRevealed(c.registration_deadline, c.winners_announce_date))
+    .map((c) => ({
+      label: `Certificate of Appreciation — ${c.name}`,
+      href: `/api/certificates/support/${userId}?competition_id=${c.id}`,
+    }));
+}
+
 /**
  * "Your Certificate" download box — appears on /account for every role
  * eligible for at least one certificate right now (winner, participant,
@@ -114,9 +137,7 @@ export default async function CertificatesSection({
     refereeLinks(supabase, userId),
     senseiId ? roleRecordLinks(supabase, "sensei", senseiId) : Promise.resolve([]),
     schoolId ? roleRecordLinks(supabase, "school", schoolId) : Promise.resolve([]),
-    isSupport
-      ? Promise.resolve([{ label: "Certificate of Appreciation — Support Team", href: `/api/certificates/support/${userId}` }])
-      : Promise.resolve([]),
+    isSupport ? supportLinks(supabase, userId) : Promise.resolve([]),
   ]);
   const links = linkGroups.flat();
   if (links.length === 0) return null;
@@ -124,17 +145,37 @@ export default async function CertificatesSection({
   return (
     <div className="mt-6">
       <h2 className="mb-3 text-lg font-bold">Your Certificate</h2>
-      <div className="space-y-2 rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
+      <div className="space-y-3 rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
         {links.map((l) => (
-          <a
-            key={l.href}
-            href={l.href}
-            className="block rounded-md border border-neutral-300 px-4 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-50"
-          >
-            ⬇ {l.label}
-          </a>
+          <div key={l.href} className="rounded-md border border-neutral-200 p-3">
+            <p className="mb-2 text-sm font-semibold text-neutral-700">{l.label}</p>
+            <div className="flex flex-wrap gap-2">
+              <a
+                href={viewHref(l.href)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50"
+              >
+                👁 View
+              </a>
+              <a
+                href={l.href}
+                className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-neutral-700"
+              >
+                ⬇ Download
+              </a>
+            </div>
+          </div>
         ))}
       </div>
     </div>
   );
+}
+
+/** Appends `view=1` — see the `inline` flag in
+ * app/api/certificates/[kind]/[id]/route.tsx — correctly whether the href
+ * already has a query string (referee/sensei/school links carry
+ * `?competition_id=...`) or not (winner/participant/support links don't). */
+function viewHref(href: string): string {
+  return `${href}${href.includes("?") ? "&" : "?"}view=1`;
 }

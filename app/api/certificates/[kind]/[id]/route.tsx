@@ -31,22 +31,22 @@ const SAMPLE_DATA: Record<
   },
   referee: {
     kind: "referee", recipientName: "Ahmad Zulkifli",
-    competitionName: "Malaysia Open Virtual Karate-do Kata Championship 2026",
+    competitionName: "Malaysia Open Virtual Karate-do Kata Championship 2026 — USD 10 Tier",
     categoryName: null, kataName: null, rank: null, dateLabel: "12/09/2026",
   },
   sensei: {
     kind: "sensei", recipientName: "Sensei Lim Wei Chen",
-    competitionName: "Malaysia Open Virtual Karate-do Kata Championship 2026",
+    competitionName: "Malaysia Open Virtual Karate-do Kata Championship 2026 — USD 10 Tier",
     categoryName: null, kataName: null, rank: null, dateLabel: "12/09/2026",
   },
   school: {
     kind: "school", recipientName: "Goju-ryu Karate Academy KL",
-    competitionName: "Malaysia Open Virtual Karate-do Kata Championship 2026",
+    competitionName: "Malaysia Open Virtual Karate-do Kata Championship 2026 — USD 10 Tier",
     categoryName: null, kataName: null, rank: null, dateLabel: "12/09/2026",
   },
   support: {
     kind: "support", recipientName: "Nurul Huda",
-    competitionName: "Malaysia Open Virtual Karate-do Kata Championship 2026",
+    competitionName: "Malaysia Open Virtual Karate-do Kata Championship 2026 — USD 10 Tier",
     categoryName: null, kataName: null, rank: null, dateLabel: "12/09/2026",
   },
 };
@@ -69,9 +69,16 @@ async function certificateSettings(supabase: Awaited<ReturnType<typeof createCli
   };
 }
 
-function pngResponse(image: Awaited<ReturnType<typeof renderCertificatePng>>, filename: string) {
+/** `inline` (the "View" link) opens the PNG in the browser tab it's linked
+ * from instead of forcing a download — everything else about the response
+ * is identical, same live-rendered bytes as "Download". */
+function pngResponse(
+  image: Awaited<ReturnType<typeof renderCertificatePng>>,
+  filename: string,
+  inline: boolean,
+) {
   const headers = new Headers(image.headers);
-  headers.set("Content-Disposition", `attachment; filename="${filename}"`);
+  headers.set("Content-Disposition", `${inline ? "inline" : "attachment"}; filename="${filename}"`);
   // next/og's ImageResponse defaults to a 1-year Cache-Control, which made the
   // admin Template Preview page (and social-style thumbnails) show stale
   // designs after every code change. Every certificate here is meant to be
@@ -85,6 +92,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ kind
   if (!VALID_KINDS.includes(kind as CertificateKind)) {
     return new Response("Unknown certificate type.", { status: 400 });
   }
+  const inline = new URL(request.url).searchParams.get("view") === "1";
 
   const supabase = await createClient();
   const {
@@ -110,7 +118,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ kind
       rank: kind === "winner" ? sampleRank : sample.rank,
       ...settings,
     });
-    return pngResponse(image, `${kind}-certificate-sample.png`);
+    return pngResponse(image, `${kind}-certificate-sample.png`, inline);
   }
 
   if (kind === "winner" || kind === "participant") {
@@ -118,7 +126,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ kind
       .from("registrations")
       .select(
         "id, payment_status, competition_id, participant:participants(full_name), category:categories(name), " +
-          "competition:competitions(name, event_date, registration_deadline, winners_announce_date)",
+          "competition:competitions(name, event_date, certificate_date, registration_deadline, winners_announce_date)",
       )
       .eq("id", registrationId)
       .maybeSingle();
@@ -131,6 +139,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ kind
       competition: {
         name: string;
         event_date: string | null;
+        certificate_date: string | null;
         registration_deadline: string | null;
         winners_announce_date: string | null;
       } | null;
@@ -178,10 +187,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ kind
       categoryName: categoryLabel,
       kataName,
       rank,
-      dateLabel: formatDate(competition.event_date),
+      dateLabel: formatDate(competition.certificate_date ?? competition.event_date),
       ...settings,
     });
-    return pngResponse(image, `${kind}-certificate.png`);
+    return pngResponse(image, `${kind}-certificate.png`, inline);
   }
 
   if (kind === "referee") {
@@ -194,7 +203,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ kind
 
     const { data: comp } = await supabase
       .from("competitions")
-      .select("name, event_date, registration_deadline, winners_announce_date")
+      .select("name, event_date, certificate_date, registration_deadline, winners_announce_date")
       .eq("id", competitionId)
       .maybeSingle();
     if (!comp) return new Response("Competition not found.", { status: 404 });
@@ -227,10 +236,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ kind
       categoryName: null,
       kataName: null,
       rank: null,
-      dateLabel: formatDate(comp.event_date as string | null),
+      dateLabel: formatDate((comp.certificate_date ?? comp.event_date) as string | null),
       ...settings,
     });
-    return pngResponse(image, "referee-certificate.png");
+    return pngResponse(image, "referee-certificate.png", inline);
   }
 
   if (kind === "sensei" || kind === "school") {
@@ -246,7 +255,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ kind
 
     const { data: comp } = await supabase
       .from("competitions")
-      .select("name, event_date, registration_deadline, winners_announce_date")
+      .select("name, event_date, certificate_date, registration_deadline, winners_announce_date")
       .eq("id", competitionId)
       .maybeSingle();
     if (!comp) return new Response("Competition not found.", { status: 404 });
@@ -278,14 +287,17 @@ export async function GET(request: Request, { params }: { params: Promise<{ kind
       categoryName: null,
       kataName: null,
       rank: null,
-      dateLabel: formatDate(comp.event_date as string | null),
+      dateLabel: formatDate((comp.certificate_date ?? comp.event_date) as string | null),
       ...settings,
     });
-    return pngResponse(image, `${kind}-certificate.png`);
+    return pngResponse(image, `${kind}-certificate.png`, inline);
   }
 
   if (kind === "support") {
     const targetUserId = registrationId;
+    const competitionId = new URL(request.url).searchParams.get("competition_id");
+    if (!competitionId) return new Response("Missing competition_id.", { status: 400 });
+
     const isOwner = user!.id === targetUserId;
     if (!isOwner && !isManager) return new Response("Not authorized for this certificate.", { status: 403 });
 
@@ -299,17 +311,27 @@ export async function GET(request: Request, { params }: { params: Promise<{ kind
       return new Response("Not eligible for a Support certificate.", { status: 404 });
     }
 
+    const { data: comp } = await supabase
+      .from("competitions")
+      .select("name, event_date, certificate_date, registration_deadline, winners_announce_date")
+      .eq("id", competitionId)
+      .maybeSingle();
+    if (!comp) return new Response("Competition not found.", { status: 404 });
+    if (!isManager && !winnersRevealed(comp.registration_deadline as string | null, comp.winners_announce_date as string | null)) {
+      return new Response("Certificates unlock once winners are announced for this tier.", { status: 403 });
+    }
+
     const image = await renderCertificatePng({
       kind: "support",
       recipientName: profRow.full_name ?? "Support Team Member",
-      competitionName: "Malaysia Open Virtual Karate-do Kata Championship",
+      competitionName: comp.name as string,
       categoryName: null,
       kataName: null,
       rank: null,
-      dateLabel: formatDate(new Date().toISOString().slice(0, 10)),
+      dateLabel: formatDate((comp.certificate_date ?? comp.event_date) as string | null),
       ...settings,
     });
-    return pngResponse(image, "support-certificate.png");
+    return pngResponse(image, "support-certificate.png", inline);
   }
 
   return new Response("This certificate type isn't available yet.", { status: 501 });

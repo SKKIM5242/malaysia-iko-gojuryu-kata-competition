@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { writeAudit } from "@/lib/audit";
-import { notifyRefereeAssignment, notifyWinnersAnnounced } from "@/lib/notify";
+import { notifyRefereeAssignment, notifyRefereeUnassigned, notifyWinnersAnnounced, notifyCertificatesPublished } from "@/lib/notify";
 import { winnersRevealed } from "@/lib/winners";
 
 export const dynamic = "force-dynamic";
@@ -46,7 +46,7 @@ async function handle(request: Request) {
 
   const { data: competitions } = await admin
     .from("competitions")
-    .select("id, name, registration_deadline, winners_announce_date, winners_notified_at")
+    .select("id, name, registration_deadline, winners_announce_date, winners_notified_at, certificates_notified_at")
     .not("registration_deadline", "is", null);
 
   const { data: refereesPool } = await admin
@@ -175,8 +175,13 @@ async function handle(request: Request) {
         actor_id: null,
       });
       try {
-        const [{ data: profile }, { data: video }] = await Promise.all([
+        const [{ data: newProfile }, { data: oldProfile }, { data: video }] = await Promise.all([
           admin.from("profiles").select("email, full_name, telegram_chat_id").eq("user_id", pick).maybeSingle(),
+          admin
+            .from("profiles")
+            .select("email, full_name, telegram_chat_id")
+            .eq("user_id", a.referee_user_id)
+            .maybeSingle(),
           admin
             .from("kata_videos")
             .select("participant:participants(full_name), registration:registrations(category:categories(name))")
@@ -187,13 +192,28 @@ async function handle(request: Request) {
           participant: { full_name: string } | null;
           registration: { category: { name: string } | null } | null;
         } | null;
-        await notifyRefereeAssignment({
-          refereeEmail: profile?.email ?? null,
-          refereeName: profile?.full_name ?? null,
-          refereeTelegramChatId: profile?.telegram_chat_id ?? null,
-          participantName: v?.participant?.full_name ?? "a participant",
-          categoryName: v?.registration?.category?.name ?? null,
-        });
+        const participantName = v?.participant?.full_name ?? "a participant";
+        const categoryName = v?.registration?.category?.name ?? null;
+        const reason = escalateToOrganizer
+          ? "This recording was handed to the organizer after the extended judging window passed."
+          : "This recording was reassigned to another judge after the judging deadline passed.";
+        await Promise.allSettled([
+          notifyRefereeAssignment({
+            refereeEmail: newProfile?.email ?? null,
+            refereeName: newProfile?.full_name ?? null,
+            refereeTelegramChatId: newProfile?.telegram_chat_id ?? null,
+            participantName,
+            categoryName,
+          }),
+          notifyRefereeUnassigned({
+            refereeEmail: oldProfile?.email ?? null,
+            refereeName: oldProfile?.full_name ?? null,
+            refereeTelegramChatId: oldProfile?.telegram_chat_id ?? null,
+            participantName,
+            categoryName,
+            reason,
+          }),
+        ]);
       } catch {
         // Notification is best-effort — the reassignment itself already stands.
       }
@@ -208,19 +228,54 @@ async function handle(request: Request) {
   }
 
   const winnerNotices: Array<Record<string, unknown>> = [];
+  const certificateNotices: Array<Record<string, unknown>> = [];
   for (const comp of competitions ?? []) {
-    if (comp.winners_notified_at) continue;
     if (!winnersRevealed(comp.registration_deadline, comp.winners_announce_date)) continue;
-    await notifyWinnersAnnounced(comp.name);
-    await admin.from("competitions").update({ winners_notified_at: new Date().toISOString() }).eq("id", comp.id);
-    await writeAudit(admin, {
-      table_name: "competitions",
-      record_id: comp.id,
-      action: "winners_announced_notified",
-      new_value: { name: comp.name },
-      actor_id: null,
-    });
-    winnerNotices.push({ competition: comp.name });
+
+    if (!comp.winners_notified_at) {
+      await notifyWinnersAnnounced(comp.name);
+      await admin.from("competitions").update({ winners_notified_at: new Date().toISOString() }).eq("id", comp.id);
+      await writeAudit(admin, {
+        table_name: "competitions",
+        record_id: comp.id,
+        action: "winners_announced_notified",
+        new_value: { name: comp.name },
+        actor_id: null,
+      });
+      winnerNotices.push({ competition: comp.name });
+    }
+
+    // Independent guard from winners_notified_at above — a different
+    // message (see lib/notify.ts's notifyCertificatesPublished), so it
+    // fires exactly once regardless of whether the manual "Publish All
+    // Certificates" button (publishWinnersNow in app/actions/admin.ts)
+    // already sent it for this competition.
+    if (!comp.certificates_notified_at) {
+      try {
+        const { data: regs } = await admin
+          .from("registrations")
+          .select("participant:participants(full_name, email)")
+          .eq("competition_id", comp.id)
+          .eq("payment_status", "paid");
+        const recipients = (
+          (regs ?? []) as unknown as Array<{ participant: { full_name: string; email: string | null } | null }>
+        )
+          .filter((r) => r.participant)
+          .map((r) => ({ name: r.participant!.full_name, email: r.participant!.email }));
+        await notifyCertificatesPublished(comp.name, recipients);
+        await admin.from("competitions").update({ certificates_notified_at: new Date().toISOString() }).eq("id", comp.id);
+        await writeAudit(admin, {
+          table_name: "competitions",
+          record_id: comp.id,
+          action: "certificates_published_notified",
+          new_value: { name: comp.name },
+          actor_id: null,
+        });
+        certificateNotices.push({ competition: comp.name });
+      } catch {
+        // Best-effort — the winners reveal itself already stands regardless.
+      }
+    }
   }
 
   return NextResponse.json({
@@ -229,5 +284,6 @@ async function handle(request: Request) {
     report,
     slotReport,
     winnerNotices,
+    certificateNotices,
   });
 }

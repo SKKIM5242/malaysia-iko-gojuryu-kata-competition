@@ -243,6 +243,10 @@ function DateBlock({ dateLabel, caption, width }: { dateLabel: string; caption: 
 }
 
 export async function renderCertificatePng(input: CertificateInput): Promise<ImageResponse> {
+  // Certificates say "Competition" even though the competition record itself
+  // is still named "...Championship..." elsewhere on the site — a wording
+  // choice scoped to this template only, not a site-wide rename.
+  const competitionName = input.competitionName.replace(/Championship/g, "Competition");
   const isWinner = input.kind === "winner" && input.rank;
   const accent = isWinner ? RANK_ACCENT[input.rank!] : ACCENT[input.kind as Exclude<CertificateKind, "winner">];
   const logo = logoDataUri();
@@ -344,7 +348,7 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
                 whiteSpace: "nowrap",
               }}
             >
-              2026 Malaysia Open Virtual Karate-do Kata Championship
+              2026 Malaysia Open Virtual Karate-do Kata Competition
             </div>
             <div
               style={{
@@ -429,7 +433,7 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
                 maxWidth: "1700px",
               }}
             >
-              at {input.competitionName}
+              at {competitionName}
             </div>
           </div>
 

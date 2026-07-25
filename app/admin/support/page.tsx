@@ -294,7 +294,10 @@ export default async function AdminSupport({
                     <input id="cs_bank_name" name="bank_name" required className={adminInput} />
                   </div>
                   <div>
-                    <label htmlFor="cs_bank_account_no" className={adminLabel}>International Bank Account No. (IBAN) *</label>
+                    <label htmlFor="cs_bank_account_no" className={adminLabel}>
+                      <span className="block font-normal text-neutral-500">For Malaysian only - Local Bank Account No.*</span>
+                      International Bank Account No. (IBAN/SWIFT/BIC/ACH)*
+                    </label>
                     <IbanInput id="cs_bank_account_no" name="bank_account_no" required className={adminInput} />
                   </div>
                   <div className="sm:col-span-2">

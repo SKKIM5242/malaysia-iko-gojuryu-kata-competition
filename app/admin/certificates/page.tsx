@@ -1,9 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
 import { schemaReady } from "@/lib/data";
-import { saveCertificateSettings } from "@/app/actions/admin";
+import { saveCertificateSettings, publishWinnersNow, saveCertificateDate } from "@/app/actions/admin";
 import { AdminShell, Card, adminBtn, adminInput, adminLabel } from "@/components/admin";
-import { SetupNotice } from "@/components/ui";
+import { EmptyState, SetupNotice, formatDate } from "@/components/ui";
 import CertificateUploadField from "@/components/CertificateUploadField";
+import { winnersRevealDate, winnersRevealDateFor } from "@/lib/winners";
+import type { Competition } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +17,7 @@ const CERT_KINDS: Array<{ key: string; kind: string; label: string; note: string
   { key: "referee", kind: "referee", label: "Referee / Judge", note: "For judging a competition tier." },
   { key: "sensei", kind: "sensei", label: "Sensei", note: "For a sensei whose students competed." },
   { key: "school", kind: "school", label: "School / Dojo", note: "For a school whose students competed." },
-  { key: "support", kind: "support", label: "Support", note: "Flat certificate of appreciation, not tier-specific." },
+  { key: "support", kind: "support", label: "Support", note: "One per revealed tier, same as Referee/Sensei/School." },
 ];
 
 export default async function AdminCertificates({
@@ -49,6 +51,12 @@ export default async function AdminCertificates({
   const stampUrl = settings?.stamp_path
     ? supabase.storage.from("branding").getPublicUrl(settings.stamp_path as string).data.publicUrl
     : null;
+
+  const { data: competitionsData } = await supabase
+    .from("competitions")
+    .select("*")
+    .order("registration_fee_usd", { ascending: true, nullsFirst: true });
+  const competitions = (competitionsData as Competition[]) ?? [];
 
   return (
     <AdminShell title="Certificates" active="/admin/certificates" flash={{ ok: params.ok, error: params.error }}>
@@ -133,6 +141,97 @@ export default async function AdminCertificates({
         </>
       ) : (
         <p className="mb-6 text-sm text-neutral-500">Only Admin / Organizer can change certificate settings.</p>
+      )}
+
+      <h2 className="mt-10 mb-3 text-lg font-bold">Publish Certificates</h2>
+      {canManage ? (
+        <>
+          <p className="mb-4 max-w-3xl text-sm text-neutral-500">
+            Certificates for a tier unlock automatically 30 days after its registration deadline (the
+            same moment the public Winners page reveals scores) — or set a custom date on{" "}
+            <a href="/admin/competitions" className="text-red-700 underline underline-offset-2">Competitions</a>.
+            Ready sooner? Publish a tier right now instead of waiting. The certificate date below is
+            what's printed on every certificate for that tier — set it separately from publishing
+            (defaults to the event date if left blank).
+          </p>
+          {competitions.length === 0 ? (
+            <EmptyState>No competitions yet.</EmptyState>
+          ) : (
+            <div className="space-y-3">
+              {competitions.map((c) => {
+                const revealDate = c.registration_deadline
+                  ? winnersRevealDateFor(c.registration_deadline, c.winners_announce_date) ??
+                    winnersRevealDate(c.registration_deadline)
+                  : null;
+                const revealed = revealDate ? new Date() >= revealDate : false;
+                return (
+                  <Card key={c.id}>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="font-semibold text-neutral-800">{c.name}</p>
+                        <p className="text-xs text-neutral-500">
+                          {revealDate
+                            ? `${revealed ? "Published" : "Scheduled"} ${formatDate(revealDate.toISOString().slice(0, 10))}`
+                            : "No registration deadline set yet."}
+                        </p>
+                      </div>
+                      {revealed ? (
+                        <span className="rounded-full border border-green-300 bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-800">
+                          Certificates live
+                        </span>
+                      ) : (
+                        revealDate && (
+                          <form action={publishWinnersNow}>
+                            <input type="hidden" name="competition_id" value={c.id} />
+                            <input type="hidden" name="return_to" value="/admin/certificates" />
+                            <button
+                              className={adminBtn}
+                              title="Publishes this tier's winners and certificates right now, instead of waiting for the scheduled date"
+                            >
+                              Publish all Certificates
+                            </button>
+                          </form>
+                        )
+                      )}
+                    </div>
+                    <form
+                      action={saveCertificateDate}
+                      className="mt-3 flex flex-wrap items-end gap-2 border-t border-neutral-100 pt-3"
+                    >
+                      <input type="hidden" name="competition_id" value={c.id} />
+                      <input type="hidden" name="return_to" value="/admin/certificates" />
+                      <div>
+                        <label htmlFor={`certificate_date_${c.id}`} className={adminLabel}>
+                          Certificate date
+                        </label>
+                        <input
+                          id={`certificate_date_${c.id}`}
+                          name="certificate_date"
+                          type="date"
+                          defaultValue={c.certificate_date ?? c.event_date ?? ""}
+                          className={adminInput}
+                        />
+                      </div>
+                      <button
+                        className={adminBtn}
+                        title="Sets the date printed on this tier's certificates — independent of publishing"
+                      >
+                        Save date
+                      </button>
+                      {c.certificate_date && (
+                        <span className="text-xs text-neutral-400">
+                          Currently {formatDate(c.certificate_date)}
+                        </span>
+                      )}
+                    </form>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </>
+      ) : (
+        <p className="text-sm text-neutral-500">Only Admin / Organizer / Staff can publish certificates.</p>
       )}
 
       <h2 className="mt-10 mb-3 text-lg font-bold">Template Preview</h2>

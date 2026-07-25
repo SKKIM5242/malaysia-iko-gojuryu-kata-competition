@@ -761,6 +761,27 @@ export default async function AccountPage({
                 <p className="mt-2 text-sm text-green-800">Thank you — it is ready for judging.</p>
               )}
             </div>
+            {(() => {
+              const connectUrl = getTelegramBotConnectUrl(user.id);
+              if (profile.telegram_chat_id) {
+                return (
+                  <p className="text-sm font-semibold text-green-700">
+                    ✅ Telegram connected — you&apos;ll be notified here once all judges have scored your recording.
+                  </p>
+                );
+              }
+              if (!connectUrl) return null;
+              return (
+                <a
+                  href={connectUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 rounded-md border border-[#229ED9]/30 bg-[#229ED9]/5 px-4 py-2.5 text-sm font-semibold text-[#1c7fb5] hover:bg-[#229ED9]/10"
+                >
+                  Connect Telegram for judging alerts
+                </a>
+              );
+            })()}
             <div>
               <p className="mb-2 text-sm text-neutral-500">
                 Watch every participant&apos;s recording for this competition in Kata Arena. Final

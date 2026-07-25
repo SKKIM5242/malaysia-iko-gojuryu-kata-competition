@@ -94,37 +94,37 @@ function buildEmail(user: HookUser, data: HookEmailData): { subject: string; tex
         text:
           `Hi,\n\nWe received a request to reset your password. Click the link below to choose a new one:\n\n${link}\n\n` +
           `If you didn't request this, you can safely ignore this email — your password won't change.\n\n` +
-          `— Malaysia Open IKO Goju-ryu Kata Championship`,
+          `— Malaysia Open Virtual Karate-do Kata Championship`,
       };
     case "signup":
       return {
         subject: "Confirm your email",
-        text: `Hi,\n\nConfirm your email address to activate your account:\n\n${link}\n\n— Malaysia Open IKO Goju-ryu Kata Championship`,
+        text: `Hi,\n\nConfirm your email address to activate your account:\n\n${link}\n\n— Malaysia Open Virtual Karate-do Kata Championship`,
       };
     case "magiclink":
       return {
         subject: "Your sign-in link",
-        text: `Hi,\n\nClick the link below to sign in:\n\n${link}\n\nIf you didn't request this, you can safely ignore this email.\n\n— Malaysia Open IKO Goju-ryu Kata Championship`,
+        text: `Hi,\n\nClick the link below to sign in:\n\n${link}\n\nIf you didn't request this, you can safely ignore this email.\n\n— Malaysia Open Virtual Karate-do Kata Championship`,
       };
     case "invite":
       return {
         subject: "You've been invited",
-        text: `Hi,\n\nYou've been invited to join. Click the link below to accept:\n\n${link}\n\n— Malaysia Open IKO Goju-ryu Kata Championship`,
+        text: `Hi,\n\nYou've been invited to join. Click the link below to accept:\n\n${link}\n\n— Malaysia Open Virtual Karate-do Kata Championship`,
       };
     case "email_change":
       return {
         subject: "Confirm your new email address",
-        text: `Hi,\n\nConfirm this as your new email address:\n\n${link}\n\nIf you didn't request this, please secure your account.\n\n— Malaysia Open IKO Goju-ryu Kata Championship`,
+        text: `Hi,\n\nConfirm this as your new email address:\n\n${link}\n\nIf you didn't request this, please secure your account.\n\n— Malaysia Open Virtual Karate-do Kata Championship`,
       };
     case "reauthentication":
       return {
         subject: "Your confirmation code",
-        text: `Hi,\n\nYour confirmation code is: ${data.token}\n\nEnter it in the app to continue.\n\n— Malaysia Open IKO Goju-ryu Kata Championship`,
+        text: `Hi,\n\nYour confirmation code is: ${data.token}\n\nEnter it in the app to continue.\n\n— Malaysia Open Virtual Karate-do Kata Championship`,
       };
     default:
       return {
         subject: "Confirm your request",
-        text: `Hi,\n\nClick the link below to continue:\n\n${link}\n\n— Malaysia Open IKO Goju-ryu Kata Championship`,
+        text: `Hi,\n\nClick the link below to continue:\n\n${link}\n\n— Malaysia Open Virtual Karate-do Kata Championship`,
       };
   }
 }

@@ -68,7 +68,7 @@ export default async function AdminRecordingPreview() {
               initialAttempts={0}
               maxAttempts={3}
               hasPendingPurchase={false}
-              watermark="PREVIEW — Malaysia Open IKO Goju-ryu Kata Championship"
+              watermark="PREVIEW — Malaysia Open Virtual Karate-do Kata Championship"
               recordingStart={start}
               recordingEnd={end}
             />

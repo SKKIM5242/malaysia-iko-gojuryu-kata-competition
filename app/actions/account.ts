@@ -4,8 +4,10 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { writeAudit } from "@/lib/audit";
 import { getStripe, paymentsEnabled } from "@/lib/payments";
+import { notifyParticipantScored } from "@/lib/notify";
 
 export interface AccountActionState {
   ok: boolean;
@@ -174,7 +176,7 @@ export async function requestExtraAttempts(
               unit_amount: EXTRA_ATTEMPTS_FEE_USD * 100,
               product_data: {
                 name: "3 more delete-and-re-record attempts",
-                description: "Malaysia Open IKO Goju-ryu Kata Championship — Kata Arena recording",
+                description: "Malaysia Open Virtual Karate-do Kata Championship — Kata Arena recording",
               },
             },
             quantity: 1,
@@ -266,6 +268,71 @@ export async function submitKataVideo(
   return { ok: true };
 }
 
+/** After a score is saved, checks whether this just completed the
+ * competition's judges_required count for the video — if so, notifies the
+ * participant (email + Telegram DM) exactly once. Runs on the admin
+ * (service-role) client since the submitting referee's own session has no
+ * read access to another user's profile (telegram_chat_id) or email.
+ * Guarded by kata_videos.participant_notified_at so a referee editing their
+ * score afterward never re-sends it. Best-effort — never throws. */
+async function maybeNotifyParticipantScored(videoId: string): Promise<void> {
+  try {
+    const admin = createAdminClient();
+    const { count } = await admin
+      .from("video_scores")
+      .select("id", { count: "exact", head: true })
+      .eq("video_id", videoId);
+    const { data: video } = await admin
+      .from("kata_videos")
+      .select(
+        "participant_notified_at, registration_id, " +
+          "participant:participants(full_name, email), " +
+          "registration:registrations(category:categories(name), competition:competitions(judges_required))",
+      )
+      .eq("id", videoId)
+      .maybeSingle();
+    const v = video as unknown as {
+      participant_notified_at: string | null;
+      registration_id: string;
+      participant: { full_name: string; email: string | null } | null;
+      registration: {
+        category: { name: string } | null;
+        competition: { judges_required: number } | null;
+      } | null;
+    } | null;
+    if (!v || v.participant_notified_at) return;
+    const judgesRequired = v.registration?.competition?.judges_required ?? 3;
+    if ((count ?? 0) < judgesRequired) return;
+
+    // Atomic claim — only the request that actually flips this from null to
+    // a timestamp proceeds to send, guarding against two referees' scores
+    // landing at nearly the same moment both trying to fire the notice.
+    const { data: claimed } = await admin
+      .from("kata_videos")
+      .update({ participant_notified_at: new Date().toISOString() })
+      .eq("id", videoId)
+      .is("participant_notified_at", null)
+      .select("id")
+      .maybeSingle();
+    if (!claimed) return;
+
+    const { data: profile } = await admin
+      .from("profiles")
+      .select("telegram_chat_id")
+      .eq("registration_id", v.registration_id)
+      .maybeSingle();
+
+    await notifyParticipantScored({
+      participantEmail: v.participant?.email ?? null,
+      participantTelegramChatId: profile?.telegram_chat_id ?? null,
+      participantName: v.participant?.full_name ?? "Participant",
+      categoryName: v.registration?.category?.name ?? null,
+    });
+  } catch {
+    // Best-effort — the score itself already saved successfully regardless.
+  }
+}
+
 /** Referee: save a 0.0–10.0 score for an assigned video — the sum of the
  * official rubric's 7 criteria (1+1+1+1+1+3+3 = 11 max). */
 export async function submitScore(formData: FormData) {
@@ -318,6 +385,7 @@ export async function submitScore(formData: FormData) {
       new_value: { score, disqualification_reason },
       actor_id: user.id,
     });
+    await maybeNotifyParticipantScored(videoId);
   }
   revalidatePath("/account");
 }

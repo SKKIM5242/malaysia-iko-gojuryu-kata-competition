@@ -108,28 +108,10 @@ export default async function AdminSenseis({
         <div>
           <h2 className="mb-3 text-lg font-bold">{editing ? "Edit Sensei" : "Add Sensei"}</h2>
           <Card>
-            {editing && (
-              <div className="mb-4 rounded-md border border-neutral-200 bg-neutral-50 p-3">
-                <p className="text-xs font-bold uppercase tracking-wide text-neutral-500">
-                  Personal invitation code for this sensei
-                </p>
-                <form action={generateRecordInvitationCode} className="mt-2">
-                  <input type="hidden" name="role" value="sensei" />
-                  <input type="hidden" name="id" value={editing.id} />
-                  <input type="hidden" name="return_to" value="/admin/senseis" />
-                  <button type="submit" className={adminBtnSecondary}>
-                    {editing.invitation_code ? "Regenerate personal code" : "Generate personal code"}
-                  </button>
-                </form>
-                <p className="mt-1 text-xs text-neutral-400">
-                  {editing.invitation_code
-                    ? `Current code: ${editing.invitation_code} — bound to ${editing.email}, single use.`
-                    : `Single-use, bound only to ${editing.email || "this sensei's email"} — for signing in with this specific sensei's access, not a shared code.`}
-                </p>
-              </div>
-            )}
             <form action={saveSensei} className="space-y-4">
               {editing && <input type="hidden" name="id" value={editing.id} />}
+              {editing && <input type="hidden" name="role" value="sensei" />}
+              {editing && <input type="hidden" name="return_to" value={`/admin/senseis?edit=${editing.id}`} />}
               <div>
                 <label htmlFor="name" className={adminLabel}>Name *</label>
                 <input id="name" name="name" required defaultValue={editing?.name ?? ""} className={adminInput} />
@@ -206,6 +188,51 @@ export default async function AdminSenseis({
                   <input id="referral_source" name="referral_source" defaultValue={editing?.referral_source ?? ""} className={adminInput} placeholder="e.g. a friend's name" />
                 </div>
               </div>
+
+              {editing && (
+                <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3">
+                  <p className="text-xs font-bold uppercase tracking-wide text-neutral-500">
+                    Personal invitation code for this sensei
+                  </p>
+                  <div className="mt-2">
+                    <label htmlFor="pic_competition_id" className={adminLabel}>Competition Tier *</label>
+                    <select id="pic_competition_id" name="pic_competition_id" defaultValue="" className={adminInput}>
+                      <option value="" disabled>Select competition tier</option>
+                      {competitions.map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="mt-3 grid gap-4 sm:grid-cols-3">
+                    <div>
+                      <label htmlFor="pic_valid_from" className={adminLabel}>Valid from *</label>
+                      <input id="pic_valid_from" name="pic_valid_from" type="date" className={adminInput} />
+                    </div>
+                    <div>
+                      <label htmlFor="pic_valid_until" className={adminLabel}>Valid until *</label>
+                      <input id="pic_valid_until" name="pic_valid_until" type="date" className={adminInput} />
+                    </div>
+                    <div>
+                      <label htmlFor="pic_sign_in_limit" className={adminLabel}>Sign-in limit *</label>
+                      <input id="pic_sign_in_limit" name="pic_sign_in_limit" type="number" min="1" className={adminInput} />
+                    </div>
+                  </div>
+                  <button
+                    type="submit"
+                    formAction={generateRecordInvitationCode}
+                    formNoValidate
+                    className={`mt-3 ${editing.invitation_code ? adminBtn : adminBtnSecondary}`}
+                  >
+                    {editing.invitation_code ? "Regenerate personal code" : "Generate personal code"}
+                  </button>
+                  <p className="mt-2 text-xs text-neutral-400">
+                    {editing.invitation_code
+                      ? `Note: Current code: "${editing.invitation_code}" — bound to ${editing.email} address, single use in create account.`
+                      : `Single-use, bound only to ${editing.email || "this sensei's email"} — for creating that one login, not a shared code. Sign-in access after account creation depends on the Valid from/until window and Sign-in limit above, whichever is reached first.`}
+                  </p>
+                </div>
+              )}
+
               <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3">
                 <p className="text-xs font-bold uppercase tracking-wide text-neutral-500">Personal Bank Details *</p>
                 <div className="mt-2 grid gap-4 sm:grid-cols-2">
@@ -214,7 +241,10 @@ export default async function AdminSenseis({
                     <input id="bank_name" name="bank_name" required defaultValue={editing?.bank_name ?? ""} className={adminInput} />
                   </div>
                   <div>
-                    <label htmlFor="bank_account_no" className={adminLabel}>International Bank Account No. (IBAN) *</label>
+                    <label htmlFor="bank_account_no" className={adminLabel}>
+                      <span className="block font-normal text-neutral-500">For Malaysian only - Local Bank Account No.*</span>
+                      International Bank Account No. (IBAN/SWIFT/BIC/ACH)*
+                    </label>
                     <IbanInput id="bank_account_no" name="bank_account_no" required defaultValue={editing?.bank_account_no ?? ""} className={adminInput} />
                   </div>
                   <div className="sm:col-span-2">

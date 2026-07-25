@@ -21,6 +21,10 @@ export interface Competition {
    * announcement — usually on/after the announce date so one paid sign-in
    * sees everything including judge scores. */
   audience_signin_date: string | null;
+  /** Date printed on this tier's certificates — set by the organizer
+   * alongside "Publish all Certificates" on /admin/certificates. Null falls
+   * back to event_date wherever a certificate's date field is rendered. */
+  certificate_date: string | null;
   created_at: string;
 }
 

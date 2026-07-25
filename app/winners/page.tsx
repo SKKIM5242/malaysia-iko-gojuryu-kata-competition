@@ -14,6 +14,7 @@ const MEDALS = ["🥇", "🥈", "🥉"];
 
 interface WinnerEntry {
   rank: number;
+  registrationId: string;
   participantName: string;
   categoryName: string | null;
   finalScore: number;
@@ -86,6 +87,7 @@ async function computeWinners(
       catId,
       entries.map((e) => ({
         rank: e.rank,
+        registrationId: e.registrationId,
         participantName: e.participantName,
         categoryName: categoryNameById.get(catId) ?? null,
         finalScore: e.finalScore,
@@ -107,9 +109,11 @@ async function computeWinners(
 async function CompetitionWinners({
   competition,
   supabase,
+  myRegistrationId,
 }: {
   competition: Competition;
   supabase: Awaited<ReturnType<typeof createClient>>;
+  myRegistrationId: string | null;
 }) {
   if (!competition.registration_deadline) {
     return (
@@ -166,37 +170,78 @@ async function CompetitionWinners({
                       </p>
                       <ul className="space-y-2">
                         {winners.map((w) => (
-                          <li key={w.rank} className="flex items-center justify-between gap-2 text-sm">
-                            <span>
-                              <span className="block">
-                                {MEDALS[w.rank - 1]} {w.participantName}
-                              </span>
-                              {w.judges.length > 0 && (
-                                <span className="mt-0.5 block text-xs text-neutral-400">
-                                  Judge scores:{" "}
-                                  {w.judges.map((j, i) => (
-                                    <span key={i}>
-                                      {i > 0 && ", "}
-                                      {j.total != null ? j.total.toFixed(1) : "—"}
-                                    </span>
-                                  ))}
+                          <li key={w.rank} className="text-sm">
+                            <div className="flex items-center justify-between gap-2">
+                              <span>
+                                <span className="block">
+                                  {MEDALS[w.rank - 1]} {w.participantName}
                                 </span>
-                              )}
-                            </span>
-                            <span className="flex items-center gap-2">
-                              <span className="font-semibold text-neutral-700">{w.finalScore.toFixed(1)}</span>
-                              <FullViewButton
-                                url={w.playbackUrl}
-                                participantName={w.participantName}
-                                categoryName={w.categoryName}
-                                competitionName={competition.name}
-                                judges={w.judges}
-                                judgesRequired={competition.judges_required}
-                                queuePosition={null}
-                                averageText={`Final score ${w.finalScore.toFixed(1)}`}
-                                disqualified={false}
-                              />
-                            </span>
+                                {w.judges.length > 0 && (
+                                  <span className="mt-0.5 block text-xs text-neutral-400">
+                                    Judge scores:{" "}
+                                    {w.judges.map((j, i) => (
+                                      <span key={i}>
+                                        {i > 0 && ", "}
+                                        {j.total != null ? j.total.toFixed(1) : "—"}
+                                      </span>
+                                    ))}
+                                  </span>
+                                )}
+                              </span>
+                              <span className="flex items-center gap-2">
+                                <span className="font-semibold text-neutral-700">{w.finalScore.toFixed(1)}</span>
+                                <FullViewButton
+                                  url={w.playbackUrl}
+                                  participantName={w.participantName}
+                                  categoryName={w.categoryName}
+                                  competitionName={competition.name}
+                                  judges={w.judges}
+                                  judgesRequired={competition.judges_required}
+                                  queuePosition={null}
+                                  averageText={`Final score ${w.finalScore.toFixed(1)}`}
+                                  disqualified={false}
+                                />
+                              </span>
+                            </div>
+                            {w.registrationId === myRegistrationId && (
+                              <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5">
+                                <span className="text-xs font-semibold text-amber-800">🎓 That&apos;s you:</span>
+                                <span className="flex flex-wrap items-center gap-1.5">
+                                  <span className="text-xs text-amber-800">Winner Certificate</span>
+                                  <a
+                                    href={`/api/certificates/winner/${w.registrationId}?view=1`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="rounded border border-amber-300 px-2 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-100"
+                                  >
+                                    👁 View
+                                  </a>
+                                  <a
+                                    href={`/api/certificates/winner/${w.registrationId}`}
+                                    className="rounded bg-amber-800 px-2 py-1 text-xs font-semibold text-white hover:bg-amber-700"
+                                  >
+                                    ⬇ Download
+                                  </a>
+                                </span>
+                                <span className="flex flex-wrap items-center gap-1.5">
+                                  <span className="text-xs text-amber-800">Certificate of Participation</span>
+                                  <a
+                                    href={`/api/certificates/participant/${w.registrationId}?view=1`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="rounded border border-amber-300 px-2 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-100"
+                                  >
+                                    👁 View
+                                  </a>
+                                  <a
+                                    href={`/api/certificates/participant/${w.registrationId}`}
+                                    className="rounded bg-amber-800 px-2 py-1 text-xs font-semibold text-white hover:bg-amber-700"
+                                  >
+                                    ⬇ Download
+                                  </a>
+                                </span>
+                              </div>
+                            )}
                           </li>
                         ))}
                       </ul>
@@ -233,17 +278,34 @@ export default async function WinnersPage() {
     .order("registration_fee_usd", { ascending: true, nullsFirst: true });
   const competitions = (competitionsData as Competition[]) ?? [];
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { data: myProfile } = user
+    ? await supabase.from("profiles").select("registration_id").eq("user_id", user.id).maybeSingle()
+    : { data: null };
+  const myRegistrationId = (myProfile?.registration_id as string | null) ?? null;
+
   return (
     <>
       <SiteHeader />
       <main className="mx-auto max-w-4xl px-4 py-10">
         <SectionTitle>Winners</SectionTitle>
+        {!myRegistrationId && (
+          <p className="mb-6 rounded-md border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
+            🏆 Placed in the Top 3?{" "}
+            <a href="/account" className="font-semibold text-red-700 underline underline-offset-2">
+              Sign in
+            </a>{" "}
+            to view and download your winner certificate.
+          </p>
+        )}
         {competitions.length === 0 ? (
           <EmptyState>No competitions yet.</EmptyState>
         ) : (
           <div className="space-y-12">
             {competitions.map((c) => (
-              <CompetitionWinners key={c.id} competition={c} supabase={supabase} />
+              <CompetitionWinners key={c.id} competition={c} supabase={supabase} myRegistrationId={myRegistrationId} />
             ))}
           </div>
         )}
