@@ -349,7 +349,7 @@ export default async function AdminReferees({
                 payment_status: r.payment_status,
                 status: r.status,
                 certificates: (
-                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <div key="certificates" className="flex flex-wrap items-center gap-2 text-xs">
                     {r.certificate_path && certUrls.get(r.certificate_path) ? (
                       <a href={certUrls.get(r.certificate_path)} target="_blank" rel="noopener noreferrer"
                         className="font-semibold text-green-700 underline underline-offset-2">Rank cert</a>
@@ -369,17 +369,18 @@ export default async function AdminReferees({
                 invitation_code: r.invitation_code ?? "",
                 referral_source: r.referral_source ?? "",
                 deposit: (
-                  <StatusButtons table="referees" id={r.id} field="payment_status" current={r.payment_status}
+                  <StatusButtons key="deposit" table="referees" id={r.id} field="payment_status" current={r.payment_status}
                     options={["pending", "paid", "waived", "refunded", "forfeited"]} />
                 ),
                 approval: (
-                  <StatusButtons table="referees" id={r.id} field="status" current={r.status}
+                  <StatusButtons key="approval" table="referees" id={r.id} field="status" current={r.status}
                     options={["pending", "approved", "rejected"]} />
                 ),
                 ...(isAdminTier
                   ? {
                       sign_in_control: (
                         <SignInControlBox
+                          key="sign_in_control"
                           userId={r.user_id}
                           signInCount={loginByUserId.get(r.user_id ?? "")?.sign_in_count ?? 0}
                           signInLimit={loginByUserId.get(r.user_id ?? "")?.sign_in_limit ?? null}
@@ -393,7 +394,7 @@ export default async function AdminReferees({
                     }
                   : {}),
                 actions: (
-                  <div className="flex gap-1.5">
+                  <div key="actions" className="flex gap-1.5">
                     <Link
                       href={`/admin/referees?editref=${r.id}`}
                       className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
@@ -484,7 +485,7 @@ export default async function AdminReferees({
                 no: String(t.position),
                 content: t.content,
                 actions: (
-                  <div className="flex gap-1.5">
+                  <div key="actions" className="flex gap-1.5">
                     <Link
                       href={`/admin/referees?editterm=${t.id}`}
                       className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"

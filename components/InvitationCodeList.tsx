@@ -128,7 +128,7 @@ export default async function InvitationCodeList({
             created_by: c.generated_by ?? "",
             status: c.active ? "Active" : "Revoked",
             actions: (
-              <div className="flex flex-wrap items-center gap-1.5">
+              <div key="actions" className="flex flex-wrap items-center gap-1.5">
                 <Link
                   href={editHref(c.id)}
                   className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"

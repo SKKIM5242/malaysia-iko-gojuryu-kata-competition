@@ -197,16 +197,16 @@ async function ApprovalsTab({ supabase }: { supabase: Awaited<ReturnType<typeof 
             country: p.country ?? "",
             email: p.email ?? "",
             status: (
-              <span className={p.approved ? "font-semibold text-green-700" : "text-amber-600"}>
+              <span key="status" className={p.approved ? "font-semibold text-green-700" : "text-amber-600"}>
                 {p.approved ? "Approved — unlimited sign-in" : "Pending"}
               </span>
             ),
             status_text: p.approved ? "Approved — unlimited sign-in" : "Pending",
             actions:
               p.role === "admin" ? (
-                <span className="text-xs text-neutral-400">Owner</span>
+                <span key="actions" className="text-xs text-neutral-400">Owner</span>
               ) : (
-                <form action={setProfileApproval}>
+                <form key="actions" action={setProfileApproval}>
                   <input type="hidden" name="user_id" value={p.user_id} />
                   <input type="hidden" name="approve" value={(!p.approved).toString()} />
                   <button

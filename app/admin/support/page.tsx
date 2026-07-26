@@ -362,7 +362,7 @@ export default async function AdminSupport({
             message: s.message ?? "",
             status_text: s.status,
             status: (
-              <div className="flex flex-wrap gap-1">
+              <div key="status" className="flex flex-wrap gap-1">
                 {["pending", "approved", "rejected"].map((o) => (
                   <form key={o} action={updateCommunityStatus}>
                     <input type="hidden" name="table" value="staff_applications" />
@@ -546,7 +546,7 @@ export default async function AdminSupport({
                 status: t.status,
                 own_school: t.own_school ? "Yes (not counted)" : "No",
                 complaint: (
-                  <form action={toggleTicketComplaint}>
+                  <form key="complaint" action={toggleTicketComplaint}>
                     <input type="hidden" name="id" value={t.id} />
                     <input type="hidden" name="complaint" value={(!t.complaint).toString()} />
                     <button
@@ -561,7 +561,7 @@ export default async function AdminSupport({
                   </form>
                 ),
                 actions: (
-                  <div className="flex gap-1.5">
+                  <div key="actions" className="flex gap-1.5">
                     <Link
                       href={`/admin/support?editticket=${t.id}`}
                       className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"

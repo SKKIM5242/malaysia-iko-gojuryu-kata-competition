@@ -58,9 +58,17 @@ export async function requestPasswordReset(
   if (typeof email === "string" && email) {
     const origin =
       (await headers()).get("origin") ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-    await supabase.auth.resetPasswordForEmail(email, {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${origin}/account/reset-password`,
     });
+    // Logged, not surfaced to the client — the response must stay identical
+    // whether or not the identifier matched an account (see doc comment
+    // above), so a send failure can't become an enumeration side-channel.
+    // Check Vercel logs for "[requestPasswordReset]" if users report never
+    // receiving the email despite using a valid address.
+    if (error) {
+      console.error("[requestPasswordReset] resetPasswordForEmail failed", error.message);
+    }
   }
   return generic;
 }

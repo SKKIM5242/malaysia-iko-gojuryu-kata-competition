@@ -321,6 +321,7 @@ export default async function AdminSenseis({
                 certificate:
                   s.certificate_path && certUrls.get(s.certificate_path) ? (
                     <a
+                      key="certificate"
                       href={certUrls.get(s.certificate_path)}
                       target="_blank"
                       rel="noopener noreferrer"
@@ -329,7 +330,7 @@ export default async function AdminSenseis({
                       View
                     </a>
                   ) : (
-                    <span className="text-neutral-400">—</span>
+                    <span key="certificate" className="text-neutral-400">—</span>
                   ),
                 location: [s.home_address, s.city_town, s.postcode, s.home_country].filter(Boolean).join(", "),
                 contact: [s.email, s.phone].filter(Boolean).join(" · "),
@@ -346,11 +347,12 @@ export default async function AdminSenseis({
                 school: s.school?.name ?? "",
                 expected_fee: senseiFees.has(s.id) ? formatUSD(senseiFees.get(s.id)) : "— no participants yet",
                 payment_status_text: s.payment_status,
-                payment: <PaymentButtons id={s.id} current={s.payment_status} />,
+                payment: <PaymentButtons key="payment" id={s.id} current={s.payment_status} />,
                 ...(isAdminTier
                   ? {
                       sign_in_control: (
                         <SignInControlBox
+                          key="sign_in_control"
                           userId={loginBySenseiId.get(s.id)?.user_id ?? null}
                           signInCount={loginBySenseiId.get(s.id)?.sign_in_count ?? 0}
                           signInLimit={loginBySenseiId.get(s.id)?.sign_in_limit ?? null}
@@ -364,7 +366,7 @@ export default async function AdminSenseis({
                     }
                   : {}),
                 actions: (
-                  <div className="flex gap-1.5">
+                  <div key="actions" className="flex gap-1.5">
                     <Link
                       href={`/admin/senseis?edit=${s.id}`}
                       className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
