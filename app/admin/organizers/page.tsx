@@ -172,7 +172,8 @@ export default async function AdminOrganizers({
           columns={[
             { key: "full_name", label: "Name" },
             { key: "reference_id", label: "Reference ID" },
-            { key: "contact", label: "Contact" },
+            { key: "email", label: "Email" },
+            { key: "phone", label: "Phone" },
             { key: "role_requested", label: "Role requested" },
             { key: "message", label: "Message" },
             { key: "status", label: "Status" },
@@ -190,7 +191,6 @@ export default async function AdminOrganizers({
             id: s.id,
             reference_id: s.id.slice(0, 8).toUpperCase(),
             full_name: s.full_name,
-            contact: [s.email, s.phone].filter(Boolean).join(" · "),
             email: s.email ?? "",
             phone: s.phone ?? "",
             role_requested: s.role_requested.replace("_", " "),
