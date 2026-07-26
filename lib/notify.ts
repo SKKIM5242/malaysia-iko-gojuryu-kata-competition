@@ -426,6 +426,59 @@ export async function notifyCertificatesPublished(
   ]);
 }
 
+interface StatusChangeNotice {
+  email: string | null;
+  telegramChatId: string | null;
+  name: string;
+  /** Human label for what changed, e.g. "Approval status", "Deposit status". */
+  fieldLabel: string;
+  /** Human label for the new value, e.g. "Approved", "Paid". */
+  valueLabel: string;
+}
+
+async function sendStatusChangeEmail(notice: StatusChangeNotice): Promise<void> {
+  if (!notice.email) return;
+  await sendEmail(
+    notice.email,
+    `Your ${notice.fieldLabel.toLowerCase()} has changed to ${notice.valueLabel}`,
+    `Hi ${notice.name},\n\n` +
+      `Your ${notice.fieldLabel.toLowerCase()} for the Malaysia Open Virtual Karate-do Kata ` +
+      `Championship has been updated to: ${notice.valueLabel}.\n\n` +
+      `Sign in to your account for details: ${appUrl()}/account\n\n` +
+      `— Malaysia Open Virtual Karate-do Kata Championship`,
+  );
+}
+
+async function sendStatusChangeTelegram(notice: StatusChangeNotice): Promise<void> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token || !notice.telegramChatId) return;
+  try {
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: notice.telegramChatId,
+        text:
+          `🔔 Your ${notice.fieldLabel.toLowerCase()} has been updated to: ${notice.valueLabel}.\n` +
+          `Sign in for details: ${appUrl()}/account`,
+      }),
+    });
+  } catch {
+    // Best-effort
+  }
+}
+
+/** Fires whenever an admin clicks a status/payment button for a School,
+ * Sensei, Participant (registration), Referee, Audience, Organizer, or
+ * Participant Support record — emails the person and DMs them on Telegram
+ * if they have a connected chat (see statusChangeRecipient in
+ * app/actions/admin.ts for how each table's recipient is resolved). Same
+ * no-op-until-configured, Promise.allSettled pattern as every other notice
+ * in this file. */
+export async function notifyStatusChanged(notice: StatusChangeNotice): Promise<void> {
+  await Promise.allSettled([sendStatusChangeEmail(notice), sendStatusChangeTelegram(notice)]);
+}
+
 const CODE_ROLE_LABELS: Record<string, string> = {
   participant: "Participant",
   school: "School / Dojo",

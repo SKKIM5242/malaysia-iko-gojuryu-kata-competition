@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { writeAudit } from "@/lib/audit";
 import { kataBaseOf, ageAt } from "@/lib/division";
-import { notifyRefereeAssignment, notifyRefereeUnassigned, sendConfirmationEmail, notifyAnnouncementPublished, notifyCertificatesPublished, notifyInvitationCodeIssued } from "@/lib/notify";
+import { notifyRefereeAssignment, notifyRefereeUnassigned, sendConfirmationEmail, notifyAnnouncementPublished, notifyCertificatesPublished, notifyInvitationCodeIssued, notifyStatusChanged } from "@/lib/notify";
 import type { PaymentStatus } from "@/lib/types";
 import { parseCsvWithHeader, parseDDMMYYYY, type CsvUploadResult } from "@/lib/csv-bulk";
 import { normalizeIban } from "@/lib/bank";
@@ -163,6 +163,41 @@ async function uploadCertificateIfPresent(
 
 // ── Registrations ────────────────────────────────────────────────────────────
 
+/** Best-effort — never throws, so a notification hiccup can't undo a
+ * payment status update that already succeeded. A participant's own
+ * `user_id` is never populated by self-registration (no login exists yet
+ * at that point) — the reliable link is profiles.registration_id, set only
+ * once they sign in and claim this specific registration (see
+ * claim_registration / claim_registration_by_id in
+ * supabase/migrations/0072_claim_registration_any_role.sql). Until they
+ * claim it, only email applies — no Telegram DM is possible. */
+async function notifyRegistrationStatusChange(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  registrationId: string,
+  status: string,
+) {
+  try {
+    const { data: reg } = await supabase
+      .from("registrations")
+      .select("participant:participants(full_name, email)")
+      .eq("id", registrationId)
+      .maybeSingle();
+    const participant = (reg as unknown as { participant: { full_name: string; email: string | null } | null } | null)?.participant;
+    if (!participant) return;
+    const { data: profile } = await supabase
+      .from("profiles").select("telegram_chat_id").eq("registration_id", registrationId).maybeSingle();
+    await notifyStatusChanged({
+      email: participant.email,
+      telegramChatId: profile?.telegram_chat_id ?? null,
+      name: participant.full_name,
+      fieldLabel: "Payment status",
+      valueLabel: STATUS_VALUE_LABELS[status] ?? status,
+    });
+  } catch {
+    // Best-effort
+  }
+}
+
 export async function updatePaymentStatus(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const status = String(formData.get("status") ?? "") as PaymentStatus;
@@ -194,6 +229,8 @@ export async function updatePaymentStatus(formData: FormData) {
     new_value: { payment_status: status },
     actor_id: actorId,
   });
+
+  await notifyRegistrationStatusChange(supabase, id, status);
 
   revalidatePath("/participants");
   revalidatePath("/admin/registrations");
@@ -973,6 +1010,82 @@ export async function deleteSensei(formData: FormData) {
 
 // ── Community (referees / audiences / staff applications) ───────────────────
 
+const STATUS_FIELD_LABELS: Record<string, Record<string, string>> = {
+  referees: { status: "Approval status", payment_status: "Deposit status" },
+  audiences: { payment_status: "Payment status" },
+  staff_applications: { status: "Application status" },
+  schools: { payment_status: "Fee status" },
+  senseis: { payment_status: "Fee status" },
+};
+
+const STATUS_VALUE_LABELS: Record<string, string> = {
+  pending: "Pending", approved: "Approved", rejected: "Rejected",
+  paid: "Paid", waived: "Waived", refunded: "Refunded", forfeited: "Forfeited",
+};
+
+/** Resolves who a status/payment button click on `updateCommunityStatus`
+ * notifies, and how to reach them. Each table links to its own login
+ * differently: referees and audiences carry their own `user_id` column,
+ * auto-linked by email match right at signup (see handle_new_user in
+ * supabase/migrations/0060_multi_role_accounts.sql) — schools and senseis
+ * have no such column populated, so their login is found in reverse via
+ * profiles.school_id / profiles.sensei_id (set from the invitation code's
+ * for_record_id at signup, same migration). staff_applications rows never
+ * get an account of their own — approving one here doesn't create a login
+ * (see the note under the Organizer Applications table) — so no Telegram
+ * chat can exist for it; email is all that applies there. */
+async function statusChangeRecipient(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  table: string,
+  id: string,
+): Promise<{ email: string | null; name: string; telegramChatId: string | null } | null> {
+  const { data: row } = await supabase.from(table).select("*").eq("id", id).maybeSingle();
+  if (!row) return null;
+  const r = row as Record<string, unknown>;
+  const nameColumn = table === "schools" ? "contact_name" : table === "senseis" ? "name" : "full_name";
+  const email = (r.email as string | null) ?? null;
+  const name = (r[nameColumn] as string | null) ?? "there";
+
+  let telegramChatId: string | null = null;
+  if ((table === "referees" || table === "audiences") && r.user_id) {
+    const { data: profile } = await supabase
+      .from("profiles").select("telegram_chat_id").eq("user_id", r.user_id as string).maybeSingle();
+    telegramChatId = profile?.telegram_chat_id ?? null;
+  } else if (table === "schools" || table === "senseis") {
+    const { data: profile } = await supabase
+      .from("profiles").select("telegram_chat_id")
+      .eq(table === "schools" ? "school_id" : "sensei_id", id).maybeSingle();
+    telegramChatId = profile?.telegram_chat_id ?? null;
+  }
+  return { email, name, telegramChatId };
+}
+
+/** Best-effort — never throws, so a notification hiccup can't undo a
+ * status update that already succeeded. */
+async function notifyCommunityStatusChange(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  table: string,
+  id: string,
+  field: string,
+  value: string,
+) {
+  const fieldLabel = STATUS_FIELD_LABELS[table]?.[field];
+  if (!fieldLabel) return;
+  try {
+    const recipient = await statusChangeRecipient(supabase, table, id);
+    if (!recipient) return;
+    await notifyStatusChanged({
+      email: recipient.email,
+      telegramChatId: recipient.telegramChatId,
+      name: recipient.name,
+      fieldLabel,
+      valueLabel: STATUS_VALUE_LABELS[value] ?? value,
+    });
+  } catch {
+    // Best-effort
+  }
+}
+
 export async function updateCommunityStatus(formData: FormData) {
   const table = String(formData.get("table") ?? "");
   const id = String(formData.get("id") ?? "");
@@ -999,6 +1112,7 @@ export async function updateCommunityStatus(formData: FormData) {
     table_name: table, record_id: id, action: `${field}_changed`,
     new_value: { [field]: value }, actor_id: actorId,
   });
+  await notifyCommunityStatusChange(supabase, table, id, field, value);
   backTo(returnTo, { ok: "Updated." });
 }
 
