@@ -18,6 +18,9 @@ import DateOfBirthField from "@/components/DateOfBirthField";
 import InvitationCodeForm from "@/components/InvitationCodeForm";
 import InvitationCodeList from "@/components/InvitationCodeList";
 import IbanInput from "@/components/IbanInput";
+import IbanConfirmCheckbox from "@/components/IbanConfirmCheckbox";
+import BankDetailsNote from "@/components/BankDetailsNote";
+import BankAccountNameField from "@/components/BankAccountNameField";
 import { IBAN_CSV_NOTE } from "@/lib/bank";
 import { EDUCATION_LEVELS, SPOKEN_LANGUAGES } from "@/lib/reference-data";
 
@@ -288,21 +291,24 @@ export default async function AdminSupport({
               </div>
               <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3">
                 <p className="text-xs font-bold uppercase tracking-wide text-neutral-500">Bank details *</p>
+                <BankDetailsNote />
                 <div className="mt-2 grid gap-4 sm:grid-cols-2">
                   <div>
                     <label htmlFor="cs_bank_name" className={adminLabel}>Bank name *</label>
                     <input id="cs_bank_name" name="bank_name" required className={adminInput} />
                   </div>
                   <div>
-                    <label htmlFor="cs_bank_account_no" className={adminLabel}>
-                      <span className="block font-normal text-neutral-500">For Malaysian only - Local Bank Account No.*</span>
-                      International Bank Account No. (IBAN/SWIFT/BIC/ACH)*
-                    </label>
+                    <label htmlFor="cs_bank_account_no" className={adminLabel}>International Bank Account No. (IBAN/SWIFT/BIC/ACH) *</label>
                     <IbanInput id="cs_bank_account_no" name="bank_account_no" required className={adminInput} />
+                    <IbanConfirmCheckbox id="bank_account_no_confirmed" />
                   </div>
                   <div className="sm:col-span-2">
-                    <label htmlFor="cs_bank_account_name" className={adminLabel}>Account holder name *</label>
-                    <input id="cs_bank_account_name" name="bank_account_name" required className={adminInput} />
+                    <label htmlFor="bank_account_name" className={adminLabel}>Bank account holder name *</label>
+                    <BankAccountNameField
+                      id="bank_account_name"
+                      fullNameFieldId="cs_full_name"
+                      className={adminInput}
+                    />
                   </div>
                 </div>
               </div>

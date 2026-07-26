@@ -11,6 +11,9 @@ import InvitationCodeList from "@/components/InvitationCodeList";
 import { NoCommaInput } from "@/components/NoCommaAddressField";
 import DateOfBirthField from "@/components/DateOfBirthField";
 import IbanInput from "@/components/IbanInput";
+import IbanConfirmCheckbox from "@/components/IbanConfirmCheckbox";
+import BankDetailsNote from "@/components/BankDetailsNote";
+import BankAccountNameField from "@/components/BankAccountNameField";
 import { IBAN_CSV_NOTE } from "@/lib/bank";
 
 export const dynamic = "force-dynamic";
@@ -131,18 +134,24 @@ export default async function AdminOrganizers({
               </div>
               <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3">
                 <p className="text-xs font-bold uppercase tracking-wide text-neutral-500">Bank details *</p>
+                <BankDetailsNote />
                 <div className="mt-2 grid gap-4 sm:grid-cols-2">
                   <div>
                     <label htmlFor="org_bank_name" className={adminLabel}>Bank name *</label>
                     <input id="org_bank_name" name="bank_name" required className={adminInput} />
                   </div>
                   <div>
-                    <label htmlFor="org_bank_account_no" className={adminLabel}>International Bank Account No. (IBAN) *</label>
+                    <label htmlFor="org_bank_account_no" className={adminLabel}>International Bank Account No. (IBAN/SWIFT/BIC/ACH) *</label>
                     <IbanInput id="org_bank_account_no" name="bank_account_no" required className={adminInput} />
+                    <IbanConfirmCheckbox id="bank_account_no_confirmed" />
                   </div>
                   <div className="sm:col-span-2">
-                    <label htmlFor="org_bank_account_name" className={adminLabel}>Account holder name *</label>
-                    <input id="org_bank_account_name" name="bank_account_name" required className={adminInput} />
+                    <label htmlFor="bank_account_name" className={adminLabel}>Bank account holder name *</label>
+                    <BankAccountNameField
+                      id="bank_account_name"
+                      fullNameFieldId="org_full_name"
+                      className={adminInput}
+                    />
                   </div>
                 </div>
               </div>

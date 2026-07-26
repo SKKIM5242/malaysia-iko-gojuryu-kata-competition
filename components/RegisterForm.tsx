@@ -7,6 +7,7 @@ import { OrganizerContact, formatUSD } from "@/components/ui";
 import CertificateUploadField from "@/components/CertificateUploadField";
 import IbanInput from "@/components/IbanInput";
 import IbanConfirmCheckbox from "@/components/IbanConfirmCheckbox";
+import BankDetailsNote from "@/components/BankDetailsNote";
 import { NoCommaTextarea } from "@/components/NoCommaAddressField";
 import DateOfBirthField from "@/components/DateOfBirthField";
 import { ageAt, beltGroup, genderCode, kataBaseOf, kataBases as allKataBasesOf } from "@/lib/division";
@@ -461,11 +462,7 @@ export default function RegisterForm({
             Winnings are transferred to this account after 1 month of the winner announcement. Kept
             private — visible to the organizer only.
           </p>
-          <p className="mt-1 text-xs text-neutral-500">
-            Note: participants outside Malaysia — please provide your IBAN, SWIFT code, BIC, BBAN, or
-            ACH number. If you don&apos;t know your IBAN, please call your bank to check. This ensures
-            smooth processing with no delay in receiving any reward or commission.
-          </p>
+          <BankDetailsNote />
           <div className="mt-3 grid gap-4 sm:grid-cols-2">
             <div>
               <label htmlFor="bank_name" className={labelCls}>Bank name *</label>
