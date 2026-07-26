@@ -197,7 +197,7 @@ export default async function AdminOrganizers({
             message: s.message ?? "",
             status_text: s.status,
             status: (
-              <div className="flex flex-wrap gap-1">
+              <div key="status" className="flex flex-wrap gap-1">
                 {["pending", "approved", "rejected"].map((o) => (
                   <form key={o} action={updateCommunityStatus}>
                     <input type="hidden" name="table" value="staff_applications" />
