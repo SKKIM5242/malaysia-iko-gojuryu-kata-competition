@@ -366,8 +366,8 @@ export default async function AdminJudging({
         Every score a Referee/Judge submits is <strong>final — no appeal is available</strong>. A
         judge&apos;s individual score is visible to everyone as soon as they submit it; the
         Average Score and standings stay hidden from the public until winners are announced.
-        Admin and Organizer/Staff can also score any recording directly below, regardless of
-        assignment.
+        Only Organizer or Chief Referee/Judge can override the score of any recording directly
+        below, regardless of assignment.
       </div>
 
       <div className="mb-3 flex justify-end">
