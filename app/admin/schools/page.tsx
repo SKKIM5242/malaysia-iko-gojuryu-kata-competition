@@ -267,7 +267,8 @@ export default async function AdminSchools({
                 { key: "state", label: "State" },
                 { key: "person_in_charge", label: "Person in-charge" },
                 { key: "location", label: "Location" },
-                { key: "contact", label: "Contact" },
+                { key: "email", label: "Email" },
+                { key: "phone", label: "Phone" },
                 { key: "bank", label: "Bank" },
                 { key: "expected_fee", label: "Required Fee" },
                 { key: "payment", label: "Fee Status" },
@@ -302,7 +303,6 @@ export default async function AdminSchools({
                 person_in_charge: [s.contact_title, s.contact_name].filter(Boolean).join(" ") +
                   (s.contact_karate_title ? ` (${s.contact_karate_title}${s.contact_rank ? ` — ${s.contact_rank}` : ""})` : ""),
                 location: [s.home_address, s.city_town, s.postcode, s.home_country].filter(Boolean).join(", "),
-                contact: [s.email, s.phone].filter(Boolean).join(" · "),
                 bank: [s.bank_name, s.bank_account_no, s.bank_account_name].filter(Boolean).join(" · "),
                 contact_title: s.contact_title ?? "",
                 contact_name: s.contact_name ?? "",
@@ -319,11 +319,12 @@ export default async function AdminSchools({
                 bank_account_name: s.bank_account_name ?? "",
                 expected_fee: schoolFees.has(s.id) ? formatUSD(schoolFees.get(s.id)) : "— no participants yet",
                 payment_status_text: s.payment_status,
-                payment: <PaymentButtons id={s.id} current={s.payment_status} />,
+                payment: <PaymentButtons key="payment" id={s.id} current={s.payment_status} />,
                 ...(isAdminTier
                   ? {
                       sign_in_control: (
                         <SignInControlBox
+                          key="sign_in_control"
                           userId={loginBySchoolId.get(s.id)?.user_id ?? null}
                           signInCount={loginBySchoolId.get(s.id)?.sign_in_count ?? 0}
                           signInLimit={loginBySchoolId.get(s.id)?.sign_in_limit ?? null}
@@ -337,7 +338,7 @@ export default async function AdminSchools({
                     }
                   : {}),
                 actions: (
-                  <div className="flex gap-1.5">
+                  <div key="actions" className="flex gap-1.5">
                     <Link
                       href={`/admin/schools?edit=${s.id}`}
                       className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"

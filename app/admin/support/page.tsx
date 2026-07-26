@@ -330,7 +330,8 @@ export default async function AdminSupport({
             { key: "full_name", label: "Name" },
             { key: "short_name", label: "Short Name" },
             { key: "reference_id", label: "Reference ID" },
-            { key: "contact", label: "Contact" },
+            { key: "email", label: "Email" },
+            { key: "phone", label: "Phone" },
             ...competitions.map((c) => ({ key: `tier_${c.id}`, label: `Tier ${formatUSD(c.registration_fee_usd)}` })),
             { key: "message", label: "Message" },
             { key: "status", label: "Status" },
@@ -350,7 +351,6 @@ export default async function AdminSupport({
             reference_id: s.id.slice(0, 8).toUpperCase(),
             full_name: s.full_name,
             short_name: s.short_name ?? "",
-            contact: [s.email, s.phone].filter(Boolean).join(" · "),
             email: s.email ?? "",
             phone: s.phone ?? "",
             ...Object.fromEntries(

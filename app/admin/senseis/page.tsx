@@ -282,7 +282,8 @@ export default async function AdminSenseis({
                 { key: "gender", label: "Sex" },
                 { key: "certificate", label: "Certificate" },
                 { key: "location", label: "Location" },
-                { key: "contact", label: "Contact" },
+                { key: "email", label: "Email" },
+                { key: "phone", label: "Phone" },
                 { key: "bank", label: "Payout Bank" },
                 { key: "school", label: "School" },
                 { key: "expected_fee", label: "Required Fee" },
@@ -333,7 +334,6 @@ export default async function AdminSenseis({
                     <span key="certificate" className="text-neutral-400">—</span>
                   ),
                 location: [s.home_address, s.city_town, s.postcode, s.home_country].filter(Boolean).join(", "),
-                contact: [s.email, s.phone].filter(Boolean).join(" · "),
                 bank: [s.bank_name, s.bank_account_no, s.bank_account_name].filter(Boolean).join(" · "),
                 home_address: s.home_address ?? "",
                 city_town: s.city_town ?? "",

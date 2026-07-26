@@ -151,7 +151,8 @@ export default async function AdminAudience({
           columns={[
             { key: "full_name", label: "Name" },
             { key: "reference_id", label: "Reference ID" },
-            { key: "contact", label: "Contact" },
+            { key: "email", label: "Email" },
+            { key: "phone", label: "Phone" },
             { key: "home_country", label: "Country" },
             { key: "invitation_code", label: "Code" },
             { key: "support_referral", label: "Support Referral" },
@@ -175,7 +176,6 @@ export default async function AdminAudience({
             id: a.id,
             reference_id: a.id.slice(0, 8).toUpperCase(),
             full_name: a.full_name,
-            contact: [a.email, a.phone].filter(Boolean).join(" · "),
             email: a.email ?? "",
             phone: a.phone ?? "",
             home_country: a.home_country ?? "",
@@ -184,11 +184,12 @@ export default async function AdminAudience({
             referral_source: a.referral_source ?? "",
             payment_status: a.payment_status,
             payment: (
-              <StatusButtons table="audiences" id={a.id} field="payment_status" current={a.payment_status}
+              <StatusButtons key="payment" table="audiences" id={a.id} field="payment_status" current={a.payment_status}
                 options={["pending", "paid", "waived"]} />
             ),
             telegram: telegramLink ? (
               <a
+                key="telegram"
                 href={telegramLink}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -197,12 +198,13 @@ export default async function AdminAudience({
                 Join Telegram
               </a>
             ) : (
-              <span className="text-neutral-400">—</span>
+              <span key="telegram" className="text-neutral-400">—</span>
             ),
             ...(isAdminTier
               ? {
                   sign_in_control: (
                     <SignInControlBox
+                      key="sign_in_control"
                       userId={a.user_id}
                       signInCount={loginByUserId.get(a.user_id ?? "")?.sign_in_count ?? 0}
                       signInLimit={loginByUserId.get(a.user_id ?? "")?.sign_in_limit ?? null}
