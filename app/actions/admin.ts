@@ -11,7 +11,7 @@ import { notifyRefereeAssignment, notifyRefereeUnassigned, sendConfirmationEmail
 import type { PaymentStatus } from "@/lib/types";
 import { parseCsvWithHeader, parseDDMMYYYY, type CsvUploadResult } from "@/lib/csv-bulk";
 import { normalizeIban } from "@/lib/bank";
-import { getTelegramLink } from "@/lib/telegram";
+import { getTelegramLink, getTelegramLabel, type TelegramCategory } from "@/lib/telegram";
 import { ACCESS_MATRIX, accessMatrixToMarkdown } from "@/lib/access-matrix";
 import { DEFAULT_COMPARISON_ROWS } from "@/components/AccessComparisonTable";
 import { DEFAULT_AUTO_ASSIGN_CRITERIA } from "@/lib/auto-assign-criteria";
@@ -165,18 +165,20 @@ async function uploadCertificateIfPresent(
 // ── Registrations ────────────────────────────────────────────────────────────
 
 /** Best-effort — never throws, so a notification hiccup can't undo a
- * payment status update that already succeeded. A participant's own
- * `user_id` is never populated by self-registration (no login exists yet
- * at that point) — the reliable link is profiles.registration_id, set only
- * once they sign in and claim this specific registration (see
- * claim_registration / claim_registration_by_id in
- * supabase/migrations/0072_claim_registration_any_role.sql). Until they
- * claim it, only email applies — no Telegram DM is possible. */
+ * payment status update that already succeeded. Only fires for "paid" —
+ * "pending" and "rejected" don't email/DM the participant, per the
+ * organizer's instruction. Telegram lookup tries two links: the reliable
+ * one is profiles.registration_id, set once they sign in and claim this
+ * specific registration (see claim_registration / claim_registration_by_id
+ * in supabase/migrations/0072_claim_registration_any_role.sql); as a
+ * fallback (e.g. they have an account but never claimed this particular
+ * registration) it also tries a plain email match on profiles. */
 async function notifyRegistrationStatusChange(
   supabase: Awaited<ReturnType<typeof createClient>>,
   registrationId: string,
   status: string,
 ) {
+  if (status !== "paid") return;
   try {
     const { data: reg } = await supabase
       .from("registrations")
@@ -185,14 +187,22 @@ async function notifyRegistrationStatusChange(
       .maybeSingle();
     const participant = (reg as unknown as { participant: { full_name: string; email: string | null } | null } | null)?.participant;
     if (!participant) return;
-    const { data: profile } = await supabase
+    const { data: byClaim } = await supabase
       .from("profiles").select("telegram_chat_id").eq("registration_id", registrationId).maybeSingle();
+    let telegramChatId = byClaim?.telegram_chat_id ?? null;
+    if (!telegramChatId && participant.email) {
+      const { data: byEmail } = await supabase
+        .from("profiles").select("telegram_chat_id").ilike("email", participant.email).maybeSingle();
+      telegramChatId = byEmail?.telegram_chat_id ?? null;
+    }
+    const groupUrl = getTelegramLink("participant");
     await notifyStatusChanged({
       email: participant.email,
-      telegramChatId: profile?.telegram_chat_id ?? null,
+      telegramChatId,
       name: participant.full_name,
       fieldLabel: "Payment status",
       valueLabel: STATUS_VALUE_LABELS[status] ?? status,
+      telegramGroups: groupUrl ? [{ label: getTelegramLabel("participant"), url: groupUrl }] : null,
     });
   } catch {
     // Best-effort
@@ -1024,6 +1034,14 @@ const STATUS_VALUE_LABELS: Record<string, string> = {
   paid: "Paid", waived: "Waived", refunded: "Refunded", forfeited: "Forfeited",
 };
 
+/** Only these status values notify for these tables — Organizer/Support
+ * applications and Participant registrations stay silent on "pending" and
+ * "rejected", per the organizer's instruction; every other table (Referee,
+ * Audience, School, Sensei) still notifies on every value change. */
+const STATUS_NOTIFY_ONLY_VALUES: Partial<Record<string, string[]>> = {
+  staff_applications: ["approved"],
+};
+
 /** Resolves who a status/payment button click on `updateCommunityStatus`
  * notifies, and how to reach them. Referees and audiences carry their own
  * `user_id` column, auto-linked by email match right at signup (see
@@ -1034,20 +1052,23 @@ const STATUS_VALUE_LABELS: Record<string, string> = {
  * (profiles.school_id / profiles.sensei_id, set from the invitation code's
  * for_record_id at signup, still used by the sign-in-quota lookups), since
  * older accounts may only have the reverse-link. staff_applications rows
- * never get an account of their own — approving one here doesn't create a
- * login (see the note under the Organizer Applications table) — so no
- * Telegram chat can exist for it; email is all that applies there. */
+ * have no user_id/school_id-style column of their own — approving one here
+ * doesn't create a login by itself (see the note under the Organizer
+ * Applications table) — so the only way to find a Telegram chat for one is
+ * a plain email match against profiles, for whoever *did* separately get an
+ * account created (e.g. via "Create an Admin / Organizer account"). */
 async function statusChangeRecipient(
   supabase: Awaited<ReturnType<typeof createClient>>,
   table: string,
   id: string,
-): Promise<{ email: string | null; name: string; telegramChatId: string | null } | null> {
+): Promise<{ email: string | null; name: string; telegramChatId: string | null; roleRequested: string | null } | null> {
   const { data: row } = await supabase.from(table).select("*").eq("id", id).maybeSingle();
   if (!row) return null;
   const r = row as Record<string, unknown>;
   const nameColumn = table === "schools" ? "contact_name" : table === "senseis" ? "name" : "full_name";
   const email = (r.email as string | null) ?? null;
   const name = (r[nameColumn] as string | null) ?? "there";
+  const roleRequested = (r.role_requested as string | null) ?? null;
 
   let telegramChatId: string | null = null;
   if ((table === "referees" || table === "audiences" || table === "schools" || table === "senseis") && r.user_id) {
@@ -1061,7 +1082,42 @@ async function statusChangeRecipient(
       .eq(table === "schools" ? "school_id" : "sensei_id", id).maybeSingle();
     telegramChatId = profile?.telegram_chat_id ?? null;
   }
-  return { email, name, telegramChatId };
+  if (!telegramChatId && table === "staff_applications" && email) {
+    const { data: profile } = await supabase
+      .from("profiles").select("telegram_chat_id").ilike("email", email).maybeSingle();
+    telegramChatId = profile?.telegram_chat_id ?? null;
+  }
+  return { email, name, telegramChatId, roleRequested };
+}
+
+/** All 5 competition-related groups (excludes "class", which is the
+ * unrelated dojo-class-students feature) — what an Organizer/Admin
+ * application's approval email links to, since that role moderates across
+ * every category, not just one. */
+const ORGANIZER_TELEGRAM_CATEGORIES: TelegramCategory[] = ["participant", "school", "referee", "audience", "staff"];
+
+/** Which Telegram group link(s) go in a community status-change email.
+ * Organizer/Admin applications get all 5 competition groups' links (they
+ * moderate across the whole competition); every other table gets just its
+ * own. */
+function communityTelegramGroups(
+  table: string,
+  roleRequested: string | null,
+): Array<{ label: string; url: string }> | null {
+  if (table === "staff_applications") {
+    if (roleRequested === "admin" || roleRequested === "organizer") {
+      const groups = ORGANIZER_TELEGRAM_CATEGORIES
+        .map((category) => ({ category, url: getTelegramLink(category) }))
+        .filter((g): g is { category: TelegramCategory; url: string } => !!g.url)
+        .map((g) => ({ label: getTelegramLabel(g.category), url: g.url }));
+      return groups.length ? groups : null;
+    }
+    const url = getTelegramLink("staff");
+    return url ? [{ label: getTelegramLabel("staff"), url }] : null;
+  }
+  const category = table === "referees" ? "referee" : table === "audiences" ? "audience" : "school";
+  const url = getTelegramLink(category);
+  return url ? [{ label: getTelegramLabel(category), url }] : null;
 }
 
 /** Best-effort — never throws, so a notification hiccup can't undo a
@@ -1075,6 +1131,8 @@ async function notifyCommunityStatusChange(
 ) {
   const fieldLabel = STATUS_FIELD_LABELS[table]?.[field];
   if (!fieldLabel) return;
+  const onlyValues = STATUS_NOTIFY_ONLY_VALUES[table];
+  if (onlyValues && !onlyValues.includes(value)) return;
   try {
     const recipient = await statusChangeRecipient(supabase, table, id);
     if (!recipient) return;
@@ -1084,7 +1142,7 @@ async function notifyCommunityStatusChange(
       name: recipient.name,
       fieldLabel,
       valueLabel: STATUS_VALUE_LABELS[value] ?? value,
-      telegramGroupUrl: table === "schools" || table === "senseis" ? getTelegramLink("school") : null,
+      telegramGroups: communityTelegramGroups(table, recipient.roleRequested),
     });
   } catch {
     // Best-effort

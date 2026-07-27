@@ -434,10 +434,21 @@ interface StatusChangeNotice {
   fieldLabel: string;
   /** Human label for the new value, e.g. "Approved", "Paid". */
   valueLabel: string;
-  /** Set only for roles without a Telegram DM guarantee yet (e.g. School/
-   * Sensei) — surfaces the group invite link in the email itself so they
-   * can join even before connecting a DM chat. */
-  telegramGroupUrl?: string | null;
+  /** Telegram group invite link(s) to surface in the email — one per table
+   * (Referee, Audience, School/Sensei, Support, Participant), except
+   * Organizer/Admin applications, which get every group's link since that
+   * role moderates across the whole competition, not just one category. */
+  telegramGroups?: Array<{ label: string; url: string }> | null;
+}
+
+function telegramGroupsBlock(groups: Array<{ label: string; url: string }> | null | undefined): string {
+  if (!groups || groups.length === 0) return "";
+  const verb = groups.length === 1 ? "it" : "the ones you haven't already";
+  const list =
+    groups.length === 1
+      ? `Telegram group: ${groups[0].url}\n`
+      : `Telegram groups:\n${groups.map((g) => `- ${g.label}: ${g.url}`).join("\n")}\n`;
+  return `${list}Join ${verb} if you haven't already — that's where the organizer posts announcements.\n\n`;
 }
 
 async function sendStatusChangeEmail(notice: StatusChangeNotice): Promise<void> {
@@ -449,10 +460,7 @@ async function sendStatusChangeEmail(notice: StatusChangeNotice): Promise<void> 
       `Your ${notice.fieldLabel.toLowerCase()} for the Malaysia Open Virtual Karate-do Kata ` +
       `Championship has been updated to: ${notice.valueLabel}.\n\n` +
       `Sign in to your account for details: ${appUrl()}/account\n\n` +
-      (notice.telegramGroupUrl
-        ? `Telegram group: ${notice.telegramGroupUrl}\n` +
-          `Join it if you haven't already — that's where the organizer posts announcements.\n\n`
-        : "") +
+      telegramGroupsBlock(notice.telegramGroups) +
       `— Malaysia Open Virtual Karate-do Kata Championship`,
   );
 }
