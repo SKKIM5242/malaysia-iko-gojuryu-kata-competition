@@ -396,7 +396,7 @@ export default async function AdminSenseis({
       </div>
       <div className="mt-8 space-y-6">
         <InvitationCodeForm
-          role="school"
+          role="sensei"
           returnTo="/admin/senseis"
           title="Sensei / Coach Invitation Code"
           idPrefix="sensei_code"
@@ -404,7 +404,7 @@ export default async function AdminSenseis({
           competitions={competitions}
         />
         <InvitationCodeList
-          role="school"
+          role="sensei"
           returnTo="/admin/senseis"
           codeExample="IKO-SENSEI-2026"
           competitions={competitions}
