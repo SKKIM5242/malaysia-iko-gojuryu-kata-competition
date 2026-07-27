@@ -76,6 +76,7 @@ export default async function AdminClasses({
   }
 
   const supabase = await createClient();
+  const classTelegramLink = await getTelegramLink("class");
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -747,9 +748,9 @@ export default async function AdminClasses({
                 schedules the next cycle (yearly / monthly / bi-monthly / quarterly). When your Stripe
                 secret key is added, these invoices can be charged online automatically. “Email invoice”
                 and “Email payment links to all unpaid” send to the student&apos;s own email address —
-                {getTelegramLink("class")
+                {classTelegramLink
                   ? " each email also includes the Dojo Class Students Telegram group link, since individual students aren't bot-linked for a direct Telegram message."
-                  : " set TELEGRAM_GROUP_CLASS to also include the Dojo Class Students Telegram group link in these emails."}
+                  : " add a \"class\" Telegram group on the Telegram Groups admin page to also include its link in these emails."}
               </p>
             </div>
           </div>

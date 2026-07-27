@@ -6,7 +6,8 @@ export const dynamic = "force-dynamic";
 
 export const metadata = { title: "Audience / Spectator registration" };
 
-export default function RegisterAudiencePage() {
+export default async function RegisterAudiencePage() {
+  const telegramLink = await getTelegramLink("audience");
   return (
     <>
       <SiteHeader />
@@ -19,7 +20,7 @@ export default function RegisterAudiencePage() {
           viewing access.
         </div>
         <div className="mt-8">
-          <AudienceForm telegramLink={getTelegramLink("audience")} />
+          <AudienceForm telegramLink={telegramLink} />
         </div>
       </main>
       <SiteFooter />

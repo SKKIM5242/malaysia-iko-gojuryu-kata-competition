@@ -16,6 +16,7 @@ export default async function RegisterSchoolPage() {
         fee: Number(c.registration_fee_usd ?? 0),
       }))
     : [];
+  const telegramLink = await getTelegramLink("school");
   return (
     <>
       <SiteHeader />
@@ -27,7 +28,7 @@ export default async function RegisterSchoolPage() {
           USD 100 / USD 200.
         </p>
         <div className="mt-8">
-          {ready ? <SchoolForm telegramLink={getTelegramLink("school")} tiers={tiers} /> : <SetupNotice />}
+          {ready ? <SchoolForm telegramLink={telegramLink} tiers={tiers} /> : <SetupNotice />}
         </div>
       </main>
       <SiteFooter />

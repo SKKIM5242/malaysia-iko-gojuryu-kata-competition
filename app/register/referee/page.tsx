@@ -6,7 +6,8 @@ export const dynamic = "force-dynamic";
 
 export const metadata = { title: "Referee / Judge registration" };
 
-export default function RegisterRefereePage() {
+export default async function RegisterRefereePage() {
+  const telegramLink = await getTelegramLink("referee");
   return (
     <>
       <SiteHeader />
@@ -23,7 +24,7 @@ export default function RegisterRefereePage() {
           </p>
         </div>
         <div className="mt-8">
-          <RefereeForm telegramLink={getTelegramLink("referee")} />
+          <RefereeForm telegramLink={telegramLink} />
         </div>
       </main>
       <SiteFooter />

@@ -68,7 +68,7 @@ export default async function AdminAudience({
 
   const supabase = await createClient();
   const { data: audiences } = await supabase.from("audiences").select("*").order("created_at", { ascending: false });
-  const telegramLink = getTelegramLink("audience");
+  const telegramLink = await getTelegramLink("audience");
 
   const {
     data: { user },

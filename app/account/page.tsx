@@ -357,6 +357,7 @@ export default async function AccountPage({
   // ── Staff / Admin / Organizer / Participant Support ────────────────────────
   if (["staff", "admin", "organizer", "customer_support"].includes(profile.role)) {
     const recordingCtx = profile.registration_id ? await getRecordingContext(supabase, user.id, profile) : null;
+    const staffTelegramLinks = profile.approved ? await getAllTelegramLinks() : [];
     return (
       <>
         <SiteHeader />
@@ -389,7 +390,7 @@ export default async function AccountPage({
                 <p className="mb-2 text-sm font-semibold text-green-900">
                   Full access — every Telegram group:
                 </p>
-                <TelegramFullAccessLinks links={getAllTelegramLinks()} />
+                <TelegramFullAccessLinks links={staffTelegramLinks} />
               </div>
             </div>
           ) : (
@@ -443,6 +444,7 @@ export default async function AccountPage({
     }
 
     const recordingCtx = profile.registration_id ? await getRecordingContext(supabase, user.id, profile) : null;
+    const refereeTelegramLinks = await getAllTelegramLinks();
 
     const { data: assignments } = await supabase
       .from("referee_assignments")
@@ -511,7 +513,7 @@ export default async function AccountPage({
             <p className="mb-2 text-sm font-semibold text-neutral-700">
               Full access — every Telegram group:
             </p>
-            <TelegramFullAccessLinks links={getAllTelegramLinks()} />
+            <TelegramFullAccessLinks links={refereeTelegramLinks} />
           </div>
           {(() => {
             const connectUrl = getTelegramBotConnectUrl(user.id);

@@ -105,7 +105,7 @@ export default async function AdminSupport({
     if (t.complaint) entry.complaints += 1;
     perSupporter.set(t.answered_by, entry);
   }
-  const telegramGroups = getAllTelegramLinks();
+  const telegramGroups = await getAllTelegramLinks();
 
   const { data: apps } = await supabase
     .from("staff_applications")

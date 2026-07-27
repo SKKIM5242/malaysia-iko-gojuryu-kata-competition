@@ -11,7 +11,7 @@ import { notifyRefereeAssignment, notifyRefereeUnassigned, sendConfirmationEmail
 import type { PaymentStatus } from "@/lib/types";
 import { parseCsvWithHeader, parseDDMMYYYY, type CsvUploadResult } from "@/lib/csv-bulk";
 import { normalizeIban } from "@/lib/bank";
-import { getTelegramLink, getTelegramLabel, type TelegramCategory } from "@/lib/telegram";
+import { listTelegramGroups, type TelegramCategory } from "@/lib/telegram";
 import { ACCESS_MATRIX, accessMatrixToMarkdown } from "@/lib/access-matrix";
 import { DEFAULT_COMPARISON_ROWS } from "@/components/AccessComparisonTable";
 import { DEFAULT_AUTO_ASSIGN_CRITERIA } from "@/lib/auto-assign-criteria";
@@ -195,14 +195,14 @@ async function notifyRegistrationStatusChange(
         .from("profiles").select("telegram_chat_id").ilike("email", participant.email).maybeSingle();
       telegramChatId = byEmail?.telegram_chat_id ?? null;
     }
-    const groupUrl = getTelegramLink("participant");
+    const participantGroup = (await listTelegramGroups()).find((g) => g.category === "participant");
     await notifyStatusChanged({
       email: participant.email,
       telegramChatId,
       name: participant.full_name,
       fieldLabel: "Payment status",
       valueLabel: STATUS_VALUE_LABELS[status] ?? status,
-      telegramGroups: groupUrl ? [{ label: getTelegramLabel("participant"), url: groupUrl }] : null,
+      telegramGroups: participantGroup ? [{ label: participantGroup.label, url: participantGroup.url }] : null,
     });
   } catch {
     // Best-effort
@@ -1091,25 +1091,27 @@ const ORGANIZER_TELEGRAM_CATEGORIES: TelegramCategory[] = ["participant", "schoo
 /** Which Telegram group link(s) go in a community status-change email.
  * Organizer/Admin applications get all 5 competition groups' links (they
  * moderate across the whole competition); every other table gets just its
- * own. */
-function communityTelegramGroups(
+ * own. One DB fetch covers every category, rather than one round trip per
+ * lookup. */
+async function communityTelegramGroups(
   table: string,
   roleRequested: string | null,
-): Array<{ label: string; url: string }> | null {
+): Promise<Array<{ label: string; url: string }> | null> {
+  const byCategory = new Map((await listTelegramGroups()).map((g) => [g.category, g]));
   if (table === "staff_applications") {
     if (roleRequested === "admin" || roleRequested === "organizer") {
       const groups = ORGANIZER_TELEGRAM_CATEGORIES
-        .map((category) => ({ category, url: getTelegramLink(category) }))
-        .filter((g): g is { category: TelegramCategory; url: string } => !!g.url)
-        .map((g) => ({ label: getTelegramLabel(g.category), url: g.url }));
+        .map((category) => byCategory.get(category))
+        .filter((g): g is NonNullable<typeof g> => !!g)
+        .map((g) => ({ label: g.label, url: g.url }));
       return groups.length ? groups : null;
     }
-    const url = getTelegramLink("staff");
-    return url ? [{ label: getTelegramLabel("staff"), url }] : null;
+    const staffGroup = byCategory.get("staff");
+    return staffGroup ? [{ label: staffGroup.label, url: staffGroup.url }] : null;
   }
   const category = table === "referees" ? "referee" : table === "audiences" ? "audience" : "school";
-  const url = getTelegramLink(category);
-  return url ? [{ label: getTelegramLabel(category), url }] : null;
+  const group = byCategory.get(category);
+  return group ? [{ label: group.label, url: group.url }] : null;
 }
 
 /** Best-effort — never throws, so a notification hiccup can't undo a
@@ -1132,7 +1134,7 @@ async function notifyCommunityStatusChange(
       name: recipient.name,
       fieldLabel,
       valueLabel: STATUS_VALUE_LABELS[value] ?? value,
-      telegramGroups: communityTelegramGroups(table, recipient.roleRequested),
+      telegramGroups: await communityTelegramGroups(table, recipient.roleRequested),
     });
   } catch {
     // Best-effort
@@ -1702,6 +1704,70 @@ export async function deleteAccessComparisonRow(formData: FormData) {
   });
   revalidatePath("/register");
   backTo(returnTo, { ok: "Access Comparison row deleted." });
+}
+
+// ── Telegram Groups ──────────────────────────────────────────────────────────
+
+async function requireTelegramGroupEditor(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  actorId: string | null,
+  returnTo: string,
+) {
+  const role = await getActorRole(supabase, actorId);
+  if (!["admin", "organizer", "staff"].includes(role ?? "")) {
+    backTo(returnTo, { error: "Only Admin / Organizer can edit Telegram groups." });
+  }
+}
+
+/** Category is fixed once created for the 6 built-in categories (participant/
+ * school/referee/audience/staff/class) — many registration pages and
+ * notification emails look a group up by that exact string (see
+ * lib/telegram.ts), so silently renaming it here would break those links.
+ * The admin page only lets category be set when creating a new row; existing
+ * rows only let label/url/order be edited. */
+export async function saveTelegramGroup(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/telegram";
+  const { supabase, actorId } = await getActor();
+  await requireTelegramGroupEditor(supabase, actorId, returnTo);
+  const values = {
+    category: String(formData.get("category") ?? "").trim(),
+    label: String(formData.get("label") ?? "").trim(),
+    url: String(formData.get("url") ?? "").trim(),
+    sort_order: Number(formData.get("sort_order") ?? 0) || 0,
+  };
+  if (!values.category || !values.label || !values.url) {
+    backTo(returnTo, { error: "Category, label, and invite link are all required." });
+  }
+  const { error } = id
+    ? await supabase.from("telegram_groups").update(values).eq("id", id)
+    : await supabase.from("telegram_groups").insert(values);
+  if (error) {
+    backTo(returnTo, {
+      error: error.message.toLowerCase().includes("duplicate")
+        ? `A Telegram group with category "${values.category}" already exists.`
+        : "Could not save the Telegram group.",
+    });
+  }
+  await writeAudit(supabase, {
+    table_name: "telegram_groups", record_id: id || null,
+    action: id ? "telegram_group_updated" : "telegram_group_created",
+    new_value: values, actor_id: actorId,
+  });
+  backTo(returnTo, { ok: "Telegram group saved." });
+}
+
+export async function deleteTelegramGroup(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/telegram";
+  const { supabase, actorId } = await getActor();
+  await requireTelegramGroupEditor(supabase, actorId, returnTo);
+  const { error } = await supabase.from("telegram_groups").delete().eq("id", id);
+  if (error) backTo(returnTo, { error: "Could not delete the Telegram group." });
+  await writeAudit(supabase, {
+    table_name: "telegram_groups", record_id: id, action: "telegram_group_deleted", actor_id: actorId,
+  });
+  backTo(returnTo, { ok: "Telegram group deleted." });
 }
 
 // ── Participant Support tickets (per-resolved-ticket bounty) ────────────────

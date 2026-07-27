@@ -42,18 +42,16 @@ Winners (owner-only).
 
 ## Changing or adding groups later
 
-Update the relevant environment variable in Vercel → Project → Settings →
-Environment Variables, then redeploy (or just push any commit — Vercel
-redeploys automatically):
+Group invite links are stored in the `telegram_groups` table, editable
+straight from **Admin panel → Telegram Groups** (`/admin/telegram`) — no
+environment variable or redeploy needed. Each row has a `category` (the
+6 built-in ones are `participant`, `school`, `referee`, `audience`, `staff`,
+`class`), a display `label`, and the invite `url`; edit/save updates a row,
+"Add group" creates a brand new one (e.g. for a sponsor group), and Delete
+removes one. The `category` for the 6 built-in rows can't be changed from
+the admin page, since registration pages and notification emails look a
+group up by that exact string.
 
-```
-TELEGRAM_GROUP_PARTICIPANT=https://t.me/+mfpuPeHf6gs5Y2Rl
-TELEGRAM_GROUP_SCHOOL=https://t.me/+JjPOjCHLOzNlMzRl
-TELEGRAM_GROUP_REFEREE=https://t.me/+WfAyMh5t9t02N2Rl
-TELEGRAM_GROUP_AUDIENCE=https://t.me/+15XLZ1AK8nAwNWFl
-TELEGRAM_GROUP_STAFF=https://t.me/+pCKynJO6wLJmZjhl
-```
-
-Leaving any of these blank makes the corresponding "Join Telegram Group"
-button fall back to the phone/email contact instead of linking anywhere
-broken.
+Deleting or leaving a category's row empty makes the corresponding "Join
+Telegram Group" button fall back to the phone/email contact instead of
+linking anywhere broken.

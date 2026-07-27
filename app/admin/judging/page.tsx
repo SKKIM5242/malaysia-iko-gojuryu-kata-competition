@@ -125,7 +125,7 @@ export default async function AdminJudging({
     refereeName.set(r.user_id, r.full_name || r.email || r.user_id.slice(0, 8));
     refereeCountry.set(r.user_id, r.country ?? null);
   }
-  const refereeTelegramLink = getTelegramLink("referee");
+  const refereeTelegramLink = await getTelegramLink("referee");
 
   // Admin/Organizer/Staff who self-assigned via "take over or override
   // score" — Full View surfaces these separately from genuine judges.

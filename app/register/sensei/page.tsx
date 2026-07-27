@@ -22,6 +22,7 @@ export default async function RegisterSenseiPage({
         fee: Number(c.registration_fee_usd ?? 0),
       }))
     : [];
+  const telegramLink = await getTelegramLink("school");
   return (
     <>
       <SiteHeader />
@@ -36,7 +37,7 @@ export default async function RegisterSenseiPage({
         </p>
         <div className="mt-8">
           {ready ? (
-            <SenseiForm schools={schools} defaultBy={by} telegramLink={getTelegramLink("school")} tiers={tiers} />
+            <SenseiForm schools={schools} defaultBy={by} telegramLink={telegramLink} tiers={tiers} />
           ) : (
             <SetupNotice />
           )}

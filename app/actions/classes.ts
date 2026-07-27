@@ -425,7 +425,7 @@ export async function emailInvoice(formData: FormData) {
     table_name: "class_invoices", record_id: id, action: "invoice_emailed",
     new_value: { to: invoice!.student!.email }, actor_id: actorId,
   });
-  const telegramUrl = getTelegramLink("class");
+  const telegramUrl = await getTelegramLink("class");
   backTo("invoices", {
     ok: telegramUrl
       ? "Invoice emailed. Dojo Class Students Telegram group is also linked in that email."

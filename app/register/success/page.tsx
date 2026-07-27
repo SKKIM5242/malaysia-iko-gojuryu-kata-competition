@@ -18,6 +18,7 @@ export default async function RegisterSuccessPage({
   if (!paymentsEnabled() || !session_id) redirect("/register");
 
   const result = await finalizeStripeSession(session_id);
+  const telegramLink = await getTelegramLink("participant");
 
   return (
     <>
@@ -47,7 +48,7 @@ export default async function RegisterSuccessPage({
 
               <div>
                 <p className="text-sm font-semibold text-green-900">1) Join the Telegram Group</p>
-                <TelegramJoinButton href={getTelegramLink("participant")} />
+                <TelegramJoinButton href={telegramLink} />
               </div>
 
               <div>

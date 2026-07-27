@@ -9,6 +9,7 @@ export const metadata = { title: "Participant Support registration" };
 
 export default async function RegisterStaffPage() {
   const competitions = await getAllCompetitions();
+  const telegramLink = await getTelegramLink("staff");
   return (
     <>
       <SiteHeader />
@@ -21,7 +22,7 @@ export default async function RegisterStaffPage() {
           the organizer before any access is granted.
         </p>
         <div className="mt-8">
-          <StaffForm telegramLink={getTelegramLink("staff")} competitions={competitions} />
+          <StaffForm telegramLink={telegramLink} competitions={competitions} />
         </div>
       </main>
       <SiteFooter />

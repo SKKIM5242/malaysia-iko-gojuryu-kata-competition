@@ -48,6 +48,7 @@ export default async function PayThanksPage({
             : await finalizeInvoiceSession(session_id);
   }
   const isDirectory = kind === "directory";
+  const joinGroupUrl = await getTelegramLink(isDirectory ? "school" : "class");
 
   return (
     <>
@@ -84,7 +85,7 @@ export default async function PayThanksPage({
               </Link>
             ) : (
               <div className="mx-auto max-w-md text-green-900">
-                <TelegramJoinButton href={getTelegramLink(isDirectory ? "school" : "class")} />
+                <TelegramJoinButton href={joinGroupUrl} />
               </div>
             )}
           </div>

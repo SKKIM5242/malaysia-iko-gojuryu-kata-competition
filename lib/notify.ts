@@ -4,7 +4,7 @@
  * to call unconditionally from the assignment / registration code paths.
  */
 
-import { getTelegramLink, type TelegramCategory } from "@/lib/telegram";
+import { getTelegramLink, getAllTelegramLinks, type TelegramCategory } from "@/lib/telegram";
 
 interface AssignmentNotice {
   refereeEmail: string | null;
@@ -191,8 +191,7 @@ export interface ConfirmationEmailInput {
   telegramCategory?: TelegramCategory | null;
 }
 
-function buildConfirmationBody(input: ConfirmationEmailInput): string {
-  const telegramUrl = input.telegramCategory ? getTelegramLink(input.telegramCategory) : null;
+function buildConfirmationBody(input: ConfirmationEmailInput, telegramUrl: string | null): string {
   const lines: string[] = [`Hi ${input.recipientName},`, "", ...input.bodyLines];
   if (input.referenceId) lines.push("", `Reference ID: ${input.referenceId}`);
   lines.push(
@@ -222,7 +221,8 @@ function buildConfirmationBody(input: ConfirmationEmailInput): string {
  */
 export async function sendConfirmationEmail(input: ConfirmationEmailInput): Promise<void> {
   if (!input.toEmail) return;
-  await sendEmail(input.toEmail, input.subject, buildConfirmationBody(input));
+  const telegramUrl = input.telegramCategory ? await getTelegramLink(input.telegramCategory) : null;
+  await sendEmail(input.toEmail, input.subject, buildConfirmationBody(input, telegramUrl));
 }
 
 const RESEND_BATCH_SIZE = 100;
@@ -241,9 +241,16 @@ export async function sendConfirmationEmailBatch(inputs: ConfirmationEmailInput[
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) return;
   const from = process.env.EMAIL_FROM || "onboarding@resend.dev";
+  // One lookup for the whole batch (up to 10,000 rows) instead of one per
+  // recipient — every recipient's telegramCategory maps to the same handful
+  // of groups, so there's no reason to hit the DB per row.
+  const groupUrlByCategory = new Map((await getAllTelegramLinks()).map((g) => [g.category, g.url]));
   const emails = inputs
     .filter((i): i is ConfirmationEmailInput & { toEmail: string } => !!i.toEmail)
-    .map((i) => ({ from, to: i.toEmail, subject: i.subject, text: buildConfirmationBody(i) }));
+    .map((i) => ({
+      from, to: i.toEmail, subject: i.subject,
+      text: buildConfirmationBody(i, i.telegramCategory ? groupUrlByCategory.get(i.telegramCategory) ?? null : null),
+    }));
   if (emails.length === 0) return;
 
   for (let i = 0; i < emails.length; i += RESEND_BATCH_SIZE) {
@@ -285,7 +292,7 @@ const ANNOUNCEMENT_TELEGRAM_CATEGORIES: TelegramCategory[] = [
 
 /** Posts to one group's "Announcements" topic. No-ops until that group's
  * numeric chat id (TELEGRAM_CHAT_ID_<CATEGORY>) is configured — the invite
- * links already set up (TELEGRAM_GROUP_<CATEGORY>) aren't enough for the Bot
+ * link already set up in the telegram_groups table isn't enough for the Bot
  * API, which needs the chat id. TELEGRAM_TOPIC_ANNOUNCEMENT_<CATEGORY> (the
  * topic's message_thread_id) is optional — omitted, the message just posts
  * to the group's General topic instead of a dedicated one. */
@@ -546,7 +553,7 @@ export async function notifyInvitationCodeIssued(input: {
 }): Promise<void> {
   const roleLabel = CODE_ROLE_LABELS[input.role] ?? input.role;
   const category = CODE_ROLE_TELEGRAM_CATEGORY[input.role];
-  const telegramUrl = category ? getTelegramLink(category) : null;
+  const telegramUrl = category ? await getTelegramLink(category) : null;
   const lines = [
     `Hi,`,
     "",
