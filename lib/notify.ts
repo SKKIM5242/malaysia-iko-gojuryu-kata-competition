@@ -434,6 +434,10 @@ interface StatusChangeNotice {
   fieldLabel: string;
   /** Human label for the new value, e.g. "Approved", "Paid". */
   valueLabel: string;
+  /** Set only for roles without a Telegram DM guarantee yet (e.g. School/
+   * Sensei) — surfaces the group invite link in the email itself so they
+   * can join even before connecting a DM chat. */
+  telegramGroupUrl?: string | null;
 }
 
 async function sendStatusChangeEmail(notice: StatusChangeNotice): Promise<void> {
@@ -445,6 +449,10 @@ async function sendStatusChangeEmail(notice: StatusChangeNotice): Promise<void> 
       `Your ${notice.fieldLabel.toLowerCase()} for the Malaysia Open Virtual Karate-do Kata ` +
       `Championship has been updated to: ${notice.valueLabel}.\n\n` +
       `Sign in to your account for details: ${appUrl()}/account\n\n` +
+      (notice.telegramGroupUrl
+        ? `Telegram group: ${notice.telegramGroupUrl}\n` +
+          `Join it if you haven't already — that's where the organizer posts announcements.\n\n`
+        : "") +
       `— Malaysia Open Virtual Karate-do Kata Championship`,
   );
 }

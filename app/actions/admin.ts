@@ -11,6 +11,7 @@ import { notifyRefereeAssignment, notifyRefereeUnassigned, sendConfirmationEmail
 import type { PaymentStatus } from "@/lib/types";
 import { parseCsvWithHeader, parseDDMMYYYY, type CsvUploadResult } from "@/lib/csv-bulk";
 import { normalizeIban } from "@/lib/bank";
+import { getTelegramLink } from "@/lib/telegram";
 import { ACCESS_MATRIX, accessMatrixToMarkdown } from "@/lib/access-matrix";
 import { DEFAULT_COMPARISON_ROWS } from "@/components/AccessComparisonTable";
 import { DEFAULT_AUTO_ASSIGN_CRITERIA } from "@/lib/auto-assign-criteria";
@@ -1024,16 +1025,18 @@ const STATUS_VALUE_LABELS: Record<string, string> = {
 };
 
 /** Resolves who a status/payment button click on `updateCommunityStatus`
- * notifies, and how to reach them. Each table links to its own login
- * differently: referees and audiences carry their own `user_id` column,
- * auto-linked by email match right at signup (see handle_new_user in
- * supabase/migrations/0060_multi_role_accounts.sql) — schools and senseis
- * have no such column populated, so their login is found in reverse via
- * profiles.school_id / profiles.sensei_id (set from the invitation code's
- * for_record_id at signup, same migration). staff_applications rows never
- * get an account of their own — approving one here doesn't create a login
- * (see the note under the Organizer Applications table) — so no Telegram
- * chat can exist for it; email is all that applies there. */
+ * notifies, and how to reach them. Referees and audiences carry their own
+ * `user_id` column, auto-linked by email match right at signup (see
+ * handle_new_user in supabase/migrations/0060_multi_role_accounts.sql).
+ * Schools and senseis now get the same email-match auto-link on their own
+ * `user_id` column (supabase/migrations/0080_school_sensei_email_autolink.sql)
+ * — checked alongside the older invitation-code reverse-link
+ * (profiles.school_id / profiles.sensei_id, set from the invitation code's
+ * for_record_id at signup, still used by the sign-in-quota lookups), since
+ * older accounts may only have the reverse-link. staff_applications rows
+ * never get an account of their own — approving one here doesn't create a
+ * login (see the note under the Organizer Applications table) — so no
+ * Telegram chat can exist for it; email is all that applies there. */
 async function statusChangeRecipient(
   supabase: Awaited<ReturnType<typeof createClient>>,
   table: string,
@@ -1047,11 +1050,12 @@ async function statusChangeRecipient(
   const name = (r[nameColumn] as string | null) ?? "there";
 
   let telegramChatId: string | null = null;
-  if ((table === "referees" || table === "audiences") && r.user_id) {
+  if ((table === "referees" || table === "audiences" || table === "schools" || table === "senseis") && r.user_id) {
     const { data: profile } = await supabase
       .from("profiles").select("telegram_chat_id").eq("user_id", r.user_id as string).maybeSingle();
     telegramChatId = profile?.telegram_chat_id ?? null;
-  } else if (table === "schools" || table === "senseis") {
+  }
+  if (!telegramChatId && (table === "schools" || table === "senseis")) {
     const { data: profile } = await supabase
       .from("profiles").select("telegram_chat_id")
       .eq(table === "schools" ? "school_id" : "sensei_id", id).maybeSingle();
@@ -1080,6 +1084,7 @@ async function notifyCommunityStatusChange(
       name: recipient.name,
       fieldLabel,
       valueLabel: STATUS_VALUE_LABELS[value] ?? value,
+      telegramGroupUrl: table === "schools" || table === "senseis" ? getTelegramLink("school") : null,
     });
   } catch {
     // Best-effort
