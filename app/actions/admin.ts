@@ -851,6 +851,53 @@ export async function publishAccessMatrixAnnouncement() {
   redirect(`/admin/announcements?edit=${data!.id}`);
 }
 
+const ADMIN_ADD_ROLE_LABEL: Record<string, string> = {
+  school: "School / Dojo",
+  sensei: "Sensei / Coach",
+  referee: "Referee / Judge",
+  audience: "Audience / Spectator",
+  participant: "Participant",
+};
+
+const ADMIN_ADD_TELEGRAM_CATEGORY: Record<string, TelegramCategory> = {
+  school: "school",
+  sensei: "school",
+  referee: "referee",
+  audience: "audience",
+  participant: "participant",
+};
+
+/** Fires once, right after an Admin/Organizer manually adds a School,
+ * Sensei, Referee, Audience, or Participant record directly (not via
+ * public self-registration, which already emails its own confirmation) —
+ * asks them to join the Telegram group right away. The "DM within about
+ * an hour" line is deliberately conditional, not a guarantee: a Telegram
+ * DM can only ever reach someone who has both created their account and
+ * connected Telegram from their Account page (Bot API can't message an
+ * arbitrary phone/email) — nothing here schedules or forces that to
+ * happen, it just sets the expectation for once they do. Best-effort —
+ * never throws, so a notification hiccup can't undo the record having
+ * already been saved. */
+async function notifyAddedByAdmin(role: string, email: string | null, recipientName: string) {
+  if (!email) return;
+  const roleLabel = ADMIN_ADD_ROLE_LABEL[role] ?? role;
+  try {
+    await sendConfirmationEmail({
+      toEmail: email,
+      recipientName,
+      subject: `You've been added as a ${roleLabel}`,
+      bodyLines: [
+        `Hello! The organizer has added you to the Malaysia Open Virtual Karate-do Kata Championship as a ${roleLabel}.`,
+        "Please join our Telegram group as soon as possible — that's where the organizer posts announcements and where you can reach the team.",
+        "Once you've created your account and connected Telegram from your Account page, you'll typically receive a Telegram DM confirming your status within about an hour.",
+      ],
+      telegramCategory: ADMIN_ADD_TELEGRAM_CATEGORY[role],
+    });
+  } catch {
+    // Best-effort
+  }
+}
+
 // ── Schools ──────────────────────────────────────────────────────────────────
 
 export async function saveSchool(formData: FormData) {
@@ -911,6 +958,7 @@ export async function saveSchool(formData: FormData) {
       table_name: "schools", record_id: data!.id, action: "school_created",
       new_value: values, actor_id: actorId,
     });
+    await notifyAddedByAdmin("school", values.email, values.contact_name || values.name);
   }
   backTo(returnTo, { ok: "School saved." });
 }
@@ -1006,6 +1054,7 @@ export async function saveSensei(formData: FormData) {
       table_name: "senseis", record_id: data!.id, action: "sensei_created",
       new_value: values, actor_id: actorId,
     });
+    await notifyAddedByAdmin("sensei", values.email, values.name);
   }
   backTo(returnTo, { ok: "Sensei saved." });
 }
@@ -1211,6 +1260,7 @@ export async function createAudienceMember(formData: FormData) {
     table_name: "audiences", record_id: id, action: "audience_added_by_admin",
     new_value: { full_name, email, invitation_code }, actor_id: actorId,
   });
+  await notifyAddedByAdmin("audience", email, full_name);
   revalidatePath("/admin/audience");
   backTo(returnTo, { ok: `${full_name} added to Audience / Spectators.` });
 }
@@ -1283,6 +1333,7 @@ export async function saveReferee(formData: FormData) {
       table_name: "referees", record_id: data!.id, action: "referee_created_by_admin",
       new_value: values, actor_id: actorId,
     });
+    await notifyAddedByAdmin("referee", values.email, values.full_name);
   }
   backTo(returnTo, { ok: "Referee saved." });
 }
@@ -1373,6 +1424,7 @@ export async function saveParticipant(formData: FormData) {
       table_name: "participants", record_id: targetId, action: "participant_created",
       new_value: values, actor_id: actorId,
     });
+    await notifyAddedByAdmin("participant", values.email, values.full_name);
   }
 
   // Upsert reward bank details when all three fields are provided
@@ -2593,7 +2645,10 @@ export async function createStaffAccount(formData: FormData) {
       `An account has been created for you as ${ROLE_LABEL[role]}.`,
       `Temporary password: ${tempPassword}`,
       "Sign in and keep this password safe — there is currently no self-service password reset, contact the organizer if you need it changed.",
+      "Please join our Telegram group as soon as possible — that's where the organizer posts announcements and where you can reach the team.",
+      "Once you've signed in and connected Telegram from your Account page, you'll typically receive a Telegram DM confirming your status within about an hour.",
     ],
+    telegramCategory: "staff",
   });
 
   revalidatePath(returnTo);

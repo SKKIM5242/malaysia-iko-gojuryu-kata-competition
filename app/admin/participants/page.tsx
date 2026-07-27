@@ -226,16 +226,18 @@ export default async function AdminParticipants({
               rowKey="id"
               downloadName="participants"
               columns={[
-                { key: "full_name", label: "Name" },
-                { key: "ic_passport", label: "IC / Passport" },
-                { key: "date_of_birth", label: "DOB" },
-                { key: "age", label: "Age" },
-                { key: "belt_rank", label: "Belt" },
-                { key: "rank_status", label: "Rank status" },
-                { key: "home_country", label: "Country" },
-                { key: "school", label: "School" },
-                { key: "bank", label: "Payout bank" },
-                { key: "actions", label: "Actions" },
+                { key: "full_name", label: "Name", width: 170 },
+                { key: "ic_passport", label: "IC / Passport", width: 150 },
+                { key: "date_of_birth", label: "DOB", width: 120 },
+                { key: "age", label: "Age", width: 90 },
+                { key: "belt_rank", label: "Belt", width: 130 },
+                { key: "rank_status", label: "Rank status", width: 150 },
+                { key: "home_country", label: "Country", width: 130 },
+                { key: "school", label: "School", width: 170 },
+                { key: "bank_name", label: "Bank Name", width: 150 },
+                { key: "bank_account_no", label: "IBAN / Account No.", width: 180 },
+                { key: "bank_account_name", label: "Account Holder Name", width: 170 },
+                { key: "actions", label: "Actions", width: 150 },
               ]}
               csvColumns={[
                 { key: "full_name", label: "Name" },
@@ -275,7 +277,6 @@ export default async function AdminParticipants({
                   ),
                 home_country: p.home_country ?? "",
                 school: p.school?.name ?? "",
-                bank: p.bank ? `${p.bank.bank_name} · ${p.bank.bank_account_no}` : "",
                 bank_name: p.bank?.bank_name ?? "",
                 bank_account_no: p.bank?.bank_account_no ?? "",
                 bank_account_name: p.bank?.bank_account_name ?? "",
