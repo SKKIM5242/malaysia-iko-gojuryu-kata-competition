@@ -165,20 +165,20 @@ async function uploadCertificateIfPresent(
 // ── Registrations ────────────────────────────────────────────────────────────
 
 /** Best-effort — never throws, so a notification hiccup can't undo a
- * payment status update that already succeeded. Only fires for "paid" —
- * "pending" and "rejected" don't email/DM the participant, per the
- * organizer's instruction. Telegram lookup tries two links: the reliable
- * one is profiles.registration_id, set once they sign in and claim this
- * specific registration (see claim_registration / claim_registration_by_id
- * in supabase/migrations/0072_claim_registration_any_role.sql); as a
- * fallback (e.g. they have an account but never claimed this particular
+ * payment status update that already succeeded. Fires on every status —
+ * pending (submission received, waiting for approval), paid, and rejected
+ * all notify the participant personally, per the organizer's instruction.
+ * Telegram lookup tries two links: the reliable one is
+ * profiles.registration_id, set once they sign in and claim this specific
+ * registration (see claim_registration / claim_registration_by_id in
+ * supabase/migrations/0072_claim_registration_any_role.sql); as a fallback
+ * (e.g. they have an account but never claimed this particular
  * registration) it also tries a plain email match on profiles. */
 async function notifyRegistrationStatusChange(
   supabase: Awaited<ReturnType<typeof createClient>>,
   registrationId: string,
   status: string,
 ) {
-  if (status !== "paid") return;
   try {
     const { data: reg } = await supabase
       .from("registrations")
@@ -1034,14 +1034,6 @@ const STATUS_VALUE_LABELS: Record<string, string> = {
   paid: "Paid", waived: "Waived", refunded: "Refunded", forfeited: "Forfeited",
 };
 
-/** Only these status values notify for these tables — Organizer/Support
- * applications and Participant registrations stay silent on "pending" and
- * "rejected", per the organizer's instruction; every other table (Referee,
- * Audience, School, Sensei) still notifies on every value change. */
-const STATUS_NOTIFY_ONLY_VALUES: Partial<Record<string, string[]>> = {
-  staff_applications: ["approved"],
-};
-
 /** Resolves who a status/payment button click on `updateCommunityStatus`
  * notifies, and how to reach them. Referees and audiences carry their own
  * `user_id` column, auto-linked by email match right at signup (see
@@ -1131,8 +1123,6 @@ async function notifyCommunityStatusChange(
 ) {
   const fieldLabel = STATUS_FIELD_LABELS[table]?.[field];
   if (!fieldLabel) return;
-  const onlyValues = STATUS_NOTIFY_ONLY_VALUES[table];
-  if (onlyValues && !onlyValues.includes(value)) return;
   try {
     const recipient = await statusChangeRecipient(supabase, table, id);
     if (!recipient) return;
