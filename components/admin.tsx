@@ -7,6 +7,7 @@ import { adminInput, adminLabel, adminBtn, adminBtnSecondary } from "@/component
 
 const FULL_NAV: Array<[string, string]> = [
   ["Dashboard", "/admin"],
+  ["Full Activity Log", "/admin/activity"],
   ["Registrations", "/admin/registrations"],
   ["Competitions", "/admin/competitions"],
   ["Announcements", "/admin/announcements"],

@@ -63,7 +63,12 @@ export default async function AdminDashboard() {
         ))}
       </div>
 
-      <h2 className="mt-10 mb-3 text-lg font-bold">Recent Activity</h2>
+      <div className="mt-10 mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-lg font-bold">Recent Activity</h2>
+        <Link href="/admin/activity" className="text-sm font-semibold text-red-700 underline underline-offset-2">
+          View full activity log →
+        </Link>
+      </div>
       {logs.length === 0 ? (
         <p className="text-sm text-neutral-500">No audit log entries yet.</p>
       ) : (

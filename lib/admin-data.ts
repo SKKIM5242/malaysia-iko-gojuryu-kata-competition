@@ -361,3 +361,28 @@ export async function getRecentAuditLogs(limit = 20): Promise<AuditLog[]> {
     .limit(limit);
   return (data as AuditLog[]) ?? [];
 }
+
+export interface AuditLogQuery {
+  /** Rows per page — defaults to 100 so the Full Activity Log page always
+   * shows a substantial window of history without fetching everything. */
+  limit?: number;
+  offset?: number;
+  /** Inclusive date range, "YYYY-MM-DD" — either end optional. */
+  from?: string;
+  to?: string;
+}
+
+/** Paginated + date-filtered audit log query for /admin/activity — unlike
+ * getRecentAuditLogs (a fixed small preview for the Dashboard), this
+ * always asks Postgres for an exact total count too, so the page can show
+ * "Showing X–Y of Z" and know when Prev/Next should be disabled, without
+ * ever fetching more than one page of rows into memory at a time. */
+export async function getAuditLogsPage(query: AuditLogQuery = {}): Promise<{ rows: AuditLog[]; total: number }> {
+  const { limit = 100, offset = 0, from, to } = query;
+  const supabase = await createClient();
+  let q = supabase.from("audit_logs").select("*", { count: "exact" }).order("created_at", { ascending: false });
+  if (from) q = q.gte("created_at", `${from}T00:00:00`);
+  if (to) q = q.lte("created_at", `${to}T23:59:59.999`);
+  const { data, count } = await q.range(offset, offset + limit - 1);
+  return { rows: (data as AuditLog[]) ?? [], total: count ?? 0 };
+}
