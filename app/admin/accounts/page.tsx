@@ -6,9 +6,10 @@ import { getAllCompetitions } from "@/lib/admin-data";
 import { AdminShell, Card, adminBtn } from "@/components/admin";
 import { EmptyState, SetupNotice } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
+import AccessMatrixTable from "@/components/AccessMatrixTable";
 import InvitationCodeForm from "@/components/InvitationCodeForm";
 import InvitationCodeList from "@/components/InvitationCodeList";
-import { ACCESS_MATRIX } from "@/lib/access-matrix";
+import { accessMatrixRowsFromDb } from "@/lib/access-matrix";
 
 export const dynamic = "force-dynamic";
 
@@ -75,17 +76,7 @@ async function AccessMatrixTab({ supabase }: { supabase: Awaited<ReturnType<type
   // Editable rows (managed on the Content page) win; the code's built-in
   // snapshot is the fallback while the table is empty.
   const { data: dbRows } = await supabase.from("access_matrix_rows").select("*").order("position");
-  const matrix =
-    dbRows && dbRows.length > 0
-      ? dbRows.map((r) => ({
-          resource: r.resource,
-          admin: r.admin,
-          organizer: r.organizer,
-          customerSupport: r.customer_support,
-          referee: r.referee,
-          note: r.note ?? undefined,
-        }))
-      : ACCESS_MATRIX;
+  const matrix = accessMatrixRowsFromDb(dbRows);
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -105,42 +96,11 @@ async function AccessMatrixTab({ supabase }: { supabase: Awaited<ReturnType<type
         </form>
       </div>
       <p className="mb-4 text-xs text-neutral-400">
-        This creates a new draft announcement for you to review and publish — republish whenever
-        access rules change so the posted copy stays current.
+        This creates a new draft announcement for you to review and publish. The published page
+        shows this same adjustable/filterable table, reading these rows live — no need to
+        republish when a row changes, only when you want to bump the announcement&apos;s date.
       </p>
-      <FilterableTable
-        rowKey="resource_text"
-        downloadName="access-matrix"
-        columns={[
-          { key: "resource", label: "Resource", wrap: true },
-          { key: "admin", label: "Admin" },
-          { key: "organizer", label: "Organizer / Staff" },
-          { key: "customerSupport", label: "Participant Support" },
-          { key: "referee", label: "Referee / Judge" },
-        ]}
-        rows={matrix.map((row) => ({
-          resource: row.note ? (
-            <>
-              <p className="whitespace-normal break-words">{row.resource}</p>
-              <p className="mt-1 whitespace-normal break-words text-xs font-normal text-neutral-400">{row.note}</p>
-            </>
-          ) : (
-            row.resource
-          ),
-          resource_text: row.resource,
-          admin: row.admin,
-          organizer: row.organizer,
-          customerSupport: row.customerSupport,
-          referee: row.referee,
-        }))}
-        csvColumns={[
-          { key: "resource_text", label: "Resource" },
-          { key: "admin", label: "Admin" },
-          { key: "organizer", label: "Organizer / Staff" },
-          { key: "customerSupport", label: "Participant Support" },
-          { key: "referee", label: "Referee / Judge" },
-        ]}
-      />
+      <AccessMatrixTable rows={matrix} />
     </div>
   );
 }

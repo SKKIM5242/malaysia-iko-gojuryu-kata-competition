@@ -12,7 +12,7 @@ import type { PaymentStatus } from "@/lib/types";
 import { parseCsvWithHeader, parseDDMMYYYY, type CsvUploadResult } from "@/lib/csv-bulk";
 import { normalizeIban } from "@/lib/bank";
 import { listTelegramGroups, type TelegramCategory } from "@/lib/telegram";
-import { ACCESS_MATRIX, accessMatrixToMarkdown } from "@/lib/access-matrix";
+import { ACCESS_MATRIX, accessMatrixAnnouncementIntro } from "@/lib/access-matrix";
 import { DEFAULT_COMPARISON_ROWS } from "@/components/AccessComparisonTable";
 import { DEFAULT_AUTO_ASSIGN_CRITERIA } from "@/lib/auto-assign-criteria";
 import { formatUSD } from "@/components/ui";
@@ -838,7 +838,7 @@ export async function publishAccessMatrixAnnouncement() {
   const values = {
     competition_id: null,
     title: `Admin Panel Access Matrix — updated ${generatedAt}`,
-    body: accessMatrixToMarkdown(generatedAt),
+    body: accessMatrixAnnouncementIntro(generatedAt),
     published: false,
   };
   const { data, error } = await supabase.from("announcements").insert(values).select("id").single();

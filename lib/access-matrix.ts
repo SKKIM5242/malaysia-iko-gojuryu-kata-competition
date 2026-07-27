@@ -122,23 +122,38 @@ export const ACCESS_MATRIX: AccessRow[] = [
   },
 ];
 
-/** Renders the matrix as a Markdown table for the Announcements body. */
-export function accessMatrixToMarkdown(generatedAt: string): string {
-  const header = "| Resource | Admin | Organizer / Staff | Participant Support | Referee / Judge |\n" +
-    "|---|---|---|---|---|";
-  const rows = ACCESS_MATRIX.map(
-    (r) => `| ${r.resource} | ${r.admin} | ${r.organizer} | ${r.customerSupport} | ${r.referee} |`,
-  );
-  const notes = ACCESS_MATRIX.filter((r) => r.note)
-    .map((r) => `- **${r.resource}**: ${r.note}`)
-    .join("\n");
-  return [
-    `_Snapshot as of ${generatedAt}. Reflects the actual route gating and server-action guards in the codebase — republish this announcement whenever access rules change._`,
-    "",
-    header,
-    ...rows,
-    "",
-    "**Notes**",
-    notes,
-  ].join("\n");
+/** Intro text shown above the interactive table on the published Access
+ * Matrix announcement (see app/announcements/[slug]/page.tsx, which
+ * special-cases this announcement to render the same adjustable/filterable
+ * FilterableTable used on /admin/accounts, reading the live
+ * access_matrix_rows table rather than a frozen snapshot — so it's always
+ * current and there's no separate table/notes text to keep in sync. */
+export function accessMatrixAnnouncementIntro(generatedAt: string): string {
+  return `_Snapshot as of ${generatedAt}. Reflects the actual route gating and server-action guards in the codebase. The table below always shows the current rules — edit rows on the Content page and they update here automatically._`;
+}
+
+export interface AccessMatrixDbRow {
+  resource: string;
+  admin: string;
+  organizer: string;
+  customer_support: string;
+  referee: string;
+  note: string | null;
+}
+
+/** Editable rows (managed on the Content page) win; the code's built-in
+ * snapshot is the fallback while the table is empty — shared by the admin
+ * Access Matrix tab and the published announcement's interactive table. */
+export function accessMatrixRowsFromDb(dbRows: AccessMatrixDbRow[] | null): AccessRow[] {
+  if (dbRows && dbRows.length > 0) {
+    return dbRows.map((r) => ({
+      resource: r.resource,
+      admin: r.admin,
+      organizer: r.organizer,
+      customerSupport: r.customer_support,
+      referee: r.referee,
+      note: r.note ?? undefined,
+    }));
+  }
+  return ACCESS_MATRIX;
 }
