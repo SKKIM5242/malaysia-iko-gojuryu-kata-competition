@@ -4,7 +4,7 @@
  * to call unconditionally from the assignment / registration code paths.
  */
 
-import { getTelegramLink, getAllTelegramLinks, type TelegramCategory } from "@/lib/telegram";
+import { getTelegramLink, listTelegramGroups, type TelegramCategory } from "@/lib/telegram";
 
 interface AssignmentNotice {
   refereeEmail: string | null;
@@ -191,7 +191,14 @@ export interface ConfirmationEmailInput {
   telegramCategory?: TelegramCategory | null;
 }
 
-function buildConfirmationBody(input: ConfirmationEmailInput, telegramUrl: string | null): string {
+interface TelegramLinksForEmail {
+  /** Public invite link — the one that lets a new member actually join. */
+  url: string | null;
+  /** Announcements-topic deep link — only opens for existing members. */
+  memberUrl: string | null;
+}
+
+function buildConfirmationBody(input: ConfirmationEmailInput, telegram: TelegramLinksForEmail): string {
   const lines: string[] = [`Hi ${input.recipientName},`, "", ...input.bodyLines];
   if (input.referenceId) lines.push("", `Reference ID: ${input.referenceId}`);
   lines.push(
@@ -201,12 +208,15 @@ function buildConfirmationBody(input: ConfirmationEmailInput, telegramUrl: strin
     `Kata Arena log in: ${appUrl()}/account`,
     `App: ${appUrl()}`,
   );
-  if (telegramUrl) {
+  if (telegram.url) {
     lines.push(
-      `Telegram group: ${telegramUrl}`,
+      `Join the Telegram group: ${telegram.url}`,
       "Make sure you are in the Telegram group to receive any announcements from the " +
         "organizer — it's also where you communicate with the organizer and all other participants.",
     );
+  }
+  if (telegram.memberUrl) {
+    lines.push(`Already in the group? Jump straight to Announcements: ${telegram.memberUrl}`);
   }
   lines.push("", "— Malaysia Open Virtual Karate-do Kata Championship");
   return lines.join("\n");
@@ -216,13 +226,19 @@ function buildConfirmationBody(input: ConfirmationEmailInput, telegramUrl: strin
  * Record-purpose confirmation sent right after any registration (participant,
  * referee, audience, staff, school, sensei) is created. Every email includes
  * the Kata Arena log-in link, the app link, and — when applicable — the
- * relevant category's Telegram group link, in addition to whatever detail
- * lines the caller supplies to mirror that flow's on-screen confirmation.
+ * relevant category's Telegram invite link (to join) and Announcements-topic
+ * link (for existing members), in addition to whatever detail lines the
+ * caller supplies to mirror that flow's on-screen confirmation.
  */
 export async function sendConfirmationEmail(input: ConfirmationEmailInput): Promise<void> {
   if (!input.toEmail) return;
-  const telegramUrl = input.telegramCategory ? await getTelegramLink(input.telegramCategory) : null;
-  await sendEmail(input.toEmail, input.subject, buildConfirmationBody(input, telegramUrl));
+  const groups = await listTelegramGroups();
+  const group = input.telegramCategory ? groups.find((g) => g.category === input.telegramCategory) : undefined;
+  await sendEmail(
+    input.toEmail,
+    input.subject,
+    buildConfirmationBody(input, { url: group?.url ?? null, memberUrl: group?.memberUrl ?? null }),
+  );
 }
 
 const RESEND_BATCH_SIZE = 100;
@@ -244,13 +260,16 @@ export async function sendConfirmationEmailBatch(inputs: ConfirmationEmailInput[
   // One lookup for the whole batch (up to 10,000 rows) instead of one per
   // recipient — every recipient's telegramCategory maps to the same handful
   // of groups, so there's no reason to hit the DB per row.
-  const groupUrlByCategory = new Map((await getAllTelegramLinks()).map((g) => [g.category, g.url]));
+  const groupsByCategory = new Map((await listTelegramGroups()).map((g) => [g.category, g]));
   const emails = inputs
     .filter((i): i is ConfirmationEmailInput & { toEmail: string } => !!i.toEmail)
-    .map((i) => ({
-      from, to: i.toEmail, subject: i.subject,
-      text: buildConfirmationBody(i, i.telegramCategory ? groupUrlByCategory.get(i.telegramCategory) ?? null : null),
-    }));
+    .map((i) => {
+      const group = i.telegramCategory ? groupsByCategory.get(i.telegramCategory) : undefined;
+      return {
+        from, to: i.toEmail, subject: i.subject,
+        text: buildConfirmationBody(i, { url: group?.url ?? null, memberUrl: group?.memberUrl ?? null }),
+      };
+    });
   if (emails.length === 0) return;
 
   for (let i = 0; i < emails.length; i += RESEND_BATCH_SIZE) {
@@ -441,21 +460,30 @@ interface StatusChangeNotice {
   fieldLabel: string;
   /** Human label for the new value, e.g. "Approved", "Paid". */
   valueLabel: string;
-  /** Telegram group invite link(s) to surface in the email — one per table
+  /** Telegram group link(s) to surface in the email — one per table
    * (Referee, Audience, School/Sensei, Support, Participant), except
    * Organizer/Admin applications, which get every group's link since that
-   * role moderates across the whole competition, not just one category. */
-  telegramGroups?: Array<{ label: string; url: string }> | null;
+   * role moderates across the whole competition, not just one category.
+   * Each entry carries both the invite link (to join, for new members) and
+   * the Announcements-topic link (only opens for existing members). */
+  telegramGroups?: Array<{ label: string; url: string; memberUrl?: string | null }> | null;
 }
 
-function telegramGroupsBlock(groups: Array<{ label: string; url: string }> | null | undefined): string {
+function telegramGroupsBlock(
+  groups: Array<{ label: string; url: string; memberUrl?: string | null }> | null | undefined,
+): string {
   if (!groups || groups.length === 0) return "";
-  const verb = groups.length === 1 ? "it" : "the ones you haven't already";
-  const list =
-    groups.length === 1
-      ? `Telegram group: ${groups[0].url}\n`
-      : `Telegram groups:\n${groups.map((g) => `- ${g.label}: ${g.url}`).join("\n")}\n`;
-  return `${list}Join ${verb} if you haven't already — that's where the organizer posts announcements.\n\n`;
+  const multi = groups.length > 1;
+  const inviteList = multi
+    ? `Telegram groups — join the ones you haven't already:\n${groups.map((g) => `- ${g.label}: ${g.url}`).join("\n")}\n`
+    : `Telegram group — join it if you haven't already: ${groups[0].url}\n`;
+  const memberGroups = groups.filter((g) => g.memberUrl);
+  const memberList = memberGroups.length
+    ? `\nAlready in the group? Jump straight to Announcements:\n` +
+      memberGroups.map((g) => (multi ? `- ${g.label}: ${g.memberUrl}` : g.memberUrl)).join("\n") +
+      `\n`
+    : "";
+  return `${inviteList}That's where the organizer posts announcements.\n${memberList}\n`;
 }
 
 async function sendStatusChangeEmail(notice: StatusChangeNotice): Promise<void> {

@@ -17,7 +17,15 @@ export interface TelegramGroupRow {
   id: string;
   category: string;
   label: string;
+  /** Public invite link (https://t.me/+...) — the only kind that lets
+   * someone who isn't a member yet actually join. Always shown as the main
+   * "join" link/button. */
   url: string;
+  /** Direct link into the group's Announcements topic
+   * (https://t.me/c/<chat_id>/<topic_id>) — only opens for people who are
+   * already members, so it supplements the invite link rather than
+   * replacing it. Null until the organizer sets one for that category. */
+  memberUrl: string | null;
   sortOrder: number;
 }
 
@@ -26,24 +34,25 @@ export interface TelegramGroupRow {
  * invite links) — genuine per-category access, since Telegram fully
  * separates membership between groups (unlike Topics within one group,
  * which everyone in the group can browse regardless of role). Stored in the
- * telegram_groups table (see supabase/migrations/0081_telegram_groups_table.sql)
- * so Admin/Organizer/Staff can add, edit, and delete groups from
- * /admin/telegram without a Vercel env var change + redeploy. Uses the
- * service-role client since this is called from public registration pages
- * (no session) as well as admin pages and background jobs — the data
- * itself isn't sensitive (these are invite links meant to be shared), so
- * bypassing RLS here is safe.
+ * telegram_groups table (see supabase/migrations/0081_telegram_groups_table.sql,
+ * 0082_telegram_groups_member_url.sql) so Admin/Organizer/Staff can add,
+ * edit, and delete groups from /admin/telegram without a Vercel env var
+ * change + redeploy. Uses the service-role client since this is called
+ * from public registration pages (no session) as well as admin pages and
+ * background jobs — the data itself isn't sensitive (these are invite
+ * links meant to be shared), so bypassing RLS here is safe.
  */
 export async function listTelegramGroups(): Promise<TelegramGroupRow[]> {
   const { data } = await createAdminClient()
     .from("telegram_groups")
-    .select("id, category, label, url, sort_order")
+    .select("id, category, label, url, member_url, sort_order")
     .order("sort_order", { ascending: true });
   return (data ?? []).map((r) => ({
     id: r.id as string,
     category: r.category as string,
     label: r.label as string,
     url: r.url as string,
+    memberUrl: (r.member_url as string | null) ?? null,
     sortOrder: r.sort_order as number,
   }));
 }
@@ -60,9 +69,9 @@ export async function getTelegramLabel(category: string): Promise<string> {
 
 /** Approved Referee/Judge and Admin/Organizer/Staff get every group — they
  * moderate or judge across the whole competition, not just one category. */
-export async function getAllTelegramLinks(): Promise<Array<{ category: string; label: string; url: string }>> {
+export async function getAllTelegramLinks(): Promise<Array<{ category: string; label: string; url: string; memberUrl: string | null }>> {
   const groups = await listTelegramGroups();
-  return groups.map(({ category, label, url }) => ({ category, label, url }));
+  return groups.map(({ category, label, url, memberUrl }) => ({ category, label, url, memberUrl }));
 }
 
 /** Deep link that starts a chat with the assignment-notification bot and

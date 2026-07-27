@@ -202,7 +202,9 @@ async function notifyRegistrationStatusChange(
       name: participant.full_name,
       fieldLabel: "Payment status",
       valueLabel: STATUS_VALUE_LABELS[status] ?? status,
-      telegramGroups: participantGroup ? [{ label: participantGroup.label, url: participantGroup.url }] : null,
+      telegramGroups: participantGroup
+        ? [{ label: participantGroup.label, url: participantGroup.url, memberUrl: participantGroup.memberUrl }]
+        : null,
     });
   } catch {
     // Best-effort
@@ -1096,22 +1098,22 @@ const ORGANIZER_TELEGRAM_CATEGORIES: TelegramCategory[] = ["participant", "schoo
 async function communityTelegramGroups(
   table: string,
   roleRequested: string | null,
-): Promise<Array<{ label: string; url: string }> | null> {
+): Promise<Array<{ label: string; url: string; memberUrl: string | null }> | null> {
   const byCategory = new Map((await listTelegramGroups()).map((g) => [g.category, g]));
   if (table === "staff_applications") {
     if (roleRequested === "admin" || roleRequested === "organizer") {
       const groups = ORGANIZER_TELEGRAM_CATEGORIES
         .map((category) => byCategory.get(category))
         .filter((g): g is NonNullable<typeof g> => !!g)
-        .map((g) => ({ label: g.label, url: g.url }));
+        .map((g) => ({ label: g.label, url: g.url, memberUrl: g.memberUrl }));
       return groups.length ? groups : null;
     }
     const staffGroup = byCategory.get("staff");
-    return staffGroup ? [{ label: staffGroup.label, url: staffGroup.url }] : null;
+    return staffGroup ? [{ label: staffGroup.label, url: staffGroup.url, memberUrl: staffGroup.memberUrl }] : null;
   }
   const category = table === "referees" ? "referee" : table === "audiences" ? "audience" : "school";
   const group = byCategory.get(category);
-  return group ? [{ label: group.label, url: group.url }] : null;
+  return group ? [{ label: group.label, url: group.url, memberUrl: group.memberUrl }] : null;
 }
 
 /** Best-effort — never throws, so a notification hiccup can't undo a
@@ -1734,6 +1736,7 @@ export async function saveTelegramGroup(formData: FormData) {
     category: String(formData.get("category") ?? "").trim(),
     label: String(formData.get("label") ?? "").trim(),
     url: String(formData.get("url") ?? "").trim(),
+    member_url: String(formData.get("member_url") ?? "").trim() || null,
     sort_order: Number(formData.get("sort_order") ?? 0) || 0,
   };
   if (!values.category || !values.label || !values.url) {

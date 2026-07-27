@@ -8,8 +8,8 @@ import { saveTelegramGroup, deleteTelegramGroup } from "@/app/actions/admin";
 export const dynamic = "force-dynamic";
 
 const RETURN_TO = "/admin/telegram";
-const EDIT_TEMPLATE = "64px minmax(100px,1fr) minmax(160px,1.6fr) minmax(220px,2.2fr) 128px";
-const VIEW_TEMPLATE = "minmax(100px,1fr) minmax(160px,1.6fr) minmax(220px,2.2fr)";
+const EDIT_TEMPLATE = "56px minmax(90px,0.8fr) minmax(140px,1.3fr) minmax(180px,1.8fr) minmax(180px,1.8fr) 128px";
+const VIEW_TEMPLATE = "minmax(90px,0.8fr) minmax(140px,1.3fr) minmax(180px,1.8fr) minmax(180px,1.8fr)";
 
 /** Only Organizer (and Admin/legacy Staff, who already have Organizer's
  * access everywhere else in this app) can add, edit, or delete groups.
@@ -61,15 +61,22 @@ export default async function AdminTelegramLinks({
 
   return (
     <AdminShell title="Telegram Groups" active="/admin/telegram" flash={{ ok: params.ok, error: params.error }}>
-      <p className="mb-6 text-sm text-neutral-500">
+      <p className="mb-2 text-sm text-neutral-500">
         Every registration category&apos;s dedicated Telegram group in one place.{" "}
         {canEdit
           ? "Add, edit, or delete groups directly here instead of changing a Vercel environment variable."
           : "Participant Support and Referee/Judge accounts have read-only access here — only Admin/Organizer can add, edit, or delete a group."}
       </p>
+      <p className="mb-6 text-xs text-neutral-400">
+        <strong>Invite link</strong> (https://t.me/+...) is what notification emails use to let a
+        new person join — it works even if they&apos;re not a member yet. <strong>Already-member
+        link</strong> (https://t.me/c/...) opens a group&apos;s Announcements topic directly, but
+        only works for people who are already members — it&apos;s shown as a second, supplementary
+        link in the same emails.
+      </p>
 
       <div className="overflow-x-auto rounded-lg border border-neutral-200">
-        <div style={{ minWidth: canEdit ? 700 : 560 }}>
+        <div style={{ minWidth: canEdit ? 860 : 720 }}>
           <div
             className="grid items-center gap-2 border-b border-neutral-200 bg-neutral-50 px-3 py-2"
             style={{ gridTemplateColumns: canEdit ? EDIT_TEMPLATE : VIEW_TEMPLATE }}
@@ -78,6 +85,7 @@ export default async function AdminTelegramLinks({
             <span className={gridHeaderCell}>Category</span>
             <span className={gridHeaderCell}>Label</span>
             <span className={gridHeaderCell}>Invite link</span>
+            <span className={gridHeaderCell}>Already-member link</span>
             {canEdit && <span className={gridHeaderCell}>Actions</span>}
           </div>
 
@@ -92,6 +100,7 @@ export default async function AdminTelegramLinks({
               <input name="category" required placeholder="e.g. sponsor" className={cellInput} />
               <input name="label" required placeholder="Display label *" className={cellInput} />
               <input name="url" required type="url" placeholder="https://t.me/+... *" className={cellInput} />
+              <input name="member_url" type="url" placeholder="https://t.me/c/... (optional)" className={cellInput} />
               <button className="rounded-md bg-neutral-900 px-3 py-1 text-xs font-semibold text-white hover:bg-neutral-700">
                 Add group
               </button>
@@ -119,6 +128,7 @@ export default async function AdminTelegramLinks({
                   </span>
                   <input name="label" required defaultValue={g.label} className={cellInput} />
                   <input name="url" required type="url" defaultValue={g.url} className={cellInput} />
+                  <input name="member_url" type="url" defaultValue={g.memberUrl ?? ""} placeholder="optional" className={cellInput} />
                   <span className="flex gap-1.5">
                     <button className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50">
                       Save
@@ -149,6 +159,18 @@ export default async function AdminTelegramLinks({
                   >
                     {g.url}
                   </a>
+                  {g.memberUrl ? (
+                    <a
+                      href={g.memberUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="truncate text-xs text-[#1c7fb5] underline"
+                    >
+                      {g.memberUrl}
+                    </a>
+                  ) : (
+                    <span className="text-xs text-neutral-400">—</span>
+                  )}
                 </div>
               ),
             )}
