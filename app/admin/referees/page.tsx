@@ -193,7 +193,7 @@ export default async function AdminReferees({
                 </div>
                 <div>
                   <label htmlFor="invitation_code" className={adminLabel}>Invitation code</label>
-                  <input id="invitation_code" name="invitation_code" defaultValue={editing?.invitation_code ?? ""} className={adminInput} />
+                  <input id="invitation_code" name="invitation_code" defaultValue={editing?.invitation_code ?? ""} className={`${adminInput} max-w-[65%]`} />
                 </div>
                 <div>
                   <label htmlFor="referral_source" className={adminLabel}>Referral (optional)</label>
@@ -564,13 +564,13 @@ export default async function AdminReferees({
           returnTo="/admin/referees"
           title="Referee / Judge Invitation Code"
           idPrefix="ref_code"
-          codeExample="IKO-JUDGE-2026"
+          codeExample="IKO-REFEREE-TIER-USD100-2026-00001"
           competitions={competitions}
         />
         <InvitationCodeList
           role="referee"
           returnTo="/admin/referees"
-          codeExample="IKO-JUDGE-2026"
+          codeExample="IKO-REFEREE-TIER-USD100-2026-00001"
           competitions={competitions}
           editingId={params.editcode}
         />

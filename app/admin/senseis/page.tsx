@@ -184,7 +184,7 @@ export default async function AdminSenseis({
                 </div>
                 <div>
                   <label htmlFor="invitation_code" className={adminLabel}>Invitation code (optional)</label>
-                  <input id="invitation_code" name="invitation_code" defaultValue={editing?.invitation_code ?? ""} className={adminInput} />
+                  <input id="invitation_code" name="invitation_code" defaultValue={editing?.invitation_code ?? ""} className={`${adminInput} max-w-[65%]`} />
                 </div>
                 <div>
                   <label htmlFor="referral_source" className={adminLabel}>Referral (optional)</label>
@@ -400,13 +400,13 @@ export default async function AdminSenseis({
           returnTo="/admin/senseis"
           title="Sensei / Coach Invitation Code"
           idPrefix="sensei_code"
-          codeExample="IKO-SENSEI-2026"
+          codeExample="IKO-SENSEI-TIER-USD10-2026-00001"
           competitions={competitions}
         />
         <InvitationCodeList
           role="sensei"
           returnTo="/admin/senseis"
-          codeExample="IKO-SENSEI-2026"
+          codeExample="IKO-SENSEI-TIER-USD10-2026-00001"
           competitions={competitions}
           editingId={params.editcode}
         />

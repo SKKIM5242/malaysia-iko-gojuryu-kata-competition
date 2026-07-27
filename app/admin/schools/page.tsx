@@ -172,7 +172,7 @@ export default async function AdminSchools({
                 </div>
                 <div>
                   <label htmlFor="invitation_code" className={adminLabel}>Invitation code (optional)</label>
-                  <input id="invitation_code" name="invitation_code" defaultValue={editing?.invitation_code ?? ""} className={adminInput} />
+                  <input id="invitation_code" name="invitation_code" defaultValue={editing?.invitation_code ?? ""} className={`${adminInput} max-w-[65%]`} />
                 </div>
                 <div>
                   <label htmlFor="referral_source" className={adminLabel}>Referral (optional)</label>
@@ -372,13 +372,13 @@ export default async function AdminSchools({
           returnTo="/admin/schools"
           title="School / Dojo Invitation Code"
           idPrefix="school_code"
-          codeExample="IKO-SCHOOL-2026"
+          codeExample="IKO-SCHOOL-TIER-USD10-2026-00001"
           competitions={competitions}
         />
         <InvitationCodeList
           role="school"
           returnTo="/admin/schools"
-          codeExample="IKO-SCHOOL-2026"
+          codeExample="IKO-SCHOOL-TIER-USD10-2026-00001"
           competitions={competitions}
           editingId={params.editcode}
         />

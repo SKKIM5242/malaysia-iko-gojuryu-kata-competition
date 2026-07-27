@@ -126,7 +126,7 @@ export default async function AdminAudience({
               </div>
               <div>
                 <label htmlFor="aud_invitation_code" className={adminLabel}>Invitation code (optional)</label>
-                <input id="aud_invitation_code" name="invitation_code" className={adminInput} placeholder="Waives the USD 10 fee" />
+                <input id="aud_invitation_code" name="invitation_code" className={`${adminInput} max-w-[65%]`} placeholder="Waives the USD 10 fee" />
               </div>
               <div>
                 <label htmlFor="aud_support_referral" className={adminLabel}>Participant Support referral (optional)</label>
@@ -243,13 +243,13 @@ export default async function AdminAudience({
           returnTo="/admin/audience"
           title="Audience / Spectator Invitation Code"
           idPrefix="aud_code"
-          codeExample="IKO-AUD-2026"
+          codeExample="IKO-AUDIENCE-TIER-USD10-2026-00001"
           competitions={competitions}
         />
         <InvitationCodeList
           role="audience"
           returnTo="/admin/audience"
-          codeExample="IKO-AUD-2026"
+          codeExample="IKO-AUDIENCE-TIER-USD10-2026-00001"
           competitions={competitions}
           editingId={params.editcode}
         />

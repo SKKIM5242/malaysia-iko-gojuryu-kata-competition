@@ -11,6 +11,7 @@ import { notifyRefereeAssignment, notifyRefereeUnassigned, sendConfirmationEmail
 import type { PaymentStatus } from "@/lib/types";
 import { parseCsvWithHeader, parseDDMMYYYY, type CsvUploadResult } from "@/lib/csv-bulk";
 import { normalizeIban } from "@/lib/bank";
+import { codePrefix, nextSequentialCode } from "@/lib/invitation-codes";
 import { listTelegramGroups, type TelegramCategory } from "@/lib/telegram";
 import { ACCESS_MATRIX, accessMatrixAnnouncementIntro } from "@/lib/access-matrix";
 import { DEFAULT_COMPARISON_ROWS } from "@/components/AccessComparisonTable";
@@ -1452,6 +1453,37 @@ function requireInvitationCodeFields(formData: FormData, returnTo: string) {
     sign_in_limit: Number(signInLimitRaw),
     competition_id: competitionId,
   };
+}
+
+/** Computes (never writes) the next systematic code for a role + competition
+ * tier — IKO-<ROLE>-TIER-<TIER>-2026-<NNNNN>, see lib/invitation-codes.ts.
+ * Read-only: since nothing is inserted here, a number shown by "Run" but
+ * never actually submitted via createInvitationCode is simply never
+ * recorded, so the very next Run click computes that same number again —
+ * no separate reservation or release step needed. Callable directly from
+ * the InvitationCodeForm client component (not tied to a <form> element),
+ * since Server Actions can be invoked like a plain async function from
+ * event handlers, not just form submissions. */
+export async function generateSequentialInvitationCode(
+  role: string,
+  competitionId: string,
+): Promise<{ code: string } | { error: string }> {
+  if (!INVITATION_CODE_ROLES.includes(role)) return { error: "Pick a role first." };
+  if (!competitionId) return { error: "Pick a competition tier first." };
+  const { supabase } = await getActor();
+  const { data: competition } = await supabase
+    .from("competitions")
+    .select("registration_fee_usd")
+    .eq("id", competitionId)
+    .maybeSingle();
+  if (!competition) return { error: "Competition not found." };
+  const prefix = codePrefix(role, Number(competition.registration_fee_usd ?? 0));
+  const { data: existing } = await supabase
+    .from("invitation_codes")
+    .select("code")
+    .ilike("code", `${prefix}%`);
+  const code = nextSequentialCode(prefix, (existing ?? []).map((r) => r.code as string));
+  return { code };
 }
 
 export async function createInvitationCode(formData: FormData) {

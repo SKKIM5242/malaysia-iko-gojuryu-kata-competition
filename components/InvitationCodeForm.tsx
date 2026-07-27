@@ -1,5 +1,8 @@
-import { createInvitationCode, updateInvitationCode } from "@/app/actions/admin";
-import { Card, adminBtn, adminInput, adminLabel } from "@/components/admin";
+"use client";
+
+import { useState } from "react";
+import { createInvitationCode, updateInvitationCode, generateSequentialInvitationCode } from "@/app/actions/admin";
+import { Card, adminBtn, adminBtnSecondary, adminInput, adminLabel } from "@/components/admin-styles";
 
 export const ROLE_LABELS: Record<string, string> = {
   school: "School / Dojo / Club",
@@ -29,12 +32,18 @@ export interface InvitationCodeRow {
 
 /** Full-featured invitation-code creator/editor, shared by every admin
  * listing page and the central Admin → Accounts → Invitation codes tab.
- * Every field is required except Note — the organizer's explicit
- * instruction after being told this removes the old "unlimited shared
- * code" shortcut; every code is now a deliberate, fully-specified,
- * single-purpose, competition-scoped grant. Pass a fixed `role` to lock
- * the role (per-page forms); omit it to show the role dropdown (the
- * central Accounts page). Pass `editing` to switch into edit mode. */
+ * Every field is required except Note. Pass a fixed `role` to lock the
+ * role (per-page forms); omit it to show the role dropdown (the central
+ * Accounts page). Pass `editing` to switch into edit mode.
+ *
+ * The code itself is never typed by hand — Role and Competition Tier come
+ * first, then "Run" computes the next systematic code for that exact
+ * role+tier combination (IKO-<ROLE>-TIER-<TIER>-2026-<NNNNN>, see
+ * lib/invitation-codes.ts) and locks it into the Code field; the only
+ * thing left to do after that is Create/Save. Nothing is written to the
+ * database until the code is actually submitted, so a number Run
+ * generates but the admin never submits is simply shown again to the
+ * next person who clicks Run — no separate "unreserve" step needed. */
 export default function InvitationCodeForm({
   role,
   roleOptions,
@@ -58,6 +67,21 @@ export default function InvitationCodeForm({
   editing?: InvitationCodeRow;
   onCancelHref?: string;
 }) {
+  const [selectedRole, setSelectedRole] = useState(role ?? editing?.role ?? "referee");
+  const [competitionId, setCompetitionId] = useState(editing?.competition_id ?? "");
+  const [code, setCode] = useState(editing?.code ?? "");
+  const [running, setRunning] = useState(false);
+  const [runError, setRunError] = useState<string | null>(null);
+
+  async function runGenerate() {
+    setRunning(true);
+    setRunError(null);
+    const result = await generateSequentialInvitationCode(selectedRole, competitionId);
+    if ("code" in result) setCode(result.code);
+    else setRunError(result.error);
+    setRunning(false);
+  }
+
   return (
     <Card>
       <h2 className="mb-3 text-lg font-bold">{editing ? `Edit Code ${editing.code}` : title}</h2>
@@ -65,18 +89,8 @@ export default function InvitationCodeForm({
         <input type="hidden" name="return_to" value={returnTo} />
         {editing && <input type="hidden" name="id" value={editing.id} />}
         {role && <input type="hidden" name="role" value={role} />}
+        <input type="hidden" name="code" value={code} />
         <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label htmlFor={`${idPrefix}_code`} className={adminLabel}>Code *</label>
-            <input
-              id={`${idPrefix}_code`}
-              name="code"
-              required
-              defaultValue={editing?.code ?? ""}
-              className={adminInput}
-              placeholder={`e.g. ${codeExample}`}
-            />
-          </div>
           {role ? (
             <div>
               <label className={adminLabel}>Role</label>
@@ -89,7 +103,8 @@ export default function InvitationCodeForm({
                 id={`${idPrefix}_role`}
                 name="role"
                 required
-                defaultValue={editing?.role ?? "referee"}
+                value={selectedRole}
+                onChange={(e) => setSelectedRole(e.target.value)}
                 className={adminInput}
               >
                 {Object.entries(ROLE_LABELS)
@@ -99,6 +114,51 @@ export default function InvitationCodeForm({
                   ))}
               </select>
             </div>
+          )}
+          <div>
+            <label htmlFor={`${idPrefix}_competition_id`} className={adminLabel}>Competition Tier *</label>
+            <select
+              id={`${idPrefix}_competition_id`}
+              name="competition_id"
+              required
+              value={competitionId}
+              onChange={(e) => setCompetitionId(e.target.value)}
+              className={adminInput}
+            >
+              <option value="" disabled>Select competition tier</option>
+              {competitions.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div>
+          <label htmlFor={`${idPrefix}_code`} className={adminLabel}>Code *</label>
+          <div className="flex max-w-[65%] items-center gap-2">
+            <input
+              id={`${idPrefix}_code`}
+              readOnly
+              value={code}
+              placeholder={editing ? undefined : `Click Run — e.g. ${codeExample}`}
+              className={`${adminInput} bg-neutral-50 text-neutral-500`}
+            />
+            {!editing && (
+              <button
+                type="button"
+                onClick={runGenerate}
+                disabled={running || !competitionId}
+                className={`${adminBtnSecondary} shrink-0 whitespace-nowrap disabled:opacity-50`}
+              >
+                {running ? "Running…" : "Run"}
+              </button>
+            )}
+          </div>
+          {runError && <p className="mt-1 text-xs text-red-700">{runError}</p>}
+          {!editing && !runError && (
+            <p className="mt-1 text-xs text-neutral-400">
+              Pick Role and Competition Tier above, then click Run — the systematic code for that
+              exact combination fills in here, ready to reuse if this form isn&apos;t submitted.
+            </p>
           )}
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -137,21 +197,6 @@ export default function InvitationCodeForm({
             placeholder="e.g. jane@example.com"
           />
         </div>
-        <div>
-          <label htmlFor={`${idPrefix}_competition_id`} className={adminLabel}>Competition *</label>
-          <select
-            id={`${idPrefix}_competition_id`}
-            name="competition_id"
-            required
-            defaultValue={editing?.competition_id ?? ""}
-            className={adminInput}
-          >
-            <option value="" disabled>Select competition</option>
-            {competitions.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-        </div>
         <div className="grid gap-4 sm:grid-cols-3">
           <div>
             <label htmlFor={`${idPrefix}_valid_from`} className={adminLabel}>Valid from *</label>
@@ -189,7 +234,9 @@ export default function InvitationCodeForm({
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <button type="submit" className={adminBtn}>{editing ? "Save changes" : "Create code"}</button>
+          <button type="submit" disabled={!code} className={`${adminBtn} disabled:opacity-50`}>
+            {editing ? "Save changes" : "Create code"}
+          </button>
           {editing && onCancelHref && (
             <a href={onCancelHref} className="text-sm font-semibold text-neutral-500 hover:text-neutral-700">
               Cancel

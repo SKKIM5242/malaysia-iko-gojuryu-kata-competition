@@ -60,7 +60,7 @@ export default async function AdminRegistrations({
             roleOptions={["audience", "referee", "school"]}
             returnTo={returnTo}
             idPrefix="cs_code"
-            codeExample="IKO-AUD-2026"
+            codeExample="IKO-AUDIENCE-TIER-USD10-2026-00001"
             competitions={competitions}
           />
         </div>

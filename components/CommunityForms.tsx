@@ -192,7 +192,7 @@ export function RefereeForm({ telegramLink }: { telegramLink: string | null }) {
           <label htmlFor="invitation_code" className={labelCls}>
             Invitation code <span className="font-normal text-neutral-400">(optional)</span>
           </label>
-          <input id="invitation_code" name="invitation_code" className={inputCls} />
+          <input id="invitation_code" name="invitation_code" className={`${inputCls} max-w-[65%]`} />
         </div>
         <div className="sm:col-span-2">
           <label htmlFor="referral_source" className={labelCls}>
@@ -256,7 +256,7 @@ export function AudienceForm({ telegramLink }: { telegramLink: string | null }) 
           <label htmlFor="invitation_code" className={labelCls}>
             Invitation code <span className="font-normal text-neutral-400">(optional)</span>
           </label>
-          <input id="invitation_code" name="invitation_code" className={inputCls} />
+          <input id="invitation_code" name="invitation_code" className={`${inputCls} max-w-[65%]`} />
         </div>
         <div className="sm:col-span-2">
           <label htmlFor="support_referral" className={labelCls}>
@@ -502,7 +502,7 @@ export function StaffForm({
         </div>
         <div className="sm:col-span-2">
           <label htmlFor="invitation_code" className={labelCls}>Invitation code (optional)</label>
-          <input id="invitation_code" name="invitation_code" className={inputCls} />
+          <input id="invitation_code" name="invitation_code" className={`${inputCls} max-w-[65%]`} />
         </div>
         <div className="sm:col-span-2">
           <label htmlFor="referral_source" className={labelCls}>

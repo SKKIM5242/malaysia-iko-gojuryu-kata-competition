@@ -129,7 +129,7 @@ export default async function AdminOrganizers({
                 </div>
                 <div>
                   <label htmlFor="org_invitation_code" className={adminLabel}>Invitation code (optional)</label>
-                  <input id="org_invitation_code" name="invitation_code" className={adminInput} />
+                  <input id="org_invitation_code" name="invitation_code" className={`${adminInput} max-w-[65%]`} />
                 </div>
               </div>
               <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3">
@@ -242,13 +242,13 @@ export default async function AdminOrganizers({
             returnTo="/admin/organizers"
             title="Admin / Organizer Invitation Code"
             idPrefix="org_code"
-            codeExample="IKO-ORG-2026"
+            codeExample="IKO-ORGANIZER-TIER-USD10-2026-00001"
             competitions={competitions}
           />
           <InvitationCodeList
             role="organizer"
             returnTo="/admin/organizers"
-            codeExample="IKO-ORG-2026"
+            codeExample="IKO-ORGANIZER-TIER-USD10-2026-00001"
             competitions={competitions}
             editingId={params.editcode}
           />

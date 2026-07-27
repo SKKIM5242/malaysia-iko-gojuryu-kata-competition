@@ -238,7 +238,7 @@ export default async function AdminSupport({
                 </div>
                 <div>
                   <label htmlFor="cs_invitation_code" className={adminLabel}>Invitation code (optional)</label>
-                  <input id="cs_invitation_code" name="invitation_code" className={adminInput} />
+                  <input id="cs_invitation_code" name="invitation_code" className={`${adminInput} max-w-[65%]`} />
                 </div>
                 <div>
                   <label htmlFor="cs_referral_source" className={adminLabel}>Referral (optional)</label>
@@ -675,13 +675,13 @@ export default async function AdminSupport({
             returnTo="/admin/support"
             title="Participant Support Invitation Code"
             idPrefix="support_code"
-            codeExample="IKO-SUPPORT-2026"
+            codeExample="IKO-SUPPORT-TIER-USD10-2026-00001"
             competitions={competitions}
           />
           <InvitationCodeList
             role="customer_support"
             returnTo="/admin/support"
-            codeExample="IKO-SUPPORT-2026"
+            codeExample="IKO-SUPPORT-TIER-USD10-2026-00001"
             competitions={competitions}
             editingId={params.editcode}
           />

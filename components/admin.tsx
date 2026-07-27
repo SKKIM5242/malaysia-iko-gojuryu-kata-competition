@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { signOut } from "@/app/actions/auth";
 import { createClient } from "@/lib/supabase/server";
 import CertificateUploadField from "@/components/CertificateUploadField";
-import { adminInput, adminLabel, adminBtn, adminBtnSecondary } from "@/components/admin-styles";
+import { adminInput, adminLabel, adminBtn, adminBtnSecondary, Card } from "@/components/admin-styles";
 
 const FULL_NAV: Array<[string, string]> = [
   ["Dashboard", "/admin"],
@@ -121,13 +121,7 @@ export async function AdminShell({
   );
 }
 
-export { adminInput, adminLabel, adminBtn, adminBtnSecondary };
-
-export function Card({ children }: { children: ReactNode }) {
-  return (
-    <div className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">{children}</div>
-  );
-}
+export { adminInput, adminLabel, adminBtn, adminBtnSecondary, Card };
 
 /** Upload-or-take-a-picture field for a latest rank certificate. Reused on
  * the Sensei, Participant, and Referee/Judge admin forms (Schools have no

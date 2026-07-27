@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 /** Shared admin-panel form styling constants — kept in their own module
  * (no server-only imports) so client components can use them without
  * pulling in components/admin.tsx's AdminShell, which needs next/headers
@@ -10,3 +12,9 @@ export const adminBtn =
   "rounded-md bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-600";
 export const adminBtnSecondary =
   "rounded-md border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-50";
+
+export function Card({ children }: { children: ReactNode }) {
+  return (
+    <div className="rounded-lg border border-neutral-200 bg-white p-5 shadow-sm">{children}</div>
+  );
+}

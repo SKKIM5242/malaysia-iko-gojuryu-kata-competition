@@ -192,12 +192,12 @@ async function CodesTab({ editingId }: { editingId?: string }) {
       <InvitationCodeForm
         returnTo="/admin/accounts?tab=codes"
         idPrefix="central_code"
-        codeExample="IKO-JUDGE-2026"
+        codeExample="IKO-REFEREE-TIER-USD100-2026-00001"
         competitions={competitions}
       />
       <InvitationCodeList
         returnTo="/admin/accounts?tab=codes"
-        codeExample="IKO-JUDGE-2026"
+        codeExample="IKO-REFEREE-TIER-USD100-2026-00001"
         competitions={competitions}
         editingId={editingId}
       />
