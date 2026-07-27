@@ -112,7 +112,7 @@ async function AccessMatrixTab({ supabase }: { supabase: Awaited<ReturnType<type
         rowKey="resource_text"
         downloadName="access-matrix"
         columns={[
-          { key: "resource", label: "Resource" },
+          { key: "resource", label: "Resource", wrap: true },
           { key: "admin", label: "Admin" },
           { key: "organizer", label: "Organizer / Staff" },
           { key: "customerSupport", label: "Participant Support" },
@@ -121,8 +121,8 @@ async function AccessMatrixTab({ supabase }: { supabase: Awaited<ReturnType<type
         rows={matrix.map((row) => ({
           resource: row.note ? (
             <>
-              {row.resource}
-              <p className="mt-1 text-xs font-normal text-neutral-400">{row.note}</p>
+              <p className="whitespace-normal break-words">{row.resource}</p>
+              <p className="mt-1 whitespace-normal break-words text-xs font-normal text-neutral-400">{row.note}</p>
             </>
           ) : (
             row.resource
