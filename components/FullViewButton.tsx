@@ -6,6 +6,25 @@ import LockedVideo from "@/components/LockedVideo";
 import { RubricTable } from "@/components/RefereeScoring";
 import { SHEET1_CRITERIA, SHEET2_CRITERIA, rubricFor, splitEvenly } from "@/lib/scoring-rubric";
 
+/** Collapsed to 2 lines by default so a long disqualification reason
+ * doesn't push the video + judge panels below the fold in the maximized
+ * Full View window — tap/click to see the full text. */
+function DisqualificationReason({ reason, label }: { reason: string; label: string }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={() => setExpanded((e) => !e)}
+      className="mt-1.5 block w-full rounded-md border border-red-200 bg-red-50 px-2 py-1.5 text-left text-xs text-red-800"
+    >
+      <strong>{label}</strong> <span className={expanded ? "" : "line-clamp-2"}>{reason}</span>
+      <span className="mt-0.5 block text-[10px] font-semibold text-red-600 underline underline-offset-2">
+        {expanded ? "Show less" : "Tap to see the full reason"}
+      </span>
+    </button>
+  );
+}
+
 export interface FullViewJudge {
   judgeName: string;
   country: string | null;
@@ -103,10 +122,10 @@ export default function FullViewButton({
                           )}
                           <RubricTable values={values} rubric={rubricFor(values)} readOnly dense />
                           {j.total === 0 && (
-                            <p className="mt-1.5 rounded-md border border-red-200 bg-red-50 px-2 py-1.5 text-xs text-red-800">
-                              <strong>Disqualification reason:</strong>{" "}
-                              {j.reason || "Not recorded (submitted before this was required)."}
-                            </p>
+                            <DisqualificationReason
+                              label="Disqualification reason:"
+                              reason={j.reason || "Not recorded (submitted before this was required)."}
+                            />
                           )}
                         </>
                       )}
@@ -132,10 +151,17 @@ export default function FullViewButton({
               </p>
               <p className="mt-1 text-[11px] text-neutral-400">View only — nothing here can be edited.</p>
               {override && (
-                <p className="mt-1 text-xs font-semibold text-purple-700">
-                  Admin/Organizer override — {override.judgeName}: Score {override.total!.toFixed(1)}
-                  {override.total === 0 ? ` · Disqualified: ${override.reason || "No reason recorded"}` : ""}
-                </p>
+                <>
+                  <p className="mt-1 text-xs font-semibold text-purple-700">
+                    Admin/Organizer override — {override.judgeName}: Score {override.total!.toFixed(1)}
+                  </p>
+                  {override.total === 0 && (
+                    <DisqualificationReason
+                      label="Disqualified:"
+                      reason={override.reason || "No reason recorded"}
+                    />
+                  )}
+                </>
               )}
             </div>
           </div>

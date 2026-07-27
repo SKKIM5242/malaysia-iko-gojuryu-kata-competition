@@ -48,10 +48,10 @@ export default function ReasonPicker({
       {open && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-4" onClick={() => setOpen(false)}>
           <div
-            className="max-h-[85vh] w-full max-w-3xl overflow-y-auto rounded-lg bg-white p-5 shadow-2xl"
+            className="flex max-h-[97vh] w-full max-w-3xl flex-col overflow-y-auto rounded-lg bg-white p-4 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="mb-3 flex items-start justify-between gap-2">
+            <div className="mb-2 flex items-start justify-between gap-2">
               <h3 className="text-sm font-bold uppercase tracking-wide text-neutral-700">
                 Select a disqualification reason
               </h3>
@@ -59,7 +59,7 @@ export default function ReasonPicker({
                 ✕
               </button>
             </div>
-            <div className="space-y-1">
+            <div className="space-y-0.5">
               {DISQUALIFICATION_REASONS.map((r, i) => (
                 <button
                   key={r}
@@ -68,7 +68,7 @@ export default function ReasonPicker({
                     onReasonChange(r);
                     setOpen(false);
                   }}
-                  className={`flex w-full items-start gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-neutral-50 ${
+                  className={`flex w-full items-start gap-2 rounded-md px-3 py-1.5 text-left text-sm leading-snug hover:bg-neutral-50 ${
                     reason === r ? "bg-red-50 font-semibold text-red-700" : "text-neutral-700"
                   }`}
                 >
@@ -79,7 +79,7 @@ export default function ReasonPicker({
               <button
                 type="button"
                 onClick={() => onReasonChange(OTHER_DISQUALIFICATION_REASON)}
-                className={`flex w-full items-start gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-neutral-50 ${
+                className={`flex w-full items-start gap-2 rounded-md px-3 py-1.5 text-left text-sm leading-snug hover:bg-neutral-50 ${
                   isOther ? "bg-red-50 font-semibold text-red-700" : "text-neutral-700"
                 }`}
               >

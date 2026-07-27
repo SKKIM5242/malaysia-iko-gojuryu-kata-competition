@@ -52,6 +52,11 @@ export default function QuickScoreForm({
         >
           Submit score
         </button>
+        {existingScore != null && (
+          <span className="font-bold text-green-600" title="This override score has been submitted">
+            ✓
+          </span>
+        )}
       </div>
       {isZero && (
         <div className="mt-2 rounded-md border-2 border-red-300 bg-red-50 p-3">
