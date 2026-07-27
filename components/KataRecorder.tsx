@@ -289,13 +289,24 @@ export default function KataRecorder({
         )}
       </div>
 
-      <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
-        <strong>Camera placement:</strong> prop your phone up (against a wall, on a chair, or a
-        tripod) about <strong>12 feet (≈3.6 m)</strong> away from your starting point, at roughly
-        chest height, in the same direction you will be performing your kata. Leave enough space
-        in frame for the full routine — you should be able to see your whole body move throughout.
-        Tap <strong>Start</strong>, walk into position, perform your kata, then walk back and tap{" "}
-        <strong>Stop</strong> when you are finished.
+      <div className="space-y-2 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+        <p>
+          <strong>Camera placement:</strong> Prop your phone up (on a chair, or a tripod) about{" "}
+          <strong>300cm (≈118 inch)</strong> away from your starting point, at roughly chest
+          height, in the same direction you bow or 45 degrees to the left or right, for this
+          Malaysia Open Virtual Kata Competition. Leave enough space in frame for the full routine
+          — the recording should be able to see your whole kata move from start to end.
+        </p>
+        <p>
+          Tap <strong>Start</strong>. Imagine you are just outside the Tatami box or Kata Arena:
+          bow first, then walk 3–6 steps forward into position, then bow again. State the name of
+          the kata you are performing, then start with <strong>&quot;Yo e&quot;</strong> with hard
+          breathing and perform your kata to the end, then <strong>&quot;Na o te&quot;</strong>{" "}
+          with hard or soft breathing depending on your kata, and bow. After that, walk backward
+          3–5 steps and bow again. Tap <strong>Stop</strong> when you have faced forward for a
+          second or two after your bow.
+        </p>
+        <p>All the best to you — may your recording be a successful one. Thank you for participating.</p>
       </div>
 
       <div className="relative mx-auto max-w-md overflow-hidden rounded-lg border border-neutral-300 bg-black">
