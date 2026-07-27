@@ -464,7 +464,7 @@ export function ScoreSessionButton({
         (canScore ? (
           <ScoreSession item={item} onExit={() => setOpen(false)} allowAdvancedControls={allowAdvancedControls} />
         ) : (
-          <FloatingWindow title={`Watch Recording — ${item.participantName}`} onClose={() => setOpen(false)}>
+          <FloatingWindow title={`Watch Recording — ${item.participantName}`} onClose={() => setOpen(false)} initial="max">
             <div className="flex h-full flex-col bg-black">
               <LockedVideo src={item.playbackUrl} autoPlay allowAdvancedControls={allowAdvancedControls} />
             </div>

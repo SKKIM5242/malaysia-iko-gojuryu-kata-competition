@@ -62,7 +62,13 @@ export default function VideoWatchButton({
         {label}
       </button>
       {open && (
-        <FloatingWindow title="Watch Recording" onClose={() => setOpen(false)} defaultWidth={760} defaultHeight={560}>
+        <FloatingWindow
+          title="Watch Recording"
+          onClose={() => setOpen(false)}
+          initial="max"
+          defaultWidth={760}
+          defaultHeight={560}
+        >
           <div className="flex h-full flex-col">
             <div className="min-h-0 flex-1 bg-black">
               <LockedVideo src={url} autoPlay allowAdvancedControls={allowAdvancedControls} />
