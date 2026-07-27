@@ -144,12 +144,6 @@ export function SchoolForm({ telegramLink, tiers }: { telegramLink: string | nul
         <label htmlFor="name" className={labelCls}>School / Dojo name *</label>
         <input id="name" name="name" required className={inputCls} placeholder="e.g. Dojo Goju-ryu Johor Bahru" />
       </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <label htmlFor="state" className={labelCls}>State / Province / Region</label>
-          <input id="state" name="state" className={inputCls} placeholder="e.g. Selangor, California, Tokyo" />
-        </div>
-      </div>
 
       <div className="rounded-md border border-neutral-200 bg-neutral-50 p-4">
         <p className="text-sm font-bold text-neutral-800">Person in-charge / Chief Instructor</p>
@@ -197,6 +191,10 @@ export function SchoolForm({ telegramLink, tiers }: { telegramLink: string | nul
             <span className="font-normal text-neutral-400">(no comma &quot;,&quot; allowed in the box)</span>
           </label>
           <NoCommaTextarea id="home_address" className={inputCls} />
+        </div>
+        <div>
+          <label htmlFor="state" className={labelCls}>State / Province / Region</label>
+          <input id="state" name="state" className={inputCls} placeholder="e.g. Selangor, California, Tokyo" />
         </div>
         <div>
           <label htmlFor="city_town" className={labelCls}>City / Town *</label>

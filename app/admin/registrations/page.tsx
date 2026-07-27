@@ -92,15 +92,15 @@ export default async function AdminRegistrations({
           rowKey="id"
           downloadName="registrations"
           columns={[
-            { key: "participant", label: "Participant" },
-            { key: "ref", label: "Ref" },
-            { key: "ic_passport", label: "IC / Passport" },
-            { key: "category", label: "Category" },
-            { key: "division", label: "Division" },
-            { key: "school", label: "School" },
-            { key: "payment_ref", label: "Payment ref" },
-            { key: "status", label: "Status" },
-            { key: "actions", label: "Actions" },
+            { key: "participant", label: "Participant", width: 170 },
+            { key: "ref", label: "Ref", width: 100 },
+            { key: "ic_passport", label: "IC / Passport", width: 140 },
+            { key: "category", label: "Category", width: 240, wrap: true },
+            { key: "division", label: "Division", width: 150 },
+            { key: "school", label: "School", width: 170 },
+            { key: "payment_ref", label: "Payment ref", width: 170 },
+            { key: "status", label: "Status", width: 120 },
+            { key: "actions", label: "Actions", width: 170 },
           ]}
           csvColumns={[
             { key: "participant", label: "Participant" },
