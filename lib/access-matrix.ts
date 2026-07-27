@@ -129,7 +129,9 @@ export const ACCESS_MATRIX: AccessRow[] = [
  * access_matrix_rows table rather than a frozen snapshot — so it's always
  * current and there's no separate table/notes text to keep in sync. */
 export function accessMatrixAnnouncementIntro(generatedAt: string): string {
-  return `_Snapshot as of ${generatedAt}. Reflects the actual route gating and server-action guards in the codebase. The table below always shows the current rules — edit rows on the Content page and they update here automatically._`;
+  // Single asterisk, not underscore — the tiny Markdown renderer (lib/markdown.tsx)
+  // only recognises *italic* and **bold**, not _italic_.
+  return `*Snapshot as of ${generatedAt}. Reflects the actual route gating and server-action guards in the codebase. The table below always shows the current rules — edit rows on the Content page and they update here automatically.*`;
 }
 
 export interface AccessMatrixDbRow {
