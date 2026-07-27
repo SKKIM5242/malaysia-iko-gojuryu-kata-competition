@@ -4,7 +4,7 @@ import { schemaReady } from "@/lib/data";
 import { getAllCompetitions } from "@/lib/admin-data";
 import {
   updateCommunityStatus, saveReferee, deleteReferee, linkRefereeAccount, bulkUploadReferees,
-  saveAutoAssignTerm, deleteAutoAssignTerm, bulkUploadAutoAssignTerms,
+  saveAutoAssignTerm, deleteAutoAssignTerm, bulkUploadAutoAssignTerms, generateRecordInvitationCode,
 } from "@/app/actions/admin";
 import { AdminShell, Card, CertificateField, adminBtn, adminBtnSecondary, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice, formatDOB } from "@/components/ui";
@@ -140,6 +140,8 @@ export default async function AdminReferees({
           <Card>
             <form action={saveReferee} className="space-y-4">
               {editing && <input type="hidden" name="id" value={editing.id} />}
+              {editing && <input type="hidden" name="role" value="referee" />}
+              {editing && <input type="hidden" name="return_to" value={`/admin/referees?editref=${editing.id}`} />}
               <div>
                 <label htmlFor="full_name" className={adminLabel}>Full name *</label>
                 <input id="full_name" name="full_name" required defaultValue={editing?.full_name ?? ""} className={adminInput} />
@@ -244,6 +246,49 @@ export default async function AdminReferees({
                   </div>
                 </div>
               </div>
+              {editing && (
+                <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3">
+                  <p className="text-xs font-bold uppercase tracking-wide text-neutral-500">
+                    Personal invitation code for this referee
+                  </p>
+                  <div className="mt-2">
+                    <label htmlFor="pic_competition_id" className={adminLabel}>Competition Tier *</label>
+                    <select id="pic_competition_id" name="pic_competition_id" defaultValue="" className={adminInput}>
+                      <option value="" disabled>Select competition tier</option>
+                      {competitions.map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="mt-3 grid gap-4 sm:grid-cols-3">
+                    <div>
+                      <label htmlFor="pic_valid_from" className={adminLabel}>Valid from *</label>
+                      <input id="pic_valid_from" name="pic_valid_from" type="date" className={adminInput} />
+                    </div>
+                    <div>
+                      <label htmlFor="pic_valid_until" className={adminLabel}>Valid until *</label>
+                      <input id="pic_valid_until" name="pic_valid_until" type="date" className={adminInput} />
+                    </div>
+                    <div>
+                      <label htmlFor="pic_sign_in_limit" className={adminLabel}>Sign-in limit *</label>
+                      <input id="pic_sign_in_limit" name="pic_sign_in_limit" type="number" min="1" className={adminInput} />
+                    </div>
+                  </div>
+                  <button
+                    type="submit"
+                    formAction={generateRecordInvitationCode}
+                    formNoValidate
+                    className={`mt-3 ${editing.invitation_code ? adminBtn : adminBtnSecondary}`}
+                  >
+                    {editing.invitation_code ? "Regenerate personal code" : "Generate personal code"}
+                  </button>
+                  <p className="mt-2 text-xs text-neutral-400">
+                    {editing.invitation_code
+                      ? `Note: Current code: "${editing.invitation_code}" — bound to ${editing.email} address, single use in create account.`
+                      : `Single-use, bound only to ${editing.email || "this referee's email"} — for creating that one login, not a shared code. Sign-in access after account creation depends on the Valid from/until window and Sign-in limit above, whichever is reached first.`}
+                  </p>
+                </div>
+              )}
               <div className="flex gap-2">
                 <button type="submit" className={adminBtn}>{editing ? "Save changes" : "Add Referee/Judge"}</button>
                 {editing && (

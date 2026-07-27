@@ -1937,7 +1937,13 @@ export async function bulkUploadAutoAssignTerms(_prev: CsvUploadResult, formData
   return { done: true, succeeded, failed: failures.length, failures: failures.slice(0, 50) };
 }
 
-const RECORD_CODE_TABLES: Record<string, string> = { school: "schools", sensei: "senseis" };
+const RECORD_CODE_TABLES: Record<string, string> = {
+  school: "schools",
+  sensei: "senseis",
+  referee: "referees",
+  audience: "audiences",
+  customer_support: "staff_applications",
+};
 
 /** Lenient partial-save of a School/Sensei record's other editable fields
  * (everything except file uploads) — used only by

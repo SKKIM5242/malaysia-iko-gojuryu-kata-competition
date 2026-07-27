@@ -13,6 +13,7 @@ import { EmptyState, SetupNotice, formatUSD, formatDateTime } from "@/components
 import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
 import SignInControlBox from "@/components/SignInControlBox";
+import GeneratePersonalCodeBox from "@/components/GeneratePersonalCodeBox";
 import { NoCommaInput } from "@/components/NoCommaAddressField";
 import DateOfBirthField from "@/components/DateOfBirthField";
 import InvitationCodeForm from "@/components/InvitationCodeForm";
@@ -30,6 +31,7 @@ interface StaffApp {
   id: string; full_name: string; short_name: string | null; email: string | null; phone: string | null;
   role_requested: string; message: string | null; status: string; created_at: string;
   support_tier_1_id: string | null; support_tier_2_id: string | null; support_tier_3_id: string | null;
+  invitation_code: string | null;
 }
 
 export default async function AdminSupport({
@@ -341,6 +343,7 @@ export default async function AdminSupport({
             ...competitions.map((c) => ({ key: `tier_${c.id}`, label: `Tier ${formatUSD(c.registration_fee_usd)}` })),
             { key: "message", label: "Message" },
             { key: "status", label: "Status" },
+            ...(canCreate ? [{ key: "personal_code", label: "Personal Code" }] : []),
           ]}
           csvColumns={[
             { key: "full_name", label: "Name" },
@@ -390,12 +393,28 @@ export default async function AdminSupport({
                 ))}
               </div>
             ),
+            ...(canCreate
+              ? {
+                  personal_code: (
+                    <GeneratePersonalCodeBox
+                      key="personal_code"
+                      role="customer_support"
+                      recordId={s.id}
+                      email={s.email}
+                      invitationCode={s.invitation_code}
+                      competitions={competitions}
+                      returnTo="/admin/support"
+                    />
+                  ),
+                }
+              : {}),
           }))}
         />
       )}
       <p className="mt-4 text-xs text-neutral-400">
         Approving an application here does not create a login by itself — use the &quot;Create a Customer
-        Support account&quot; form above to actually grant access.
+        Support account&quot; form above, or generate this applicant a personal invitation code so they
+        create their own login, to actually grant access.
       </p>
 
       {isAdminTier && (

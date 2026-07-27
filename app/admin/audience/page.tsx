@@ -7,6 +7,7 @@ import { EmptyState, SetupNotice } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
 import SignInControlBox from "@/components/SignInControlBox";
+import GeneratePersonalCodeBox from "@/components/GeneratePersonalCodeBox";
 import InvitationCodeForm from "@/components/InvitationCodeForm";
 import InvitationCodeList from "@/components/InvitationCodeList";
 import { getTelegramLink } from "@/lib/telegram";
@@ -159,7 +160,12 @@ export default async function AdminAudience({
             { key: "referral_source", label: "Referral" },
             { key: "payment", label: "Payment" },
             { key: "telegram", label: "Telegram" },
-            ...(isAdminTier ? [{ key: "sign_in_control", label: "Sign-in Control" }] : []),
+            ...(isAdminTier
+              ? [
+                  { key: "sign_in_control", label: "Sign-in Control" },
+                  { key: "personal_code", label: "Personal Code" },
+                ]
+              : []),
           ]}
           csvColumns={[
             { key: "full_name", label: "Name" },
@@ -211,6 +217,17 @@ export default async function AdminAudience({
                       signInCompetitionId={loginByUserId.get(a.user_id ?? "")?.sign_in_competition_id ?? null}
                       signInValidFrom={loginByUserId.get(a.user_id ?? "")?.sign_in_valid_from ?? null}
                       signInValidUntil={loginByUserId.get(a.user_id ?? "")?.sign_in_valid_until ?? null}
+                      competitions={competitions}
+                      returnTo="/admin/audience"
+                    />
+                  ),
+                  personal_code: (
+                    <GeneratePersonalCodeBox
+                      key="personal_code"
+                      role="audience"
+                      recordId={a.id}
+                      email={a.email}
+                      invitationCode={a.invitation_code}
                       competitions={competitions}
                       returnTo="/admin/audience"
                     />
