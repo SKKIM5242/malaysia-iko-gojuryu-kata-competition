@@ -24,6 +24,7 @@ export interface InvitationCodeRow {
   note: string | null;
   max_uses: number | null;
   email: string | null;
+  phone: string | null;
   valid_from: string | null;
   valid_until: string | null;
   sign_in_limit: number | null;
@@ -185,17 +186,30 @@ export default function InvitationCodeForm({
             />
           </div>
         </div>
-        <div>
-          <label htmlFor={`${idPrefix}_email`} className={adminLabel}>Email *</label>
-          <input
-            id={`${idPrefix}_email`}
-            name="email"
-            type="email"
-            required
-            defaultValue={editing?.email ?? ""}
-            className={adminInput}
-            placeholder="e.g. jane@example.com"
-          />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor={`${idPrefix}_email`} className={adminLabel}>Email *</label>
+            <input
+              id={`${idPrefix}_email`}
+              name="email"
+              type="email"
+              required
+              defaultValue={editing?.email ?? ""}
+              className={adminInput}
+              placeholder="e.g. jane@example.com"
+            />
+          </div>
+          <div>
+            <label htmlFor={`${idPrefix}_phone`} className={adminLabel}>Phone No. (optional)</label>
+            <input
+              id={`${idPrefix}_phone`}
+              name="phone"
+              type="tel"
+              defaultValue={editing?.phone ?? ""}
+              className={adminInput}
+              placeholder="+60…"
+            />
+          </div>
         </div>
         <div className="grid gap-4 sm:grid-cols-3">
           <div>
@@ -244,10 +258,12 @@ export default function InvitationCodeForm({
           )}
         </div>
         <p className="text-xs text-neutral-400">
-          Every field is required except Note. The code activates instantly at public sign-up —
-          only for the Competition selected above — and copies Valid from/until and Sign-in limit
-          onto the resulting account as its own sign-in window/cap. Email binds the code to one
-          address; Max uses caps total redemptions.
+          Every field is required except Note and Phone No. The code activates instantly at public
+          sign-up — only for the Competition selected above — and copies Valid from/until and
+          Sign-in limit onto the resulting account as its own sign-in window/cap. Email binds the
+          code to one address; Max uses caps total redemptions. Phone No. is a contact reference
+          only — it doesn&apos;t enable a Telegram DM by itself, since the Bot API can only message
+          someone who has already started a chat with the bot.
         </p>
       </form>
     </Card>

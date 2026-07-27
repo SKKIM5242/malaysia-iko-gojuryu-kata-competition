@@ -1433,6 +1433,7 @@ function requireInvitationCodeFields(formData: FormData, returnTo: string) {
   const note = String(formData.get("note") ?? "").trim() || null;
   const maxUsesRaw = String(formData.get("max_uses") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const phone = String(formData.get("phone") ?? "").trim() || null;
   const validFrom = String(formData.get("valid_from") ?? "").trim();
   const validUntil = String(formData.get("valid_until") ?? "").trim();
   const signInLimitRaw = String(formData.get("sign_in_limit") ?? "").trim();
@@ -1446,7 +1447,7 @@ function requireInvitationCodeFields(formData: FormData, returnTo: string) {
   if (!signInLimitRaw || Number(signInLimitRaw) < 1) backTo(returnTo, { error: "Sign-in limit is required." });
   if (!competitionId) backTo(returnTo, { error: "Competition is required." });
   return {
-    role, code, note, email,
+    role, code, note, email, phone,
     max_uses: Number(maxUsesRaw),
     valid_from: validFrom,
     valid_until: validUntil,
@@ -1977,6 +1978,14 @@ const RECORD_CODE_TABLES: Record<string, string> = {
   customer_support: "staff_applications",
 };
 
+const RECORD_CODE_REVALIDATE_PATHS: Record<string, string> = {
+  school: "/admin/schools",
+  sensei: "/admin/senseis",
+  referee: "/admin/referees",
+  audience: "/admin/audience",
+  customer_support: "/admin/support",
+};
+
 /** Lenient partial-save of a School/Sensei record's other editable fields
  * (everything except file uploads) — used only by
  * generateRecordInvitationCode below, so clicking Generate/Regenerate
@@ -2098,6 +2107,13 @@ export async function generateRecordInvitationCode(formData: FormData) {
     },
     actor_id: actorId,
   });
+  // The redirect below lands back on this exact same edit view (returnTo
+  // carries ?edit=<id> etc.) so the admin can see the code they just
+  // generated -- without this, Next.js's router cache can keep serving the
+  // pre-generation render of that same URL, showing the "Generate" button
+  // (not yet "Regenerate", still the wrong red/white color) until a manual
+  // page refresh forces a fresh fetch.
+  revalidatePath(RECORD_CODE_REVALIDATE_PATHS[role] ?? returnTo.split("?")[0]);
   backTo(returnTo, { ok: `Invitation code generated: ${code}` });
 }
 

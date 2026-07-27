@@ -59,6 +59,7 @@ export default async function InvitationCodeList({
             note: editing.note,
             max_uses: editing.max_uses,
             email: editing.email,
+            phone: editing.phone,
             valid_from: editing.valid_from,
             valid_until: editing.valid_until,
             sign_in_limit: editing.sign_in_limit,
@@ -87,6 +88,7 @@ export default async function InvitationCodeList({
           columns={[
             { key: "no", label: "No." },
             { key: "email", label: "Email" },
+            { key: "phone", label: "Phone" },
             { key: "code", label: "Code" },
             ...(role ? [] : [{ key: "role", label: "Role" }]),
             { key: "competition", label: "Competition" },
@@ -102,6 +104,7 @@ export default async function InvitationCodeList({
           csvColumns={[
             { key: "no", label: "No." },
             { key: "email", label: "Email" },
+            { key: "phone", label: "Phone" },
             { key: "code", label: "Code" },
             { key: "role", label: "Role" },
             { key: "competition", label: "Competition" },
@@ -117,6 +120,7 @@ export default async function InvitationCodeList({
             id: c.id,
             no: String(i + 1),
             email: c.email ?? "",
+            phone: c.phone ?? "",
             code: c.code,
             role: ROLE_LABELS[c.role] ?? c.role,
             competition: competitionNameById.get(c.competition_id) ?? "",
