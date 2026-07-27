@@ -38,7 +38,11 @@ export function useGridControls() {
     });
   }, []);
 
-  const handleRowMove = useCallback((e: MouseEvent) => {
+  // Pointer Events (not separate mouse/touch handlers) so dragging a row's
+  // resize handle works identically with a mouse, a finger, or a stylus —
+  // mouse-only "mousemove"/"mouseup" listeners never fire during a touch
+  // drag on mobile/tablet, silently disabling this on touch devices.
+  const handleRowMove = useCallback((e: PointerEvent) => {
     const r = resizingRow.current;
     if (!r) return;
     const next = Math.max(CLOSED_SIZE, r.startHeight + (e.clientY - r.startY));
@@ -58,17 +62,17 @@ export function useGridControls() {
 
   const handleRowUp = useCallback(() => {
     resizingRow.current = null;
-    window.removeEventListener("mousemove", handleRowMove);
-    window.removeEventListener("mouseup", handleRowUp);
+    window.removeEventListener("pointermove", handleRowMove);
+    window.removeEventListener("pointerup", handleRowUp);
   }, [handleRowMove]);
 
   const handleRowResizeStart = useCallback(
-    (e: React.MouseEvent, key: string, startHeight: number) => {
+    (e: React.PointerEvent, key: string, startHeight: number) => {
       e.preventDefault();
       e.stopPropagation();
       resizingRow.current = { key, startY: e.clientY, startHeight };
-      window.addEventListener("mousemove", handleRowMove);
-      window.addEventListener("mouseup", handleRowUp);
+      window.addEventListener("pointermove", handleRowMove);
+      window.addEventListener("pointerup", handleRowUp);
     },
     [handleRowMove, handleRowUp],
   );

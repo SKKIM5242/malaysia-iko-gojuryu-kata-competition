@@ -92,7 +92,11 @@ export default function FilterableTable({
     });
   }, []);
 
-  const handleMove = useCallback((e: MouseEvent) => {
+  // Pointer Events (not mouse-only) so dragging a column's resize handle
+  // works with a mouse, a finger, or a stylus alike — see the matching
+  // comment in lib/useGridControls.ts for why plain mouse events silently
+  // don't work on touch devices.
+  const handleMove = useCallback((e: PointerEvent) => {
     const r = resizingRef.current;
     if (!r) return;
     const next = Math.max(CLOSED_SIZE, r.startWidth + (e.clientX - r.startX));
@@ -111,17 +115,17 @@ export default function FilterableTable({
 
   const handleUp = useCallback(() => {
     resizingRef.current = null;
-    window.removeEventListener("mousemove", handleMove);
-    window.removeEventListener("mouseup", handleUp);
+    window.removeEventListener("pointermove", handleMove);
+    window.removeEventListener("pointerup", handleUp);
   }, [handleMove]);
 
   const handleResizeStart = useCallback(
-    (e: React.MouseEvent, col: FilterableColumn, index: number) => {
+    (e: React.PointerEvent, col: FilterableColumn, index: number) => {
       e.preventDefault();
       e.stopPropagation();
       resizingRef.current = { key: col.key, startX: e.clientX, startWidth: widthOf(col, index) };
-      window.addEventListener("mousemove", handleMove);
-      window.addEventListener("mouseup", handleUp);
+      window.addEventListener("pointermove", handleMove);
+      window.addEventListener("pointerup", handleUp);
     },
     [widthOf, handleMove, handleUp],
   );
@@ -256,7 +260,7 @@ export default function FilterableTable({
                       </span>
                     )}
                     <span
-                      onMouseDown={(e) => handleResizeStart(e, c, i)}
+                      onPointerDown={(e) => handleResizeStart(e, c, i)}
                       title={closed ? "Drag to reopen this column" : "Drag to resize (or close) this column"}
                       className={`absolute right-0 top-0 z-10 h-full cursor-col-resize touch-none select-none ${
                         closed ? "w-full bg-red-600 hover:bg-red-700" : "w-2 hover:bg-red-300 active:bg-red-500"
@@ -344,7 +348,7 @@ export default function FilterableTable({
                           {!closed && (isText ? cell || "—" : cell)}
                           {isHandle && (
                             <span
-                              onMouseDown={(e) => grid.handleRowResizeStart(e, key, rowHeight ?? 36)}
+                              onPointerDown={(e) => grid.handleRowResizeStart(e, key, rowHeight ?? 36)}
                               onClick={(e) => e.stopPropagation()}
                               title={rowClosed ? "Drag to reopen this row" : "Drag to resize (or close) this row"}
                               className="absolute bottom-0 left-0 right-0 z-10 h-1 cursor-row-resize touch-none select-none hover:bg-red-300 active:bg-red-500"

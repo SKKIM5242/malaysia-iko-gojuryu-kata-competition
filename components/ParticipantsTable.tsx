@@ -86,7 +86,10 @@ export default function ParticipantsTable({ rows }: { rows: ParticipantRow[] }) 
     });
   }, []);
 
-  const handleMove = useCallback((e: MouseEvent) => {
+  // Pointer Events (not mouse-only) so dragging a column's resize handle
+  // works with a mouse, a finger, or a stylus alike — plain mouse events
+  // silently don't fire during a touch drag on mobile/tablet.
+  const handleMove = useCallback((e: PointerEvent) => {
     const r = resizingRef.current;
     if (!r) return;
     const next = Math.max(CLOSED_SIZE, r.startWidth + (e.clientX - r.startX));
@@ -103,17 +106,17 @@ export default function ParticipantsTable({ rows }: { rows: ParticipantRow[] }) 
 
   const handleUp = useCallback(() => {
     resizingRef.current = null;
-    window.removeEventListener("mousemove", handleMove);
-    window.removeEventListener("mouseup", handleUp);
+    window.removeEventListener("pointermove", handleMove);
+    window.removeEventListener("pointerup", handleUp);
   }, [handleMove]);
 
   const handleResizeStart = useCallback(
-    (e: React.MouseEvent, key: string) => {
+    (e: React.PointerEvent, key: string) => {
       e.preventDefault();
       e.stopPropagation();
       resizingRef.current = { key, startX: e.clientX, startWidth: widthOf(key) };
-      window.addEventListener("mousemove", handleMove);
-      window.addEventListener("mouseup", handleUp);
+      window.addEventListener("pointermove", handleMove);
+      window.addEventListener("pointerup", handleUp);
     },
     [widthOf, handleMove, handleUp],
   );
@@ -237,7 +240,7 @@ export default function ParticipantsTable({ rows }: { rows: ParticipantRow[] }) 
                       </span>
                     )}
                     <span
-                      onMouseDown={(e) => handleResizeStart(e, c.key)}
+                      onPointerDown={(e) => handleResizeStart(e, c.key)}
                       title={closed ? "Drag to reopen this column" : "Drag to resize (or close) this column"}
                       className={`absolute right-0 top-0 z-10 h-full cursor-col-resize touch-none select-none ${
                         closed ? "w-full bg-red-600 hover:bg-red-700" : "w-2 hover:bg-red-300 active:bg-red-500"
@@ -304,7 +307,7 @@ export default function ParticipantsTable({ rows }: { rows: ParticipantRow[] }) 
                           {!closed && content}
                           {isHandle && (
                             <span
-                              onMouseDown={(e) => grid.handleRowResizeStart(e, r.id, rowHeight ?? 40)}
+                              onPointerDown={(e) => grid.handleRowResizeStart(e, r.id, rowHeight ?? 40)}
                               onClick={(e) => e.stopPropagation()}
                               title={rowClosed ? "Drag to reopen this row" : "Drag to resize (or close) this row"}
                               className="absolute bottom-0 left-0 right-0 z-10 h-1 cursor-row-resize touch-none select-none hover:bg-red-300 active:bg-red-500"
