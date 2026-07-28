@@ -5,6 +5,7 @@ import {
   finalizeBulkUploadBatchSession,
   finalizeDirectorySession,
   finalizeInvoiceSession,
+  finalizeSubscriptionRenewalSession,
 } from "@/lib/finalize";
 import { SiteFooter, SiteHeader, TelegramJoinButton } from "@/components/ui";
 import { getTelegramLink } from "@/lib/telegram";
@@ -20,11 +21,12 @@ export default async function PayThanksPage({
 }) {
   const { session_id, cancelled } = await searchParams;
   let result = null;
-  let kind: "directory" | "invoice" | "attempts" | "bulk" = "invoice";
+  let kind: "directory" | "invoice" | "attempts" | "bulk" | "subscription" = "invoice";
   if (!cancelled && session_id && paymentsEnabled()) {
     // One thank-you page serves class invoices, School/Sensei tier fees,
-    // extra re-record attempt purchases, and bulk registration batches — the
-    // session's metadata says which finalizer applies.
+    // extra re-record attempt purchases, bulk registration batches, and
+    // sign-in subscription renewals — the session's metadata says which
+    // finalizer applies.
     let metadata: Record<string, string> | null = null;
     try {
       metadata = (await getStripe().checkout.sessions.retrieve(session_id)).metadata ?? null;
@@ -37,7 +39,9 @@ export default async function PayThanksPage({
         ? "attempts"
         : metadata?.bulk_batch_id
           ? "bulk"
-          : "invoice";
+          : metadata?.subscription_renewal_id
+            ? "subscription"
+            : "invoice";
     result =
       kind === "directory"
         ? await finalizeDirectorySession(session_id)
@@ -45,7 +49,9 @@ export default async function PayThanksPage({
           ? await finalizeAttemptPurchaseSession(session_id)
           : kind === "bulk"
             ? await finalizeBulkUploadBatchSession(session_id)
-            : await finalizeInvoiceSession(session_id);
+            : kind === "subscription"
+              ? await finalizeSubscriptionRenewalSession(session_id)
+              : await finalizeInvoiceSession(session_id);
   }
   const isDirectory = kind === "directory";
   const joinGroupUrl = await getTelegramLink(isDirectory ? "school" : "class");
@@ -61,6 +67,8 @@ export default async function PayThanksPage({
             <p className="mt-2 text-green-800">
               {kind === "attempts" ? (
                 <>3 more re-record attempts have been added to your account. A Stripe receipt has been emailed to you.</>
+              ) : kind === "subscription" ? (
+                <>Your new subscription is active — check your email for the exact valid dates and sign-in count. A Stripe receipt has been emailed to you.</>
               ) : kind === "bulk" ? (
                 <>
                   Bulk registration batch{" "}
@@ -75,7 +83,7 @@ export default async function PayThanksPage({
                 </>
               )}
             </p>
-            {kind === "attempts" ? (
+            {kind === "attempts" || kind === "subscription" ? (
               <Link href="/kata-arena" className="mt-5 inline-block rounded-md bg-red-700 px-5 py-2.5 font-semibold text-white hover:bg-red-600">
                 Back to Kata Arena
               </Link>

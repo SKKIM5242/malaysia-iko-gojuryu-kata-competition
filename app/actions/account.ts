@@ -197,10 +197,14 @@ export async function requestExtraAttempts(
 }
 
 /** Requests a new subscription once someone's sign-in quota (count and/or
- * valid date range, set by Admin/Organizer — see lib/sign-in-quota.ts) runs
- * out. The organizer fulfils it by updating that person's Sign-in Control
- * fields directly on their respective admin page, then marks this request
- * paid. Refuses a second request while one is already pending. */
+ * valid date range — see lib/sign-in-quota.ts) runs out. Priced off their
+ * CURRENT tier: USD 10 tier renews at 10x (USD 100); USD 100 and USD 200
+ * tiers renew at the same price. Paid via Stripe Checkout (falls back to
+ * the manual organizer-confirms flow if Stripe isn't configured); on
+ * success (finalizeSubscriptionRenewalSession in lib/finalize.ts) the new
+ * window is exactly 3 months from the purchase date with 30 sign-ins,
+ * whichever runs out first. Refuses a second request while one is already
+ * pending. */
 export async function requestNewSubscription(
   _prev: AccountActionState,
   _formData: FormData,
@@ -219,8 +223,94 @@ export async function requestNewSubscription(
     .maybeSingle();
   if (existing) return { ok: false, error: "You already have a renewal request awaiting confirmation." };
 
-  const { error } = await supabase.from("subscription_renewals").insert({ user_id: user.id });
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("sign_in_competition_id, registration_id, school_id, sensei_id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  // Resolve which competition tier this account belongs to — usually
+  // already tracked on the profile, but fall back to whatever record it's
+  // linked to for an older account that predates that tracking.
+  let competitionId: string | null = profile?.sign_in_competition_id ?? null;
+  if (!competitionId && profile?.registration_id) {
+    const { data: reg } = await supabase
+      .from("registrations")
+      .select("competition_id")
+      .eq("id", profile.registration_id)
+      .maybeSingle();
+    competitionId = reg?.competition_id ?? null;
+  }
+  if (!competitionId && profile?.school_id) {
+    const { data: school } = await supabase
+      .from("schools")
+      .select("registration_competition_id")
+      .eq("id", profile.school_id)
+      .maybeSingle();
+    competitionId = school?.registration_competition_id ?? null;
+  }
+  if (!competitionId && profile?.sensei_id) {
+    const { data: sensei } = await supabase
+      .from("senseis")
+      .select("registration_competition_id")
+      .eq("id", profile.sensei_id)
+      .maybeSingle();
+    competitionId = sensei?.registration_competition_id ?? null;
+  }
+  if (!competitionId) {
+    return {
+      ok: false,
+      error: "We couldn't find which competition tier your account belongs to — contact the organizer to renew manually.",
+    };
+  }
+
+  const { data: competition } = await supabase
+    .from("competitions")
+    .select("registration_fee_usd")
+    .eq("id", competitionId)
+    .maybeSingle();
+  const tierFee = Number(competition?.registration_fee_usd ?? 0);
+  const renewalFee = tierFee === 10 ? tierFee * 10 : tierFee;
+  if (!renewalFee) {
+    return { ok: false, error: "Could not determine the renewal price — contact the organizer to renew manually." };
+  }
+
+  const id = crypto.randomUUID();
+  const { error } = await supabase
+    .from("subscription_renewals")
+    .insert({ id, user_id: user.id, competition_id: competitionId, amount_usd: renewalFee });
   if (error) return { ok: false, error: "Could not submit the request — please try again." };
+
+  if (paymentsEnabled()) {
+    const origin =
+      (await headers()).get("origin") ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+    try {
+      const session = await getStripe().checkout.sessions.create({
+        mode: "payment",
+        line_items: [
+          {
+            price_data: {
+              currency: "usd",
+              unit_amount: renewalFee * 100,
+              product_data: {
+                name: "New sign-in subscription — 3 months, 30 sign-ins",
+                description: "Malaysia Open Virtual Karate-do Kata Competition — Kata Arena sign-in renewal",
+              },
+            },
+            quantity: 1,
+          },
+        ],
+        metadata: { subscription_renewal_id: id },
+        success_url: `${origin}/pay/thanks?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${origin}/account?cancelled=1`,
+      });
+      if (session.url) return { ok: true, checkoutUrl: session.url };
+    } catch {
+      // Fall through to the manual organizer-confirms flow below.
+    }
+  }
+
+  revalidatePath("/account");
   return { ok: true };
 }
 

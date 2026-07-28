@@ -6,6 +6,7 @@
 
 import { getTelegramLink, listTelegramGroups, type TelegramCategory } from "@/lib/telegram";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { formatDate } from "@/components/ui";
 
 interface AssignmentNotice {
   refereeEmail: string | null;
@@ -739,6 +740,42 @@ export async function notifySenseiBulkPaymentConfirmed(input: {
     sendDirectTelegramDM(
       input.telegramChatId,
       `💳 Your bulk registration payment of ${input.totalAmountLabel} (${input.tierCount} tier${input.tierCount === 1 ? "" : "s"}) is confirmed — you can upload your CSV/table now.`,
+    ),
+  ]);
+}
+
+/** Fires once a "Request New Subscription" is paid (Stripe or the manual
+ * organizer-confirms fallback — see applySubscriptionRenewalTerms in
+ * lib/finalize.ts) — spells out the new window so there's no ambiguity
+ * about when it runs out: whichever of the valid-until date or the 30
+ * sign-ins is reached first ends it, at which point another renewal (or
+ * signing in as audience instead) is required. */
+export async function notifySubscriptionRenewed(input: {
+  email: string | null;
+  telegramChatId: string | null;
+  name: string;
+  validFrom: string;
+  validUntil: string;
+  signInLimit: number;
+}): Promise<void> {
+  const fromLabel = formatDate(input.validFrom);
+  const untilLabel = formatDate(input.validUntil);
+  const text =
+    `Hi ${input.name},\n\n` +
+    `Your new subscription is confirmed. Here are the details:\n\n` +
+    `- Valid from ${fromLabel} to ${untilLabel}\n` +
+    `- ${input.signInLimit} sign-ins available\n\n` +
+    `Whichever of these runs out first — the valid-until date, or all ${input.signInLimit} sign-ins used — ends this subscription. ` +
+    `After that, you'll need to request another new subscription, or you may choose to sign in as audience instead.\n\n` +
+    `— Malaysia Open Virtual Karate-do Kata Competition`;
+  await Promise.allSettled([
+    input.email
+      ? sendEmail(input.email, `Your new subscription is confirmed — valid ${fromLabel} to ${untilLabel}`, text)
+      : Promise.resolve(),
+    sendDirectTelegramDM(
+      input.telegramChatId,
+      `✅ Your new subscription is confirmed — valid ${fromLabel} to ${untilLabel}, ${input.signInLimit} sign-ins available. ` +
+        `Whichever runs out first ends it; renew again or sign in as audience after that.`,
     ),
   ]);
 }

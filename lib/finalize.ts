@@ -1,7 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStripe } from "@/lib/payments";
 import { writeAudit } from "@/lib/audit";
-import { sendConfirmationEmail } from "@/lib/notify";
+import { sendConfirmationEmail, notifySubscriptionRenewed } from "@/lib/notify";
 import { formatUSD } from "@/components/ui";
 
 export type FinalizeResult =
@@ -356,4 +356,100 @@ export async function finalizeBulkUploadBatchSession(sessionId: string): Promise
   }
 
   return { status: "paid", referenceIds: [batchId.slice(0, 8).toUpperCase()] };
+}
+
+const RENEWAL_SIGN_IN_LIMIT = 30;
+const RENEWAL_MONTHS = 3;
+
+/**
+ * Applies the standard "new subscription" terms to a subscription_renewals
+ * request: 30 sign-ins, valid for exactly 3 months from today (the moment
+ * this runs — Stripe success or the manual organizer-confirms fallback),
+ * whichever runs out first. Idempotent (no-ops if already paid) and shared
+ * by both paths so the terms and the notification never drift apart.
+ */
+export async function applySubscriptionRenewalTerms(
+  admin: ReturnType<typeof createAdminClient>,
+  renewalId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const { data: renewal } = await admin
+    .from("subscription_renewals")
+    .select("id, user_id, status")
+    .eq("id", renewalId)
+    .maybeSingle();
+  if (!renewal) return { ok: false, error: "Renewal request not found." };
+  if (renewal.status === "paid") return { ok: true };
+
+  const validFrom = new Date();
+  const validUntil = new Date(validFrom);
+  validUntil.setMonth(validUntil.getMonth() + RENEWAL_MONTHS);
+  const validFromStr = validFrom.toISOString().slice(0, 10);
+  const validUntilStr = validUntil.toISOString().slice(0, 10);
+
+  await admin
+    .from("profiles")
+    .update({
+      sign_in_limit: RENEWAL_SIGN_IN_LIMIT,
+      sign_in_count: 0,
+      sign_in_valid_from: validFromStr,
+      sign_in_valid_until: validUntilStr,
+    })
+    .eq("user_id", renewal.user_id);
+
+  await admin
+    .from("subscription_renewals")
+    .update({
+      status: "paid",
+      paid_at: new Date().toISOString(),
+      sign_in_limit: RENEWAL_SIGN_IN_LIMIT,
+      valid_from: validFromStr,
+      valid_until: validUntilStr,
+    })
+    .eq("id", renewalId);
+
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("email, full_name, telegram_chat_id")
+    .eq("user_id", renewal.user_id)
+    .maybeSingle();
+  if (profile) {
+    await notifySubscriptionRenewed({
+      email: profile.email,
+      telegramChatId: profile.telegram_chat_id,
+      name: profile.full_name ?? "there",
+      validFrom: validFromStr,
+      validUntil: validUntilStr,
+      signInLimit: RENEWAL_SIGN_IN_LIMIT,
+    });
+  }
+  return { ok: true };
+}
+
+/**
+ * Marks a "Request New Subscription" paid after its Stripe Checkout
+ * session succeeds, and applies the standard renewal terms immediately.
+ * Idempotent — safe to call from both the webhook and the thank-you page.
+ */
+export async function finalizeSubscriptionRenewalSession(sessionId: string): Promise<FinalizeResult> {
+  const stripe = getStripe();
+  let session;
+  try {
+    session = await stripe.checkout.sessions.retrieve(sessionId);
+  } catch {
+    return { status: "error", message: "Payment session not found." };
+  }
+  if (session.payment_status !== "paid") return { status: "unpaid" };
+  const renewalId = session.metadata?.subscription_renewal_id;
+  if (!renewalId) return { status: "error", message: "No renewal reference on this payment." };
+
+  const admin = createAdminClient();
+  const result = await applySubscriptionRenewalTerms(admin, renewalId);
+  if (!result.ok) return { status: "error", message: result.error ?? "Could not apply the renewal." };
+  await writeAudit(admin, {
+    table_name: "subscription_renewals",
+    record_id: renewalId,
+    action: "subscription_renewal_paid_online",
+    new_value: { stripe_session: sessionId },
+  });
+  return { status: "paid", referenceIds: [renewalId.slice(0, 8).toUpperCase()] };
 }

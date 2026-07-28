@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCategories, schemaReady } from "@/lib/data";
 import { getAllCompetitions } from "@/lib/admin-data";
 import { groupArenaByKata, loadKataArena, type ArenaEntry } from "@/lib/arena";
-import { CategoryName, NoTranslate, SetupNotice, SiteFooter, SiteHeader } from "@/components/ui";
+import { CategoryName, NoTranslate, SetupNotice, SiteFooter, SiteHeader, formatDate } from "@/components/ui";
 import ArenaFilterBar from "@/components/ArenaFilterBar";
 import { kataBases, splitCategoryName } from "@/lib/division";
 import { winnersRevealed } from "@/lib/winners";
@@ -521,6 +521,20 @@ export default async function KataArenaPage({
     <>
       <SiteHeader />
       <main className="mx-auto max-w-3xl px-4 py-10">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs font-semibold text-neutral-500">
+          <span>
+            {profile.sign_in_limit != null
+              ? `Sign-ins: ${profile.sign_in_count} of ${profile.sign_in_limit} used`
+              : "Sign-ins: unlimited"}
+          </span>
+          <span>
+            {profile.sign_in_valid_from || profile.sign_in_valid_until
+              ? `Valid ${profile.sign_in_valid_from ? formatDate(profile.sign_in_valid_from) : "—"} to ${
+                  profile.sign_in_valid_until ? formatDate(profile.sign_in_valid_until) : "—"
+                }`
+              : "Valid: no expiry set"}
+          </span>
+        </div>
         <h1 className="text-2xl font-bold tracking-tight">Kata Arena</h1>
         <p className="mt-1 mb-6 text-sm text-neutral-500">
           {competition.name}. Every submitted recording is listed below by kata event, in

@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { requestNewSubscription, type AccountActionState } from "@/app/actions/account";
 import { OrganizerContact } from "@/components/ui";
 
@@ -8,9 +9,10 @@ const initial: AccountActionState = { ok: false };
 
 /** Shown instead of the normal page content once Admin/Organizer's
  * sign-in quota (count and/or valid date range) for this account has run
- * out — see lib/sign-in-quota.ts. Lets them request a new subscription;
- * the organizer fulfils it by updating their Sign-in Control fields on
- * the relevant admin page. */
+ * out — see lib/sign-in-quota.ts. Requesting a new subscription takes them
+ * to a real Stripe Checkout (priced off their current tier: USD 10 tier
+ * renews at 10x, USD 100/USD 200 tiers renew at the same price) and falls
+ * back to the manual organizer-confirms flow if Stripe isn't configured. */
 export default function SubscriptionBlocked({
   title,
   reason,
@@ -20,12 +22,17 @@ export default function SubscriptionBlocked({
   reason: string;
   signOutForm: React.ReactNode;
 }) {
+  const router = useRouter();
   const [state, formAction, pending] = useActionState(requestNewSubscription, initial);
   const [requested, setRequested] = useState(false);
 
   useEffect(() => {
-    if (state.ok) setRequested(true);
-  }, [state]);
+    if (state.ok && state.checkoutUrl) window.location.href = state.checkoutUrl;
+    else if (state.ok) {
+      setRequested(true);
+      router.refresh();
+    }
+  }, [state, router]);
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-10">
@@ -33,11 +40,14 @@ export default function SubscriptionBlocked({
       <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-6">
         <p className="font-semibold text-amber-900">{reason}</p>
         <p className="mt-1 text-sm text-amber-800">
-          Request a new subscription below and the organizer will renew your sign-in access.
+          A new subscription is priced off your current tier — USD 10 tier renews at USD 100 (10x);
+          USD 100 and USD 200 tiers renew at the same price. Once paid, it&apos;s valid for 3 months
+          from today with 30 sign-ins available — whichever runs out first ends it, at which point
+          you&apos;ll need to renew again or you may choose to sign in as audience instead.
         </p>
-        {requested || state.ok ? (
+        {requested || (state.ok && !state.checkoutUrl) ? (
           <p className="mt-3 text-sm font-semibold text-green-700">
-            Request submitted — the organizer will renew your access shortly.
+            Request submitted — the organizer will confirm your payment and renew your access shortly.
           </p>
         ) : (
           <form action={formAction} className="mt-3">
@@ -47,7 +57,7 @@ export default function SubscriptionBlocked({
               disabled={pending}
               className="rounded-md bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-60"
             >
-              {pending ? "Requesting…" : "Request New Subscription"}
+              {pending ? "Redirecting to payment…" : "Request New Subscription"}
             </button>
           </form>
         )}

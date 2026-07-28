@@ -13,6 +13,7 @@ import {
   notifyOrganizersBulkPaymentConfirmed, notifyOrganizersBulkTallyDone, notifySenseiBulkPaymentConfirmed,
   notifySenseiBulkCsvConfirmed,
 } from "@/lib/notify";
+import { applySubscriptionRenewalTerms } from "@/lib/finalize";
 import type { PaymentStatus } from "@/lib/types";
 import { parseCsvWithHeader, parseDDMMYYYY, type CsvUploadResult } from "@/lib/csv-bulk";
 import { normalizeIban } from "@/lib/bank";
@@ -3769,18 +3770,19 @@ export async function updateSignInControl(formData: FormData) {
   backTo(returnTo, { ok: "Sign-in control updated." });
 }
 
-/** Marks a "New Subscription" request as fulfilled — the actual renewal
- * (limit/tier/date range) is set via updateSignInControl on that person's
- * own admin page; this just clears the request from the pending list. */
+/** Marks a "New Subscription" request as fulfilled — manual fallback for
+ * when the request wasn't (or couldn't be) paid through Stripe. Applies
+ * the same standard terms (30 sign-ins, valid 3 months from today) and
+ * sends the same notification as the online path, via
+ * applySubscriptionRenewalTerms in lib/finalize.ts, so the two paths never
+ * drift apart. Idempotent — a request already paid online is a no-op here. */
 export async function markSubscriptionRenewalFulfilled(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const returnTo = "/admin/records";
   const { supabase, actorId } = await getActor();
-  const { error } = await supabase
-    .from("subscription_renewals")
-    .update({ status: "paid", paid_at: new Date().toISOString() })
-    .eq("id", id);
-  if (error) backTo(returnTo, { error: "Could not update the request — please try again." });
+  const admin = createAdminClient();
+  const result = await applySubscriptionRenewalTerms(admin, id);
+  if (!result.ok) backTo(returnTo, { error: result.error ?? "Could not update the request — please try again." });
   await writeAudit(supabase, {
     table_name: "subscription_renewals", record_id: id, action: "subscription_renewal_fulfilled",
     actor_id: actorId,
