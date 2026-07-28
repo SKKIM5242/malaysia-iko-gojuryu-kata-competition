@@ -54,12 +54,13 @@ export default async function SignInInfoTables({ canManage }: { canManage: boole
             )}
           </p>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[480px] text-left text-xs">
+            <table className="w-full min-w-[620px] text-left text-xs">
               <thead className="border-b border-neutral-200 text-neutral-500">
                 <tr>
                   <th className="py-1.5 pr-2 font-semibold">Role</th>
                   <th className="py-1.5 pr-2 font-semibold">Default sign-ins</th>
                   <th className="py-1.5 pr-2 font-semibold">Tier-tied?</th>
+                  <th className="py-1.5 pr-2 font-semibold">Validity (start – end)</th>
                   <th className="py-1.5 pr-2 font-semibold">Notes</th>
                 </tr>
               </thead>
@@ -73,6 +74,13 @@ export default async function SignInInfoTables({ canManage }: { canManage: boole
                       {r.default_sign_in_limit == null ? "Unlimited" : String(r.default_sign_in_limit)}
                     </td>
                     <td className="py-1.5 pr-2">{r.tier_tied ? "Yes" : "No"}</td>
+                    <td className="py-1.5 pr-2">
+                      {r.valid_from || r.valid_until
+                        ? `${formatDate(r.valid_from as string | null)} – ${formatDate(r.valid_until as string | null)}`
+                        : r.tier_tied
+                          ? "Follows tier (see Competition Valid Date table)"
+                          : "—"}
+                    </td>
                     <td className="py-1.5 pr-2 text-neutral-500">{(r.notes as string) ?? "—"}</td>
                   </tr>
                 ))}

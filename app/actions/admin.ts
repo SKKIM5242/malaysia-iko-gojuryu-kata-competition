@@ -1769,12 +1769,16 @@ export async function saveSignInRoleDefault(formData: FormData) {
   await requireAccessTableEditor(supabase, actorId, returnTo);
   const role = String(formData.get("role") ?? "").trim();
   const limitRaw = String(formData.get("default_sign_in_limit") ?? "").trim();
+  const validFrom = String(formData.get("valid_from") ?? "").trim();
+  const validUntil = String(formData.get("valid_until") ?? "").trim();
   const values = {
     role,
     default_sign_in_limit: limitRaw ? Number(limitRaw) : null,
     tier_tied: formData.get("tier_tied") === "on",
     notes: String(formData.get("notes") ?? "").trim() || null,
     sort_order: Number(formData.get("sort_order") ?? 0) || 0,
+    valid_from: validFrom || null,
+    valid_until: validUntil || null,
   };
   if (!role) backTo(returnTo, { error: "Role is required." });
   const { error } = id
@@ -1800,6 +1804,150 @@ export async function deleteSignInRoleDefault(formData: FormData) {
     table_name: "sign_in_role_defaults", record_id: id, action: "sign_in_role_default_deleted", actor_id: actorId,
   });
   backTo(returnTo, { ok: "Row deleted — that role now falls back to the built-in 250 default." });
+}
+
+const ACCESS_MATRIX_CSV_COLUMNS = ["position", "resource", "admin", "organizer", "customer_support", "referee", "note"] as const;
+
+export async function bulkUploadAccessMatrixRows(_prev: CsvUploadResult, formData: FormData): Promise<CsvUploadResult> {
+  const returnTo = "/admin/content";
+  const file = formData.get("csv_file");
+  if (!(file instanceof File) || file.size === 0) return { done: false, error: "Choose a CSV file to upload." };
+  if (file.size > 5 * 1024 * 1024) return { done: false, error: "CSV file too large (max 5 MB)." };
+
+  const parsed = parseCsvWithHeader(await file.text(), ACCESS_MATRIX_CSV_COLUMNS);
+  if ("error" in parsed) return { done: false, error: parsed.error };
+  const { dataRows, get } = parsed;
+  if (dataRows.length === 0) return { done: false, error: "The CSV has no data rows." };
+  if (dataRows.length > 200) return { done: false, error: "Maximum 200 rows per upload." };
+
+  const { supabase, actorId } = await getActor();
+  const roleError = await bulkUploadRoleError(supabase, actorId);
+  if (roleError) return { done: false, error: roleError };
+
+  const failures: Array<{ row: number; name: string; error: string }> = [];
+  let succeeded = 0;
+  for (let i = 0; i < dataRows.length; i++) {
+    const r = dataRows[i];
+    const rowNo = i + 2;
+    const resource = get(r, "resource");
+    if (!resource) { failures.push({ row: rowNo, name: `Row ${rowNo}`, error: "resource is required" }); continue; }
+    const values = {
+      position: Number(get(r, "position")) || 0,
+      resource,
+      admin: get(r, "admin"),
+      organizer: get(r, "organizer"),
+      customer_support: get(r, "customer_support"),
+      referee: get(r, "referee"),
+      note: get(r, "note") || null,
+    };
+    const { data, error } = await supabase.from("access_matrix_rows").insert(values).select("id").single();
+    if (error) { failures.push({ row: rowNo, name: resource, error: "Could not save" }); continue; }
+    await writeAudit(supabase, {
+      table_name: "access_matrix_rows", record_id: data!.id, action: "access_matrix_row_created",
+      new_value: values, actor_id: actorId,
+    });
+    succeeded++;
+  }
+  revalidatePath(returnTo);
+  return { done: true, succeeded, failed: failures.length, failures: failures.slice(0, 50) };
+}
+
+const SIGN_IN_ROLE_DEFAULTS_CSV_COLUMNS = ["role", "default_sign_in_limit", "tier_tied", "valid_from", "valid_until", "notes", "sort_order"] as const;
+
+/** Upserts by role (its unique key) — re-uploading the same CSV updates
+ * existing rows instead of duplicating them, unlike the other two tables
+ * here which only insert. */
+export async function bulkUploadSignInRoleDefaults(_prev: CsvUploadResult, formData: FormData): Promise<CsvUploadResult> {
+  const returnTo = "/admin/content";
+  const file = formData.get("csv_file");
+  if (!(file instanceof File) || file.size === 0) return { done: false, error: "Choose a CSV file to upload." };
+  if (file.size > 5 * 1024 * 1024) return { done: false, error: "CSV file too large (max 5 MB)." };
+
+  const parsed = parseCsvWithHeader(await file.text(), SIGN_IN_ROLE_DEFAULTS_CSV_COLUMNS);
+  if ("error" in parsed) return { done: false, error: parsed.error };
+  const { dataRows, get } = parsed;
+  if (dataRows.length === 0) return { done: false, error: "The CSV has no data rows." };
+  if (dataRows.length > 50) return { done: false, error: "Maximum 50 rows per upload." };
+
+  const { supabase, actorId } = await getActor();
+  const roleError = await bulkUploadRoleError(supabase, actorId);
+  if (roleError) return { done: false, error: roleError };
+
+  const failures: Array<{ row: number; name: string; error: string }> = [];
+  let succeeded = 0;
+  for (let i = 0; i < dataRows.length; i++) {
+    const r = dataRows[i];
+    const rowNo = i + 2;
+    const role = get(r, "role");
+    if (!role) { failures.push({ row: rowNo, name: `Row ${rowNo}`, error: "role is required" }); continue; }
+    const limitRaw = get(r, "default_sign_in_limit");
+    const values = {
+      role,
+      default_sign_in_limit: limitRaw ? Number(limitRaw) : null,
+      tier_tied: /^(true|yes|1)$/i.test(get(r, "tier_tied")),
+      valid_from: parseDDMMYYYY(get(r, "valid_from")) || null,
+      valid_until: parseDDMMYYYY(get(r, "valid_until")) || null,
+      notes: get(r, "notes") || null,
+      sort_order: Number(get(r, "sort_order")) || 0,
+    };
+    const { error } = await supabase.from("sign_in_role_defaults").upsert(values, { onConflict: "role" });
+    if (error) { failures.push({ row: rowNo, name: role, error: "Could not save" }); continue; }
+    await writeAudit(supabase, {
+      table_name: "sign_in_role_defaults", record_id: null, action: "sign_in_role_default_upserted",
+      new_value: values, actor_id: actorId,
+    });
+    succeeded++;
+  }
+  revalidatePath(returnTo);
+  return { done: true, succeeded, failed: failures.length, failures: failures.slice(0, 50) };
+}
+
+const ACCESS_COMPARISON_CSV_COLUMNS = ["position", "what", "participant", "school", "sensei", "referee", "audience", "organizer", "support"] as const;
+
+export async function bulkUploadAccessComparisonRows(_prev: CsvUploadResult, formData: FormData): Promise<CsvUploadResult> {
+  const returnTo = "/admin/content";
+  const file = formData.get("csv_file");
+  if (!(file instanceof File) || file.size === 0) return { done: false, error: "Choose a CSV file to upload." };
+  if (file.size > 5 * 1024 * 1024) return { done: false, error: "CSV file too large (max 5 MB)." };
+
+  const parsed = parseCsvWithHeader(await file.text(), ACCESS_COMPARISON_CSV_COLUMNS);
+  if ("error" in parsed) return { done: false, error: parsed.error };
+  const { dataRows, get } = parsed;
+  if (dataRows.length === 0) return { done: false, error: "The CSV has no data rows." };
+  if (dataRows.length > 200) return { done: false, error: "Maximum 200 rows per upload." };
+
+  const { supabase, actorId } = await getActor();
+  const roleError = await bulkUploadRoleError(supabase, actorId);
+  if (roleError) return { done: false, error: roleError };
+
+  const failures: Array<{ row: number; name: string; error: string }> = [];
+  let succeeded = 0;
+  for (let i = 0; i < dataRows.length; i++) {
+    const r = dataRows[i];
+    const rowNo = i + 2;
+    const what = get(r, "what");
+    if (!what) { failures.push({ row: rowNo, name: `Row ${rowNo}`, error: "what is required" }); continue; }
+    const values = {
+      position: Number(get(r, "position")) || 0,
+      what,
+      participant: get(r, "participant"),
+      school: get(r, "school"),
+      sensei: get(r, "sensei"),
+      referee: get(r, "referee"),
+      audience: get(r, "audience"),
+      organizer: get(r, "organizer"),
+      support: get(r, "support"),
+    };
+    const { data, error } = await supabase.from("access_comparison_rows").insert(values).select("id").single();
+    if (error) { failures.push({ row: rowNo, name: what, error: "Could not save" }); continue; }
+    await writeAudit(supabase, {
+      table_name: "access_comparison_rows", record_id: data!.id, action: "access_comparison_row_created",
+      new_value: values, actor_id: actorId,
+    });
+    succeeded++;
+  }
+  revalidatePath(returnTo);
+  return { done: true, succeeded, failed: failures.length, failures: failures.slice(0, 50) };
 }
 
 export async function saveAccessComparisonRow(formData: FormData) {

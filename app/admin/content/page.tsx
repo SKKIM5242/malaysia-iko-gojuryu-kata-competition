@@ -7,11 +7,14 @@ import {
   seedAccessTables, saveAccessMatrixRow, deleteAccessMatrixRow,
   saveAccessComparisonRow, deleteAccessComparisonRow,
   saveSignInRoleDefault, deleteSignInRoleDefault,
+  bulkUploadAccessMatrixRows, bulkUploadSignInRoleDefaults, bulkUploadAccessComparisonRows,
 } from "@/app/actions/admin";
 import { AdminShell, Card, adminBtn, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice, formatDate } from "@/components/ui";
 import { Markdown } from "@/lib/markdown";
 import { shortTierName } from "@/lib/invitation-codes";
+import FilterableTable from "@/components/FilterableTable";
+import CsvUploadForm from "@/components/CsvUploadForm";
 
 export const dynamic = "force-dynamic";
 
@@ -73,15 +76,6 @@ export default async function AdminContent({
     "Paid per sign-in, per competition tier (USD 10 / 100 / 200)",
   ];
   const cellInput = "w-full rounded-md border border-neutral-300 px-2 py-1 text-xs";
-  // Shared column templates so the header row and every data row line up
-  // pixel-for-pixel — the previous plain `grid-cols-N` had no header at all,
-  // so once a cell was filled in there was no way to tell which role it
-  // belonged to (e.g. Participant Support was easy to lose track of).
-  const MATRIX_TEMPLATE = "56px minmax(160px,1.4fr) minmax(90px,1fr) minmax(90px,1fr) minmax(120px,1fr) minmax(90px,1fr) minmax(160px,1.6fr) 128px";
-  const COMPARISON_TEMPLATE =
-    "56px minmax(170px,1.3fr) repeat(7, minmax(110px,1fr)) 128px";
-  const SIGNIN_TEMPLATE = "minmax(130px,1fr) minmax(140px,0.9fr) 100px minmax(160px,1.6fr) 130px";
-  const gridHeaderCell = "px-2 py-1.5 text-[11px] font-bold uppercase tracking-wide text-neutral-500";
 
   return (
     <AdminShell title="Content" active="/admin/content" flash={{ ok: params.ok, error: params.error }}>
@@ -290,71 +284,104 @@ export default async function AdminContent({
               <button className={adminBtn}>Import current defaults</button>
             </form>
           )}
-          <div className="overflow-x-auto rounded-lg border border-neutral-200">
-            <div style={{ minWidth: 980 }}>
-              <div
-                className="grid items-center gap-2 border-b border-neutral-200 bg-neutral-50 px-3 py-2"
-                style={{ gridTemplateColumns: MATRIX_TEMPLATE }}
-              >
-                <span className={gridHeaderCell}>No.</span>
-                <span className={gridHeaderCell}>Resource</span>
-                <span className={gridHeaderCell}>Admin</span>
-                <span className={gridHeaderCell}>Organizer</span>
-                <span className={gridHeaderCell}>Participant Support</span>
-                <span className={gridHeaderCell}>Referee</span>
-                <span className={gridHeaderCell}>Note</span>
-                <span className={gridHeaderCell}>Actions</span>
-              </div>
-              <form
-                action={saveAccessMatrixRow}
-                className="grid items-center gap-2 border-b border-neutral-100 px-3 py-2"
-                style={{ gridTemplateColumns: MATRIX_TEMPLATE }}
-              >
-                <input type="hidden" name="return_to" value={RETURN_TO} />
-                <input name="position" type="number" min="1" placeholder="No." className={cellInput} />
-                <input name="resource" required placeholder="Resource *" className={cellInput} />
-                <input name="admin" list="access_choices" placeholder="Admin" className={cellInput} />
-                <input name="organizer" list="access_choices" placeholder="Organizer" className={cellInput} />
-                <input name="customer_support" list="access_choices" placeholder="Participant Support" className={cellInput} />
-                <input name="referee" list="access_choices" placeholder="Referee" className={cellInput} />
-                <input name="note" placeholder="Note (optional)" className={cellInput} />
-                <button className="rounded-md bg-neutral-900 px-3 py-1 text-xs font-semibold text-white hover:bg-neutral-700">
-                  Add row
-                </button>
-              </form>
-              <div className="divide-y divide-neutral-100">
-                {(matrixRows ?? []).map((r) => (
-                  <form
-                    key={r.id}
-                    action={saveAccessMatrixRow}
-                    className="grid items-center gap-2 px-3 py-2"
-                    style={{ gridTemplateColumns: MATRIX_TEMPLATE }}
-                  >
-                    <input type="hidden" name="id" value={r.id} />
-                    <input type="hidden" name="return_to" value={RETURN_TO} />
-                    <input name="position" type="number" min="1" defaultValue={r.position} className={cellInput} />
-                    <input name="resource" required defaultValue={r.resource} className={`${cellInput} font-semibold`} />
-                    <input name="admin" list="access_choices" defaultValue={r.admin} className={cellInput} />
-                    <input name="organizer" list="access_choices" defaultValue={r.organizer} className={cellInput} />
-                    <input name="customer_support" list="access_choices" defaultValue={r.customer_support} className={cellInput} />
-                    <input name="referee" list="access_choices" defaultValue={r.referee} className={cellInput} />
-                    <input name="note" defaultValue={r.note ?? ""} placeholder="Note" className={cellInput} />
-                    <span className="flex gap-1.5">
-                      <button className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50">
-                        Save
-                      </button>
-                      <button
-                        formAction={deleteAccessMatrixRow}
-                        className="rounded border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"
-                      >
-                        Delete
-                      </button>
-                    </span>
-                  </form>
-                ))}
-              </div>
-            </div>
-          </div>
+          {/* Each row's edit/delete controls live in a standalone form, keyed
+              by id and referenced via the `form` attribute on every input —
+              lets the row render as ordinary FilterableTable cells (so it
+              gets filtering, column resize/wrap, and the scroll sliders for
+              free) while still submitting together as one row. */}
+          {(matrixRows ?? []).map((r) => (
+            <form key={r.id} id={`matrix-${r.id}`} action={saveAccessMatrixRow}>
+              <input type="hidden" name="id" value={r.id} />
+              <input type="hidden" name="return_to" value={RETURN_TO} />
+            </form>
+          ))}
+          <form id="matrix-new" action={saveAccessMatrixRow}>
+            <input type="hidden" name="return_to" value={RETURN_TO} />
+          </form>
+          <button form="matrix-new" type="submit" className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-neutral-700">
+            + Add row (fill below, then Save on the new row)
+          </button>
+          <FilterableTable
+            rowKey="id"
+            downloadName="access-matrix"
+            stickyColumns={2}
+            firstColumnWidth={56}
+            columns={[
+              { key: "position", label: "No.", width: 56 },
+              { key: "resource", label: "Resource", width: 200, wrap: true },
+              { key: "admin", label: "Admin", width: 160, wrap: true },
+              { key: "organizer", label: "Organizer", width: 160, wrap: true },
+              { key: "customer_support", label: "Participant Support", width: 160, wrap: true },
+              { key: "referee", label: "Referee", width: 160, wrap: true },
+              { key: "note", label: "Note", width: 220, wrap: true },
+              { key: "actions", label: "Actions", width: 150 },
+            ]}
+            csvColumns={[
+              { key: "position_csv", label: "No." },
+              { key: "resource_csv", label: "Resource" },
+              { key: "admin_csv", label: "Admin" },
+              { key: "organizer_csv", label: "Organizer" },
+              { key: "customer_support_csv", label: "Participant Support" },
+              { key: "referee_csv", label: "Referee" },
+              { key: "note_csv", label: "Note" },
+            ]}
+            rows={[
+              {
+                id: "matrix-new-row",
+                position: <input form="matrix-new" name="position" type="number" min="1" placeholder="No." className={cellInput} />,
+                resource: <input form="matrix-new" name="resource" required placeholder="Resource *" className={cellInput} />,
+                admin: <input form="matrix-new" name="admin" list="access_choices" placeholder="Admin" className={cellInput} />,
+                organizer: <input form="matrix-new" name="organizer" list="access_choices" placeholder="Organizer" className={cellInput} />,
+                customer_support: <input form="matrix-new" name="customer_support" list="access_choices" placeholder="P. Support" className={cellInput} />,
+                referee: <input form="matrix-new" name="referee" list="access_choices" placeholder="Referee" className={cellInput} />,
+                note: <input form="matrix-new" name="note" placeholder="Note" className={cellInput} />,
+                actions: <span className="text-xs text-neutral-400">New row — Save above</span>,
+                position_csv: "", resource_csv: "", admin_csv: "", organizer_csv: "", customer_support_csv: "", referee_csv: "", note_csv: "",
+              },
+              ...(matrixRows ?? []).map((r) => ({
+                id: r.id as string,
+                position: (
+                  <input form={`matrix-${r.id}`} name="position" type="number" min="1" defaultValue={r.position} className={cellInput} />
+                ),
+                resource: (
+                  <input form={`matrix-${r.id}`} name="resource" required defaultValue={r.resource} className={`${cellInput} font-semibold`} />
+                ),
+                admin: <input form={`matrix-${r.id}`} name="admin" list="access_choices" defaultValue={r.admin} className={cellInput} />,
+                organizer: <input form={`matrix-${r.id}`} name="organizer" list="access_choices" defaultValue={r.organizer} className={cellInput} />,
+                customer_support: (
+                  <input form={`matrix-${r.id}`} name="customer_support" list="access_choices" defaultValue={r.customer_support} className={cellInput} />
+                ),
+                referee: <input form={`matrix-${r.id}`} name="referee" list="access_choices" defaultValue={r.referee} className={cellInput} />,
+                note: <input form={`matrix-${r.id}`} name="note" defaultValue={r.note ?? ""} placeholder="Note" className={cellInput} />,
+                actions: (
+                  <span className="flex gap-1.5">
+                    <button form={`matrix-${r.id}`} type="submit" className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50">
+                      Save
+                    </button>
+                    <button
+                      form={`matrix-${r.id}`}
+                      formAction={deleteAccessMatrixRow}
+                      className="rounded border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"
+                    >
+                      Delete
+                    </button>
+                  </span>
+                ),
+                position_csv: String(r.position ?? ""),
+                resource_csv: r.resource as string,
+                admin_csv: (r.admin as string) ?? "",
+                organizer_csv: (r.organizer as string) ?? "",
+                customer_support_csv: (r.customer_support as string) ?? "",
+                referee_csv: (r.referee as string) ?? "",
+                note_csv: (r.note as string) ?? "",
+              })),
+            ]}
+          />
+          <CsvUploadForm
+            action={bulkUploadAccessMatrixRows}
+            templateHref="/access-matrix-template.csv"
+            entityLabel="access matrix row"
+          />
           {(matrixRows ?? []).length === 0 && (
             <EmptyState>Table is empty — the built-in defaults are shown until you import or add rows.</EmptyState>
           )}
@@ -378,75 +405,119 @@ export default async function AdminContent({
           </span>
         </summary>
         <div className="space-y-3 border-t border-neutral-100 p-4">
-          <div className="overflow-x-auto rounded-lg border border-neutral-200">
-            <div style={{ minWidth: 780 }}>
-              <div
-                className="grid items-center gap-2 border-b border-neutral-200 bg-neutral-50 px-3 py-2"
-                style={{ gridTemplateColumns: SIGNIN_TEMPLATE }}
-              >
-                <span className={gridHeaderCell}>Role</span>
-                <span className={gridHeaderCell}>Default sign-ins</span>
-                <span className={gridHeaderCell}>Tier-tied?</span>
-                <span className={gridHeaderCell}>Notes</span>
-                <span className={gridHeaderCell}>Actions</span>
-              </div>
-              <form
-                action={saveSignInRoleDefault}
-                className="grid items-center gap-2 border-b border-neutral-100 px-3 py-2"
-                style={{ gridTemplateColumns: SIGNIN_TEMPLATE }}
-              >
-                <input type="hidden" name="return_to" value={RETURN_TO} />
-                <input name="role" required placeholder="role_key *" className={cellInput} />
-                <input name="default_sign_in_limit" type="number" min="0" placeholder="blank = unlimited" className={cellInput} />
-                <label className="flex items-center justify-center gap-1 text-xs text-neutral-600">
-                  <input type="checkbox" name="tier_tied" className="h-3.5 w-3.5" /> Tier-tied
-                </label>
-                <input name="notes" placeholder="Note (optional)" className={cellInput} />
-                <button className="rounded-md bg-neutral-900 px-3 py-1 text-xs font-semibold text-white hover:bg-neutral-700">
-                  Add row
-                </button>
-              </form>
-              <div className="divide-y divide-neutral-100">
-                {(signInDefaults ?? []).map((r) => (
-                  <form
-                    key={r.id}
-                    action={saveSignInRoleDefault}
-                    className="grid items-center gap-2 px-3 py-2"
-                    style={{ gridTemplateColumns: SIGNIN_TEMPLATE }}
-                  >
-                    <input type="hidden" name="id" value={r.id} />
-                    <input type="hidden" name="return_to" value={RETURN_TO} />
-                    <input type="hidden" name="sort_order" value={r.sort_order} />
-                    <input name="role" required defaultValue={r.role} className={`${cellInput} font-semibold`} />
-                    <input
-                      name="default_sign_in_limit"
-                      type="number"
-                      min="0"
-                      defaultValue={r.default_sign_in_limit ?? ""}
-                      placeholder="blank = unlimited"
-                      className={cellInput}
-                    />
-                    <label className="flex items-center justify-center gap-1 text-xs text-neutral-600">
-                      <input type="checkbox" name="tier_tied" defaultChecked={r.tier_tied} className="h-3.5 w-3.5" /> Tier-tied
-                    </label>
-                    <input name="notes" defaultValue={r.notes ?? ""} placeholder="Note" className={cellInput} />
-                    <span className="flex gap-1.5">
-                      <button className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50">
-                        Save
-                      </button>
-                      <button
-                        formAction={deleteSignInRoleDefault}
-                        className="rounded border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"
-                        title="Deleting falls back to the built-in 250 default for this role"
-                      >
-                        Delete
-                      </button>
-                    </span>
-                  </form>
-                ))}
-              </div>
-            </div>
-          </div>
+          {(signInDefaults ?? []).map((r) => (
+            <form key={r.id} id={`signin-${r.id}`} action={saveSignInRoleDefault}>
+              <input type="hidden" name="id" value={r.id} />
+              <input type="hidden" name="return_to" value={RETURN_TO} />
+              <input type="hidden" name="sort_order" value={r.sort_order} />
+            </form>
+          ))}
+          <form id="signin-new" action={saveSignInRoleDefault}>
+            <input type="hidden" name="return_to" value={RETURN_TO} />
+          </form>
+          <button form="signin-new" type="submit" className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-neutral-700">
+            + Add row (fill below, then Save on the new row)
+          </button>
+          <FilterableTable
+            rowKey="id"
+            downloadName="sign-in-access-matrix"
+            stickyColumns={1}
+            columns={[
+              { key: "role", label: "Role", width: 150 },
+              { key: "default_sign_in_limit", label: "Default sign-ins", width: 140 },
+              { key: "tier_tied", label: "Tier-tied?", width: 90 },
+              { key: "validity", label: "Validity (start – end)", width: 240 },
+              { key: "notes", label: "Notes", width: 260, wrap: true },
+              { key: "actions", label: "Actions", width: 150 },
+            ]}
+            csvColumns={[
+              { key: "role_csv", label: "Role" },
+              { key: "default_sign_in_limit_csv", label: "Default sign-ins" },
+              { key: "tier_tied_csv", label: "Tier-tied?" },
+              { key: "valid_from_csv", label: "Valid from" },
+              { key: "valid_until_csv", label: "Valid until" },
+              { key: "notes_csv", label: "Notes" },
+            ]}
+            rows={[
+              {
+                id: "signin-new-row",
+                role: <input form="signin-new" name="role" required placeholder="role_key *" className={cellInput} />,
+                default_sign_in_limit: (
+                  <input form="signin-new" name="default_sign_in_limit" type="number" min="0" placeholder="blank = unlimited" className={cellInput} />
+                ),
+                tier_tied: (
+                  <label className="flex items-center justify-center gap-1 text-xs text-neutral-600">
+                    <input form="signin-new" type="checkbox" name="tier_tied" className="h-3.5 w-3.5" /> Tier-tied
+                  </label>
+                ),
+                validity: (
+                  <div className="flex items-center gap-1">
+                    <input form="signin-new" name="valid_from" type="date" className={cellInput} title="Valid from (optional override)" />
+                    <span className="text-neutral-400">–</span>
+                    <input form="signin-new" name="valid_until" type="date" className={cellInput} title="Valid until (optional override)" />
+                  </div>
+                ),
+                notes: <input form="signin-new" name="notes" placeholder="Note (optional)" className={cellInput} />,
+                actions: <span className="text-xs text-neutral-400">New row — Save above</span>,
+                role_csv: "", default_sign_in_limit_csv: "", tier_tied_csv: "", valid_from_csv: "", valid_until_csv: "", notes_csv: "",
+              },
+              ...(signInDefaults ?? []).map((r) => ({
+                id: r.id as string,
+                role: <input form={`signin-${r.id}`} name="role" required defaultValue={r.role} className={`${cellInput} font-semibold`} />,
+                default_sign_in_limit: (
+                  <input
+                    form={`signin-${r.id}`}
+                    name="default_sign_in_limit"
+                    type="number"
+                    min="0"
+                    defaultValue={r.default_sign_in_limit ?? ""}
+                    placeholder="blank = unlimited"
+                    className={cellInput}
+                  />
+                ),
+                tier_tied: (
+                  <label className="flex items-center justify-center gap-1 text-xs text-neutral-600">
+                    <input form={`signin-${r.id}`} type="checkbox" name="tier_tied" defaultChecked={r.tier_tied} className="h-3.5 w-3.5" /> Tier-tied
+                  </label>
+                ),
+                validity: (
+                  <div className="flex items-center gap-1" title="Optional override — when set, wins over the dynamic tier-derived window">
+                    <input form={`signin-${r.id}`} name="valid_from" type="date" defaultValue={r.valid_from ?? ""} className={cellInput} />
+                    <span className="text-neutral-400">–</span>
+                    <input form={`signin-${r.id}`} name="valid_until" type="date" defaultValue={r.valid_until ?? ""} className={cellInput} />
+                  </div>
+                ),
+                notes: <input form={`signin-${r.id}`} name="notes" defaultValue={r.notes ?? ""} placeholder="Note" className={cellInput} />,
+                actions: (
+                  <span className="flex gap-1.5">
+                    <button form={`signin-${r.id}`} type="submit" className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50">
+                      Save
+                    </button>
+                    <button
+                      form={`signin-${r.id}`}
+                      formAction={deleteSignInRoleDefault}
+                      className="rounded border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"
+                      title="Deleting falls back to the built-in 250 default for this role"
+                    >
+                      Delete
+                    </button>
+                  </span>
+                ),
+                role_csv: r.role as string,
+                default_sign_in_limit_csv: r.default_sign_in_limit == null ? "Unlimited" : String(r.default_sign_in_limit),
+                tier_tied_csv: r.tier_tied ? "Yes" : "No",
+                valid_from_csv: (r.valid_from as string) ?? "",
+                valid_until_csv: (r.valid_until as string) ?? "",
+                notes_csv: (r.notes as string) ?? "",
+              })),
+            ]}
+          />
+          <CsvUploadForm
+            action={bulkUploadSignInRoleDefaults}
+            templateHref="/sign-in-role-defaults-template.csv"
+            entityLabel="role default"
+            note="Dates use DD/MM/YYYY format. Re-uploading updates existing roles instead of duplicating them."
+          />
           {(signInDefaults ?? []).length === 0 && (
             <EmptyState>Table is empty — every role falls back to the built-in 250 default until you add rows.</EmptyState>
           )}
@@ -459,77 +530,103 @@ export default async function AdminContent({
           These rows render on the public Registration page. Columns: Participant · School ·
           Sensei · Referee · Audience · Organizer · Participant Support.
         </p>
-        <div className="overflow-x-auto rounded-lg border border-neutral-200">
-          <div style={{ minWidth: 1280 }}>
-            <div
-              className="grid items-center gap-2 border-b border-neutral-200 bg-neutral-50 px-3 py-2"
-              style={{ gridTemplateColumns: COMPARISON_TEMPLATE }}
-            >
-              <span className={gridHeaderCell}>No.</span>
-              <span className={gridHeaderCell}>Access row</span>
-              <span className={gridHeaderCell}>Participant</span>
-              <span className={gridHeaderCell}>School</span>
-              <span className={gridHeaderCell}>Sensei</span>
-              <span className={gridHeaderCell}>Referee</span>
-              <span className={gridHeaderCell}>Audience</span>
-              <span className={gridHeaderCell}>Organizer</span>
-              <span className={gridHeaderCell}>P. Support</span>
-              <span className={gridHeaderCell}>Actions</span>
-            </div>
-            <form
-              action={saveAccessComparisonRow}
-              className="grid items-center gap-2 border-b border-neutral-100 px-3 py-2"
-              style={{ gridTemplateColumns: COMPARISON_TEMPLATE }}
-            >
-              <input type="hidden" name="return_to" value={RETURN_TO} />
-              <input name="position" type="number" min="1" placeholder="No." className={cellInput} />
-              <input name="what" required placeholder="Access row *" className={cellInput} />
-              <input name="participant" list="access_choices" placeholder="Participant" className={cellInput} />
-              <input name="school" list="access_choices" placeholder="School" className={cellInput} />
-              <input name="sensei" list="access_choices" placeholder="Sensei" className={cellInput} />
-              <input name="referee" list="access_choices" placeholder="Referee" className={cellInput} />
-              <input name="audience" list="access_choices" placeholder="Audience" className={cellInput} />
-              <input name="organizer" list="access_choices" placeholder="Organizer" className={cellInput} />
-              <input name="support" list="access_choices" placeholder="P. Support" className={cellInput} />
-              <button className="rounded-md bg-neutral-900 px-3 py-1 text-xs font-semibold text-white hover:bg-neutral-700">
-                Add
-              </button>
-            </form>
-            <div className="divide-y divide-neutral-100">
-              {(comparisonRows ?? []).map((r) => (
-                <form
-                  key={r.id}
-                  action={saveAccessComparisonRow}
-                  className="grid items-center gap-2 px-3 py-2"
-                  style={{ gridTemplateColumns: COMPARISON_TEMPLATE }}
-                >
-                  <input type="hidden" name="id" value={r.id} />
-                  <input type="hidden" name="return_to" value={RETURN_TO} />
-                  <input name="position" type="number" min="1" defaultValue={r.position} className={cellInput} />
-                  <input name="what" required defaultValue={r.what} className={`${cellInput} font-semibold`} />
-                  <input name="participant" list="access_choices" defaultValue={r.participant} className={cellInput} />
-                  <input name="school" list="access_choices" defaultValue={r.school} className={cellInput} />
-                  <input name="sensei" list="access_choices" defaultValue={r.sensei} className={cellInput} />
-                  <input name="referee" list="access_choices" defaultValue={r.referee} className={cellInput} />
-                  <input name="audience" list="access_choices" defaultValue={r.audience} className={cellInput} />
-                  <input name="organizer" list="access_choices" defaultValue={r.organizer} className={cellInput} />
-                  <input name="support" list="access_choices" defaultValue={r.support} className={cellInput} />
-                  <span className="flex gap-1.5">
-                    <button className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50">
-                      Save
-                    </button>
-                    <button
-                      formAction={deleteAccessComparisonRow}
-                      className="rounded border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"
-                    >
-                      Delete
-                    </button>
-                  </span>
-                </form>
-              ))}
-            </div>
-          </div>
-        </div>
+        {(comparisonRows ?? []).map((r) => (
+          <form key={r.id} id={`comparison-${r.id}`} action={saveAccessComparisonRow}>
+            <input type="hidden" name="id" value={r.id} />
+            <input type="hidden" name="return_to" value={RETURN_TO} />
+          </form>
+        ))}
+        <form id="comparison-new" action={saveAccessComparisonRow}>
+          <input type="hidden" name="return_to" value={RETURN_TO} />
+        </form>
+        <button form="comparison-new" type="submit" className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-neutral-700">
+          + Add row (fill below, then Save on the new row)
+        </button>
+        <FilterableTable
+          rowKey="id"
+          downloadName="access-comparison"
+          stickyColumns={2}
+          firstColumnWidth={56}
+          columns={[
+            { key: "position", label: "No.", width: 56 },
+            { key: "what", label: "Access row", width: 200, wrap: true },
+            { key: "participant", label: "Participant", width: 140, wrap: true },
+            { key: "school", label: "School", width: 140, wrap: true },
+            { key: "sensei", label: "Sensei", width: 140, wrap: true },
+            { key: "referee", label: "Referee", width: 140, wrap: true },
+            { key: "audience", label: "Audience", width: 140, wrap: true },
+            { key: "organizer", label: "Organizer", width: 140, wrap: true },
+            { key: "support", label: "P. Support", width: 140, wrap: true },
+            { key: "actions", label: "Actions", width: 150 },
+          ]}
+          csvColumns={[
+            { key: "position_csv", label: "No." },
+            { key: "what_csv", label: "Access row" },
+            { key: "participant_csv", label: "Participant" },
+            { key: "school_csv", label: "School" },
+            { key: "sensei_csv", label: "Sensei" },
+            { key: "referee_csv", label: "Referee" },
+            { key: "audience_csv", label: "Audience" },
+            { key: "organizer_csv", label: "Organizer" },
+            { key: "support_csv", label: "P. Support" },
+          ]}
+          rows={[
+            {
+              id: "comparison-new-row",
+              position: <input form="comparison-new" name="position" type="number" min="1" placeholder="No." className={cellInput} />,
+              what: <input form="comparison-new" name="what" required placeholder="Access row *" className={cellInput} />,
+              participant: <input form="comparison-new" name="participant" list="access_choices" placeholder="Participant" className={cellInput} />,
+              school: <input form="comparison-new" name="school" list="access_choices" placeholder="School" className={cellInput} />,
+              sensei: <input form="comparison-new" name="sensei" list="access_choices" placeholder="Sensei" className={cellInput} />,
+              referee: <input form="comparison-new" name="referee" list="access_choices" placeholder="Referee" className={cellInput} />,
+              audience: <input form="comparison-new" name="audience" list="access_choices" placeholder="Audience" className={cellInput} />,
+              organizer: <input form="comparison-new" name="organizer" list="access_choices" placeholder="Organizer" className={cellInput} />,
+              support: <input form="comparison-new" name="support" list="access_choices" placeholder="P. Support" className={cellInput} />,
+              actions: <span className="text-xs text-neutral-400">New row — Save above</span>,
+              position_csv: "", what_csv: "", participant_csv: "", school_csv: "", sensei_csv: "", referee_csv: "", audience_csv: "", organizer_csv: "", support_csv: "",
+            },
+            ...(comparisonRows ?? []).map((r) => ({
+              id: r.id as string,
+              position: <input form={`comparison-${r.id}`} name="position" type="number" min="1" defaultValue={r.position} className={cellInput} />,
+              what: <input form={`comparison-${r.id}`} name="what" required defaultValue={r.what} className={`${cellInput} font-semibold`} />,
+              participant: <input form={`comparison-${r.id}`} name="participant" list="access_choices" defaultValue={r.participant} className={cellInput} />,
+              school: <input form={`comparison-${r.id}`} name="school" list="access_choices" defaultValue={r.school} className={cellInput} />,
+              sensei: <input form={`comparison-${r.id}`} name="sensei" list="access_choices" defaultValue={r.sensei} className={cellInput} />,
+              referee: <input form={`comparison-${r.id}`} name="referee" list="access_choices" defaultValue={r.referee} className={cellInput} />,
+              audience: <input form={`comparison-${r.id}`} name="audience" list="access_choices" defaultValue={r.audience} className={cellInput} />,
+              organizer: <input form={`comparison-${r.id}`} name="organizer" list="access_choices" defaultValue={r.organizer} className={cellInput} />,
+              support: <input form={`comparison-${r.id}`} name="support" list="access_choices" defaultValue={r.support} className={cellInput} />,
+              actions: (
+                <span className="flex gap-1.5">
+                  <button form={`comparison-${r.id}`} type="submit" className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50">
+                    Save
+                  </button>
+                  <button
+                    form={`comparison-${r.id}`}
+                    formAction={deleteAccessComparisonRow}
+                    className="rounded border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"
+                  >
+                    Delete
+                  </button>
+                </span>
+              ),
+              position_csv: String(r.position ?? ""),
+              what_csv: r.what as string,
+              participant_csv: (r.participant as string) ?? "",
+              school_csv: (r.school as string) ?? "",
+              sensei_csv: (r.sensei as string) ?? "",
+              referee_csv: (r.referee as string) ?? "",
+              audience_csv: (r.audience as string) ?? "",
+              organizer_csv: (r.organizer as string) ?? "",
+              support_csv: (r.support as string) ?? "",
+            })),
+          ]}
+        />
+        <CsvUploadForm
+          action={bulkUploadAccessComparisonRows}
+          templateHref="/access-comparison-template.csv"
+          entityLabel="access comparison row"
+        />
       </div>
     </AdminShell>
   );
