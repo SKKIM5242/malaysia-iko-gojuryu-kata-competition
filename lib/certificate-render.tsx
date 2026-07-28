@@ -161,7 +161,7 @@ function Medal({ rank, width }: { rank: 1 | 2 | 3; width: number }) {
           justifyContent: "center",
         }}
       >
-        <span style={{ display: "flex", fontSize: Math.round(width * 0.13), fontWeight: 900, color: t.discDark }}>
+        <span style={{ display: "flex", fontSize: Math.round(width * 0.16), fontWeight: 900, color: t.discDark }}>
           {t.label}
         </span>
       </div>
@@ -264,10 +264,9 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
   const LOGO2_SIZE = GOLD_LOGO_SIZE;
   // Now that the medal PNG is cropped tight (bounding box == visible
   // content, same convention as the two logos), this width IS the visible
-  // ribbon+disc width. 307px reproduces the same visible medal size as
-  // before this crop (530px box x its old ~48% content fill), which was
-  // already the organizer's requested 20%-bigger-than-original size.
-  const MEDAL_WIDTH = 307;
+  // ribbon+disc width. 307px reproduced the prior visible medal size
+  // exactly; bumped another 20% per the organizer's follow-up request.
+  const MEDAL_WIDTH = Math.round(307 * 1.2);
 
   return new ImageResponse(
     (
@@ -324,10 +323,23 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={logo} width={GOLD_LOGO_SIZE} height={GOLD_LOGO_SIZE} style={{ objectFit: "contain" }} alt="" />
               )}
-              <Medal rank={input.rank!} width={MEDAL_WIDTH} />
+              {/* Lifted so the ribbon tip touches the thin inner border
+                  line above (a deliberate "linked to the frame" look) --
+                  the row's own alignItems:"center" would otherwise keep it
+                  flush with the top of the (now taller) row, 24px below
+                  that line. */}
+              <div style={{ display: "flex", marginTop: "-28px" }}>
+                <Medal rank={input.rank!} width={MEDAL_WIDTH} />
+              </div>
               {logo2 && (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={logo2} width={LOGO2_SIZE} height={LOGO2_SIZE} style={{ objectFit: "contain" }} alt="" />
+                <img
+                  src={logo2}
+                  width={LOGO2_SIZE}
+                  height={LOGO2_SIZE}
+                  style={{ objectFit: "contain", marginLeft: "46px" }}
+                  alt=""
+                />
               )}
             </div>
           ) : (
