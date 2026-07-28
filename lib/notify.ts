@@ -5,6 +5,7 @@
  */
 
 import { getTelegramLink, listTelegramGroups, type TelegramCategory } from "@/lib/telegram";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 interface AssignmentNotice {
   refereeEmail: string | null;
@@ -602,4 +603,166 @@ export async function notifyInvitationCodeIssued(input: {
   }
   lines.push("", "— Malaysia Open Virtual Karate-do Kata Competition");
   await sendEmail(input.email, `You've been invited as ${roleLabel}`, lines.join("\n"));
+}
+
+// ── Bulk registration — organizer fan-out + sensei confirmations ───────────
+
+/** Every approved Organizer's contact info — used to fan a notice out to
+ * the whole role at once (bulk-upload payment/CSV/tally notices below).
+ * Uses the service-role client since these fire from background/best-effort
+ * code paths, same reasoning as listTelegramGroups. */
+async function organizerRecipients(): Promise<
+  Array<{ email: string | null; telegramChatId: string | null; name: string }>
+> {
+  const { data } = await createAdminClient()
+    .from("profiles")
+    .select("email, full_name, telegram_chat_id")
+    .eq("role", "organizer")
+    .eq("approved", true);
+  return (data ?? []).map((p) => ({
+    email: (p.email as string | null) ?? null,
+    telegramChatId: (p.telegram_chat_id as string | null) ?? null,
+    name: (p.full_name as string | null) || (p.email as string | null) || "Organizer",
+  }));
+}
+
+async function sendDirectTelegramDM(chatId: string | null, text: string): Promise<void> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token || !chatId) return;
+  try {
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, text }),
+    });
+  } catch {
+    // Best-effort
+  }
+}
+
+/** Fans one notice out to every approved Organizer, by email and Telegram
+ * DM (whichever channels they've got connected) — shared by the three bulk
+ * upload notices below (payment confirmed / CSV received / tally done). */
+async function notifyOrganizers(subject: string, bodyLines: string[], telegramText: string): Promise<void> {
+  const organizers = await organizerRecipients();
+  if (organizers.length === 0) return;
+  const emailText = [`Hi,`, "", ...bodyLines, "", "— Malaysia Open Virtual Karate-do Kata Competition"].join("\n");
+  await Promise.allSettled(
+    organizers.flatMap((o) => [
+      o.email ? sendEmail(o.email, subject, emailText) : Promise.resolve(),
+      sendDirectTelegramDM(o.telegramChatId, telegramText),
+    ]),
+  );
+}
+
+interface BulkBatchNotice {
+  senseiName: string;
+  schoolName: string;
+  batchRef: string;
+  tierSummary: string;
+}
+
+/** Fires when Admin/Organizer confirms a sensei's bulk-upload payment (see
+ * markBulkUploadPaymentPaid in app/actions/admin.ts) — tells every Organizer
+ * so any of them can follow up once the CSV actually lands and tally it
+ * against what was paid for. */
+export async function notifyOrganizersBulkPaymentConfirmed(notice: BulkBatchNotice): Promise<void> {
+  const link = `${appUrl()}/admin/records#bulk-upload-payments`;
+  await notifyOrganizers(
+    `Bulk registration payment confirmed — ${notice.senseiName}`,
+    [
+      `${notice.senseiName} (${notice.schoolName})'s bulk registration payment has been confirmed — batch ${notice.batchRef}, covering ${notice.tierSummary}.`,
+      `They can now upload their CSV/table. Once it lands, please tally the upload against the paid headcount from the Participant Records page: ${link}`,
+    ],
+    `💳 Bulk registration payment confirmed — ${notice.senseiName} (${notice.schoolName}), batch ${notice.batchRef}. Tally once the CSV lands: ${link}`,
+  );
+}
+
+interface BulkCsvNotice {
+  senseiName: string;
+  schoolName: string;
+  batchRef: string;
+  competitionName: string;
+  rowCount: number;
+}
+
+/** Fires the moment a sensei's CSV/table upload actually succeeds (see
+ * bulkRegisterCsv/bulkRegister in app/actions/bulk.ts) — tells every
+ * Organizer so they can tally the upload against the paid headcount. */
+export async function notifyOrganizersBulkCsvReceived(notice: BulkCsvNotice): Promise<void> {
+  const link = `${appUrl()}/admin/records#participants`;
+  await notifyOrganizers(
+    `Bulk CSV uploaded — ${notice.senseiName} — ${notice.rowCount} participant${notice.rowCount === 1 ? "" : "s"}`,
+    [
+      `${notice.senseiName} (${notice.schoolName}) just uploaded ${notice.rowCount} participant${notice.rowCount === 1 ? "" : "s"} for ${notice.competitionName} — batch ${notice.batchRef}.`,
+      `Please tally this against what they paid for, then mark the tally done on the Bulk Upload CSV listing (Participant Records page): ${link}`,
+    ],
+    `📥 Bulk CSV uploaded — ${notice.senseiName} (${notice.schoolName}), ${notice.rowCount} participant${notice.rowCount === 1 ? "" : "s"}, batch ${notice.batchRef}. Tally it here: ${link}`,
+  );
+}
+
+/** Fires once an Organizer marks a bulk upload's tally done (see
+ * markBulkUploadTallyDone in app/actions/admin.ts) — lets every other
+ * Organizer know it's settled, no follow-up needed. */
+export async function notifyOrganizersBulkTallyDone(notice: BulkBatchNotice): Promise<void> {
+  await notifyOrganizers(
+    `Bulk upload tally done — ${notice.senseiName}`,
+    [`The tally for ${notice.senseiName} (${notice.schoolName})'s bulk upload — batch ${notice.batchRef} — is done. No follow-up needed.`],
+    `✅ Tally done — ${notice.senseiName} (${notice.schoolName}), batch ${notice.batchRef}.`,
+  );
+}
+
+/** Fires when Admin/Organizer confirms a sensei's bulk-upload payment (see
+ * markBulkUploadPaymentPaid in app/actions/admin.ts) — email (with the
+ * usual Telegram-group-join-links via sendConfirmationEmail) plus a direct
+ * Telegram DM if the sensei's login is already connected. Kept separate
+ * from notifySenseiBulkCsvConfirmed below since payment and upload can
+ * happen well apart in time. */
+export async function notifySenseiBulkPaymentConfirmed(input: {
+  email: string | null;
+  telegramChatId: string | null;
+  senseiName: string;
+  totalAmountLabel: string;
+  tierCount: number;
+}): Promise<void> {
+  await Promise.allSettled([
+    sendConfirmationEmail({
+      toEmail: input.email,
+      recipientName: input.senseiName,
+      subject: "Your bulk registration payment is confirmed — you can upload now",
+      telegramCategory: "school",
+      bodyLines: [
+        `Your payment of ${input.totalAmountLabel} covering ${input.tierCount} tier${input.tierCount === 1 ? "" : "s"} is confirmed.`,
+        "Go back to the Bulk registration page and upload your CSV or table using the same School and Sensei — no further payment needed for these participants.",
+      ],
+    }),
+    sendDirectTelegramDM(
+      input.telegramChatId,
+      `💳 Your bulk registration payment of ${input.totalAmountLabel} (${input.tierCount} tier${input.tierCount === 1 ? "" : "s"}) is confirmed — you can upload your CSV/table now.`,
+    ),
+  ]);
+}
+
+/** Fires when Admin/Organizer clicks "Confirm upload CSV file" on a bulk
+ * upload submission (see confirmBulkUploadSubmission in
+ * app/actions/admin.ts) — separate from the payment confirmation notice,
+ * since a sensei may pay and upload well apart in time. */
+export async function notifySenseiBulkCsvConfirmed(input: {
+  email: string | null;
+  telegramChatId: string | null;
+  senseiName: string;
+  competitionName: string;
+  rowCount: number;
+}): Promise<void> {
+  const text =
+    `Hi ${input.senseiName},\n\n` +
+    `Your bulk upload of ${input.rowCount} participant${input.rowCount === 1 ? "" : "s"} for ${input.competitionName} has been confirmed by the organizer.\n\n` +
+    `— Malaysia Open Virtual Karate-do Kata Competition`;
+  await Promise.allSettled([
+    input.email ? sendEmail(input.email, "Your bulk upload has been confirmed", text) : Promise.resolve(),
+    sendDirectTelegramDM(
+      input.telegramChatId,
+      `✅ Your bulk upload of ${input.rowCount} participant${input.rowCount === 1 ? "" : "s"} for ${input.competitionName} has been confirmed by the organizer.`,
+    ),
+  ]);
 }

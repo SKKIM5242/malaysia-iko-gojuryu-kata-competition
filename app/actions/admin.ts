@@ -7,7 +7,12 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { writeAudit } from "@/lib/audit";
 import { kataBaseOf, ageAt } from "@/lib/division";
-import { notifyRefereeAssignment, notifyRefereeUnassigned, sendConfirmationEmail, notifyAnnouncementPublished, notifyCertificatesPublished, notifyInvitationCodeIssued, notifyStatusChanged } from "@/lib/notify";
+import {
+  notifyRefereeAssignment, notifyRefereeUnassigned, sendConfirmationEmail, notifyAnnouncementPublished,
+  notifyCertificatesPublished, notifyInvitationCodeIssued, notifyStatusChanged,
+  notifyOrganizersBulkPaymentConfirmed, notifyOrganizersBulkTallyDone, notifySenseiBulkPaymentConfirmed,
+  notifySenseiBulkCsvConfirmed,
+} from "@/lib/notify";
 import type { PaymentStatus } from "@/lib/types";
 import { parseCsvWithHeader, parseDDMMYYYY, type CsvUploadResult } from "@/lib/csv-bulk";
 import { normalizeIban } from "@/lib/bank";
@@ -3450,7 +3455,7 @@ export async function markBulkUploadPaymentPaid(formData: FormData) {
   const { supabase, actorId } = await getActor();
   const { data: payment } = await supabase
     .from("bulk_upload_payments")
-    .select("id, batch_id, sensei_id, participant_count, declared_participants, amount_usd, status")
+    .select("id, batch_id, sensei_id, school_id, participant_count, declared_participants, amount_usd, status")
     .eq("id", id)
     .maybeSingle();
   if (!payment || payment.status !== "pending") {
@@ -3476,24 +3481,129 @@ export async function markBulkUploadPaymentPaid(formData: FormData) {
     table_name: "bulk_upload_payments", record_id: id, action: "bulk_upload_payment_confirmed",
     new_value: { sensei_id: payment!.sensei_id, batch_id: payment!.batch_id, tiers: batchRows.length }, actor_id: actorId,
   });
-  const { data: sensei } = await supabase
-    .from("senseis")
-    .select("name, email")
-    .eq("id", payment!.sensei_id)
+  const [{ data: sensei }, { data: school }] = await Promise.all([
+    supabase.from("senseis").select("name, email, user_id").eq("id", payment!.sensei_id).maybeSingle(),
+    supabase.from("schools").select("name").eq("id", payment!.school_id).maybeSingle(),
+  ]);
+  let senseiTelegramChatId: string | null = null;
+  if (sensei?.user_id) {
+    const { data: senseiProfile } = await supabase
+      .from("profiles")
+      .select("telegram_chat_id")
+      .eq("user_id", sensei.user_id)
+      .maybeSingle();
+    senseiTelegramChatId = (senseiProfile?.telegram_chat_id as string | null) ?? null;
+  }
+  const totalAmount = batchRows.reduce((sum, r) => sum + Number(r!.amount_usd), 0);
+  await notifySenseiBulkPaymentConfirmed({
+    email: sensei?.email ?? null,
+    telegramChatId: senseiTelegramChatId,
+    senseiName: sensei?.name ?? "Sensei",
+    totalAmountLabel: formatUSD(totalAmount),
+    tierCount: batchRows.length,
+  });
+  const batchRef = (payment!.batch_id ?? payment!.id).slice(0, 8).toUpperCase();
+  await notifyOrganizersBulkPaymentConfirmed({
+    senseiName: sensei?.name ?? "Sensei",
+    schoolName: school?.name ?? "School",
+    batchRef,
+    tierSummary: `${batchRows.length} tier${batchRows.length === 1 ? "" : "s"} (${formatUSD(totalAmount)} total)`,
+  });
+  revalidatePath(returnTo);
+  backTo(returnTo, { ok: "Payment confirmed — sensei can now upload." });
+}
+
+/** Marks a bulk_upload_submissions row confirmed — Admin/Organizer's
+ * acknowledgement that they've checked a sensei's uploaded CSV/table
+ * against what was paid for. Separate from the tally (see
+ * markBulkUploadTallyDone below): this just confirms "the file itself is
+ * fine," the tally is the deeper "does headcount/amount actually match"
+ * reconciliation. */
+export async function confirmBulkUploadSubmission(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const returnTo = "/admin/records";
+  const { supabase, actorId } = await getActor();
+  await requireJudgingManager(supabase, actorId, returnTo);
+  const { data: submission } = await supabase
+    .from("bulk_upload_submissions")
+    .select("id, competition_id, sensei_id, row_count, status")
+    .eq("id", id)
     .maybeSingle();
-  if (sensei?.email) {
-    const totalAmount = batchRows.reduce((sum, r) => sum + Number(r!.amount_usd), 0);
-    await sendConfirmationEmail({
-      toEmail: sensei.email,
-      recipientName: sensei.name ?? "Sensei",
-      subject: "Your bulk registration payment is confirmed — you can upload now",
-      bodyLines: [
-        `Your payment of ${formatUSD(totalAmount)} covering ${batchRows.length} tier${batchRows.length === 1 ? "" : "s"} is confirmed.`,
-        "Go back to the Bulk registration page and upload your CSV or table using the same School and Sensei — no further payment needed for these participants.",
-      ],
+  if (!submission || submission.status !== "received") {
+    backTo(returnTo, { error: "That upload is no longer pending confirmation." });
+  }
+  const { error } = await supabase
+    .from("bulk_upload_submissions")
+    .update({ status: "confirmed", confirmed_at: new Date().toISOString(), confirmed_by: actorId })
+    .eq("id", id);
+  if (error) backTo(returnTo, { error: "Could not confirm the upload — please try again." });
+  await writeAudit(supabase, {
+    table_name: "bulk_upload_submissions", record_id: id, action: "bulk_upload_submission_confirmed",
+    new_value: { sensei_id: submission!.sensei_id }, actor_id: actorId,
+  });
+  const [{ data: sensei }, { data: competition }] = await Promise.all([
+    supabase.from("senseis").select("name, email, user_id").eq("id", submission!.sensei_id).maybeSingle(),
+    supabase.from("competitions").select("name").eq("id", submission!.competition_id).maybeSingle(),
+  ]);
+  let senseiTelegramChatId: string | null = null;
+  if (sensei?.user_id) {
+    const { data: senseiProfile } = await supabase
+      .from("profiles")
+      .select("telegram_chat_id")
+      .eq("user_id", sensei.user_id)
+      .maybeSingle();
+    senseiTelegramChatId = (senseiProfile?.telegram_chat_id as string | null) ?? null;
+  }
+  await notifySenseiBulkCsvConfirmed({
+    email: sensei?.email ?? null,
+    telegramChatId: senseiTelegramChatId,
+    senseiName: sensei?.name ?? "Sensei",
+    competitionName: competition?.name ?? "the competition",
+    rowCount: submission!.row_count,
+  });
+  revalidatePath(returnTo);
+  backTo(returnTo, { ok: "Upload confirmed." });
+}
+
+/** Marks a bulk upload batch's tally done — Admin/Organizer's sign-off
+ * that the uploaded headcount was checked against what the sensei paid
+ * for. Applies to every bulk_upload_submissions row sharing this batch_id
+ * (a batch can cover up to 3 tiers uploaded separately), and tells every
+ * Organizer it's settled. */
+export async function markBulkUploadTallyDone(formData: FormData) {
+  const batchId = String(formData.get("batch_id") ?? "");
+  const returnTo = "/admin/records";
+  const { supabase, actorId } = await getActor();
+  await requireJudgingManager(supabase, actorId, returnTo);
+  const { data: rows } = await supabase
+    .from("bulk_upload_submissions")
+    .select("id, sensei_id, school_id, tally_status")
+    .eq("batch_id", batchId);
+  if (!rows || rows.length === 0) backTo(returnTo, { error: "Batch not found." });
+  const ids = rows!.filter((r) => r.tally_status !== "done").map((r) => r.id);
+  if (ids.length > 0) {
+    const { error } = await supabase
+      .from("bulk_upload_submissions")
+      .update({ tally_status: "done", tally_done_at: new Date().toISOString(), tally_done_by: actorId })
+      .in("id", ids);
+    if (error) backTo(returnTo, { error: "Could not mark the tally done — please try again." });
+    await writeAudit(supabase, {
+      table_name: "bulk_upload_submissions", record_id: batchId, action: "bulk_upload_tally_done",
+      new_value: { batch_id: batchId }, actor_id: actorId,
+    });
+    const [{ data: sensei }, { data: school }] = await Promise.all([
+      supabase.from("senseis").select("name").eq("id", rows![0].sensei_id).maybeSingle(),
+      supabase.from("schools").select("name").eq("id", rows![0].school_id).maybeSingle(),
+    ]);
+    await notifyOrganizersBulkTallyDone({
+      senseiName: sensei?.name ?? "Sensei",
+      schoolName: school?.name ?? "School",
+      batchRef: batchId.slice(0, 8).toUpperCase(),
+      tierSummary: `${rows!.length} upload${rows!.length === 1 ? "" : "s"}`,
     });
   }
-  backTo(returnTo, { ok: "Payment confirmed — sensei can now upload." });
+  revalidatePath(returnTo);
+  backTo(returnTo, { ok: "Tally marked done." });
 }
 
 // ── Registration slot status (Admin/Organizer/Referee) ──────────────────────

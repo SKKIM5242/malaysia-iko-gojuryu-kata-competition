@@ -7,7 +7,10 @@ import { resolveCategory, ageAt } from "@/lib/division";
 import { parseCsv } from "@/lib/csv";
 import { parseDDMMYYYY } from "@/lib/csv-bulk";
 import { normalizeIban } from "@/lib/bank";
-import { sendConfirmationEmail, sendConfirmationEmailBatch, type ConfirmationEmailInput } from "@/lib/notify";
+import {
+  sendConfirmationEmail, sendConfirmationEmailBatch, notifyOrganizersBulkCsvReceived,
+  type ConfirmationEmailInput,
+} from "@/lib/notify";
 import { getStripe, paymentsEnabled } from "@/lib/payments";
 import { formatUSD } from "@/components/ui";
 import type { Category } from "@/lib/types";
@@ -377,6 +380,48 @@ async function sendSenseiSummaryEmail(
   });
 }
 
+/** Logs one bulk_upload_submissions row for this upload event (what the
+ * Bulk Upload CSV listing on the Participant Records page reads from —
+ * separate from bulk_upload_payments, which only tracks the payment gate)
+ * and tells every Organizer a CSV/table just landed so they can tally it
+ * against what was paid for. Called from both bulkRegister and
+ * bulkRegisterCsv right after a successful upload; no-ops if nothing was
+ * actually registered. */
+async function recordBulkUploadSubmission(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  params: {
+    batchId: string | null;
+    paymentId: string;
+    competitionId: string;
+    competitionName: string;
+    schoolId: string;
+    senseiId: string;
+    registrationIds: string[];
+  },
+): Promise<void> {
+  if (params.registrationIds.length === 0) return;
+  const batchId = params.batchId ?? params.paymentId;
+  await supabase.from("bulk_upload_submissions").insert({
+    batch_id: batchId,
+    competition_id: params.competitionId,
+    school_id: params.schoolId,
+    sensei_id: params.senseiId,
+    registration_ids: params.registrationIds,
+    row_count: params.registrationIds.length,
+  });
+  const [{ data: schoolRow }, { data: senseiRow }] = await Promise.all([
+    supabase.from("schools").select("name").eq("id", params.schoolId).maybeSingle(),
+    supabase.from("senseis").select("name").eq("id", params.senseiId).maybeSingle(),
+  ]);
+  await notifyOrganizersBulkCsvReceived({
+    senseiName: senseiRow?.name ?? "Sensei",
+    schoolName: schoolRow?.name ?? "School",
+    batchRef: batchId.slice(0, 8).toUpperCase(),
+    competitionName: params.competitionName,
+    rowCount: params.registrationIds.length,
+  });
+}
+
 export async function bulkRegister(_prev: BulkState, formData: FormData): Promise<BulkState> {
   const competitionId = String(formData.get("competition_id") ?? "");
   const schoolId = String(formData.get("school_id") ?? "");
@@ -416,7 +461,7 @@ export async function bulkRegister(_prev: BulkState, formData: FormData): Promis
   // a matching paid, sufficient-balance payment server-side.
   const { data: payment } = await supabase
     .from("bulk_upload_payments")
-    .select("id, participant_count, declared_participants")
+    .select("id, batch_id, participant_count, declared_participants")
     .eq("competition_id", competitionId)
     .eq("school_id", schoolId)
     .eq("sensei_id", senseiId)
@@ -446,6 +491,7 @@ export async function bulkRegister(_prev: BulkState, formData: FormData): Promis
 
   const results: BulkRowResult[] = [];
   const confirmationEmails: ConfirmationEmailInput[] = [];
+  const insertedRegistrationIds: string[] = [];
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
@@ -558,6 +604,7 @@ export async function bulkRegister(_prev: BulkState, formData: FormData): Promis
     });
     const referenceId = registrationId.slice(0, 8).toUpperCase();
     results.push({ row: i + 1, name: label, ok: true, referenceId });
+    insertedRegistrationIds.push(registrationId);
     confirmationEmails.push({
       toEmail: row.email.trim(),
       recipientName: row.full_name.trim(),
@@ -579,6 +626,15 @@ export async function bulkRegister(_prev: BulkState, formData: FormData): Promis
     competition.name,
     results.filter((r): r is BulkRowResult & { referenceId: string } => r.ok && !!r.referenceId).map((r) => ({ name: r.name, referenceId: r.referenceId })),
   );
+  await recordBulkUploadSubmission(supabase, {
+    batchId: payment.batch_id,
+    paymentId: payment.id,
+    competitionId,
+    competitionName: competition.name,
+    schoolId,
+    senseiId,
+    registrationIds: insertedRegistrationIds,
+  });
 
   return { done: true, results };
 }
@@ -662,7 +718,7 @@ export async function bulkRegisterCsv(_prev: CsvBulkState, formData: FormData): 
   // a matching paid, sufficient-balance payment server-side.
   const { data: payment } = await supabase
     .from("bulk_upload_payments")
-    .select("id, participant_count, declared_participants")
+    .select("id, batch_id, participant_count, declared_participants")
     .eq("competition_id", competitionId)
     .eq("school_id", schoolId)
     .eq("sensei_id", senseiId)
@@ -845,6 +901,7 @@ export async function bulkRegisterCsv(_prev: CsvBulkState, formData: FormData): 
   // Chunked batch inserts
   let registered = 0;
   const senseiSummaryEntries: Array<{ name: string; referenceId: string }> = [];
+  const insertedRegistrationIds: string[] = [];
   for (let i = 0; i < toInsert.length; i += CHUNK) {
     const chunk = toInsert.slice(i, i + CHUNK);
     const withIds = chunk.map((v) => ({
@@ -916,6 +973,7 @@ export async function bulkRegisterCsv(_prev: CsvBulkState, formData: FormData): 
     );
     for (const v of withIds) {
       senseiSummaryEntries.push({ name: v.full_name, referenceId: v.registrationId.slice(0, 8).toUpperCase() });
+      insertedRegistrationIds.push(v.registrationId);
     }
   }
 
@@ -927,6 +985,15 @@ export async function bulkRegisterCsv(_prev: CsvBulkState, formData: FormData): 
   });
   await supabase.rpc("consume_bulk_upload_payment", { p_id: payment.id, p_rows_uploaded: registered });
   await sendSenseiSummaryEmail(supabase, senseiId, competition.name, senseiSummaryEntries);
+  await recordBulkUploadSubmission(supabase, {
+    batchId: payment.batch_id,
+    paymentId: payment.id,
+    competitionId,
+    competitionName: competition.name,
+    schoolId,
+    senseiId,
+    registrationIds: insertedRegistrationIds,
+  });
 
   failures.sort((a, b) => a.row - b.row);
   return {

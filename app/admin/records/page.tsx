@@ -8,12 +8,16 @@ import {
   getSenseiRecords,
   getStaffAccountRecords,
 } from "@/lib/admin-data";
-import { AdminShell, adminBtnSecondary } from "@/components/admin";
+import { AdminShell, adminBtn, adminBtnSecondary } from "@/components/admin";
 import { EmptyState, SetupNotice, formatDate, formatDOB, formatUSD } from "@/components/ui";
 import ParticipantRecordsTable, { type ParticipantRecordRow } from "@/components/ParticipantRecordsTable";
 import FilterableTable from "@/components/FilterableTable";
+import DownloadCsvButton from "@/components/DownloadCsvButton";
 import { ageAt } from "@/lib/division";
-import { markAttemptPurchasePaid, markBulkUploadPaymentPaid, markSubscriptionRenewalFulfilled } from "@/app/actions/admin";
+import {
+  markAttemptPurchasePaid, markBulkUploadPaymentPaid, markSubscriptionRenewalFulfilled,
+  confirmBulkUploadSubmission, markBulkUploadTallyDone,
+} from "@/app/actions/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -152,6 +156,32 @@ export default async function AdminParticipantRecords({
     const list = bulkBatches.get(key) ?? [];
     list.push(p);
     bulkBatches.set(key, list);
+  }
+
+  // What actually landed from each CSV/table upload (separate from the
+  // payment gate above) — shown as its own listing below Bulk Upload
+  // Payments, grouped by the same batch_id so a payment and its upload(s)
+  // are visually tied together.
+  const { data: bulkSubmissions } = await supabase
+    .from("bulk_upload_submissions")
+    .select("id, batch_id, competition_id, school_id, sensei_id, registration_ids, row_count, status, confirmed_at, tally_status, tally_done_at, created_at")
+    .order("created_at", { ascending: false });
+  const bulkSubmissionList = bulkSubmissions ?? [];
+  const allSubmissionRegIds = [...new Set(bulkSubmissionList.flatMap((s) => (s.registration_ids as string[]) ?? []))];
+  const { data: submissionRegs } =
+    allSubmissionRegIds.length > 0
+      ? await supabase
+          .from("registrations")
+          .select("id, participant:participants(full_name, ic_passport, email, phone), category:categories(name)")
+          .in("id", allSubmissionRegIds)
+      : { data: [] };
+  const submissionRegById = new Map((submissionRegs ?? []).map((r) => [r.id as string, r]));
+  const submissionBatches = new Map<string, typeof bulkSubmissionList>();
+  for (const s of bulkSubmissionList) {
+    const key = (s.batch_id as string | null) ?? (s.id as string);
+    const list = submissionBatches.get(key) ?? [];
+    list.push(s);
+    submissionBatches.set(key, list);
   }
 
   // Paid, still-active registrations with no recording submitted yet — a
@@ -532,17 +562,12 @@ export default async function AdminParticipantRecords({
                     {allPending ? (
                       <form action={markBulkUploadPaymentPaid}>
                         <input type="hidden" name="id" value={first.id} />
-                        <button type="submit" className={adminBtnSecondary}>Confirm payment received</button>
+                        <button type="submit" className={adminBtn}>Confirm payment received</button>
                       </form>
                     ) : (
-                      <span
-                        className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${
-                          allConsumed
-                            ? "border-neutral-300 bg-neutral-50 text-neutral-600"
-                            : "border-green-300 bg-green-50 text-green-800"
-                        }`}
-                      >
-                        {allConsumed ? "Fully used" : "Paid — ready to upload"}
+                      <span className={`${adminBtnSecondary} cursor-default hover:bg-white`}>
+                        {allConsumed ? "✓ Fully used" : "✓ Payment confirmed"}
+                        {first.paid_at ? ` — ${formatDate((first.paid_at as string).slice(0, 10))}` : ""}
                       </span>
                     )}
                   </div>
@@ -557,6 +582,93 @@ export default async function AdminParticipantRecords({
                         </span>
                       </li>
                     ))}
+                  </ul>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Section>
+
+      <Section id="bulk-upload-csv-listing" title="Bulk Upload CSV File Listing">
+        <p className="mb-3 text-xs text-neutral-400">
+          What each sensei actually uploaded, grouped by the same batch as its payment above — download
+          the participant list, confirm the file looks right, then mark the tally done once you&apos;ve
+          checked the headcount against what was paid for.
+        </p>
+        {bulkSubmissionList.length === 0 ? (
+          <EmptyState>No bulk CSV uploads received yet.</EmptyState>
+        ) : (
+          <div className="space-y-2">
+            {[...submissionBatches.entries()].map(([batchKey, rows]) => {
+              const first = rows[0];
+              const allTallyDone = rows.every((r) => r.tally_status === "done");
+              const totalRows = rows.reduce((sum, r) => sum + Number(r.row_count), 0);
+              return (
+                <div key={batchKey} className="rounded-md border border-neutral-200 p-3 text-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="font-semibold text-neutral-900">
+                        {senseiNameById.get(first.sensei_id as string) ?? "—"}
+                        <span className="font-normal text-neutral-400"> · {schoolNameById.get(first.school_id as string) ?? "—"}</span>
+                      </p>
+                      <p className="text-xs text-neutral-400">
+                        {totalRows} participant{totalRows === 1 ? "" : "s"} across {rows.length} upload{rows.length === 1 ? "" : "s"} ·{" "}
+                        Batch {(batchKey as string).slice(0, 8).toUpperCase()}
+                      </p>
+                    </div>
+                    {allTallyDone ? (
+                      <span className={`${adminBtnSecondary} cursor-default hover:bg-white`}>
+                        ✓ Tally done
+                        {first.tally_done_at ? ` — ${formatDate((first.tally_done_at as string).slice(0, 10))}` : ""}
+                      </span>
+                    ) : (
+                      <form action={markBulkUploadTallyDone}>
+                        <input type="hidden" name="batch_id" value={batchKey} />
+                        <button type="submit" className={adminBtn}>Mark tally done</button>
+                      </form>
+                    )}
+                  </div>
+                  <ul className="mt-2 space-y-2 border-t border-neutral-100 pt-2">
+                    {rows.map((s) => {
+                      const csvRows = ((s.registration_ids as string[]) ?? []).map((rid) => {
+                        const reg = submissionRegById.get(rid) as
+                          | { participant: { full_name: string; ic_passport: string; email: string | null; phone: string | null } | null; category: { name: string } | null }
+                          | undefined;
+                        return {
+                          "Reference ID": rid.slice(0, 8).toUpperCase(),
+                          "Full Name": reg?.participant?.full_name ?? "",
+                          "IC / Passport": reg?.participant?.ic_passport ?? "",
+                          Email: reg?.participant?.email ?? "",
+                          Phone: reg?.participant?.phone ?? "",
+                          "Kata Category": reg?.category?.name ?? "",
+                        };
+                      });
+                      return (
+                        <li key={s.id as string} className="flex flex-wrap items-center justify-between gap-2 text-xs text-neutral-500">
+                          <span>
+                            {bulkCompetitionNameById.get(s.competition_id as string) ?? "—"} — {s.row_count} participant{s.row_count === 1 ? "" : "s"} ·{" "}
+                            Uploaded {formatDate((s.created_at as string).slice(0, 10))}
+                          </span>
+                          <span className="flex items-center gap-1.5">
+                            <DownloadCsvButton rows={csvRows} filename={`bulk-upload-${(s.id as string).slice(0, 8)}`} />
+                            {s.status === "confirmed" ? (
+                              <span className={`${adminBtnSecondary} cursor-default px-3 py-1 text-xs hover:bg-white`}>
+                                ✓ Confirmed
+                                {s.confirmed_at ? ` — ${formatDate((s.confirmed_at as string).slice(0, 10))}` : ""}
+                              </span>
+                            ) : (
+                              <form action={confirmBulkUploadSubmission}>
+                                <input type="hidden" name="id" value={s.id} />
+                                <button type="submit" className={`${adminBtn} px-3 py-1 text-xs`}>
+                                  Confirm upload CSV file
+                                </button>
+                              </form>
+                            )}
+                          </span>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               );
