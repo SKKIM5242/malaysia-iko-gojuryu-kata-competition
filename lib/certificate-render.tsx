@@ -343,7 +343,20 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
               )}
             </div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: "20px" }}>
+            // marginBottom matches the breathing room the winner row gets
+            // "for free" below its taller medal -- these certs have no
+            // medal, so the two same-height logos leave zero gap on their
+            // own before the title text starts right underneath.
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "20px",
+                marginBottom: "40px",
+              }}
+            >
               {logo && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={logo} width={GOLD_LOGO_SIZE} height={GOLD_LOGO_SIZE} style={{ objectFit: "contain" }} alt="" />
