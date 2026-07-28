@@ -6,6 +6,7 @@ import Link from "next/link";
 import { bulkRegister, type BulkRow, type BulkState } from "@/app/actions/bulk";
 import { formatUSD } from "@/components/ui";
 import { ageAt } from "@/lib/division";
+import { shortTierName } from "@/lib/invitation-codes";
 import DateOfBirthField from "@/components/DateOfBirthField";
 import type { Competition, School, Sensei } from "@/lib/types";
 
@@ -116,7 +117,7 @@ export default function BulkRegisterForm({
           >
             <option value="" disabled>Select the tier you paid for</option>
             {competitions.map((c) => (
-              <option key={c.id} value={c.id}>{c.name} — {formatUSD(c.registration_fee_usd)} per event</option>
+              <option key={c.id} value={c.id}>{shortTierName(c.name)} — {formatUSD(c.registration_fee_usd)} per event</option>
             ))}
           </select>
         </div>

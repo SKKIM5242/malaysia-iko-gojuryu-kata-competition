@@ -8,6 +8,7 @@ import {
   type CommunityState,
 } from "@/app/actions/community";
 import { TelegramJoinButton, formatUSD } from "@/components/ui";
+import { shortTierName } from "@/lib/invitation-codes";
 import CertificateUploadField from "@/components/CertificateUploadField";
 import IbanInput from "@/components/IbanInput";
 import IbanConfirmCheckbox from "@/components/IbanConfirmCheckbox";
@@ -456,7 +457,7 @@ export function StaffForm({
                   <option value="">— None —</option>
                   {competitions.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.name} ({formatUSD(c.registration_fee_usd)})
+                      {shortTierName(c.name)} ({formatUSD(c.registration_fee_usd)})
                     </option>
                   ))}
                 </select>

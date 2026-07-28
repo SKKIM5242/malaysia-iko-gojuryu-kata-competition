@@ -887,7 +887,7 @@ async function notifyAddedByAdmin(role: string, email: string | null, recipientN
       recipientName,
       subject: `You've been added as a ${roleLabel}`,
       bodyLines: [
-        `Hello! The organizer has added you to the Malaysia Open Virtual Karate-do Kata Championship as a ${roleLabel}.`,
+        `Hello! The organizer has added you to the Malaysia Open Virtual Karate-do Kata Competition as a ${roleLabel}.`,
         "Please join our Telegram group as soon as possible — that's where the organizer posts announcements and where you can reach the team.",
         "Once you've created your account and connected Telegram from your Account page, you'll typically receive a Telegram DM confirming your status within about an hour.",
       ],

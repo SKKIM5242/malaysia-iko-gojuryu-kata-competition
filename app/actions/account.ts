@@ -176,7 +176,7 @@ export async function requestExtraAttempts(
               unit_amount: EXTRA_ATTEMPTS_FEE_USD * 100,
               product_data: {
                 name: "3 more delete-and-re-record attempts",
-                description: "Malaysia Open Virtual Karate-do Kata Championship — Kata Arena recording",
+                description: "Malaysia Open Virtual Karate-do Kata Competition — Kata Arena recording",
               },
             },
             quantity: 1,

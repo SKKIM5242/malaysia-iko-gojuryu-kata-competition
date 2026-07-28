@@ -8,6 +8,7 @@ import { EmptyState, SetupNotice, formatDate } from "@/components/ui";
 import DownloadCsvButton from "@/components/DownloadCsvButton";
 import CsvUploadForm from "@/components/CsvUploadForm";
 import { Markdown } from "@/lib/markdown";
+import { shortTierName } from "@/lib/invitation-codes";
 
 export const dynamic = "force-dynamic";
 
@@ -72,7 +73,7 @@ export default async function AdminAnnouncements({
                 <select id="competition_id" name="competition_id" defaultValue={editing?.competition_id ?? ""} className={adminInput}>
                   <option value="">— General —</option>
                   {competitions.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
+                    <option key={c.id} value={c.id}>{shortTierName(c.name)}</option>
                   ))}
                 </select>
               </div>

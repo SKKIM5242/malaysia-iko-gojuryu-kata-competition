@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { updateSignInControl } from "@/app/actions/admin";
 import { adminInput, adminLabel, adminBtnSecondary } from "@/components/admin-styles";
+import { shortTierName } from "@/lib/invitation-codes";
 import type { Competition } from "@/lib/types";
 
 /** Admin/Organizer-only control over a registrant's sign-in quota — how
@@ -88,7 +89,7 @@ export default function SignInControlBox({
                 <select id={`sic-${userId}`} name="sign_in_competition_id" defaultValue={signInCompetitionId ?? ""} className={adminInput}>
                   <option value="">— None —</option>
                   {competitions.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
+                    <option key={c.id} value={c.id}>{shortTierName(c.name)}</option>
                   ))}
                 </select>
               </div>

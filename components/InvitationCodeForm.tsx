@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createInvitationCode, updateInvitationCode, generateSequentialInvitationCode } from "@/app/actions/admin";
 import { Card, adminBtn, adminBtnSecondary, adminInput, adminLabel } from "@/components/admin-styles";
+import { shortTierName } from "@/lib/invitation-codes";
 
 export const ROLE_LABELS: Record<string, string> = {
   school: "School / Dojo / Club",
@@ -128,7 +129,7 @@ export default function InvitationCodeForm({
             >
               <option value="" disabled>Select competition tier</option>
               {competitions.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
+                <option key={c.id} value={c.id}>{shortTierName(c.name)}</option>
               ))}
             </select>
           </div>

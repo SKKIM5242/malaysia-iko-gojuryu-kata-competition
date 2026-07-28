@@ -2,6 +2,7 @@
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import OptionPicker from "@/components/OptionPicker";
+import { shortTierName } from "@/lib/invitation-codes";
 
 /** Dropdown filters for the Kata Arena — Competition Tier, Kata, Belt
  * division, Age, and Sex/Mix section. Selections live in the URL query so
@@ -46,7 +47,7 @@ export default function ArenaFilterBar({
           <select value={params.get("tier") ?? ""} onChange={(e) => setParam("tier", e.target.value)} className={selectCls}>
             <option value="">All</option>
             {tiers.map((t) => (
-              <option key={t.id} value={t.id}>{t.name}</option>
+              <option key={t.id} value={t.id}>{shortTierName(t.name)}</option>
             ))}
           </select>
         </label>

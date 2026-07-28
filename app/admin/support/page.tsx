@@ -10,6 +10,7 @@ import { getAllTelegramLinks } from "@/lib/telegram";
 import { getOpenShift, getAllShifts } from "@/lib/support-shifts";
 import { AdminShell, Card, CertificateField, adminBtn, adminBtnSecondary, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice, formatUSD, formatDateTime } from "@/components/ui";
+import { shortTierName } from "@/lib/invitation-codes";
 import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
 import SignInControlBox from "@/components/SignInControlBox";
@@ -283,7 +284,7 @@ export default async function AdminSupport({
                         <option value="">— None —</option>
                         {competitions.map((c) => (
                           <option key={c.id} value={c.id}>
-                            {c.name} ({formatUSD(c.registration_fee_usd)})
+                            {shortTierName(c.name)} ({formatUSD(c.registration_fee_usd)})
                           </option>
                         ))}
                       </select>

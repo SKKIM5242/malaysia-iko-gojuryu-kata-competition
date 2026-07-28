@@ -26,6 +26,15 @@ export function tierToken(feeUsd: number): string {
   return `USD${Math.round(feeUsd)}`;
 }
 
+/** Shortens a competition's full event name down to just its tier — e.g.
+ * "Malaysia Open Virtual Karate-do Kata Competition 2026 — USD 100 Tier"
+ * becomes "Tier USD100" — used in every tier dropdown so options don't
+ * repeat the full event name three times over. */
+export function shortTierName(competitionName: string): string {
+  const m = competitionName.match(/USD\s*(\d+)/i);
+  return m ? `Tier USD${m[1]}` : competitionName;
+}
+
 /** Everything except the running number. */
 export function codePrefix(role: string, feeUsd: number): string {
   const roleToken = CODE_ROLE_TOKEN[role] ?? role.toUpperCase();

@@ -20,7 +20,7 @@ export default function LoginPage() {
           />
           <h1 className="mt-3 text-xl font-bold">Admin/Organizer Login</h1>
           <p className="mt-1 text-sm text-neutral-400">
-            Malaysia Open Karate-do Kata Competition - Goju-ryu or IKO Goju-ryu Version Only.
+            Malaysia Open Virtual Karate-do Kata Competition - Goju-ryu or IKO Goju-ryu Version Only.
             Specially for all Goju-ryu Karateka to compete globally without leaving their beloved
             Country.
           </p>

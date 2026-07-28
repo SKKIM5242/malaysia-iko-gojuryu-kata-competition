@@ -9,7 +9,7 @@ export default function TermsPage() {
       <main className="mx-auto max-w-3xl px-4 py-10">
         <h1 className="text-2xl font-bold tracking-tight">Kata Arena — Terms &amp; Conditions</h1>
         <p className="mt-1 text-sm text-neutral-500">
-          Malaysia Open IKO Goju-ryu Karate-do Kata Competition — organised by IKO GOJU-RYU
+          Malaysia Open Virtual Karate-do Kata Competition 2026 — organised by IKO GOJU-RYU
           KARATE-DO MALAYSIA SDN BHD.
         </p>
         <div className="mt-8 space-y-6 text-sm leading-relaxed text-neutral-700">

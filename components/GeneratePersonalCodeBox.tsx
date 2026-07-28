@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { generateRecordInvitationCode } from "@/app/actions/admin";
 import { adminInput, adminLabel, adminBtn } from "@/components/admin-styles";
+import { shortTierName } from "@/lib/invitation-codes";
 import type { Competition } from "@/lib/types";
 
 /** Generate/regenerate a single-use invitation code bound to one existing
@@ -58,7 +59,7 @@ export default function GeneratePersonalCodeBox({
                 <select id={`pic_competition_id_${recordId}`} name="pic_competition_id" required defaultValue="" className={adminInput}>
                   <option value="" disabled>Select competition tier</option>
                   {competitions.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
+                    <option key={c.id} value={c.id}>{shortTierName(c.name)}</option>
                   ))}
                 </select>
               </div>

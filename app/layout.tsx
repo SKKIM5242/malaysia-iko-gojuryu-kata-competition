@@ -8,13 +8,13 @@ import TelegramWebApp from "@/components/TelegramWebApp";
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
   title: {
-    default: "Malaysia Open Karate-do Kata Competition - Goju-ryu or IKO Goju-ryu Version Only",
-    template: "%s — Malaysia Open Karate-do Kata Competition - Goju-ryu or IKO Goju-ryu Version Only",
+    default: "Malaysia Open Virtual Karate-do Kata Competition - Goju-ryu or IKO Goju-ryu Version Only",
+    template: "%s — Malaysia Open Virtual Karate-do Kata Competition - Goju-ryu or IKO Goju-ryu Version Only",
   },
   description:
-    "Malaysia Open Karate-do Kata Competition - Goju-ryu or IKO Goju-ryu Version Only. Specially for all Goju-ryu Karateka to compete globally without leaving their beloved Country. Organizer: IKO GOJU-RYU KARATE-DO MALAYSIA SDN BHD.",
+    "Malaysia Open Virtual Karate-do Kata Competition - Goju-ryu or IKO Goju-ryu Version Only. Specially for all Goju-ryu Karateka to compete globally without leaving their beloved Country. Organizer: IKO GOJU-RYU KARATE-DO MALAYSIA SDN BHD.",
   openGraph: {
-    title: "Malaysia Open Karate-do Kata Competition - Goju-ryu or IKO Goju-ryu Version Only",
+    title: "Malaysia Open Virtual Karate-do Kata Competition - Goju-ryu or IKO Goju-ryu Version Only",
     description:
       "Specially for all Goju-ryu Karateka to compete globally without leaving their beloved Country. Organizer: IKO GOJU-RYU KARATE-DO MALAYSIA SDN BHD.",
     type: "website",

@@ -73,7 +73,7 @@ export function SiteHeader() {
             className="h-7 w-7 rounded-lg bg-white p-0.5 sm:h-11 sm:w-11 [@media(max-height:500px)_and_(orientation:landscape)]:h-6 [@media(max-height:500px)_and_(orientation:landscape)]:w-6"
           />
           <span className="leading-none sm:leading-tight">
-            <span className="block text-[10.5px] font-bold tracking-wide sm:text-sm">MALAYSIA OPEN KARATE-DO KATA COMPETITION</span>
+            <span className="block text-[10.5px] font-bold tracking-wide sm:text-sm">MALAYSIA OPEN VIRTUAL KARATE-DO KATA COMPETITION</span>
             <span className="block text-[10.5px] font-bold tracking-wide sm:text-sm [@media(max-height:500px)_and_(orientation:landscape)]:hidden">
               Goju-ryu or IKO Goju-ryu Version Only &amp; Open Version for Kobudo (Weapon) Kata
             </span>

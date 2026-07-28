@@ -4,6 +4,7 @@ import { useActionState, useEffect } from "react";
 import Link from "next/link";
 import { registerSchool, registerSensei, type DirectoryState } from "@/app/actions/directory";
 import { TelegramJoinButton } from "@/components/ui";
+import { shortTierName } from "@/lib/invitation-codes";
 import CertificateUploadField from "@/components/CertificateUploadField";
 import { NoCommaTextarea } from "@/components/NoCommaAddressField";
 import type { School } from "@/lib/types";
@@ -37,7 +38,7 @@ function TierSelect({ tiers, idPrefix }: { tiers: TierOption[]; idPrefix: string
         <option value="" disabled>Select tier</option>
         {tiers.map((t) => (
           <option key={t.id} value={t.id}>
-            {t.name} — USD {t.fee.toFixed(0)}
+            {shortTierName(t.name)}
           </option>
         ))}
       </select>

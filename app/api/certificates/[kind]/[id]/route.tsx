@@ -19,34 +19,34 @@ const SAMPLE_DATA: Record<
 > = {
   winner: {
     kind: "winner", recipientName: "Jane Doe",
-    competitionName: "Malaysia Open Virtual Karate-do Kata Championship 2026 — USD 100 Tier",
+    competitionName: "Malaysia Open Virtual Karate-do Kata Competition 2026 — USD 100 Tier",
     categoryName: "Color/Kyu Belt — Age 15–40 — Male", kataName: "Kata Saifa", rank: 1,
     dateLabel: "12/09/2026",
   },
   participant: {
     kind: "participant", recipientName: "John Tan",
-    competitionName: "Malaysia Open Virtual Karate-do Kata Championship 2026 — USD 10 Tier",
+    competitionName: "Malaysia Open Virtual Karate-do Kata Competition 2026 — USD 10 Tier",
     categoryName: "Color/Kyu Belt — Age 4–14 — Female", kataName: "Kata Gekisai Dai Ichi", rank: null,
     dateLabel: "12/09/2026",
   },
   referee: {
     kind: "referee", recipientName: "Ahmad Zulkifli",
-    competitionName: "Malaysia Open Virtual Karate-do Kata Championship 2026 — USD 10 Tier",
+    competitionName: "Malaysia Open Virtual Karate-do Kata Competition 2026 — USD 10 Tier",
     categoryName: null, kataName: null, rank: null, dateLabel: "12/09/2026",
   },
   sensei: {
     kind: "sensei", recipientName: "Sensei Lim Wei Chen",
-    competitionName: "Malaysia Open Virtual Karate-do Kata Championship 2026 — USD 10 Tier",
+    competitionName: "Malaysia Open Virtual Karate-do Kata Competition 2026 — USD 10 Tier",
     categoryName: null, kataName: null, rank: null, dateLabel: "12/09/2026",
   },
   school: {
     kind: "school", recipientName: "Goju-ryu Karate Academy KL",
-    competitionName: "Malaysia Open Virtual Karate-do Kata Championship 2026 — USD 10 Tier",
+    competitionName: "Malaysia Open Virtual Karate-do Kata Competition 2026 — USD 10 Tier",
     categoryName: null, kataName: null, rank: null, dateLabel: "12/09/2026",
   },
   support: {
     kind: "support", recipientName: "Nurul Huda",
-    competitionName: "Malaysia Open Virtual Karate-do Kata Championship 2026 — USD 10 Tier",
+    competitionName: "Malaysia Open Virtual Karate-do Kata Competition 2026 — USD 10 Tier",
     categoryName: null, kataName: null, rank: null, dateLabel: "12/09/2026",
   },
 };

@@ -10,6 +10,7 @@ import IbanConfirmCheckbox from "@/components/IbanConfirmCheckbox";
 import { NoCommaTextarea } from "@/components/NoCommaAddressField";
 import DateOfBirthField from "@/components/DateOfBirthField";
 import { ageAt, beltGroup, genderCode, kataBaseOf, kataBases as allKataBasesOf } from "@/lib/division";
+import { shortTierName } from "@/lib/invitation-codes";
 import type { Category, Competition, School, Sensei } from "@/lib/types";
 
 const initialState: RegisterState = { ok: false };
@@ -369,7 +370,7 @@ export default function RegisterForm({
                   </label>
                   <input
                     readOnly
-                    value={`${c.name} — ${formatUSD(c.registration_fee_usd)}/event`}
+                    value={`${shortTierName(c.name)} — ${formatUSD(c.registration_fee_usd)}/event`}
                     className="mb-3 w-full rounded-md border border-neutral-300 bg-neutral-100 px-2 py-1.5 text-xs text-neutral-600"
                   />
 

@@ -10,6 +10,7 @@ import {
 import { AdminShell, Card, adminBtn, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice, formatDate } from "@/components/ui";
 import { Markdown } from "@/lib/markdown";
+import { shortTierName } from "@/lib/invitation-codes";
 
 export const dynamic = "force-dynamic";
 
@@ -108,7 +109,7 @@ export default async function AdminContent({
                 >
                   <option value="">— General —</option>
                   {competitions.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
+                    <option key={c.id} value={c.id}>{shortTierName(c.name)}</option>
                   ))}
                 </select>
               </div>

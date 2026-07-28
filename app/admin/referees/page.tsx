@@ -8,6 +8,7 @@ import {
 } from "@/app/actions/admin";
 import { AdminShell, Card, CertificateField, adminBtn, adminBtnSecondary, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice, formatDOB } from "@/components/ui";
+import { shortTierName } from "@/lib/invitation-codes";
 import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
 import SignInControlBox from "@/components/SignInControlBox";
@@ -256,7 +257,7 @@ export default async function AdminReferees({
                     <select id="pic_competition_id" name="pic_competition_id" defaultValue="" className={adminInput}>
                       <option value="" disabled>Select competition tier</option>
                       {competitions.map((c) => (
-                        <option key={c.id} value={c.id}>{c.name}</option>
+                        <option key={c.id} value={c.id}>{shortTierName(c.name)}</option>
                       ))}
                     </select>
                   </div>

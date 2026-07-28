@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { bulkRegisterCsv, type CsvBulkState } from "@/app/actions/bulk";
 import { formatUSD } from "@/components/ui";
+import { shortTierName } from "@/lib/invitation-codes";
 import type { Competition, School, Sensei } from "@/lib/types";
 
 const initial: CsvBulkState = { done: false };
@@ -81,7 +82,7 @@ export default function CsvBulkForm({
           >
             <option value="" disabled>Select the tier you paid for</option>
             {competitions.map((c) => (
-              <option key={c.id} value={c.id}>{c.name} — {formatUSD(c.registration_fee_usd)} per event</option>
+              <option key={c.id} value={c.id}>{shortTierName(c.name)} — {formatUSD(c.registration_fee_usd)} per event</option>
             ))}
           </select>
         </div>

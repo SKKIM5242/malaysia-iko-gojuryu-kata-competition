@@ -54,7 +54,7 @@ async function sendAssignmentEmail(notice: AssignmentNotice): Promise<void> {
     `Hi ${notice.refereeName ?? "Judge"},\n\n` +
       `You've been assigned a new recording to score: ${notice.participantName} — ${notice.categoryName ?? "Kata"}.\n\n` +
       `Sign in to Kata Arena to watch and submit your score: ${appUrl()}/account\n\n` +
-      `— Malaysia Open Virtual Karate-do Kata Championship`,
+      `— Malaysia Open Virtual Karate-do Kata Competition`,
   );
 }
 
@@ -96,7 +96,7 @@ async function sendUnassignedEmail(notice: UnassignedNotice): Promise<void> {
       `You've been unassigned from judging: ${notice.participantName} — ${notice.categoryName ?? "Kata"}.` +
       (notice.reason ? ` ${notice.reason}` : "") +
       `\n\nNo action is needed from you for this recording.\n\n` +
-      `— Malaysia Open Virtual Karate-do Kata Championship`,
+      `— Malaysia Open Virtual Karate-do Kata Competition`,
   );
 }
 
@@ -148,7 +148,7 @@ async function sendScoredEmail(notice: ScoredNotice): Promise<void> {
     `Hi ${notice.participantName},\n\n` +
       `All assigned judges have now scored your recording${notice.categoryName ? ` — ${notice.categoryName}` : ""}.\n\n` +
       `Results are revealed on the Winners page once the organizer announces them: ${appUrl()}/winners\n\n` +
-      `— Malaysia Open Virtual Karate-do Kata Championship`,
+      `— Malaysia Open Virtual Karate-do Kata Competition`,
   );
 }
 
@@ -218,7 +218,7 @@ function buildConfirmationBody(input: ConfirmationEmailInput, telegram: Telegram
   if (telegram.memberUrl) {
     lines.push(`Already in the group? Jump straight to Announcements: ${telegram.memberUrl}`);
   }
-  lines.push("", "— Malaysia Open Virtual Karate-do Kata Championship");
+  lines.push("", "— Malaysia Open Virtual Karate-do Kata Competition");
   return lines.join("\n");
 }
 
@@ -295,13 +295,13 @@ export async function sendConfirmationEmailBatch(inputs: ConfirmationEmailInput[
 export async function sendVerificationEmail(toEmail: string, verifyUrl: string): Promise<void> {
   await sendEmail(
     toEmail,
-    "Please verify your email — Malaysia Open Virtual Karate-do Kata Championship",
+    "Please verify your email — Malaysia Open Virtual Karate-do Kata Competition",
     `Thanks for creating an account.\n\n` +
       `Please confirm this is really your email address by clicking the link below. Until you ` +
       `do, you won't be able to sign in.\n\n` +
       `Verify my email: ${verifyUrl}\n\n` +
       `If you didn't create this account, you can ignore this email.\n\n` +
-      `— Malaysia Open Virtual Karate-do Kata Championship`,
+      `— Malaysia Open Virtual Karate-do Kata Competition`,
   );
 }
 
@@ -409,7 +409,7 @@ async function sendCertificatesAvailableEmailBatch(
       text:
         `Hi ${r.name},\n\n` +
         `Certificates for ${competitionName} are now available. Sign in to view and download yours: ${appUrl()}/account\n\n` +
-        `— Malaysia Open Virtual Karate-do Kata Championship`,
+        `— Malaysia Open Virtual Karate-do Kata Competition`,
     }));
   if (emails.length === 0) return;
 
@@ -496,7 +496,7 @@ async function sendStatusChangeEmail(notice: StatusChangeNotice): Promise<void> 
       `Championship has been updated to: ${notice.valueLabel}.\n\n` +
       `Sign in to your account for details: ${appUrl()}/account\n\n` +
       telegramGroupsBlock(notice.telegramGroups) +
-      `— Malaysia Open Virtual Karate-do Kata Championship`,
+      `— Malaysia Open Virtual Karate-do Kata Competition`,
   );
 }
 
@@ -585,7 +585,7 @@ export async function notifyInvitationCodeIssued(input: {
   const lines = [
     `Hi,`,
     "",
-    `You've been assigned the role of ${roleLabel} for the Malaysia Open Virtual Karate-do Kata Championship.`,
+    `You've been assigned the role of ${roleLabel} for the Malaysia Open Virtual Karate-do Kata Competition.`,
     "",
     `Your invitation code: ${input.code}`,
     "",
@@ -600,6 +600,6 @@ export async function notifyInvitationCodeIssued(input: {
       "Please join it too — that's where the organizer posts announcements and where you'll be notified going forward.",
     );
   }
-  lines.push("", "— Malaysia Open Virtual Karate-do Kata Championship");
+  lines.push("", "— Malaysia Open Virtual Karate-do Kata Competition");
   await sendEmail(input.email, `You've been invited as ${roleLabel}`, lines.join("\n"));
 }
