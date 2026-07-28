@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { writeAudit } from "@/lib/audit";
-import { notifyRefereeAssignment, notifyRefereeUnassigned, notifyWinnersAnnounced, notifyCertificatesPublished } from "@/lib/notify";
+import {
+  notifyRefereeAssignment, notifyRefereeUnassigned, notifyWinnersAnnounced, notifyCertificatesPublished,
+  notifyParticipantTelegramWelcome,
+} from "@/lib/notify";
 import { winnersRevealed } from "@/lib/winners";
 
 export const dynamic = "force-dynamic";
@@ -278,6 +281,46 @@ async function handle(request: Request) {
     }
   }
 
+  // Telegram welcome DM — same-day best-effort: any paid registration at
+  // least 1 hour old whose participant has since connected Telegram (email
+  // match, same rule as everywhere else in this app) gets a one-time
+  // confirmation DM. Runs once a day alongside everything else above, so
+  // this can land anywhere from ~1 hour up to ~24 hours after registration
+  // depending on when they signed up relative to this run.
+  const telegramWelcomeNotices: Array<Record<string, unknown>> = [];
+  const oneHourAgo = new Date(now - 60 * 60 * 1000).toISOString();
+  const { data: dueRegistrations } = await admin
+    .from("registrations")
+    .select("id, participant:participants(full_name, email)")
+    .eq("payment_status", "paid")
+    .is("telegram_welcome_sent_at", null)
+    .lte("created_at", oneHourAgo);
+  const dueList =
+    (dueRegistrations as unknown as Array<{
+      id: string;
+      participant: { full_name: string; email: string | null } | null;
+    }>) ?? [];
+  const dueEmails = [
+    ...new Set(dueList.map((r) => r.participant?.email?.toLowerCase()).filter((e): e is string => !!e)),
+  ];
+  const { data: connectedProfiles } =
+    dueEmails.length > 0
+      ? await admin.from("profiles").select("email, telegram_chat_id").not("telegram_chat_id", "is", null)
+      : { data: [] };
+  const chatIdByEmail = new Map(
+    (connectedProfiles ?? [])
+      .filter((p) => p.email && dueEmails.includes((p.email as string).toLowerCase()))
+      .map((p) => [(p.email as string).toLowerCase(), p.telegram_chat_id as string]),
+  );
+  for (const reg of dueList) {
+    const email = reg.participant?.email?.toLowerCase();
+    const chatId = email ? chatIdByEmail.get(email) : undefined;
+    if (!chatId) continue;
+    await notifyParticipantTelegramWelcome(chatId, reg.participant?.full_name ?? "there");
+    await admin.from("registrations").update({ telegram_welcome_sent_at: new Date().toISOString() }).eq("id", reg.id);
+    telegramWelcomeNotices.push({ registration_id: reg.id });
+  }
+
   return NextResponse.json({
     ok: true,
     changed: report.length + slotReport.length,
@@ -285,5 +328,6 @@ async function handle(request: Request) {
     slotReport,
     winnerNotices,
     certificateNotices,
+    telegramWelcomeNotices,
   });
 }

@@ -743,6 +743,22 @@ export async function notifySenseiBulkPaymentConfirmed(input: {
   ]);
 }
 
+/** Fires from the daily cron (app/api/cron/judging-timeline) for any paid
+ * registration at least 1 hour old whose participant has since connected
+ * Telegram (matched by email, same as everywhere else in this app) —
+ * confirms their registration landed and that Telegram is the right place
+ * to watch for updates. Same-day best-effort timing: the cron runs once a
+ * day, so this can land anywhere from ~1 hour up to ~24 hours after
+ * registration depending on when they signed up relative to the run. */
+export async function notifyParticipantTelegramWelcome(chatId: string, participantName: string): Promise<void> {
+  await sendDirectTelegramDM(
+    chatId,
+    `🥋 Hi ${participantName}, thanks for registering for the Malaysia Open Virtual Karate-do Kata Competition! ` +
+      `Glad you're connected here — this is where you'll hear about judging and results. ` +
+      `Sign in any time to record your kata: ${appUrl()}/account`,
+  );
+}
+
 /** Fires when Admin/Organizer clicks "Confirm upload CSV file" on a bulk
  * upload submission (see confirmBulkUploadSubmission in
  * app/actions/admin.ts) — separate from the payment confirmation notice,
