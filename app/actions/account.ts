@@ -362,14 +362,15 @@ export async function submitScore(formData: FormData) {
     revalidatePath("/account");
     return;
   }
-  const { data: myProfile } = await supabase.from("profiles").select("role").eq("user_id", user.id).maybeSingle();
-  if (myProfile?.role && ["admin", "organizer", "staff"].includes(myProfile.role)) {
-    // Admin/Organizer full-access override: they may score any recording,
-    // not just ones formally assigned to them — self-assign first so they
-    // show up correctly everywhere assignment drives display (Judging
-    // Arena, Kata Arena's per-judge chips), same as a regular referee.
-    await supabase.rpc("assign_referee", { p_video: videoId, p_referee: user.id });
-  }
+  // Admin/Organizer/Staff full-access override: they may score any
+  // recording, not just ones formally assigned to them. This intentionally
+  // does NOT self-assign into referee_assignments — an override isn't a
+  // judge slot, and doing so was silently pushing recordings past their
+  // "Judges per recording" target. The RLS policy scores_manager_upsert
+  // already allows this upsert for admin/organizer/staff without requiring
+  // a referee_assignments row; the Judging page and Full View read
+  // overrides straight from video_scores instead (see overrideByVideo in
+  // app/admin/judging/page.tsx).
   const disqualification_reason = score === 0 ? reason : null;
   const { error } = await supabase
     .from("video_scores")

@@ -2252,7 +2252,7 @@ export async function assignRefereeToVideo(formData: FormData) {
   const { supabase, actorId } = await getActor();
   await requireJudgingManager(supabase, actorId, returnTo);
   const { error } = await supabase.rpc("assign_referee", { p_video: videoId, p_referee: refereeUserId });
-  if (error) backTo(returnTo, { error: "Could not assign referee." });
+  if (error) backTo(returnTo, { error: error.message || "Could not assign referee." });
   await writeAudit(supabase, {
     table_name: "referee_assignments", record_id: videoId,
     action: "referee_assigned", new_value: { referee_user_id: refereeUserId }, actor_id: actorId,

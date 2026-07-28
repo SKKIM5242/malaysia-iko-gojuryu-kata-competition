@@ -88,7 +88,7 @@ export default async function Home() {
                       <p className="text-xs font-semibold uppercase tracking-widest text-red-500">
                         {open ? "Registration open" : "Closed"}
                       </p>
-                      <h2 className="mt-2 text-xl font-bold tracking-tight">{competition.name}</h2>
+                      <h2 className="mt-2 min-h-[9rem] text-xl font-bold tracking-tight">{competition.name}</h2>
                       <p className="mt-2 text-2xl font-bold text-red-400">
                         {formatUSD(competition.registration_fee_usd)}
                       </p>

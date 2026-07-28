@@ -149,6 +149,23 @@ export default async function AdminJudging({
     reasonByKey.set(`${s.video_id}:${s.referee_user_id}`, (s.disqualification_reason as string | null) ?? null);
   }
 
+  // An Admin/Organizer/Staff "take over or override score" no longer
+  // self-assigns as a judge (see submitScore) — it's just a video_scores
+  // row from a staff-role user with no matching referee_assignments row.
+  // Tracked separately here so it still counts toward the average and
+  // disqualification, but is never confused with — or counted toward the
+  // cap of — a genuine judge assignment.
+  const overrideByVideo = new Map<string, string[]>();
+  for (const s of scores ?? []) {
+    const uid = s.referee_user_id as string;
+    if (!staffName.has(uid)) continue;
+    const assignedList = assignedByVideo.get(s.video_id as string) ?? [];
+    if (assignedList.includes(uid)) continue;
+    const list = overrideByVideo.get(s.video_id as string) ?? [];
+    list.push(uid);
+    overrideByVideo.set(s.video_id as string, list);
+  }
+
   // Signed playback URLs (1hr) for the private kata-videos bucket.
   const playbackUrls = new Map<string, string>();
   await Promise.all(
@@ -169,9 +186,12 @@ export default async function AdminJudging({
 
   function renderVideoCard(v: VideoRow, queuePosition: number | null, dq: boolean, judgesRequired: number) {
     const assigned = assignedByVideo.get(v.id) ?? [];
+    const overrides = overrideByVideo.get(v.id) ?? [];
+    const allScorers = [...assigned, ...overrides];
     const available = refereeList.filter((r) => !assigned.includes(r.user_id));
     const myScore = user ? scoreByKey.get(`${v.id}:${user.id}`) : undefined;
-    const submittedScores = assigned
+    const myReason = user ? reasonByKey.get(`${v.id}:${user.id}`) ?? null : null;
+    const submittedScores = allScorers
       .map((uid) => scoreByKey.get(`${v.id}:${uid}`))
       .filter((s): s is number => s != null);
     const final = finalScore(submittedScores);
@@ -199,7 +219,7 @@ export default async function AdminJudging({
               participantName={v.participant?.full_name ?? "Unknown participant"}
               categoryName={v.registration?.category?.name ?? null}
               competitionName={competitions.find((c) => c.id === v.registration?.competition_id)?.name ?? null}
-              judges={assigned.map((uid) => ({
+              judges={allScorers.map((uid) => ({
                 judgeName: staffName.get(uid) ?? refereeName.get(uid) ?? uid.slice(0, 8),
                 country: refereeCountry.get(uid) ?? null,
                 total: scoreByKey.get(`${v.id}:${uid}`) ?? null,
@@ -211,7 +231,7 @@ export default async function AdminJudging({
               queuePosition={queuePosition}
               averageText={
                 final != null
-                  ? `Average ${final.toFixed(1)} (${submittedScores.length}/${assigned.length} scored${trimmed ? ", high/low dropped" : ""})`
+                  ? `Average ${final.toFixed(1)} (${submittedScores.length}/${allScorers.length} scored${trimmed ? ", high/low dropped" : ""})`
                   : null
               }
               disqualified={dq}
@@ -300,9 +320,39 @@ export default async function AdminJudging({
               );
             })
           )}
+          {overrides.map((uid) => {
+            const score = scoreByKey.get(`${v.id}:${uid}`);
+            const reason = reasonByKey.get(`${v.id}:${uid}`);
+            const judgeName = staffName.get(uid) ?? uid.slice(0, 8);
+            return (
+              <span
+                key={uid}
+                className="flex items-center gap-1.5 rounded-full border border-purple-300 bg-purple-50 px-2.5 py-1 text-xs font-semibold text-purple-800"
+                title="Admin/Organizer/Staff override — not counted toward Judges per recording"
+              >
+                Override — {judgeName}
+                {score != null ? (
+                  canScoreAnyVideo ? (
+                    <ScoreDetailButton
+                      judgeName={judgeName}
+                      total={score}
+                      criteria={criteriaByKey.get(`${v.id}:${uid}`) ?? null}
+                      reason={reason ?? null}
+                    />
+                  ) : (
+                    <span className={score === 0 ? "font-bold text-red-700" : "text-purple-700"}>
+                      Total {score.toFixed(1)}
+                    </span>
+                  )
+                ) : (
+                  <span className="text-amber-600">pending</span>
+                )}
+              </span>
+            );
+          })}
           {final != null && (
             <span className="rounded-full bg-neutral-900 px-2.5 py-1 text-xs font-semibold text-white">
-              Average {final.toFixed(1)} ({submittedScores.length}/{assigned.length} scored
+              Average {final.toFixed(1)} ({submittedScores.length}/{allScorers.length} scored
               {trimmed ? ", high/low dropped" : ""})
             </span>
           )}
@@ -355,7 +405,9 @@ export default async function AdminJudging({
           </div>
         )}
 
-        {canScoreAnyVideo && <QuickScoreForm videoId={v.id} existingScore={myScore ?? null} />}
+        {canScoreAnyVideo && (
+          <QuickScoreForm videoId={v.id} existingScore={myScore ?? null} existingReason={myReason} />
+        )}
       </Card>
     );
   }
@@ -504,10 +556,10 @@ export default async function AdminJudging({
             rowKey="id"
             downloadName="auto-assign-criteria"
             columns={[
-              { key: "position", label: "No." },
-              { key: "title", label: "Title" },
+              { key: "position", label: "No.", width: 50 },
+              { key: "title", label: "Title", width: 180, wrap: true },
               { key: "description", label: "Description", width: 480, wrap: true },
-              { key: "actions", label: "Actions" },
+              { key: "actions", label: "Actions", width: 160 },
             ]}
             rows={criteriaRows.map((c) => ({
               id: c.id,

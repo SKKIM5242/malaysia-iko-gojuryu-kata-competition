@@ -3,23 +3,30 @@
 import { useState } from "react";
 import { submitScore } from "@/app/actions/account";
 import ReasonPicker from "@/components/ReasonPicker";
-import { OTHER_DISQUALIFICATION_REASON } from "@/lib/scoring-rubric";
+import { DISQUALIFICATION_REASONS, OTHER_DISQUALIFICATION_REASON } from "@/lib/scoring-rubric";
 
 /** The plain single-number "Admin/Organizer override" score field on the
  * Judging page (no rubric sheet, just a Total Score straight in) — same
  * "0 requires a reason" rule as Score Sheet 1/2 in RefereeScoring.tsx, so
  * an override score of 0 can't be submitted without picking a reason
- * (dropdown) or typing one ("Others"). */
+ * (dropdown) or typing one ("Others"). `existingReason` re-hydrates a
+ * previously-submitted reason after reload — without it the picker looked
+ * blank even though a reason had already been saved. */
 export default function QuickScoreForm({
   videoId,
   existingScore,
+  existingReason,
 }: {
   videoId: string;
   existingScore: number | null;
+  existingReason?: string | null;
 }) {
+  const isKnownReason = !!existingReason && DISQUALIFICATION_REASONS.includes(existingReason);
   const [score, setScore] = useState(existingScore != null ? String(existingScore) : "");
-  const [reason, setReason] = useState("");
-  const [customReason, setCustomReason] = useState("");
+  const [reason, setReason] = useState(
+    !existingReason ? "" : isKnownReason ? existingReason : OTHER_DISQUALIFICATION_REASON,
+  );
+  const [customReason, setCustomReason] = useState(existingReason && !isKnownReason ? existingReason : "");
   const finalReason = (reason === OTHER_DISQUALIFICATION_REASON ? customReason : reason).trim();
   const numericScore = score === "" ? null : Math.round(Number(score) * 10) / 10;
   const isZero = numericScore === 0;
