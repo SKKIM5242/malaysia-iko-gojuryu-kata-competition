@@ -252,12 +252,13 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
   const logo = logoDataUri();
   const logo2 = logo2DataUri();
   const GOLD_LOGO_SIZE = 420;
-  // Second (right-hand) crest reads ~25% bigger than the primary one.
-  const LOGO2_SIZE = Math.round(GOLD_LOGO_SIZE * 1.25);
-  // Width of the whole medal image (ribbon + disc together); the disc
-  // itself is about 62% of that, so this reads at roughly the same disc
-  // diameter as the logo crest beside it.
-  const MEDAL_WIDTH = 530;
+  // Logo 2's own asset is now cropped just as tightly as Logo 1's (see
+  // "IKO International Logo.png"), so equal boxes now read as equal sizes
+  // — the old 1.25x bump was compensating for that asset's excess padding.
+  const LOGO2_SIZE = GOLD_LOGO_SIZE;
+  // Width of the whole medal image (ribbon + disc together) -- 20% bigger
+  // than its original 530px per the organizer's request.
+  const MEDAL_WIDTH = Math.round(530 * 1.2);
 
   return new ImageResponse(
     (
@@ -284,7 +285,11 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
             alignItems: "center",
             border: `14px solid ${accent}`,
             borderRadius: "18px",
-            padding: "60px 90px",
+            // Top padding trimmed (was 60px, matching the sides) to make
+            // room for the 20%-bigger medal without growing the card or
+            // touching anything below the logo row -- bottom stays 60px so
+            // the footer's own spacing is untouched.
+            padding: "20px 90px 60px",
             backgroundColor: "#ffffff",
             position: "relative",
           }}
@@ -303,7 +308,7 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
           />
 
           {isWinner ? (
-            <div style={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: "22px" }}>
+            <div style={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: "18px" }}>
               {logo && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={logo} width={GOLD_LOGO_SIZE} height={GOLD_LOGO_SIZE} style={{ objectFit: "contain" }} alt="" />
@@ -315,7 +320,7 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
               )}
             </div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: "56px" }}>
+            <div style={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: "20px" }}>
               {logo && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={logo} width={GOLD_LOGO_SIZE} height={GOLD_LOGO_SIZE} style={{ objectFit: "contain" }} alt="" />
@@ -329,7 +334,7 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
 
           <div
             style={{
-              marginTop: "6px",
+              marginTop: "0px",
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
