@@ -64,17 +64,17 @@ export function SetupNotice() {
 export function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-neutral-200 bg-neutral-950 text-white">
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-1.5 px-4 py-2 sm:gap-3 sm:py-4">
-        <Link href="/" className="flex items-center gap-1.5 sm:gap-3">
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-1.5 px-4 py-2 sm:gap-3 sm:py-4 [@media(max-height:500px)_and_(orientation:landscape)]:gap-1 [@media(max-height:500px)_and_(orientation:landscape)]:py-1">
+        <Link href="/" className="flex items-center gap-1.5 sm:gap-3 [@media(max-height:500px)_and_(orientation:landscape)]:gap-1">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/logo.jpg"
             alt="Malaysia IKO Goju-ryu Karate-do crest"
-            className="h-7 w-7 rounded-lg bg-white p-0.5 sm:h-11 sm:w-11"
+            className="h-7 w-7 rounded-lg bg-white p-0.5 sm:h-11 sm:w-11 [@media(max-height:500px)_and_(orientation:landscape)]:h-6 [@media(max-height:500px)_and_(orientation:landscape)]:w-6"
           />
           <span className="leading-none sm:leading-tight">
             <span className="block text-[10.5px] font-bold tracking-wide sm:text-sm">MALAYSIA OPEN KARATE-DO KATA COMPETITION</span>
-            <span className="block text-[10.5px] font-bold tracking-wide sm:text-sm">
+            <span className="block text-[10.5px] font-bold tracking-wide sm:text-sm [@media(max-height:500px)_and_(orientation:landscape)]:hidden">
               Goju-ryu or IKO Goju-ryu Version Only &amp; Open Version for Kobudo (Weapon) Kata
             </span>
           </span>
@@ -112,15 +112,15 @@ export function SiteFooter() {
           whole footer to the bottom of the viewport, so it stays visible
           while scrolling a long page, mirroring the sticky SiteHeader at
           the top. */}
-      <div aria-hidden className="h-28 sm:h-24" />
+      <div aria-hidden className="h-28 sm:h-24 [@media(max-height:500px)_and_(orientation:landscape)]:h-20" />
       <div data-mobile-footer className="fixed inset-x-0 bottom-0 z-40 border-t border-neutral-800 bg-neutral-950 text-white">
-        <div className="mx-auto max-w-6xl px-4 py-2 text-center text-xs sm:text-sm">
-          <p className="font-bold">
+        <div className="mx-auto max-w-6xl px-4 py-2 text-center text-xs sm:text-sm [@media(max-height:500px)_and_(orientation:landscape)]:px-3 [@media(max-height:500px)_and_(orientation:landscape)]:py-1">
+          <p className="font-bold [@media(max-height:500px)_and_(orientation:landscape)]:text-[10px]">
             Specially for all Goju-ryu Karateka to compete globally without leaving their beloved
             Country.
           </p>
-          <p className="font-bold">Record your Kata live to compete online.</p>
-          <p className="mt-1 text-[10px] leading-tight text-neutral-300 sm:text-xs">
+          <p className="font-bold [@media(max-height:500px)_and_(orientation:landscape)]:text-[10px]">Record your Kata live to compete online.</p>
+          <p className="mt-1 text-[10px] leading-tight text-neutral-300 sm:text-xs [@media(max-height:500px)_and_(orientation:landscape)]:mt-0.5 [@media(max-height:500px)_and_(orientation:landscape)]:text-[9px]">
             Organizer:{" "}
             <a
               href="https://www.mixo.io/site/iko-goju-ryu-karate-do-m-sdn-bhd-wt9nk"
@@ -134,7 +134,7 @@ export function SiteFooter() {
           </p>
           <Link
             href="/register"
-            className="mt-1.5 inline-block rounded-md bg-red-700 px-5 py-1.5 font-semibold text-white hover:bg-red-600"
+            className="mt-1.5 inline-block rounded-md bg-red-700 px-5 py-1.5 font-semibold text-white hover:bg-red-600 [@media(max-height:500px)_and_(orientation:landscape)]:mt-1 [@media(max-height:500px)_and_(orientation:landscape)]:px-4 [@media(max-height:500px)_and_(orientation:landscape)]:py-1 [@media(max-height:500px)_and_(orientation:landscape)]:text-xs"
           >
             Self Registration
           </Link>
