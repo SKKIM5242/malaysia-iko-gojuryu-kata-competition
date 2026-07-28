@@ -9,6 +9,13 @@ import type { Competition } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
+// Forces the Template Preview thumbnails onto a brand-new URL on every
+// deploy, so a browser that cached an old design under next/og's original
+// (since-overridden) 1-year Cache-Control can never keep serving it — a
+// same-URL "no-store" header only stops *future* staleness, it can't
+// invalidate a copy a browser already saved before that header existed.
+const CERT_CACHE_BUST = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 8) ?? "dev";
+
 const CERT_KINDS: Array<{ key: string; kind: string; label: string; note: string; query?: string }> = [
   { key: "winner-1", kind: "winner", label: "Winner — 1st Place", note: "Gold accent + gold medal.", query: "?rank=1" },
   { key: "winner-2", kind: "winner", label: "Winner — 2nd Place", note: "Silver accent + silver medal.", query: "?rank=2" },
@@ -248,7 +255,7 @@ export default async function AdminCertificates({
                 <p className="mb-2 text-xs text-neutral-400">{c.note}</p>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={`/api/certificates/${c.kind}/sample${c.query ?? ""}`}
+                  src={`/api/certificates/${c.kind}/sample${c.query ?? ""}${c.query ? "&" : "?"}v=${CERT_CACHE_BUST}`}
                   alt={`${c.label} certificate sample`}
                   className="w-full rounded border border-neutral-100"
                 />
