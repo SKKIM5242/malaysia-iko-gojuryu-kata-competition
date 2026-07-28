@@ -1755,6 +1755,53 @@ export async function deleteAccessMatrixRow(formData: FormData) {
   backTo(returnTo, { ok: "Access Matrix row deleted." });
 }
 
+/** Sign-in Access Matrix (Editable) — each role's default sign-in cap and
+ * whether it's tied to a competition tier's default valid window. Read by
+ * default_sign_in_limit_for_role / recompute_sign_in_quota, so an edit here
+ * actually changes future defaults (never retroactively touches an
+ * account whose sign_in_quota_auto is already false — see
+ * recompute_sign_in_quota in migration 0089). Shown editable on
+ * /admin/content, and read-only for everyone on the Account page. */
+export async function saveSignInRoleDefault(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/content";
+  const { supabase, actorId } = await getActor();
+  await requireAccessTableEditor(supabase, actorId, returnTo);
+  const role = String(formData.get("role") ?? "").trim();
+  const limitRaw = String(formData.get("default_sign_in_limit") ?? "").trim();
+  const values = {
+    role,
+    default_sign_in_limit: limitRaw ? Number(limitRaw) : null,
+    tier_tied: formData.get("tier_tied") === "on",
+    notes: String(formData.get("notes") ?? "").trim() || null,
+    sort_order: Number(formData.get("sort_order") ?? 0) || 0,
+  };
+  if (!role) backTo(returnTo, { error: "Role is required." });
+  const { error } = id
+    ? await supabase.from("sign_in_role_defaults").update(values).eq("id", id)
+    : await supabase.from("sign_in_role_defaults").insert(values);
+  if (error) backTo(returnTo, { error: "Could not save the row — role names must be unique." });
+  await writeAudit(supabase, {
+    table_name: "sign_in_role_defaults", record_id: id || null,
+    action: id ? "sign_in_role_default_updated" : "sign_in_role_default_created",
+    new_value: values, actor_id: actorId,
+  });
+  backTo(returnTo, { ok: "Sign-in Access Matrix row saved." });
+}
+
+export async function deleteSignInRoleDefault(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/content";
+  const { supabase, actorId } = await getActor();
+  await requireAccessTableEditor(supabase, actorId, returnTo);
+  const { error } = await supabase.from("sign_in_role_defaults").delete().eq("id", id);
+  if (error) backTo(returnTo, { error: "Could not delete the row." });
+  await writeAudit(supabase, {
+    table_name: "sign_in_role_defaults", record_id: id, action: "sign_in_role_default_deleted", actor_id: actorId,
+  });
+  backTo(returnTo, { ok: "Row deleted — that role now falls back to the built-in 250 default." });
+}
+
 export async function saveAccessComparisonRow(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const returnTo = String(formData.get("return_to") ?? "") || "/admin/content";
@@ -3758,6 +3805,10 @@ export async function updateSignInControl(formData: FormData) {
     sign_in_competition_id: competitionId || null,
     sign_in_valid_from: validFrom || null,
     sign_in_valid_until: validUntil || null,
+    // A manual save here is a deliberate override — recompute_sign_in_quota
+    // (fired whenever a new role/tier link appears for this account) must
+    // never silently replace it with a system default afterward.
+    sign_in_quota_auto: false,
   };
   if (resetCount) update.sign_in_count = 0;
 

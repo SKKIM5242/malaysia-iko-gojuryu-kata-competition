@@ -286,7 +286,25 @@ export default async function KataArenaPage({
     );
   }
 
-  const quota = isWithinSignInQuota(profile);
+  let hasPendingRefereeWork = false;
+  if (profile.role === "referee") {
+    const { data: myAssignments } = await supabase
+      .from("referee_assignments")
+      .select("video_id")
+      .eq("referee_user_id", user.id);
+    const videoIds = (myAssignments ?? []).map((a) => a.video_id as string);
+    if (videoIds.length > 0) {
+      const { data: myScores } = await supabase
+        .from("video_scores")
+        .select("video_id")
+        .eq("referee_user_id", user.id)
+        .in("video_id", videoIds);
+      const scoredIds = new Set((myScores ?? []).map((s) => s.video_id as string));
+      hasPendingRefereeWork = videoIds.some((id) => !scoredIds.has(id));
+    }
+  }
+
+  const quota = isWithinSignInQuota(profile, hasPendingRefereeWork);
   if (!quota.ok) {
     return (
       <>

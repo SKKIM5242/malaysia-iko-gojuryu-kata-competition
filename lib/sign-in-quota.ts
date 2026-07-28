@@ -12,14 +12,24 @@ export interface SignInQuotaProfile {
  * just at sign-in time, since a session obtained before the quota ran out
  * would otherwise let someone straight past a check made only once at
  * sign-in. Admin/Organizer/Staff are never subject to a quota.
+ *
+ * `hasPendingRefereeWork` (a Referee/Judge with at least one unscored
+ * assignment) exempts them from the valid-until date check specifically —
+ * they're never signed out while a score is still owed, only the
+ * 30-minute inactivity timeout still applies. It does not exempt the
+ * sign-in count or the valid-from date.
  */
-export function isWithinSignInQuota(profile: SignInQuotaProfile): { ok: boolean; reason?: string } {
+export function isWithinSignInQuota(
+  profile: SignInQuotaProfile,
+  hasPendingRefereeWork = false,
+): { ok: boolean; reason?: string } {
   if (["admin", "organizer", "staff"].includes(profile.role)) return { ok: true };
   const today = new Date().toISOString().slice(0, 10);
   if (profile.sign_in_valid_from && today < profile.sign_in_valid_from) {
     return { ok: false, reason: "Your subscription is not active yet." };
   }
-  if (profile.sign_in_valid_until && today > profile.sign_in_valid_until) {
+  const pastValidUntil = profile.sign_in_valid_until != null && today > profile.sign_in_valid_until;
+  if (pastValidUntil && !(profile.role === "referee" && hasPendingRefereeWork)) {
     return { ok: false, reason: "Your subscription has expired." };
   }
   if (profile.sign_in_limit != null && profile.sign_in_count >= profile.sign_in_limit) {

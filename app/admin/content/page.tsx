@@ -6,6 +6,7 @@ import {
   saveAnnouncement, toggleAnnouncement, deleteAnnouncement, saveCompetition,
   seedAccessTables, saveAccessMatrixRow, deleteAccessMatrixRow,
   saveAccessComparisonRow, deleteAccessComparisonRow,
+  saveSignInRoleDefault, deleteSignInRoleDefault,
 } from "@/app/actions/admin";
 import { AdminShell, Card, adminBtn, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice, formatDate } from "@/components/ui";
@@ -52,12 +53,14 @@ export default async function AdminContent({
     );
   }
 
-  const [announcements, competitions, { data: matrixRows }, { data: comparisonRows }] = await Promise.all([
-    getAllAnnouncements(),
-    getAllCompetitions(),
-    supabase.from("access_matrix_rows").select("*").order("position"),
-    supabase.from("access_comparison_rows").select("*").order("position"),
-  ]);
+  const [announcements, competitions, { data: matrixRows }, { data: comparisonRows }, { data: signInDefaults }] =
+    await Promise.all([
+      getAllAnnouncements(),
+      getAllCompetitions(),
+      supabase.from("access_matrix_rows").select("*").order("position"),
+      supabase.from("access_comparison_rows").select("*").order("position"),
+      supabase.from("sign_in_role_defaults").select("*").order("sort_order"),
+    ]);
   const editing = params.edit ? announcements.find((a) => a.id === params.edit) : undefined;
 
   // Suggested access levels — the "drop-down choices" available in every
@@ -77,6 +80,7 @@ export default async function AdminContent({
   const MATRIX_TEMPLATE = "56px minmax(160px,1.4fr) minmax(90px,1fr) minmax(90px,1fr) minmax(120px,1fr) minmax(90px,1fr) minmax(160px,1.6fr) 128px";
   const COMPARISON_TEMPLATE =
     "56px minmax(170px,1.3fr) repeat(7, minmax(110px,1fr)) 128px";
+  const SIGNIN_TEMPLATE = "minmax(130px,1fr) minmax(140px,0.9fr) 100px minmax(160px,1.6fr) 130px";
   const gridHeaderCell = "px-2 py-1.5 text-[11px] font-bold uppercase tracking-wide text-neutral-500";
 
   return (
@@ -353,6 +357,98 @@ export default async function AdminContent({
           </div>
           {(matrixRows ?? []).length === 0 && (
             <EmptyState>Table is empty — the built-in defaults are shown until you import or add rows.</EmptyState>
+          )}
+        </div>
+      </details>
+
+      <details className="mt-6 rounded-lg border border-neutral-200 bg-white" open>
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3">
+          <div>
+            <h2 className="text-lg font-bold">Sign-in Access Matrix (Editable)</h2>
+            <p className="text-sm font-normal text-neutral-500">
+              Each role&apos;s default sign-in cap, and whether its valid window follows a
+              competition tier&apos;s default dates — read by every new account and by
+              recompute_sign_in_quota whenever a new role/tier link appears for it. Never touches
+              an account that already has a custom invitation-code value or a manual Sign-in
+              Control override. Shown read-only on the Account page for everyone.
+            </p>
+          </div>
+          <span className="shrink-0 rounded-md border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-500 hover:bg-neutral-50">
+            ✕ Close
+          </span>
+        </summary>
+        <div className="space-y-3 border-t border-neutral-100 p-4">
+          <div className="overflow-x-auto rounded-lg border border-neutral-200">
+            <div style={{ minWidth: 780 }}>
+              <div
+                className="grid items-center gap-2 border-b border-neutral-200 bg-neutral-50 px-3 py-2"
+                style={{ gridTemplateColumns: SIGNIN_TEMPLATE }}
+              >
+                <span className={gridHeaderCell}>Role</span>
+                <span className={gridHeaderCell}>Default sign-ins</span>
+                <span className={gridHeaderCell}>Tier-tied?</span>
+                <span className={gridHeaderCell}>Notes</span>
+                <span className={gridHeaderCell}>Actions</span>
+              </div>
+              <form
+                action={saveSignInRoleDefault}
+                className="grid items-center gap-2 border-b border-neutral-100 px-3 py-2"
+                style={{ gridTemplateColumns: SIGNIN_TEMPLATE }}
+              >
+                <input type="hidden" name="return_to" value={RETURN_TO} />
+                <input name="role" required placeholder="role_key *" className={cellInput} />
+                <input name="default_sign_in_limit" type="number" min="0" placeholder="blank = unlimited" className={cellInput} />
+                <label className="flex items-center justify-center gap-1 text-xs text-neutral-600">
+                  <input type="checkbox" name="tier_tied" className="h-3.5 w-3.5" /> Tier-tied
+                </label>
+                <input name="notes" placeholder="Note (optional)" className={cellInput} />
+                <button className="rounded-md bg-neutral-900 px-3 py-1 text-xs font-semibold text-white hover:bg-neutral-700">
+                  Add row
+                </button>
+              </form>
+              <div className="divide-y divide-neutral-100">
+                {(signInDefaults ?? []).map((r) => (
+                  <form
+                    key={r.id}
+                    action={saveSignInRoleDefault}
+                    className="grid items-center gap-2 px-3 py-2"
+                    style={{ gridTemplateColumns: SIGNIN_TEMPLATE }}
+                  >
+                    <input type="hidden" name="id" value={r.id} />
+                    <input type="hidden" name="return_to" value={RETURN_TO} />
+                    <input type="hidden" name="sort_order" value={r.sort_order} />
+                    <input name="role" required defaultValue={r.role} className={`${cellInput} font-semibold`} />
+                    <input
+                      name="default_sign_in_limit"
+                      type="number"
+                      min="0"
+                      defaultValue={r.default_sign_in_limit ?? ""}
+                      placeholder="blank = unlimited"
+                      className={cellInput}
+                    />
+                    <label className="flex items-center justify-center gap-1 text-xs text-neutral-600">
+                      <input type="checkbox" name="tier_tied" defaultChecked={r.tier_tied} className="h-3.5 w-3.5" /> Tier-tied
+                    </label>
+                    <input name="notes" defaultValue={r.notes ?? ""} placeholder="Note" className={cellInput} />
+                    <span className="flex gap-1.5">
+                      <button className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50">
+                        Save
+                      </button>
+                      <button
+                        formAction={deleteSignInRoleDefault}
+                        className="rounded border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"
+                        title="Deleting falls back to the built-in 250 default for this role"
+                      >
+                        Delete
+                      </button>
+                    </span>
+                  </form>
+                ))}
+              </div>
+            </div>
+          </div>
+          {(signInDefaults ?? []).length === 0 && (
+            <EmptyState>Table is empty — every role falls back to the built-in 250 default until you add rows.</EmptyState>
           )}
         </div>
       </details>

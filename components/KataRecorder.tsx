@@ -106,10 +106,17 @@ export default function KataRecorder({
   const attemptsLeft = Math.max(0, maxAttempts - attempts);
   const canReRecord = attemptsLeft > 0;
 
-  const totalDays = recordingStart && recordingEnd
-    ? daysBetween(new Date(recordingStart + "T00:00:00"), new Date(recordingEnd + "T00:00:00"))
-    : null;
-  const daysLeft = recordingEnd ? daysBetween(new Date(), new Date(recordingEnd + "T23:59:59")) : null;
+  // Both comparisons use the viewer's own browser clock — new Date() and
+  // the plain (no explicit offset) date-time strings below both resolve in
+  // whatever timezone this component is actually running in, so "today"
+  // and "the deadline" are always evaluated in the participant's own
+  // country's time frame, not the server's.
+  const now = new Date();
+  const windowOpensAt = recordingStart ? new Date(recordingStart + "T00:00:00") : null;
+  const windowClosesAt = recordingEnd ? new Date(recordingEnd + "T23:59:59") : null;
+  const notYetOpen = !!windowOpensAt && now < windowOpensAt;
+  const windowClosed = !!windowClosesAt && now > windowClosesAt;
+  const daysLeft = recordingEnd ? daysBetween(now, new Date(recordingEnd + "T23:59:59")) : null;
 
   useEffect(() => {
     return () => {
@@ -262,31 +269,84 @@ export default function KataRecorder({
     );
   }
 
+  if (notYetOpen || windowClosed) {
+    return (
+      <div className="rounded-lg border border-amber-300 bg-amber-50 p-8 text-center">
+        <p className="text-3xl">{notYetOpen ? "⏳" : "🔒"}</p>
+        <h2 className="mt-2 text-xl font-bold text-amber-900">
+          {notYetOpen ? "Recording hasn't opened yet" : "Recording window closed"}
+        </h2>
+        <p className="mt-2 text-sm text-amber-800">
+          {notYetOpen
+            ? `Recording opens on ${recordingStart ? formatDate(recordingStart) : "the event date"} for your competition tier — based on today's date where you are.`
+            : `The deadline (${recordingEnd ? formatDate(recordingEnd) : "the registration deadline"}) has passed for your competition tier, based on today's date where you are. No further recording or submission is possible for this tier.`}
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       {error && (
         <div className="rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>
       )}
 
-      <div className="rounded-md border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
-        You have <strong>{attemptsLeft}</strong> of {maxAttempts} delete-and-re-record chances left.
-        Recording is limited to <strong>5 minutes</strong>. No file upload or editing is allowed — only
-        this in-app camera recorder.
-        {(recordingStart || recordingEnd) && (
-          <p className="mt-1 text-[10px] text-neutral-400">
-            Recording started {recordingStart ? formatDate(recordingStart) : "—"} · ends{" "}
-            {recordingEnd ? formatDate(recordingEnd) : "—"}
-            {totalDays != null && ` · ${totalDays} day${totalDays === 1 ? "" : "s"} total`}
-            {daysLeft != null && (daysLeft >= 0
-              ? ` · ${daysLeft} day${daysLeft === 1 ? "" : "s"} left`
-              : " · recording window closed")}
-          </p>
-        )}
+      <div className="space-y-2 rounded-md border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
+        <p>
+          Please start your recording as soon as possible — don&apos;t wait until the last minute
+          (i.e. the deadline) to start recording.
+        </p>
+        <p>
+          After your recording, you may view it back. If you are satisfied with the performance,
+          then submit. If you are not satisfied, you may continue training, then come back to
+          delete the recording and record a new one to submit again. You can repeat this{" "}
+          <strong>3 times only</strong> — you have <strong>{attemptsLeft}</strong> of {maxAttempts}{" "}
+          delete-and-re-record chances left for this recording (the 4th recording is the final one
+          to submit — recommendation).
+        </p>
+        <p>
+          Even if you are still not satisfied with your submitted recording, you may purchase
+          another 3 more delete chances to redo your recording. This has no effect on scoring, no
+          matter how many delete chances you buy.
+        </p>
+        <p>
+          Recording is limited to <strong>5 minutes</strong> to perform{" "}
+          <strong>1 set of Kata only, from one angle</strong>. No file upload or editing is
+          allowed, and no recording on screen or screen recording is allowed — only the in-app
+          camera recorder, with the header on top and a watermark with the date and time of
+          recording at the footer.
+        </p>
+        <p>
+          Recording opens as per your competition tier&apos;s event start date, and closes on its
+          registration deadline
+          {recordingStart && recordingEnd && (
+            <>
+              {" "}
+              — for your tier: <strong>{formatDate(recordingStart)}</strong> to{" "}
+              <strong>{formatDate(recordingEnd)}</strong>
+              {daysLeft != null && daysLeft >= 0 && (
+                <>
+                  {" "}
+                  (<strong>
+                    {daysLeft} day{daysLeft === 1 ? "" : "s"} left
+                  </strong>{" "}
+                  to record and submit, based on today&apos;s date where you are)
+                </>
+              )}
+            </>
+          )}
+          .
+        </p>
         {attemptsLeft <= 0 && (
-          <div className="mt-2">
+          <div className="pt-1">
             <BuyExtraAttemptsButton hasPendingPurchase={hasPendingPurchase} />
           </div>
         )}
+        <p className="border-t border-neutral-200 pt-2 text-xs text-neutral-500">
+          <strong>Reminder:</strong> please do not leave your recording and submission to the last
+          minute — the system may be slow or unavailable if a large number of people rush to
+          record and submit at the same time. Thank you for your co-operation.
+        </p>
       </div>
 
       <div className="space-y-2 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">

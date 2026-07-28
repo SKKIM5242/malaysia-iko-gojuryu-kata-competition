@@ -337,6 +337,34 @@ export async function submitKataVideo(
   if (!profile?.registration_id) {
     return { ok: false, error: "Link your paid registration before submitting a recording." };
   }
+
+  // Server-side backstop for the recording window — deliberately generous
+  // since the server can't know the participant's own timezone (the exact,
+  // precise cutoff is enforced client-side in KataRecorder.tsx using their
+  // own browser clock): stays open from the earliest moment anyone on
+  // Earth could call it the event date (UTC+14) through the latest moment
+  // anyone could still call it the deadline (UTC-12), so a participant
+  // using their own correct local time is never wrongly rejected here.
+  const { data: regRow } = await supabase
+    .from("registrations")
+    .select("competition:competitions(event_date, registration_deadline)")
+    .eq("id", profile.registration_id)
+    .maybeSingle();
+  const competition = (
+    regRow as unknown as { competition: { event_date: string | null; registration_deadline: string | null } | null } | null
+  )?.competition;
+  const opensAt = competition?.event_date ? new Date(`${competition.event_date}T00:00:00+14:00`) : null;
+  const closesAt = competition?.registration_deadline
+    ? new Date(`${competition.registration_deadline}T23:59:59-12:00`)
+    : null;
+  const now = new Date();
+  if (opensAt && now < opensAt) {
+    return { ok: false, error: "Recording hasn't opened yet for your competition tier." };
+  }
+  if (closesAt && now > closesAt) {
+    return { ok: false, error: "The recording window for your competition tier has closed." };
+  }
+
   const { error } = await supabase.from("kata_videos").insert({
     registration_id: profile.registration_id,
     participant_id: profile.participant_id,
