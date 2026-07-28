@@ -115,11 +115,17 @@ const MEDAL_IMAGE_FILE: Record<1 | 2 | 3, string> = {
   2: "Medal Silver.png",
   3: "Medal Bronze.png",
 };
-const MEDAL_NATURAL_W = 511;
-const MEDAL_NATURAL_H = 488;
+// These PNGs are now cropped tight to the ribbon+disc artwork itself (the
+// original files had the medal filling only ~48% of a much wider canvas,
+// which made the logo-medal-logo cluster read as far more spread out than
+// intended even with a small flex gap -- see the coordinate note below).
+const MEDAL_NATURAL_W = 247;
+const MEDAL_NATURAL_H = 391;
 // Bounding box (in the source image's own pixel coordinates) of the blank
 // patch left after erasing "1st" -- where the rank label gets rendered.
-const MEDAL_LABEL_BOX = { x: 180, y: 278, w: 160, h: 82 };
+// Original box was { x: 180, y: 278, w: 160, h: 82 } in the untrimmed
+// 511x488 image; shifted by the crop's origin (132, 48) to match.
+const MEDAL_LABEL_BOX = { x: 48, y: 230, w: 160, h: 82 };
 
 const cachedMedalImage: Partial<Record<1 | 2 | 3, string | null>> = {};
 function medalImageDataUri(rank: 1 | 2 | 3): string | null {
@@ -256,9 +262,12 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
   // "IKO International Logo.png"), so equal boxes now read as equal sizes
   // — the old 1.25x bump was compensating for that asset's excess padding.
   const LOGO2_SIZE = GOLD_LOGO_SIZE;
-  // Width of the whole medal image (ribbon + disc together) -- 20% bigger
-  // than its original 530px per the organizer's request.
-  const MEDAL_WIDTH = Math.round(530 * 1.2);
+  // Now that the medal PNG is cropped tight (bounding box == visible
+  // content, same convention as the two logos), this width IS the visible
+  // ribbon+disc width. 307px reproduces the same visible medal size as
+  // before this crop (530px box x its old ~48% content fill), which was
+  // already the organizer's requested 20%-bigger-than-original size.
+  const MEDAL_WIDTH = 307;
 
   return new ImageResponse(
     (
@@ -285,11 +294,13 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
             alignItems: "center",
             border: `14px solid ${accent}`,
             borderRadius: "18px",
-            // Top padding trimmed (was 60px, matching the sides) to make
-            // room for the 20%-bigger medal without growing the card or
-            // touching anything below the logo row -- bottom stays 60px so
-            // the footer's own spacing is untouched.
-            padding: "20px 90px 60px",
+            // Top padding trimmed from the original 60px, but kept well
+            // clear of the inner double-border overlay below (a fixed 20px
+            // inset from this box's own border, regardless of padding) --
+            // going all the way down to 20px here made the logo row start
+            // at the exact same Y as that border line and draw over it,
+            // erasing it wherever a logo sat. 44px leaves a clean gap.
+            padding: "44px 90px 60px",
             backgroundColor: "#ffffff",
             position: "relative",
           }}
@@ -308,7 +319,7 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
           />
 
           {isWinner ? (
-            <div style={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: "18px" }}>
+            <div style={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: "20px" }}>
               {logo && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={logo} width={GOLD_LOGO_SIZE} height={GOLD_LOGO_SIZE} style={{ objectFit: "contain" }} alt="" />
