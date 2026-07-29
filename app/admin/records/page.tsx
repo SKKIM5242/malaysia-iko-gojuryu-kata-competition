@@ -109,7 +109,7 @@ export default async function AdminParticipantRecords({
 
   const { data: renewals } = await supabase
     .from("subscription_renewals")
-    .select("id, user_id, status, created_at, paid_at")
+    .select("id, user_id, competition_id, status, created_at, paid_at, valid_from, valid_until")
     .order("created_at", { ascending: false });
   const renewalList = renewals ?? [];
   const renewalUserIds = [...new Set(renewalList.map((r) => r.user_id as string))];
@@ -123,6 +123,12 @@ export default async function AdminParticipantRecords({
       { name: (p.full_name as string) || (p.email as string) || (p.user_id as string), role: p.role as string },
     ]),
   );
+  const renewalCompetitionIds = [...new Set(renewalList.map((r) => r.competition_id as string).filter(Boolean))];
+  const { data: renewalCompetitions } =
+    renewalCompetitionIds.length > 0
+      ? await supabase.from("competitions").select("id, name").in("id", renewalCompetitionIds)
+      : { data: [] };
+  const renewalCompetitionNameById = new Map((renewalCompetitions ?? []).map((c) => [c.id as string, c.name as string]));
 
   const { data: bulkPayments } = await supabase
     .from("bulk_upload_payments")
@@ -474,10 +480,18 @@ export default async function AdminParticipantRecords({
                       {info?.name ?? "—"}
                       <span className="font-normal text-neutral-400"> · {info?.role ?? "—"}</span>
                     </p>
+                    <p className="text-xs text-neutral-500">
+                      {renewalCompetitionNameById.get(r.competition_id as string) ?? "Competition tier not found"}
+                    </p>
                     <p className="text-xs text-neutral-400">
                       Requested {formatDate((r.created_at as string).slice(0, 10))}
                       {r.paid_at ? ` · Fulfilled ${formatDate((r.paid_at as string).slice(0, 10))}` : ""}
                     </p>
+                    {r.valid_from && r.valid_until && (
+                      <p className="text-xs text-neutral-400">
+                        New sign-in window: {formatDate(r.valid_from as string)} to {formatDate(r.valid_until as string)}
+                      </p>
+                    )}
                   </div>
                   {r.status === "pending" ? (
                     <form action={markSubscriptionRenewalFulfilled}>

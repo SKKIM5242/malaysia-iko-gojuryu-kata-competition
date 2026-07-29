@@ -64,7 +64,7 @@ export function SetupNotice() {
 export function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-neutral-200 bg-neutral-950 text-white">
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-1.5 px-4 py-2 sm:gap-3 sm:py-4 [@media(max-height:500px)_and_(orientation:landscape)]:gap-1 [@media(max-height:500px)_and_(orientation:landscape)]:py-1">
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-1.5 px-4 py-2 sm:gap-3 sm:py-4 [@media(max-height:500px)_and_(orientation:landscape)]:gap-1 [@media(max-height:500px)_and_(orientation:landscape)]:py-0.5">
         <Link href="/" className="flex items-center gap-1.5 sm:gap-3 [@media(max-height:500px)_and_(orientation:landscape)]:gap-1">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -72,9 +72,16 @@ export function SiteHeader() {
             alt="Malaysia IKO Goju-ryu Karate-do crest"
             className="h-7 w-7 rounded-lg bg-white p-0.5 sm:h-11 sm:w-11 [@media(max-height:500px)_and_(orientation:landscape)]:h-6 [@media(max-height:500px)_and_(orientation:landscape)]:w-6"
           />
-          <span className="leading-none sm:leading-tight">
-            <span className="block text-[10.5px] font-bold tracking-wide sm:text-sm">MALAYSIA OPEN VIRTUAL KARATE-DO KATA COMPETITION</span>
-            <span className="block text-[10.5px] font-bold tracking-wide sm:text-sm [@media(max-height:500px)_and_(orientation:landscape)]:hidden">
+          <span className="leading-none sm:leading-tight [@media(max-height:500px)_and_(orientation:landscape)]:leading-none">
+            {/* Fluid (vw-based) font size + no-wrap instead of a fixed px
+                size -- a fixed size either wrapped to 2 lines on narrow
+                phones or sat needlessly small on wider ones. Scales with
+                the viewport instead, so it stays on one line at any width
+                this breakpoint covers. */}
+            <span className="block whitespace-nowrap text-[clamp(7.5px,2.9vw,11px)] font-bold tracking-wide sm:text-sm sm:whitespace-normal">
+              MALAYSIA OPEN VIRTUAL KARATE-DO KATA COMPETITION
+            </span>
+            <span className="block whitespace-nowrap text-[clamp(6px,2.15vw,8.5px)] font-bold tracking-wide sm:whitespace-normal sm:text-sm [@media(max-height:500px)_and_(orientation:landscape)]:text-[clamp(5px,1.5vw,6.5px)]">
               Goju-ryu or IKO Goju-ryu Version Only &amp; Open Version for Kobudo (Weapon) Kata
             </span>
           </span>

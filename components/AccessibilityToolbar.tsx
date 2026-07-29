@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 
 declare global {
   interface Window {
@@ -233,6 +234,34 @@ export default function AccessibilityToolbar() {
   const [selectedVoiceURI, setSelectedVoiceURI] = useState("");
 
   const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
+
+  // Pins the button just below the page's own <header> instead of a fixed
+  // top-56/top-36 guess -- that guess drifted out of place whenever the
+  // header's real height changed (portrait vs. landscape, role switcher
+  // showing/hiding, different pages), landing mid-content instead of right
+  // under the header. offsetHeight is scroll-position-independent, so for
+  // SiteHeader (sticky at top:0) this keeps the button glued directly under
+  // it at every scroll position, not just on first paint.
+  const pathname = usePathname();
+  const [headerBottom, setHeaderBottom] = useState(96);
+
+  useEffect(() => {
+    const header = document.querySelector("header");
+    const measure = () => setHeaderBottom((header?.offsetHeight ?? 88) + 12);
+    measure();
+    let ro: ResizeObserver | undefined;
+    if (header && typeof ResizeObserver !== "undefined") {
+      ro = new ResizeObserver(measure);
+      ro.observe(header);
+    }
+    window.addEventListener("resize", measure);
+    window.addEventListener("orientationchange", measure);
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("orientationchange", measure);
+    };
+  }, [pathname]);
 
   const queueRef = useRef<string[]>([]);
   const indexRef = useRef(0);
@@ -553,7 +582,8 @@ export default function AccessibilityToolbar() {
   return (
     <div
       data-a11y-skip-read="true"
-      className="fixed top-56 right-4 z-[60] flex flex-col items-end gap-2 sm:top-36 print:hidden"
+      className="fixed right-4 z-[60] flex flex-col items-end gap-2 print:hidden"
+      style={{ top: headerBottom }}
     >
       {/* Read Aloud word cursor — styled via the CSS Custom Highlight API, which
           doesn't require mutating the page's DOM. Rendered as a literal <style>
