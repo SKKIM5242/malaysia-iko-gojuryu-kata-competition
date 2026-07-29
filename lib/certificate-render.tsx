@@ -145,11 +145,11 @@ const MEDAL_IMAGE_FILE: Record<1 | 2 | 3, string> = {
 // intended even with a small flex gap -- see the coordinate note below).
 const MEDAL_NATURAL_W = 247;
 const MEDAL_NATURAL_H = 391;
-// Bounding box (in the source image's own pixel coordinates) of the blank
-// patch left after erasing "1st" -- where the rank label gets rendered.
-// Original box was { x: 180, y: 278, w: 160, h: 82 } in the untrimmed
-// 511x488 image; shifted by the crop's origin (132, 48) to match.
-const MEDAL_LABEL_BOX = { x: 48, y: 230, w: 160, h: 82 };
+// Bounding box (in the source image's own pixel coordinates) of the wreath's
+// open center, where the rank label gets rendered -- moved up closer to the
+// star (small gap only) and enlarged to better fill that circular opening,
+// measured directly off a zoomed crop of the medal artwork.
+const MEDAL_LABEL_BOX = { x: 35, y: 216, w: 177, h: 104 };
 
 const cachedMedalImage: Partial<Record<1 | 2 | 3, string | null>> = {};
 function medalImageDataUri(rank: 1 | 2 | 3): string | null {
@@ -200,7 +200,7 @@ function Medal({ rank, width }: { rank: 1 | 2 | 3; width: number }) {
 function RankLabel3D({ rank, width }: { rank: 1 | 2 | 3; width: number }) {
   const t = MEDAL_THEME[rank];
   const s = MEDAL_LABEL_STYLE[rank];
-  const fontSize = Math.round(width * 0.24);
+  const fontSize = Math.round(width * 0.34);
   const step = Math.max(1, Math.round(width * 0.009));
   const depthSteps = 6;
   return (
@@ -501,7 +501,7 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
             style={{
               marginTop: "-6px",
               display: "flex",
-              fontSize: 88,
+              fontSize: 112,
               fontWeight: 900,
               letterSpacing: 1,
               color: accent,
