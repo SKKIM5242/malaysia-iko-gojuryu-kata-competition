@@ -6,7 +6,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { writeAudit } from "@/lib/audit";
-import { kataBaseOf, ageAt } from "@/lib/division";
+import { kataBaseOf, groupByKata, ageAt } from "@/lib/division";
 import {
   notifyRefereeAssignment, notifyRefereeUnassigned, sendConfirmationEmail, notifyAnnouncementPublished,
   notifyCertificatesPublished, notifyInvitationCodeIssued, notifyStatusChanged,
@@ -14,7 +14,7 @@ import {
   notifySenseiBulkCsvConfirmed, notifyOrganizersDirectoryBulkUpload, sendAdminTelegramDM,
 } from "@/lib/notify";
 import { applySubscriptionRenewalTerms } from "@/lib/finalize";
-import type { PaymentStatus } from "@/lib/types";
+import type { PaymentStatus, Category } from "@/lib/types";
 import { parseCsvWithHeader, parseDDMMYYYY, type CsvUploadResult } from "@/lib/csv-bulk";
 import { normalizeIban } from "@/lib/bank";
 import { codePrefix, nextSequentialCode } from "@/lib/invitation-codes";
@@ -647,6 +647,97 @@ export async function mergeCategoryAgeGroup(formData: FormData) {
   });
   revalidatePath("/");
   backTo(returnTo, { ok: `Merged “${neighbor!.name}” into “${newName}”.` });
+}
+
+/** Re-sequences sort_order for exactly the rows whose position actually
+ * changed in `newOrder` (compared to their current sort_order) -- swapping
+ * two adjacent kata groups only touches that many rows, not the whole
+ * competition's category list, since every other group's rows keep their
+ * existing sort_order values untouched. */
+async function persistCategoryOrder(
+  supabase: SupabaseClient,
+  newOrder: Array<{ id: string; sort_order: number }>,
+): Promise<void> {
+  const changed = newOrder.filter((r) => r.sort_order !== undefined);
+  await Promise.all(
+    changed.map((r) => supabase.from("categories").update({ sort_order: r.sort_order }).eq("id", r.id)),
+  );
+}
+
+/** Moves an entire kata group (e.g. "Kata Saifa", all its belt/age/gender
+ * sub-categories together) one position up or down among the other kata
+ * groups in the same competition -- lets the organizer reorder which event
+ * appears first without touching any individual sub-category's own
+ * ordering within that group. */
+export async function moveCategoryGroup(formData: FormData) {
+  const competitionId = String(formData.get("competition_id") ?? "");
+  const kataBase = String(formData.get("kata_base") ?? "");
+  const direction = formData.get("direction") === "up" ? "up" : "down";
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/competitions";
+  const { supabase } = await getActor();
+
+  const { data: all } = await supabase
+    .from("categories")
+    .select("id, name, sort_order")
+    .eq("competition_id", competitionId)
+    .order("sort_order")
+    .order("name");
+  const groups = groupByKata((all ?? []) as Category[]);
+  const i = groups.findIndex(([base]) => base === kataBase);
+  const j = direction === "up" ? i - 1 : i + 1;
+  if (i === -1 || j < 0 || j >= groups.length) {
+    backTo(returnTo, { error: "Already at that end of the list." });
+  }
+  [groups[i], groups[j]] = [groups[j], groups[i]];
+
+  const flattened = groups.flatMap(([, cats]) => cats);
+  const changes = flattened
+    .map((cat, idx) => ({ id: cat.id, oldOrder: cat.sort_order, sort_order: idx }))
+    .filter((c) => c.sort_order !== c.oldOrder);
+  await persistCategoryOrder(supabase, changes);
+  revalidatePath("/");
+  backTo(returnTo, { ok: "Kata order updated." });
+}
+
+/** Moves one sub-category (a single belt/age/gender row) up or down within
+ * its own kata group, without affecting the group's position among other
+ * kata groups or any other group's internal ordering. */
+export async function moveCategorySubcategory(formData: FormData) {
+  const categoryId = String(formData.get("category_id") ?? "");
+  const direction = formData.get("direction") === "up" ? "up" : "down";
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/competitions";
+  const { supabase } = await getActor();
+
+  const { data: source } = await supabase
+    .from("categories").select("competition_id, name").eq("id", categoryId).maybeSingle();
+  if (!source) backTo(returnTo, { error: "Category not found." });
+
+  const { data: all } = await supabase
+    .from("categories")
+    .select("id, name, sort_order")
+    .eq("competition_id", source!.competition_id)
+    .order("sort_order")
+    .order("name");
+  const groups = groupByKata((all ?? []) as Category[]);
+  const kataBase = kataBaseOf(source!.name);
+  const groupIdx = groups.findIndex(([base]) => base === kataBase);
+  if (groupIdx === -1) backTo(returnTo, { error: "Category not found." });
+  const cats = groups[groupIdx][1];
+  const i = cats.findIndex((c) => c.id === categoryId);
+  const j = direction === "up" ? i - 1 : i + 1;
+  if (i === -1 || j < 0 || j >= cats.length) {
+    backTo(returnTo, { error: "Already at that end of the list." });
+  }
+  [cats[i], cats[j]] = [cats[j], cats[i]];
+  groups[groupIdx] = [groups[groupIdx][0], cats];
+
+  const flattened = groups.flatMap(([, c]) => c);
+  const changes = flattened
+    .map((cat, idx) => ({ id: cat.id, oldOrder: cat.sort_order, sort_order: idx }))
+    .filter((c) => c.sort_order !== c.oldOrder);
+  await persistCategoryOrder(supabase, changes);
+  revalidatePath("/");
+  backTo(returnTo, { ok: "Category order updated." });
 }
 
 // ── Certificates ─────────────────────────────────────────────────────────────
