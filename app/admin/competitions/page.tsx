@@ -6,7 +6,7 @@ import { saveCompetition, saveCategory, deleteCategory, mergeCategoryToMix, merg
 import { AdminShell, Card, adminBtn, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, NoTranslate, SetupNotice, formatDate, formatUSD } from "@/components/ui";
 import DownloadCsvButton from "@/components/DownloadCsvButton";
-import { groupByKata } from "@/lib/division";
+import { groupByKata, kataBaseOf } from "@/lib/division";
 import type { Category } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +14,14 @@ export const dynamic = "force-dynamic";
 export default async function AdminCompetitions({
   searchParams,
 }: {
-  searchParams: Promise<{ edit?: string; editcat?: string; addcat?: string; ok?: string; error?: string }>;
+  searchParams: Promise<{
+    edit?: string; editcat?: string; addcat?: string; ok?: string; error?: string;
+    /** Which competition's panel, and which kata group within it, to keep
+     * expanded after a category action (save/delete/merge) redirects back
+     * here — without these, every such action landed back at the bare page
+     * top with both accordion levels collapsed. */
+    opencomp?: string; openkata?: string;
+  }>;
 }) {
   const params = await searchParams;
   const ready = await schemaReady();
@@ -61,7 +68,22 @@ export default async function AdminCompetitions({
   const categoryModalCompetition = editingCategory
     ? competitions.find((c) => c.id === editingCategory.competition_id)
     : addingToCompetition;
-  const categoryModalCloseHref = params.edit ? `/admin/competitions?edit=${params.edit}` : "/admin/competitions";
+  const editingCategoryBase = editingCategory ? kataBaseOf(editingCategory.name) : null;
+
+  /** Builds a return_to that reopens the right competition panel (and, when
+   * given, the right kata-group sub-panel within it) instead of landing back
+   * at the bare top of the page. */
+  function categoryReturnTo(competitionId: string, base?: string | null): string {
+    return `/admin/competitions?opencomp=${competitionId}${base ? `&openkata=${encodeURIComponent(base)}` : ""}`;
+  }
+
+  const categoryModalCloseHref = (() => {
+    const base = params.edit ? `/admin/competitions?edit=${params.edit}` : "/admin/competitions";
+    if (!categoryModalCompetition) return base;
+    const sep = base.includes("?") ? "&" : "?";
+    const kataParam = editingCategoryBase ? `&openkata=${encodeURIComponent(editingCategoryBase)}` : "";
+    return `${base}${sep}opencomp=${categoryModalCompetition.id}${kataParam}`;
+  })();
   const editing = params.edit ? competitions.find((c) => c.id === params.edit) : undefined;
 
   return (
@@ -182,7 +204,7 @@ export default async function AdminCompetitions({
                 <details
                   key={c.id}
                   className="rounded-lg border border-neutral-200 bg-white shadow-sm"
-                  open={editing?.id === c.id || categoryModalCompetition?.id === c.id}
+                  open={editing?.id === c.id || categoryModalCompetition?.id === c.id || params.opencomp === c.id}
                 >
                   <summary className="flex cursor-pointer flex-wrap items-start justify-between gap-2 px-4 py-3 hover:bg-neutral-50">
                     <div>
@@ -229,7 +251,11 @@ export default async function AdminCompetitions({
                     ) : (
                       <div className="space-y-2">
                         {groupByKata(categoriesByCompetition.get(c.id) ?? []).map(([base, cats]) => (
-                          <details key={base} className="rounded border border-neutral-100">
+                          <details
+                            key={base}
+                            className="rounded border border-neutral-100"
+                            open={params.openkata === base || cats.some((cat) => cat.id === params.editcat)}
+                          >
                             <summary className="cursor-pointer px-2 py-1.5 text-sm font-semibold text-neutral-800 hover:bg-neutral-50">
                               <NoTranslate>{base}</NoTranslate>{" "}
                               <span className="font-normal text-neutral-400">({cats.length} sub-categories)</span>
@@ -257,6 +283,7 @@ export default async function AdminCompetitions({
                                         {(cat.gender === "male" || cat.gender === "female") && (
                                           <form action={mergeCategoryToMix}>
                                             <input type="hidden" name="category_id" value={cat.id} />
+                                            <input type="hidden" name="return_to" value={categoryReturnTo(c.id, base)} />
                                             <button
                                               className="rounded border border-amber-300 px-2 py-0.5 text-xs text-amber-700 hover:bg-amber-50"
                                               title="Move this category's (and its Male/Female sibling's) registrations into a shared Mix (Male & Female) category"
@@ -268,6 +295,7 @@ export default async function AdminCompetitions({
                                         <form action={mergeCategoryAgeGroup}>
                                           <input type="hidden" name="category_id" value={cat.id} />
                                           <input type="hidden" name="direction" value="before" />
+                                          <input type="hidden" name="return_to" value={categoryReturnTo(c.id, base)} />
                                           <button
                                             className="rounded border border-purple-300 px-2 py-0.5 text-xs text-purple-700 hover:bg-purple-50"
                                             title="Merge with the earlier age group (same kata, belt, and gender) — the age range widens to cover both; repeat to combine 2 or 3 age groups"
@@ -278,6 +306,7 @@ export default async function AdminCompetitions({
                                         <form action={mergeCategoryAgeGroup}>
                                           <input type="hidden" name="category_id" value={cat.id} />
                                           <input type="hidden" name="direction" value="after" />
+                                          <input type="hidden" name="return_to" value={categoryReturnTo(c.id, base)} />
                                           <button
                                             className="rounded border border-purple-300 px-2 py-0.5 text-xs text-purple-700 hover:bg-purple-50"
                                             title="Merge with the later age group (same kata, belt, and gender) — the age range widens to cover both; repeat to combine 2 or 3 age groups"
@@ -294,6 +323,7 @@ export default async function AdminCompetitions({
                                         </Link>
                                         <form action={deleteCategory}>
                                           <input type="hidden" name="id" value={cat.id} />
+                                          <input type="hidden" name="return_to" value={categoryReturnTo(c.id, base)} />
                                           <button className="rounded border border-red-200 px-2 py-0.5 text-xs text-red-600 hover:bg-red-50">
                                             Delete
                                           </button>
@@ -340,6 +370,11 @@ export default async function AdminCompetitions({
             <form action={saveCategory} className="space-y-4">
               <input type="hidden" name="competition_id" value={categoryModalCompetition.id} />
               {editingCategory && <input type="hidden" name="id" value={editingCategory.id} />}
+              <input
+                type="hidden"
+                name="return_to"
+                value={categoryReturnTo(categoryModalCompetition.id, editingCategoryBase)}
+              />
               <div>
                 <label htmlFor="cat_name" className={adminLabel}>Category name *</label>
                 <input id="cat_name" name="name" required defaultValue={editingCategory?.name ?? ""} className={adminInput} placeholder="e.g. Kata Saifa" />
