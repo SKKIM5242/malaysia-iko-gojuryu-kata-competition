@@ -197,10 +197,17 @@ function Medal({ rank, width }: { rank: 1 | 2 | 3; width: number }) {
  * copy on the opposite corner catches the light, and the glossy banded
  * gradient face sits on top -- same construction as a chrome/gem 3D text
  * effect, per the organizer's reference image. */
+// "2ND"/"3RD" carry wider glyphs (N, D, R) than "1ST"'s (S, T) at the same
+// font size, so one shared ratio let them spill past the wreath's leaves
+// while "1ST" fit fine -- Satori can't measure rendered text width like a
+// canvas can, so these per-rank ratios are tuned by eye against the actual
+// wreath opening instead of computed.
+const MEDAL_LABEL_FONT_SCALE: Record<1 | 2 | 3, number> = { 1: 0.34, 2: 0.27, 3: 0.27 };
+
 function RankLabel3D({ rank, width }: { rank: 1 | 2 | 3; width: number }) {
   const t = MEDAL_THEME[rank];
   const s = MEDAL_LABEL_STYLE[rank];
-  const fontSize = Math.round(width * 0.34);
+  const fontSize = Math.round(width * MEDAL_LABEL_FONT_SCALE[rank]);
   const step = Math.max(1, Math.round(width * 0.009));
   const depthSteps = 6;
   return (

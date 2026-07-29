@@ -98,6 +98,7 @@ interface RecordingContext {
   hasPendingPurchase: boolean;
   eventDate: string | null;
   registrationDeadline: string | null;
+  competitionName: string | null;
   pendingOthers: PendingRegistration[];
 }
 
@@ -129,12 +130,12 @@ async function getRecordingContext(
 
   const { data: registration } = await supabase
     .from("registrations")
-    .select("competition:competitions(id, event_date, registration_deadline)")
+    .select("competition:competitions(id, name, event_date, registration_deadline)")
     .eq("id", registrationId)
     .maybeSingle();
   const competition = (
     registration as unknown as {
-      competition: { id: string; event_date: string | null; registration_deadline: string | null } | null;
+      competition: { id: string; name: string | null; event_date: string | null; registration_deadline: string | null } | null;
     } | null
   )?.competition ?? null;
 
@@ -153,6 +154,7 @@ async function getRecordingContext(
     hasPendingPurchase: !!pendingPurchase,
     eventDate: competition?.event_date ?? null,
     registrationDeadline: competition?.registration_deadline ?? null,
+    competitionName: competition?.name ?? null,
     pendingOthers,
   };
 }
@@ -202,6 +204,7 @@ function PersonalRecordingSection({
             watermark={watermarkText(ctx.eventDate)}
             recordingStart={ctx.eventDate}
             recordingEnd={ctx.registrationDeadline}
+            competitionName={ctx.competitionName}
           />
           <PendingRecordingsList items={ctx.pendingOthers} />
         </div>
@@ -707,16 +710,17 @@ export default async function AccountPage({
 
   const { data: registration } = await supabase
     .from("registrations")
-    .select("competition:competitions(id, event_date, registration_deadline)")
+    .select("competition:competitions(id, name, event_date, registration_deadline)")
     .eq("id", profile.registration_id)
     .maybeSingle();
   const competition = (
     registration as unknown as {
-      competition: { id: string; event_date: string | null; registration_deadline: string | null } | null;
+      competition: { id: string; name: string | null; event_date: string | null; registration_deadline: string | null } | null;
     } | null
   )?.competition ?? null;
   const eventDate = competition?.event_date ?? null;
   const registrationDeadline = competition?.registration_deadline ?? null;
+  const competitionName = competition?.name ?? null;
 
   let ownVideoUrl: string | null = null;
   if (existingVideo) {
@@ -801,6 +805,7 @@ export default async function AccountPage({
               watermark={watermarkText(eventDate)}
               recordingStart={eventDate}
               recordingEnd={registrationDeadline}
+              competitionName={competitionName}
             />
             <div>
               <p className="mb-2 text-sm text-neutral-500">

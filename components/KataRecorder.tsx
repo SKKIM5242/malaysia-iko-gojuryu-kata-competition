@@ -89,6 +89,7 @@ export default function KataRecorder({
   watermark,
   recordingStart,
   recordingEnd,
+  competitionName,
 }: {
   initialAttempts: number;
   maxAttempts: number;
@@ -96,6 +97,11 @@ export default function KataRecorder({
   watermark: string;
   recordingStart?: string | null;
   recordingEnd?: string | null;
+  /** Full competition/tier name (e.g. "...2026 — USD 100 Tier"), named
+   * explicitly in the not-yet-open/window-closed messages below so a
+   * participant registered for more than one tier can tell them apart —
+   * falls back to the generic "your competition tier" when omitted. */
+  competitionName?: string | null;
 }) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [attempts, setAttempts] = useState(initialAttempts);
@@ -289,8 +295,8 @@ export default function KataRecorder({
         </h2>
         <p className="mt-2 text-sm text-amber-800">
           {notYetOpen
-            ? `Recording opens on ${recordingStart ? formatDate(recordingStart) : "the event date"} for your competition tier — based on today's date where you are.`
-            : `The deadline (${recordingEnd ? formatDate(recordingEnd) : "the registration deadline"}) has passed for your competition tier, based on today's date where you are. No further recording or submission is possible for this tier.`}
+            ? `Recording opens on ${recordingStart ? formatDate(recordingStart) : "the event date"} for your ${competitionName ? `competition tier — ${competitionName}` : "competition tier"} — based on today's date where you are.`
+            : `The deadline (${recordingEnd ? formatDate(recordingEnd) : "the registration deadline"}) has passed for your ${competitionName ? `competition tier — ${competitionName}` : "competition tier"}, based on today's date where you are. No further recording or submission is possible for this tier.`}
         </p>
       </div>
     );
