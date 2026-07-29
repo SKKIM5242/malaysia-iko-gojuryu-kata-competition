@@ -50,8 +50,19 @@ function drawFrame(
   ctx.fillStyle = "#ffffff";
   ctx.shadowColor = "rgba(0,0,0,0.6)";
   ctx.shadowBlur = 4;
-  ctx.font = `bold ${Math.max(12, Math.round(topH * 0.32))}px Georgia, serif`;
-  ctx.fillText("MALAYSIA OPEN — ONLINE KATA COMPETITION", w / 2, topH * 0.48);
+  // Longer than the old "MALAYSIA OPEN — ONLINE KATA COMPETITION" -- shrink
+  // the font (down to a 10px floor) until it actually measures within the
+  // frame width, instead of a fixed ratio that could still overflow to a
+  // second line on a narrower recording resolution.
+  const bannerTitle = "MALAYSIA OPEN VIRTUAL KARATE-DO KATA COMPETITION";
+  let titleFontPx = Math.max(12, Math.round(topH * 0.32));
+  ctx.font = `bold ${titleFontPx}px Georgia, serif`;
+  const maxTitleWidth = w * 0.94;
+  while (titleFontPx > 10 && ctx.measureText(bannerTitle).width > maxTitleWidth) {
+    titleFontPx -= 1;
+    ctx.font = `bold ${titleFontPx}px Georgia, serif`;
+  }
+  ctx.fillText(bannerTitle, w / 2, topH * 0.48);
   ctx.font = `${Math.max(9, Math.round(topH * 0.2))}px Arial, sans-serif`;
   ctx.fillText("Organized by IKO GOJU-RYU KARATE-DO MALAYSIA SDN BHD", w / 2, topH * 0.82);
   ctx.shadowBlur = 0;

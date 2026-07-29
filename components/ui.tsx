@@ -79,6 +79,12 @@ export function SiteHeader() {
             </span>
           </span>
         </Link>
+        {/* Sibling of the logo/title link, placed before <nav> in source
+            order so flex-wrap assigns it to the first row (next to the
+            title, in the space to the right of it) instead of the second
+            row -- flex-wrap can't backfill an earlier row for a later item,
+            so this only works by coming before nav, not after it. */}
+        <RoleSwitcher />
         <nav className="flex flex-wrap items-center gap-x-1.5 gap-y-0 text-xs sm:gap-1 sm:text-sm">
           <Link href="/" className="rounded px-1.5 py-px hover:bg-neutral-800 sm:px-3 sm:py-1.5">Home</Link>
           <Link href="/participants" className="rounded px-1.5 py-px hover:bg-neutral-800 sm:px-3 sm:py-1.5">Participants</Link>
@@ -98,7 +104,6 @@ export function SiteHeader() {
           >
             Kata Arena Log In
           </Link>
-          <RoleSwitcher />
         </nav>
       </div>
     </header>

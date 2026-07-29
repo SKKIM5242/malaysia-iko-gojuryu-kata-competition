@@ -3,7 +3,6 @@
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { requestNewSubscription, type AccountActionState } from "@/app/actions/account";
-import { OrganizerContact } from "@/components/ui";
 
 const initial: AccountActionState = { ok: false };
 
@@ -61,7 +60,6 @@ export default function SubscriptionBlocked({
             </button>
           </form>
         )}
-        <div className="mt-3 text-amber-900"><OrganizerContact /></div>
       </div>
       <div className="mt-4">{signOutForm}</div>
     </main>
