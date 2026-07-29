@@ -100,7 +100,7 @@ export default async function AdminSchools({
         <div>
           <h2 className="mb-3 text-lg font-bold">{editing ? "Edit School" : "Add School"}</h2>
           <Card>
-            <form action={saveSchool} className="space-y-4">
+            <form key={editing?.id ?? "new"} action={saveSchool} className="space-y-4">
               {editing && <input type="hidden" name="id" value={editing.id} />}
               {editing && <input type="hidden" name="role" value="school" />}
               {editing && <input type="hidden" name="return_to" value={`/admin/schools?edit=${editing.id}`} />}

@@ -167,7 +167,7 @@ export default async function AdminClasses({
           <div>
             <h2 className="mb-3 text-lg font-bold">{editingStudent ? "Edit Student" : "Add Student"}</h2>
             <Card>
-              <form action={saveStudent} className="space-y-4">
+              <form key={editingStudent?.id ?? "new"} action={saveStudent} className="space-y-4">
                 {editingStudent && <input type="hidden" name="id" value={editingStudent.id} />}
                 <div>
                   <label htmlFor="full_name" className={adminLabel}>Full name *</label>
@@ -316,7 +316,7 @@ export default async function AdminClasses({
           <div>
             <h2 className="mb-3 text-lg font-bold">{editingPlan ? "Edit Fee Plan" : "New Fee Plan"}</h2>
             <Card>
-              <form action={saveFeePlan} className="space-y-4">
+              <form key={editingPlan?.id ?? "new"} action={saveFeePlan} className="space-y-4">
                 {editingPlan && <input type="hidden" name="id" value={editingPlan.id} />}
                 <div>
                   <label htmlFor="plan_name" className={adminLabel}>Plan name *</label>

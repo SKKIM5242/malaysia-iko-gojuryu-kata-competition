@@ -87,7 +87,7 @@ export default function InvitationCodeForm({
   return (
     <Card>
       <h2 className="mb-3 text-lg font-bold">{editing ? `Edit Code ${editing.code}` : title}</h2>
-      <form action={editing ? updateInvitationCode : createInvitationCode} className="space-y-4">
+      <form key={editing?.id ?? "new"} action={editing ? updateInvitationCode : createInvitationCode} className="space-y-4">
         <input type="hidden" name="return_to" value={returnTo} />
         {editing && <input type="hidden" name="id" value={editing.id} />}
         {role && <input type="hidden" name="role" value={role} />}

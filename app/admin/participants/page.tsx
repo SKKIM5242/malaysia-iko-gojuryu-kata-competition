@@ -86,7 +86,7 @@ export default async function AdminParticipants({
         <div>
           <h2 className="mb-3 text-lg font-bold">{editing ? "Edit Participant" : "Add Participant"}</h2>
           <Card>
-            <form action={saveParticipant} className="space-y-4">
+            <form key={editing?.id ?? "new"} action={saveParticipant} className="space-y-4">
               {editing && <input type="hidden" name="id" value={editing.id} />}
               <div>
                 <label htmlFor="full_name" className={adminLabel}>Full name *</label>

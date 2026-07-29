@@ -2561,7 +2561,21 @@ export async function generateRecordInvitationCode(formData: FormData) {
     backTo(returnTo, { error: "This record needs an email address before a code can be generated." });
   }
 
-  const code = `${role.toUpperCase()}-${crypto.randomUUID().slice(0, 6).toUpperCase()}`;
+  // Same systematic IKO-<ROLE>-TIER-<TIER>-2026-<NNNNN> format and running
+  // sequence as the "Run" button on the general Create Code form (see
+  // generateSequentialInvitationCode above) — a personal code is still just
+  // one more code sharing that role+tier's counter, not a separate scheme.
+  const { data: picCompetition } = await supabase
+    .from("competitions")
+    .select("registration_fee_usd")
+    .eq("id", competitionId)
+    .maybeSingle();
+  const prefix = codePrefix(role, Number(picCompetition?.registration_fee_usd ?? 0));
+  const { data: existingCodes } = await supabase
+    .from("invitation_codes")
+    .select("code")
+    .ilike("code", `${prefix}%`);
+  const code = nextSequentialCode(prefix, (existingCodes ?? []).map((r) => r.code as string));
   const { data: myProfile } = actorId
     ? await supabase.from("profiles").select("full_name, email").eq("user_id", actorId).maybeSingle()
     : { data: null };

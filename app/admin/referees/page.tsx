@@ -139,7 +139,7 @@ export default async function AdminReferees({
         <div>
           <h2 className="mb-3 text-lg font-bold">{editing ? "Edit Referee/Judge" : "Add Referee/Judge"}</h2>
           <Card>
-            <form action={saveReferee} className="space-y-4">
+            <form key={editing?.id ?? "new"} action={saveReferee} className="space-y-4">
               {editing && <input type="hidden" name="id" value={editing.id} />}
               {editing && <input type="hidden" name="role" value="referee" />}
               {editing && <input type="hidden" name="return_to" value={`/admin/referees?editref=${editing.id}`} />}

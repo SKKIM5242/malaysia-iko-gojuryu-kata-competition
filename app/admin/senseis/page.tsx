@@ -112,7 +112,7 @@ export default async function AdminSenseis({
         <div>
           <h2 className="mb-3 text-lg font-bold">{editing ? "Edit Sensei" : "Add Sensei"}</h2>
           <Card>
-            <form action={saveSensei} className="space-y-4">
+            <form key={editing?.id ?? "new"} action={saveSensei} className="space-y-4">
               {editing && <input type="hidden" name="id" value={editing.id} />}
               {editing && <input type="hidden" name="role" value="sensei" />}
               {editing && <input type="hidden" name="return_to" value={`/admin/senseis?edit=${editing.id}`} />}
