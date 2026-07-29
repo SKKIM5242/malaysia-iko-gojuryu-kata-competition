@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { toggleInvitationCode, deleteInvitationCode, bulkUploadInvitationCodes } from "@/app/actions/admin";
-import { EmptyState } from "@/components/ui";
+import { EmptyState, formatDate } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
 import InvitationCodeForm, { ROLE_LABELS } from "@/components/InvitationCodeForm";
@@ -73,7 +73,7 @@ export default async function InvitationCodeList({
           action={bulkUploadInvitationCodes}
           templateHref="/invitation-codes-template.csv"
           entityLabel="invitation code"
-          note="competition_name must match an existing competition exactly; role must be one of the role keys in the template."
+          note="competition_name must match an existing competition exactly; role must be one of the role keys in the template. Dates use DD/MM/YYYY format."
         />
       )}
       <h2 className="text-lg font-bold">{role ? "Codes For This Role" : "All Codes"}</h2>
@@ -124,8 +124,8 @@ export default async function InvitationCodeList({
             code: c.code,
             role: ROLE_LABELS[c.role] ?? c.role,
             competition: competitionNameById.get(c.competition_id) ?? "",
-            valid_from: c.valid_from ?? "",
-            valid_until: c.valid_until ?? "",
+            valid_from: c.valid_from ? formatDate(c.valid_from) : "",
+            valid_until: c.valid_until ? formatDate(c.valid_until) : "",
             sign_in_limit: c.sign_in_limit != null ? String(c.sign_in_limit) : "",
             usage: `${c.use_count}${c.max_uses ? ` / ${c.max_uses}` : ""}`,
             note: c.note ?? "",

@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { schemaReady } from "@/lib/data";
 import { markEmailVerified, resendVerificationEmail } from "@/app/actions/email-verification";
 import { AdminShell } from "@/components/admin";
-import { EmptyState, SetupNotice, formatDateTime } from "@/components/ui";
+import { EmptyState, SetupNotice, formatDate, formatDateTime } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
 
 export const dynamic = "force-dynamic";
@@ -72,10 +72,10 @@ export default async function AdminEmailVerifications({
             email: r.email,
             role: r.role ?? "—",
             sent_at: formatDateTime(r.sent_at),
-            status_text: r.verified_at ? `Verified ${r.verified_at.slice(0, 10)}` : "Pending",
+            status_text: r.verified_at ? `Verified ${formatDate(r.verified_at)}` : "Pending",
             status: r.verified_at ? (
               <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-800">
-                Verified {r.verified_at.slice(0, 10)}
+                Verified {formatDate(r.verified_at)}
               </span>
             ) : (
               <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">

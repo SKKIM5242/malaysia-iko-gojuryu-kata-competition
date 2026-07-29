@@ -163,7 +163,7 @@ export default async function AdminSupport({
                 action={bulkUploadSupport}
                 templateHref="/support-template.csv"
                 entityLabel="account"
-                note={`Each row creates a real login instantly and emails a temporary password — max 200 rows per upload. ${IBAN_CSV_NOTE}`}
+                note={`Each row creates a real login instantly and emails a temporary password — max 200 rows per upload. Dates use DD/MM/YYYY format. ${IBAN_CSV_NOTE}`}
               />
             </div>
           )}

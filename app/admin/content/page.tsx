@@ -525,8 +525,8 @@ export default async function AdminContent({
                 role_csv: r.role as string,
                 default_sign_in_limit_csv: r.default_sign_in_limit == null ? "Unlimited" : String(r.default_sign_in_limit),
                 tier_tied_csv: r.tier_tied ? "Yes" : "No",
-                valid_from_csv: (r.valid_from as string) ?? "",
-                valid_until_csv: (r.valid_until as string) ?? "",
+                valid_from_csv: r.valid_from ? formatDate(r.valid_from as string) : "",
+                valid_until_csv: r.valid_until ? formatDate(r.valid_until as string) : "",
                 notes_csv: (r.notes as string) ?? "",
               })),
             ]}

@@ -104,7 +104,7 @@ export default async function AdminSenseis({
             action={bulkUploadSenseis}
             templateHref="/senseis-template.csv"
             entityLabel="sensei"
-            note={`School name must match an existing school exactly. Certificates can't be uploaded via CSV — add one later via Edit. ${IBAN_CSV_NOTE}`}
+            note={`School name must match an existing school exactly. Dates use DD/MM/YYYY format. Certificates can't be uploaded via CSV — add one later via Edit. ${IBAN_CSV_NOTE}`}
           />
         </div>
       )}

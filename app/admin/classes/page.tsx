@@ -158,6 +158,7 @@ export default async function AdminClasses({
             action={bulkUploadStudents}
             templateHref="/students-template.csv"
             entityLabel="student"
+            note="Dates use DD/MM/YYYY format."
           />
         </div>
       )}

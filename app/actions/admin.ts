@@ -22,7 +22,7 @@ import { listTelegramGroups, type TelegramCategory } from "@/lib/telegram";
 import { ACCESS_MATRIX, accessMatrixAnnouncementIntro } from "@/lib/access-matrix";
 import { DEFAULT_COMPARISON_ROWS } from "@/components/AccessComparisonTable";
 import { DEFAULT_AUTO_ASSIGN_CRITERIA } from "@/lib/auto-assign-criteria";
-import { formatUSD } from "@/components/ui";
+import { formatUSD, formatDate } from "@/components/ui";
 
 /**
  * Admin server actions. Sprint 3 runs these under the v1 open RLS policies;
@@ -841,7 +841,7 @@ export async function publishAccessMatrixAnnouncement() {
   if (actorRole !== "admin") {
     backTo(returnTo, { error: "Only the Super Admin can publish the Access Matrix." });
   }
-  const generatedAt = new Date().toISOString().slice(0, 10);
+  const generatedAt = formatDate(new Date().toISOString().slice(0, 10));
   const values = {
     competition_id: null,
     title: `Admin Panel Access Matrix — updated ${generatedAt}`,
@@ -1626,10 +1626,16 @@ export async function bulkUploadInvitationCodes(_prev: CsvUploadResult, formData
     if (!INVITATION_CODE_ROLES.includes(role)) { failures.push({ row: rowNo, name: code, error: "role is not a valid role key" }); continue; }
     const email = get(r, "email").toLowerCase();
     const maxUses = Number(get(r, "max_uses"));
-    const validFrom = get(r, "valid_from");
-    const validUntil = get(r, "valid_until");
+    const validFromRaw = get(r, "valid_from");
+    const validUntilRaw = get(r, "valid_until");
+    const validFrom = validFromRaw ? parseDDMMYYYY(validFromRaw) : null;
+    const validUntil = validUntilRaw ? parseDDMMYYYY(validUntilRaw) : null;
     const signInLimit = Number(get(r, "sign_in_limit"));
     const competitionId = competitionIdByName.get(get(r, "competition_name").trim().toLowerCase());
+    if ((validFromRaw && !validFrom) || (validUntilRaw && !validUntil)) {
+      failures.push({ row: rowNo, name: code, error: "Invalid valid_from/valid_until (use DD/MM/YYYY)" });
+      continue;
+    }
     if (!email || !maxUses || maxUses < 1 || !validFrom || !validUntil || !signInLimit || signInLimit < 1) {
       failures.push({ row: rowNo, name: code, error: "email, max_uses, valid_from, valid_until, and sign_in_limit are all required" });
       continue;
@@ -3205,10 +3211,13 @@ export async function bulkUploadSenseis(_prev: CsvUploadResult, formData: FormDa
       if (!schoolId) { failures.push({ row: rowNo, name, error: `School "${schoolName}" not found` }); continue; }
     }
     const gender = get(r, "gender").toLowerCase();
+    const dobRaw = get(r, "date_of_birth");
+    const dob = dobRaw ? parseDDMMYYYY(dobRaw) : null;
+    if (dobRaw && !dob) { failures.push({ row: rowNo, name, error: "Invalid date of birth (use DD/MM/YYYY)" }); continue; }
     const record = {
       name: get(r, "name"),
       ic_passport: get(r, "ic_passport") || null,
-      date_of_birth: get(r, "date_of_birth") || null,
+      date_of_birth: dob,
       rank: get(r, "rank") || null,
       gender: gender || null,
       school_id: schoolId,
@@ -3291,10 +3300,13 @@ export async function bulkUploadReferees(_prev: CsvUploadResult, formData: FormD
     const rowNo = i + 2;
     const full_name = get(r, "full_name") || `Row ${rowNo}`;
     const experienceRaw = get(r, "judging_experience_count");
+    const dobRaw = get(r, "date_of_birth");
+    const dob = dobRaw ? parseDDMMYYYY(dobRaw) : null;
+    if (dobRaw && !dob) { failures.push({ row: rowNo, name: full_name, error: "Invalid date of birth (use DD/MM/YYYY)" }); continue; }
     const record = {
       full_name: get(r, "full_name"),
       ic_passport: get(r, "ic_passport"),
-      date_of_birth: get(r, "date_of_birth") || null,
+      date_of_birth: dob,
       gender: get(r, "gender") || null,
       karate_rank: get(r, "karate_rank") || null,
       judging_experience_count: experienceRaw ? Number(experienceRaw) : null,
@@ -3614,7 +3626,8 @@ async function bulkCreateStaffAccounts(formData: FormData, role: "organizer" | "
     const full_name = get(r, "full_name") || `Row ${rowNo}`;
     const email = get(r, "email");
     const ic_passport = get(r, "ic_passport");
-    const date_of_birth = get(r, "date_of_birth");
+    const date_of_birth_raw = get(r, "date_of_birth");
+    const date_of_birth = date_of_birth_raw ? parseDDMMYYYY(date_of_birth_raw) : null;
     const gender = get(r, "gender");
     const home_address = get(r, "home_address");
     const city_town = get(r, "city_town");
@@ -3624,6 +3637,10 @@ async function bulkCreateStaffAccounts(formData: FormData, role: "organizer" | "
     const bank_name = get(r, "bank_name");
     const bank_account_no = normalizeIban(get(r, "bank_account_no"));
     const bank_account_name = get(r, "bank_account_name");
+    if (date_of_birth_raw && !date_of_birth) {
+      failures.push({ row: rowNo, name: full_name, error: "Invalid date of birth (use DD/MM/YYYY)" });
+      continue;
+    }
     if (!full_name || !email || !ic_passport || !date_of_birth || !gender) {
       failures.push({ row: rowNo, name: full_name, error: "Full name, email, IC/Passport, date of birth, and gender are required" });
       continue;

@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { writeAudit } from "@/lib/audit";
 import { getStripe, paymentsEnabled } from "@/lib/payments";
-import { parseCsvWithHeader, type CsvUploadResult } from "@/lib/csv-bulk";
+import { parseCsvWithHeader, parseDDMMYYYY, type CsvUploadResult } from "@/lib/csv-bulk";
 import { sendConfirmationEmail } from "@/lib/notify";
 import { getTelegramLink } from "@/lib/telegram";
 import type { ClassEnrollment, ClassInvoice, FeePlan } from "@/lib/types";
@@ -106,10 +106,16 @@ export async function bulkUploadStudents(_prev: CsvUploadResult, formData: FormD
     const rowNo = i + 2;
     const full_name = get(r, "full_name") || `Row ${rowNo}`;
     if (!get(r, "full_name")) { failures.push({ row: rowNo, name: full_name, error: "Full name is required" }); continue; }
+    const dobRaw = get(r, "date_of_birth");
+    const dob = dobRaw ? parseDDMMYYYY(dobRaw) : null;
+    if (dobRaw && !dob) { failures.push({ row: rowNo, name: full_name, error: "Invalid date of birth (use DD/MM/YYYY)" }); continue; }
+    const joinDateRaw = get(r, "join_date");
+    const joinDate = joinDateRaw ? parseDDMMYYYY(joinDateRaw) : null;
+    if (joinDateRaw && !joinDate) { failures.push({ row: rowNo, name: full_name, error: "Invalid join date (use DD/MM/YYYY)" }); continue; }
     const record = {
       full_name: get(r, "full_name"),
       ic_passport: get(r, "ic_passport") || null,
-      date_of_birth: get(r, "date_of_birth") || null,
+      date_of_birth: dob,
       gender: get(r, "gender") || null,
       category: get(r, "category").toLowerCase() === "adult" ? "adult" : "student",
       email: get(r, "email") || null,
@@ -117,7 +123,7 @@ export async function bulkUploadStudents(_prev: CsvUploadResult, formData: FormD
       home_address: get(r, "home_address") || null,
       city_town: get(r, "city_town") || null,
       home_country: get(r, "home_country") || null,
-      join_date: get(r, "join_date") || null,
+      join_date: joinDate,
       status: "active",
       notes: get(r, "notes") || null,
     };

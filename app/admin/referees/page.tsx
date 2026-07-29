@@ -130,7 +130,7 @@ export default async function AdminReferees({
             action={bulkUploadReferees}
             templateHref="/referees-template.csv"
             entityLabel="referee"
-            note={`Certificates can't be uploaded via CSV — add one later via Edit. ${IBAN_CSV_NOTE}`}
+            note={`Dates use DD/MM/YYYY format. Certificates can't be uploaded via CSV — add one later via Edit. ${IBAN_CSV_NOTE}`}
           />
         </div>
       )}

@@ -7,7 +7,7 @@ import {
   resendRefereeNotification, seedAutoAssignCriteria, deleteAutoAssignCriterion,
 } from "@/app/actions/admin";
 import { AdminShell, Card, adminBtn, adminBtnSecondary, adminInput } from "@/components/admin";
-import { CategoryName, EmptyState, SetupNotice } from "@/components/ui";
+import { CategoryName, EmptyState, SetupNotice, formatDate } from "@/components/ui";
 import FullViewButton from "@/components/FullViewButton";
 import { ScoreSessionButton } from "@/components/RefereeScoring";
 import DownloadCsvButton from "@/components/DownloadCsvButton";
@@ -429,7 +429,7 @@ export default async function AdminJudging({
             Participant: v.participant?.full_name ?? "",
             Category: v.registration?.category?.name ?? "",
             Competition: competitions.find((c) => c.id === v.registration?.competition_id)?.name ?? "",
-            Submitted: v.created_at.slice(0, 10),
+            Submitted: formatDate(v.created_at),
           }))}
         />
       </div>

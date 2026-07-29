@@ -64,7 +64,7 @@ export default async function AdminOrganizers({
               action={bulkUploadOrganizers}
               templateHref="/organizers-template.csv"
               entityLabel="account"
-              note={`Each row creates a real login instantly and emails a temporary password — max 200 rows per upload. ${IBAN_CSV_NOTE}`}
+              note={`Each row creates a real login instantly and emails a temporary password — max 200 rows per upload. Dates use DD/MM/YYYY format. ${IBAN_CSV_NOTE}`}
             />
           </div>
           <h2 className="mb-3 text-lg font-bold">Create An Admin / Organizer Account</h2>
