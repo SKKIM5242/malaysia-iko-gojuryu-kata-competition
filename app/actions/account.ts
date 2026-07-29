@@ -266,7 +266,7 @@ export async function requestNewSubscription(
 
   const { data: competition } = await supabase
     .from("competitions")
-    .select("registration_fee_usd")
+    .select("registration_fee_usd, name")
     .eq("id", competitionId)
     .maybeSingle();
   const tierFee = Number(competition?.registration_fee_usd ?? 0);
@@ -294,7 +294,7 @@ export async function requestNewSubscription(
               unit_amount: renewalFee * 100,
               product_data: {
                 name: "New sign-in subscription — 3 months, 30 sign-ins",
-                description: "Malaysia Open Virtual Karate-do Kata Competition — Kata Arena sign-in renewal",
+                description: `${competition?.name ?? "Malaysia Open Virtual Karate-do Kata Competition"} — Kata Arena sign-in renewal`,
               },
             },
             quantity: 1,
