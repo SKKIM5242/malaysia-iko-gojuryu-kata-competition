@@ -1994,6 +1994,184 @@ export async function deleteAccessComparisonRow(formData: FormData) {
   backTo(returnTo, { ok: "Access Comparison row deleted." });
 }
 
+// ── Notification Reference + Telegram-Link Reference tables ────────────────
+// Two hand-maintained documentation tables on /admin/content: every button
+// in the app and what it does/doesn't notify (email / Telegram DM / "join
+// group" link), and which roles can ever end up Telegram-linked. Same
+// editable-table + CSV import/export shape as the Access Matrix above —
+// these describe app behavior, they don't drive it.
+
+export async function saveNotificationReferenceRow(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/content";
+  const { supabase, actorId } = await getActor();
+  await requireAccessTableEditor(supabase, actorId, returnTo);
+  const values = {
+    position: Number(formData.get("position") ?? 0) || 0,
+    page: String(formData.get("page") ?? "").trim(),
+    button_label: String(formData.get("button_label") ?? "").trim(),
+    sends_email: String(formData.get("sends_email") ?? "").trim(),
+    sends_telegram_dm: String(formData.get("sends_telegram_dm") ?? "").trim(),
+    telegram_group_link: String(formData.get("telegram_group_link") ?? "").trim(),
+    notes: String(formData.get("notes") ?? "").trim() || null,
+  };
+  if (!values.page || !values.button_label) backTo(returnTo, { error: "Page and Button are required." });
+  const { error } = id
+    ? await supabase.from("notification_reference_rows").update(values).eq("id", id)
+    : await supabase.from("notification_reference_rows").insert(values);
+  if (error) backTo(returnTo, { error: "Could not save the row." });
+  await writeAudit(supabase, {
+    table_name: "notification_reference_rows", record_id: id || null,
+    action: id ? "notification_reference_row_updated" : "notification_reference_row_created",
+    new_value: values, actor_id: actorId,
+  });
+  backTo(returnTo, { ok: "Notification Reference row saved." });
+}
+
+export async function deleteNotificationReferenceRow(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/content";
+  const { supabase, actorId } = await getActor();
+  await requireAccessTableEditor(supabase, actorId, returnTo);
+  const { error } = await supabase.from("notification_reference_rows").delete().eq("id", id);
+  if (error) backTo(returnTo, { error: "Could not delete the row." });
+  await writeAudit(supabase, {
+    table_name: "notification_reference_rows", record_id: id, action: "notification_reference_row_deleted", actor_id: actorId,
+  });
+  backTo(returnTo, { ok: "Notification Reference row deleted." });
+}
+
+const NOTIFICATION_REFERENCE_CSV_COLUMNS = [
+  "position", "page", "button_label", "sends_email", "sends_telegram_dm", "telegram_group_link", "notes",
+] as const;
+
+export async function bulkUploadNotificationReferenceRows(_prev: CsvUploadResult, formData: FormData): Promise<CsvUploadResult> {
+  const returnTo = "/admin/content";
+  const file = formData.get("csv_file");
+  if (!(file instanceof File) || file.size === 0) return { done: false, error: "Choose a CSV file to upload." };
+  if (file.size > 5 * 1024 * 1024) return { done: false, error: "CSV file too large (max 5 MB)." };
+
+  const parsed = parseCsvWithHeader(await file.text(), NOTIFICATION_REFERENCE_CSV_COLUMNS);
+  if ("error" in parsed) return { done: false, error: parsed.error };
+  const { dataRows, get } = parsed;
+  if (dataRows.length === 0) return { done: false, error: "The CSV has no data rows." };
+  if (dataRows.length > 200) return { done: false, error: "Maximum 200 rows per upload." };
+
+  const { supabase, actorId } = await getActor();
+  const roleError = await bulkUploadRoleError(supabase, actorId);
+  if (roleError) return { done: false, error: roleError };
+
+  const failures: Array<{ row: number; name: string; error: string }> = [];
+  let succeeded = 0;
+  for (let i = 0; i < dataRows.length; i++) {
+    const r = dataRows[i];
+    const rowNo = i + 2;
+    const page = get(r, "page");
+    const button_label = get(r, "button_label");
+    if (!page || !button_label) { failures.push({ row: rowNo, name: `Row ${rowNo}`, error: "page and button_label are required" }); continue; }
+    const values = {
+      position: Number(get(r, "position")) || 0,
+      page,
+      button_label,
+      sends_email: get(r, "sends_email"),
+      sends_telegram_dm: get(r, "sends_telegram_dm"),
+      telegram_group_link: get(r, "telegram_group_link"),
+      notes: get(r, "notes") || null,
+    };
+    const { data, error } = await supabase.from("notification_reference_rows").insert(values).select("id").single();
+    if (error) { failures.push({ row: rowNo, name: button_label, error: "Could not save" }); continue; }
+    await writeAudit(supabase, {
+      table_name: "notification_reference_rows", record_id: data!.id, action: "notification_reference_row_created",
+      new_value: values, actor_id: actorId,
+    });
+    succeeded++;
+  }
+  revalidatePath(returnTo);
+  return { done: true, succeeded, failed: failures.length, failures: failures.slice(0, 50) };
+}
+
+export async function saveTelegramLinkReferenceRow(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/content";
+  const { supabase, actorId } = await getActor();
+  await requireAccessTableEditor(supabase, actorId, returnTo);
+  const values = {
+    position: Number(formData.get("position") ?? 0) || 0,
+    role: String(formData.get("role") ?? "").trim(),
+    can_be_linked: String(formData.get("can_be_linked") ?? "").trim(),
+    how_to_link: String(formData.get("how_to_link") ?? "").trim(),
+    notes: String(formData.get("notes") ?? "").trim() || null,
+  };
+  if (!values.role) backTo(returnTo, { error: "Role is required." });
+  const { error } = id
+    ? await supabase.from("telegram_link_reference_rows").update(values).eq("id", id)
+    : await supabase.from("telegram_link_reference_rows").insert(values);
+  if (error) backTo(returnTo, { error: "Could not save the row." });
+  await writeAudit(supabase, {
+    table_name: "telegram_link_reference_rows", record_id: id || null,
+    action: id ? "telegram_link_reference_row_updated" : "telegram_link_reference_row_created",
+    new_value: values, actor_id: actorId,
+  });
+  backTo(returnTo, { ok: "Telegram Link Reference row saved." });
+}
+
+export async function deleteTelegramLinkReferenceRow(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/content";
+  const { supabase, actorId } = await getActor();
+  await requireAccessTableEditor(supabase, actorId, returnTo);
+  const { error } = await supabase.from("telegram_link_reference_rows").delete().eq("id", id);
+  if (error) backTo(returnTo, { error: "Could not delete the row." });
+  await writeAudit(supabase, {
+    table_name: "telegram_link_reference_rows", record_id: id, action: "telegram_link_reference_row_deleted", actor_id: actorId,
+  });
+  backTo(returnTo, { ok: "Telegram Link Reference row deleted." });
+}
+
+const TELEGRAM_LINK_REFERENCE_CSV_COLUMNS = ["position", "role", "can_be_linked", "how_to_link", "notes"] as const;
+
+export async function bulkUploadTelegramLinkReferenceRows(_prev: CsvUploadResult, formData: FormData): Promise<CsvUploadResult> {
+  const returnTo = "/admin/content";
+  const file = formData.get("csv_file");
+  if (!(file instanceof File) || file.size === 0) return { done: false, error: "Choose a CSV file to upload." };
+  if (file.size > 5 * 1024 * 1024) return { done: false, error: "CSV file too large (max 5 MB)." };
+
+  const parsed = parseCsvWithHeader(await file.text(), TELEGRAM_LINK_REFERENCE_CSV_COLUMNS);
+  if ("error" in parsed) return { done: false, error: parsed.error };
+  const { dataRows, get } = parsed;
+  if (dataRows.length === 0) return { done: false, error: "The CSV has no data rows." };
+  if (dataRows.length > 200) return { done: false, error: "Maximum 200 rows per upload." };
+
+  const { supabase, actorId } = await getActor();
+  const roleError = await bulkUploadRoleError(supabase, actorId);
+  if (roleError) return { done: false, error: roleError };
+
+  const failures: Array<{ row: number; name: string; error: string }> = [];
+  let succeeded = 0;
+  for (let i = 0; i < dataRows.length; i++) {
+    const r = dataRows[i];
+    const rowNo = i + 2;
+    const role = get(r, "role");
+    if (!role) { failures.push({ row: rowNo, name: `Row ${rowNo}`, error: "role is required" }); continue; }
+    const values = {
+      position: Number(get(r, "position")) || 0,
+      role,
+      can_be_linked: get(r, "can_be_linked"),
+      how_to_link: get(r, "how_to_link"),
+      notes: get(r, "notes") || null,
+    };
+    const { data, error } = await supabase.from("telegram_link_reference_rows").insert(values).select("id").single();
+    if (error) { failures.push({ row: rowNo, name: role, error: "Could not save" }); continue; }
+    await writeAudit(supabase, {
+      table_name: "telegram_link_reference_rows", record_id: data!.id, action: "telegram_link_reference_row_created",
+      new_value: values, actor_id: actorId,
+    });
+    succeeded++;
+  }
+  revalidatePath(returnTo);
+  return { done: true, succeeded, failed: failures.length, failures: failures.slice(0, 50) };
+}
+
 // ── Telegram Groups ──────────────────────────────────────────────────────────
 
 async function requireTelegramGroupEditor(

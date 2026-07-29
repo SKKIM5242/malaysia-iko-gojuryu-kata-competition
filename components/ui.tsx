@@ -121,16 +121,16 @@ export function SiteFooter() {
           </p>
           <p className="font-bold [@media(max-height:500px)_and_(orientation:landscape)]:text-[10px]">Record your Kata live to compete online.</p>
           <p className="mt-1 text-[10px] leading-tight text-neutral-300 sm:text-xs [@media(max-height:500px)_and_(orientation:landscape)]:mt-0.5 [@media(max-height:500px)_and_(orientation:landscape)]:text-[9px]">
-            Organizer:{" "}
+            Organizer &amp; Copyright ©{" "}
             <a
               href="https://www.mixo.io/site/iko-goju-ryu-karate-do-m-sdn-bhd-wt9nk"
               target="_blank"
               rel="noopener noreferrer"
               className="font-semibold underline underline-offset-2 hover:text-white"
             >
-              IKO GOJU-RYU KARATE-DO (M) SDN BHD
+              IKO Goju-ryu Karate-do Malaysia Sdn Bhd
             </a>
-            {" "}· Copyright © IKO Goju-ryu Karate-do (M) Sdn Bhd - All Rights Reserved.
+            {" "}- All Rights Reserved.
           </p>
           <Link
             href="/register"

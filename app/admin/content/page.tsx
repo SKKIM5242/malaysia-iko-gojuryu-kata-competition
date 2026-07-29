@@ -8,6 +8,8 @@ import {
   saveAccessComparisonRow, deleteAccessComparisonRow,
   saveSignInRoleDefault, deleteSignInRoleDefault,
   bulkUploadAccessMatrixRows, bulkUploadSignInRoleDefaults, bulkUploadAccessComparisonRows,
+  saveNotificationReferenceRow, deleteNotificationReferenceRow, bulkUploadNotificationReferenceRows,
+  saveTelegramLinkReferenceRow, deleteTelegramLinkReferenceRow, bulkUploadTelegramLinkReferenceRows,
 } from "@/app/actions/admin";
 import { AdminShell, Card, adminBtn, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice, formatDate } from "@/components/ui";
@@ -56,14 +58,18 @@ export default async function AdminContent({
     );
   }
 
-  const [announcements, competitions, { data: matrixRows }, { data: comparisonRows }, { data: signInDefaults }] =
-    await Promise.all([
-      getAllAnnouncements(),
-      getAllCompetitions(),
-      supabase.from("access_matrix_rows").select("*").order("position"),
-      supabase.from("access_comparison_rows").select("*").order("position"),
-      supabase.from("sign_in_role_defaults").select("*").order("sort_order"),
-    ]);
+  const [
+    announcements, competitions, { data: matrixRows }, { data: comparisonRows }, { data: signInDefaults },
+    { data: notificationRows }, { data: telegramLinkRows },
+  ] = await Promise.all([
+    getAllAnnouncements(),
+    getAllCompetitions(),
+    supabase.from("access_matrix_rows").select("*").order("position"),
+    supabase.from("access_comparison_rows").select("*").order("position"),
+    supabase.from("sign_in_role_defaults").select("*").order("sort_order"),
+    supabase.from("notification_reference_rows").select("*").order("position"),
+    supabase.from("telegram_link_reference_rows").select("*").order("position"),
+  ]);
   const editing = params.edit ? announcements.find((a) => a.id === params.edit) : undefined;
 
   // Suggested access levels — the "drop-down choices" available in every
@@ -426,7 +432,8 @@ export default async function AdminContent({
               { key: "role", label: "Role", width: 150 },
               { key: "default_sign_in_limit", label: "Default sign-ins", width: 140 },
               { key: "tier_tied", label: "Tier-tied?", width: 90 },
-              { key: "validity", label: "Validity (start – end)", width: 240 },
+              { key: "valid_from", label: "Valid From", width: 130 },
+              { key: "valid_until", label: "Valid Until", width: 130 },
               { key: "notes", label: "Notes", width: 260, wrap: true },
               { key: "actions", label: "Actions", width: 150 },
             ]}
@@ -450,12 +457,11 @@ export default async function AdminContent({
                     <input form="signin-new" type="checkbox" name="tier_tied" className="h-3.5 w-3.5" /> Tier-tied
                   </label>
                 ),
-                validity: (
-                  <div className="flex items-center gap-1">
-                    <input form="signin-new" name="valid_from" type="date" className={cellInput} title="Valid from (optional override)" />
-                    <span className="text-neutral-400">–</span>
-                    <input form="signin-new" name="valid_until" type="date" className={cellInput} title="Valid until (optional override)" />
-                  </div>
+                valid_from: (
+                  <input form="signin-new" name="valid_from" type="date" className={cellInput} title="Valid from (optional override)" />
+                ),
+                valid_until: (
+                  <input form="signin-new" name="valid_until" type="date" className={cellInput} title="Valid until (optional override)" />
                 ),
                 notes: <input form="signin-new" name="notes" placeholder="Note (optional)" className={cellInput} />,
                 actions: <span className="text-xs text-neutral-400">New row — Save above</span>,
@@ -480,12 +486,25 @@ export default async function AdminContent({
                     <input form={`signin-${r.id}`} type="checkbox" name="tier_tied" defaultChecked={r.tier_tied} className="h-3.5 w-3.5" /> Tier-tied
                   </label>
                 ),
-                validity: (
-                  <div className="flex items-center gap-1" title="Optional override — when set, wins over the dynamic tier-derived window">
-                    <input form={`signin-${r.id}`} name="valid_from" type="date" defaultValue={r.valid_from ?? ""} className={cellInput} />
-                    <span className="text-neutral-400">–</span>
-                    <input form={`signin-${r.id}`} name="valid_until" type="date" defaultValue={r.valid_until ?? ""} className={cellInput} />
-                  </div>
+                valid_from: (
+                  <input
+                    form={`signin-${r.id}`}
+                    name="valid_from"
+                    type="date"
+                    defaultValue={r.valid_from ?? ""}
+                    className={cellInput}
+                    title="Optional override — when set, wins over the dynamic tier-derived window"
+                  />
+                ),
+                valid_until: (
+                  <input
+                    form={`signin-${r.id}`}
+                    name="valid_until"
+                    type="date"
+                    defaultValue={r.valid_until ?? ""}
+                    className={cellInput}
+                    title="Optional override — when set, wins over the dynamic tier-derived window"
+                  />
                 ),
                 notes: <input form={`signin-${r.id}`} name="notes" defaultValue={r.notes ?? ""} placeholder="Note" className={cellInput} />,
                 actions: (
@@ -626,6 +645,188 @@ export default async function AdminContent({
           action={bulkUploadAccessComparisonRows}
           templateHref="/access-comparison-template.csv"
           entityLabel="access comparison row"
+        />
+      </div>
+
+      <div className="mt-10 space-y-3">
+        <h2 className="text-lg font-bold">Notification Reference (Editable)</h2>
+        <p className="text-sm text-neutral-500">
+          Every button across the app, and whether clicking it sends an email, a Telegram DM, or a
+          &quot;join Telegram group&quot; link — kept here because a button&apos;s name alone often
+          doesn&apos;t say which of these actually fire.
+        </p>
+        {(notificationRows ?? []).map((r) => (
+          <form key={r.id} id={`notif-ref-${r.id}`} action={saveNotificationReferenceRow}>
+            <input type="hidden" name="id" value={r.id} />
+            <input type="hidden" name="return_to" value={RETURN_TO} />
+          </form>
+        ))}
+        <form id="notif-ref-new" action={saveNotificationReferenceRow}>
+          <input type="hidden" name="return_to" value={RETURN_TO} />
+        </form>
+        <button form="notif-ref-new" type="submit" className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-neutral-700">
+          + Add row (fill below, then Save on the new row)
+        </button>
+        <FilterableTable
+          rowKey="id"
+          downloadName="notification-reference"
+          stickyColumns={2}
+          firstColumnWidth={56}
+          columns={[
+            { key: "position", label: "No.", width: 56 },
+            { key: "page", label: "Page", width: 220, wrap: true },
+            { key: "button_label", label: "Button", width: 220, wrap: true },
+            { key: "sends_email", label: "Sends Email?", width: 160, wrap: true },
+            { key: "sends_telegram_dm", label: "Sends Telegram DM?", width: 160, wrap: true },
+            { key: "telegram_group_link", label: "Join Group Link?", width: 200, wrap: true },
+            { key: "notes", label: "Notes", width: 280, wrap: true },
+            { key: "actions", label: "Actions", width: 150 },
+          ]}
+          csvColumns={[
+            { key: "position_csv", label: "No." },
+            { key: "page_csv", label: "Page" },
+            { key: "button_label_csv", label: "Button" },
+            { key: "sends_email_csv", label: "Sends Email?" },
+            { key: "sends_telegram_dm_csv", label: "Sends Telegram DM?" },
+            { key: "telegram_group_link_csv", label: "Join Group Link?" },
+            { key: "notes_csv", label: "Notes" },
+          ]}
+          rows={[
+            {
+              id: "notif-ref-new-row",
+              position: <input form="notif-ref-new" name="position" type="number" min="1" placeholder="No." className={cellInput} />,
+              page: <input form="notif-ref-new" name="page" required placeholder="Page *" className={cellInput} />,
+              button_label: <input form="notif-ref-new" name="button_label" required placeholder="Button *" className={cellInput} />,
+              sends_email: <input form="notif-ref-new" name="sends_email" placeholder="Yes / No / ..." className={cellInput} />,
+              sends_telegram_dm: <input form="notif-ref-new" name="sends_telegram_dm" placeholder="Yes / No / ..." className={cellInput} />,
+              telegram_group_link: <input form="notif-ref-new" name="telegram_group_link" placeholder="Yes / No / ..." className={cellInput} />,
+              notes: <input form="notif-ref-new" name="notes" placeholder="Note (optional)" className={cellInput} />,
+              actions: <span className="text-xs text-neutral-400">New row — Save above</span>,
+              position_csv: "", page_csv: "", button_label_csv: "", sends_email_csv: "", sends_telegram_dm_csv: "", telegram_group_link_csv: "", notes_csv: "",
+            },
+            ...(notificationRows ?? []).map((r) => ({
+              id: r.id as string,
+              position: <input form={`notif-ref-${r.id}`} name="position" type="number" min="1" defaultValue={r.position} className={cellInput} />,
+              page: <input form={`notif-ref-${r.id}`} name="page" required defaultValue={r.page} className={`${cellInput} font-semibold`} />,
+              button_label: <input form={`notif-ref-${r.id}`} name="button_label" required defaultValue={r.button_label} className={cellInput} />,
+              sends_email: <input form={`notif-ref-${r.id}`} name="sends_email" defaultValue={r.sends_email} className={cellInput} />,
+              sends_telegram_dm: <input form={`notif-ref-${r.id}`} name="sends_telegram_dm" defaultValue={r.sends_telegram_dm} className={cellInput} />,
+              telegram_group_link: <input form={`notif-ref-${r.id}`} name="telegram_group_link" defaultValue={r.telegram_group_link} className={cellInput} />,
+              notes: <input form={`notif-ref-${r.id}`} name="notes" defaultValue={r.notes ?? ""} placeholder="Note" className={cellInput} />,
+              actions: (
+                <span className="flex gap-1.5">
+                  <button form={`notif-ref-${r.id}`} type="submit" className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50">
+                    Save
+                  </button>
+                  <button
+                    form={`notif-ref-${r.id}`}
+                    formAction={deleteNotificationReferenceRow}
+                    className="rounded border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"
+                  >
+                    Delete
+                  </button>
+                </span>
+              ),
+              position_csv: String(r.position ?? ""),
+              page_csv: r.page as string,
+              button_label_csv: r.button_label as string,
+              sends_email_csv: (r.sends_email as string) ?? "",
+              sends_telegram_dm_csv: (r.sends_telegram_dm as string) ?? "",
+              telegram_group_link_csv: (r.telegram_group_link as string) ?? "",
+              notes_csv: (r.notes as string) ?? "",
+            })),
+          ]}
+        />
+        <CsvUploadForm
+          action={bulkUploadNotificationReferenceRows}
+          templateHref="/notification-reference-template.csv"
+          entityLabel="notification reference row"
+        />
+      </div>
+
+      <div className="mt-10 space-y-3">
+        <h2 className="text-lg font-bold">Telegram Link Reference (Editable)</h2>
+        <p className="text-sm text-neutral-500">
+          Which roles can ever end up Telegram-linked (able to receive a DM), how they get linked,
+          and which roles have no way to link at all today — a DM attempt to an unlinked role is
+          always a silent no-op, never an error.
+        </p>
+        {(telegramLinkRows ?? []).map((r) => (
+          <form key={r.id} id={`tg-link-${r.id}`} action={saveTelegramLinkReferenceRow}>
+            <input type="hidden" name="id" value={r.id} />
+            <input type="hidden" name="return_to" value={RETURN_TO} />
+          </form>
+        ))}
+        <form id="tg-link-new" action={saveTelegramLinkReferenceRow}>
+          <input type="hidden" name="return_to" value={RETURN_TO} />
+        </form>
+        <button form="tg-link-new" type="submit" className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-neutral-700">
+          + Add row (fill below, then Save on the new row)
+        </button>
+        <FilterableTable
+          rowKey="id"
+          downloadName="telegram-link-reference"
+          stickyColumns={2}
+          firstColumnWidth={56}
+          columns={[
+            { key: "position", label: "No.", width: 56 },
+            { key: "role", label: "Role", width: 220, wrap: true },
+            { key: "can_be_linked", label: "Can Be Telegram-Linked?", width: 220, wrap: true },
+            { key: "how_to_link", label: "How To Link", width: 280, wrap: true },
+            { key: "notes", label: "Notes", width: 300, wrap: true },
+            { key: "actions", label: "Actions", width: 150 },
+          ]}
+          csvColumns={[
+            { key: "position_csv", label: "No." },
+            { key: "role_csv", label: "Role" },
+            { key: "can_be_linked_csv", label: "Can Be Telegram-Linked?" },
+            { key: "how_to_link_csv", label: "How To Link" },
+            { key: "notes_csv", label: "Notes" },
+          ]}
+          rows={[
+            {
+              id: "tg-link-new-row",
+              position: <input form="tg-link-new" name="position" type="number" min="1" placeholder="No." className={cellInput} />,
+              role: <input form="tg-link-new" name="role" required placeholder="Role *" className={cellInput} />,
+              can_be_linked: <input form="tg-link-new" name="can_be_linked" placeholder="Yes / No / ..." className={cellInput} />,
+              how_to_link: <input form="tg-link-new" name="how_to_link" placeholder="How (optional)" className={cellInput} />,
+              notes: <input form="tg-link-new" name="notes" placeholder="Note (optional)" className={cellInput} />,
+              actions: <span className="text-xs text-neutral-400">New row — Save above</span>,
+              position_csv: "", role_csv: "", can_be_linked_csv: "", how_to_link_csv: "", notes_csv: "",
+            },
+            ...(telegramLinkRows ?? []).map((r) => ({
+              id: r.id as string,
+              position: <input form={`tg-link-${r.id}`} name="position" type="number" min="1" defaultValue={r.position} className={cellInput} />,
+              role: <input form={`tg-link-${r.id}`} name="role" required defaultValue={r.role} className={`${cellInput} font-semibold`} />,
+              can_be_linked: <input form={`tg-link-${r.id}`} name="can_be_linked" defaultValue={r.can_be_linked} className={cellInput} />,
+              how_to_link: <input form={`tg-link-${r.id}`} name="how_to_link" defaultValue={r.how_to_link} className={cellInput} />,
+              notes: <input form={`tg-link-${r.id}`} name="notes" defaultValue={r.notes ?? ""} placeholder="Note" className={cellInput} />,
+              actions: (
+                <span className="flex gap-1.5">
+                  <button form={`tg-link-${r.id}`} type="submit" className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50">
+                    Save
+                  </button>
+                  <button
+                    form={`tg-link-${r.id}`}
+                    formAction={deleteTelegramLinkReferenceRow}
+                    className="rounded border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"
+                  >
+                    Delete
+                  </button>
+                </span>
+              ),
+              position_csv: String(r.position ?? ""),
+              role_csv: r.role as string,
+              can_be_linked_csv: (r.can_be_linked as string) ?? "",
+              how_to_link_csv: (r.how_to_link as string) ?? "",
+              notes_csv: (r.notes as string) ?? "",
+            })),
+          ]}
+        />
+        <CsvUploadForm
+          action={bulkUploadTelegramLinkReferenceRows}
+          templateHref="/telegram-link-reference-template.csv"
+          entityLabel="telegram link reference row"
         />
       </div>
     </AdminShell>
