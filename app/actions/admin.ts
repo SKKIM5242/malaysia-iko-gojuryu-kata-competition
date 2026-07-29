@@ -11,7 +11,7 @@ import {
   notifyRefereeAssignment, notifyRefereeUnassigned, sendConfirmationEmail, notifyAnnouncementPublished,
   notifyCertificatesPublished, notifyInvitationCodeIssued, notifyStatusChanged,
   notifyOrganizersBulkPaymentConfirmed, notifyOrganizersBulkTallyDone, notifySenseiBulkPaymentConfirmed,
-  notifySenseiBulkCsvConfirmed, notifyOrganizersDirectoryBulkUpload,
+  notifySenseiBulkCsvConfirmed, notifyOrganizersDirectoryBulkUpload, sendAdminTelegramDM,
 } from "@/lib/notify";
 import { applySubscriptionRenewalTerms } from "@/lib/finalize";
 import type { PaymentStatus } from "@/lib/types";
@@ -2235,6 +2235,51 @@ export async function deleteTelegramGroup(formData: FormData) {
     table_name: "telegram_groups", record_id: id, action: "telegram_group_deleted", actor_id: actorId,
   });
   backTo(returnTo, { ok: "Telegram group deleted." });
+}
+
+// ── Admin Telegram Direct Messages ──────────────────────────────────────────
+
+async function requireTelegramDmSender(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  actorId: string | null,
+  returnTo: string,
+) {
+  const role = await getActorRole(supabase, actorId);
+  if (!["admin", "organizer", "staff", "customer_support", "referee"].includes(role ?? "")) {
+    backTo(returnTo, { error: "You don't have permission to send Telegram messages." });
+  }
+}
+
+/** Sends a manually-composed Telegram DM to one connected profile (see
+ * /admin/telegram-dm). The chat id is always re-resolved server-side from
+ * the profile's user_id -- never trusted from the submitted form -- so
+ * nobody can be DMed by tampering with a chat id in the request. */
+export async function sendAdminTelegramDirectMessage(formData: FormData) {
+  const userId = String(formData.get("user_id") ?? "");
+  const message = String(formData.get("message") ?? "").trim();
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/telegram-dm";
+  const { supabase, actorId } = await getActor();
+  await requireTelegramDmSender(supabase, actorId, returnTo);
+  if (!message) backTo(returnTo, { error: "Message text is required." });
+  if (!userId) backTo(returnTo, { error: "No recipient selected." });
+
+  const { data: recipient } = await supabase
+    .from("profiles")
+    .select("full_name, email, telegram_chat_id")
+    .eq("user_id", userId)
+    .maybeSingle();
+  const chatId = recipient?.telegram_chat_id as string | null;
+  const recipientLabel = (recipient?.full_name as string | null) || (recipient?.email as string | null) || "that person";
+  if (!chatId) backTo(returnTo, { error: `${recipientLabel} hasn't connected Telegram yet — nothing was sent.` });
+
+  const result = await sendAdminTelegramDM(chatId!, message);
+  await writeAudit(supabase, {
+    table_name: "profiles", record_id: userId, action: "admin_telegram_dm_sent",
+    new_value: { to: recipientLabel, message, ok: result.ok, error: result.error ?? null },
+    actor_id: actorId,
+  });
+  if (!result.ok) backTo(returnTo, { error: result.error ?? "Could not send the message." });
+  backTo(returnTo, { ok: `Message sent to ${recipientLabel}.` });
 }
 
 // ── Participant Support tickets (per-resolved-ticket bounty) ────────────────

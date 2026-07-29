@@ -30,6 +30,7 @@ const FULL_NAV: Array<[string, string]> = [
   ["Commissions", "/admin/commissions"],
   ["Certificates", "/admin/certificates"],
   ["Telegram Links", "/admin/telegram"],
+  ["Telegram DM", "/admin/telegram-dm"],
   ["Classes", "/admin/classes"],
   ["Content", "/admin/content"],
   ["Accounts", "/admin/accounts"],

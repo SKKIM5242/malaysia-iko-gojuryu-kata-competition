@@ -691,6 +691,31 @@ async function organizerRecipients(): Promise<
   }));
 }
 
+/** Sends a manually-composed Telegram DM from the admin panel (see
+ * sendAdminTelegramDirectMessage in app/actions/admin.ts). Unlike every
+ * other notify function in this file, this is a deliberate, explicit send
+ * a staff member is choosing to make right now -- not a best-effort side
+ * effect of some other action -- so it reports success/failure back
+ * instead of swallowing errors silently. */
+export async function sendAdminTelegramDM(chatId: string, text: string): Promise<{ ok: boolean; error?: string }> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) return { ok: false, error: "Telegram bot is not configured (TELEGRAM_BOT_TOKEN missing)." };
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, text }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      return { ok: false, error: `Telegram rejected the message (${res.status}): ${body.slice(0, 200)}` };
+    }
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Network error sending to Telegram." };
+  }
+}
+
 async function sendDirectTelegramDM(chatId: string | null, text: string): Promise<void> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token || !chatId) return;
