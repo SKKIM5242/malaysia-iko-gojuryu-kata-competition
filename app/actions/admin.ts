@@ -664,16 +664,19 @@ async function persistCategoryOrder(
   );
 }
 
-/** Moves an entire kata group (e.g. "Kata Saifa", all its belt/age/gender
- * sub-categories together) one position up or down among the other kata
- * groups in the same competition -- lets the organizer reorder which event
- * appears first without touching any individual sub-category's own
- * ordering within that group. */
-export async function moveCategoryGroup(formData: FormData) {
+/** Drags an entire kata group (e.g. "Kata Saifa", all its belt/age/gender
+ * sub-categories together) to sit where another kata group currently is
+ * among the other kata groups in the same competition -- lets the
+ * organizer reorder which event appears first without touching any
+ * individual sub-category's own ordering within that group. */
+export async function reorderCategoryGroups(formData: FormData) {
   const competitionId = String(formData.get("competition_id") ?? "");
-  const kataBase = String(formData.get("kata_base") ?? "");
-  const direction = formData.get("direction") === "up" ? "up" : "down";
+  const sourceBase = String(formData.get("source_base") ?? "");
+  const targetBase = String(formData.get("target_base") ?? "");
   const returnTo = String(formData.get("return_to") ?? "") || "/admin/competitions";
+  if (!sourceBase || !targetBase || sourceBase === targetBase) {
+    backTo(returnTo, { error: "Could not reorder — try again." });
+  }
   const { supabase } = await getActor();
 
   const { data: all } = await supabase
@@ -683,12 +686,14 @@ export async function moveCategoryGroup(formData: FormData) {
     .order("sort_order")
     .order("name");
   const groups = groupByKata((all ?? []) as Category[]);
-  const i = groups.findIndex(([base]) => base === kataBase);
-  const j = direction === "up" ? i - 1 : i + 1;
-  if (i === -1 || j < 0 || j >= groups.length) {
-    backTo(returnTo, { error: "Already at that end of the list." });
-  }
-  [groups[i], groups[j]] = [groups[j], groups[i]];
+  const sourceIdx = groups.findIndex(([base]) => base === sourceBase);
+  if (sourceIdx === -1) backTo(returnTo, { error: "Could not reorder — try again." });
+  const [moved] = groups.splice(sourceIdx, 1);
+  // Recomputed AFTER removing the source, so the insert lands in the right
+  // spot whether the drop target was earlier or later in the list.
+  const targetIdx = groups.findIndex(([base]) => base === targetBase);
+  if (targetIdx === -1) backTo(returnTo, { error: "Could not reorder — try again." });
+  groups.splice(targetIdx, 0, moved);
 
   const flattened = groups.flatMap(([, cats]) => cats);
   const changes = flattened
@@ -699,17 +704,21 @@ export async function moveCategoryGroup(formData: FormData) {
   backTo(returnTo, { ok: "Kata order updated." });
 }
 
-/** Moves one sub-category (a single belt/age/gender row) up or down within
- * its own kata group, without affecting the group's position among other
- * kata groups or any other group's internal ordering. */
-export async function moveCategorySubcategory(formData: FormData) {
-  const categoryId = String(formData.get("category_id") ?? "");
-  const direction = formData.get("direction") === "up" ? "up" : "down";
+/** Drags one sub-category (a single belt/age/gender row) to sit where
+ * another row currently is within its own kata group, without affecting
+ * the group's position among other kata groups or any other group's
+ * internal ordering. */
+export async function reorderSubcategories(formData: FormData) {
+  const sourceId = String(formData.get("source_id") ?? "");
+  const targetId = String(formData.get("target_id") ?? "");
   const returnTo = String(formData.get("return_to") ?? "") || "/admin/competitions";
+  if (!sourceId || !targetId || sourceId === targetId) {
+    backTo(returnTo, { error: "Could not reorder — try again." });
+  }
   const { supabase } = await getActor();
 
   const { data: source } = await supabase
-    .from("categories").select("competition_id, name").eq("id", categoryId).maybeSingle();
+    .from("categories").select("competition_id, name").eq("id", sourceId).maybeSingle();
   if (!source) backTo(returnTo, { error: "Category not found." });
 
   const { data: all } = await supabase
@@ -723,12 +732,12 @@ export async function moveCategorySubcategory(formData: FormData) {
   const groupIdx = groups.findIndex(([base]) => base === kataBase);
   if (groupIdx === -1) backTo(returnTo, { error: "Category not found." });
   const cats = groups[groupIdx][1];
-  const i = cats.findIndex((c) => c.id === categoryId);
-  const j = direction === "up" ? i - 1 : i + 1;
-  if (i === -1 || j < 0 || j >= cats.length) {
-    backTo(returnTo, { error: "Already at that end of the list." });
-  }
-  [cats[i], cats[j]] = [cats[j], cats[i]];
+  const srcIdx = cats.findIndex((c) => c.id === sourceId);
+  if (srcIdx === -1) backTo(returnTo, { error: "Category not found." });
+  const [moved] = cats.splice(srcIdx, 1);
+  const tgtIdx = cats.findIndex((c) => c.id === targetId);
+  if (tgtIdx === -1) backTo(returnTo, { error: "Could not reorder — try again." });
+  cats.splice(tgtIdx, 0, moved);
   groups[groupIdx] = [groups[groupIdx][0], cats];
 
   const flattened = groups.flatMap(([, c]) => c);

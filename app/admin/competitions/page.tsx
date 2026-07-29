@@ -4,11 +4,12 @@ import { getCategories, schemaReady } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
 import {
   saveCompetition, saveCategory, deleteCategory, mergeCategoryToMix, mergeCategoryAgeGroup,
-  moveCategoryGroup, moveCategorySubcategory,
 } from "@/app/actions/admin";
 import { AdminShell, Card, adminBtn, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, NoTranslate, SetupNotice, formatDate, formatUSD } from "@/components/ui";
 import DownloadCsvButton from "@/components/DownloadCsvButton";
+import KataGroupDragZone from "@/components/KataGroupDragZone";
+import SubcategoryDragZone from "@/components/SubcategoryDragZone";
 import { groupByKata, kataBaseOf } from "@/lib/division";
 import type { Category } from "@/lib/types";
 
@@ -253,56 +254,36 @@ export default async function AdminCompetitions({
                       <p className="text-sm text-neutral-400">None yet — click &quot;+ Add category&quot; above to add one.</p>
                     ) : (
                       <div className="space-y-2">
-                        {groupByKata(categoriesByCompetition.get(c.id) ?? []).map(([base, cats], groupIdx, groupsArr) => (
+                        {groupByKata(categoriesByCompetition.get(c.id) ?? []).map(([base, cats]) => (
                           <details
                             key={base}
-                            className="rounded border border-neutral-100"
+                            className="group rounded border border-neutral-100"
                             open={params.openkata === base || cats.some((cat) => cat.id === params.editcat)}
                           >
-                            <summary className="flex cursor-pointer items-center justify-between gap-2 px-2 py-1.5 text-sm font-semibold text-neutral-800 hover:bg-neutral-50">
-                              <span>
-                                <NoTranslate>{base}</NoTranslate>{" "}
-                                <span className="font-normal text-neutral-400">({cats.length} sub-categories)</span>
+                            <summary className="flex cursor-pointer items-center gap-2 px-2 py-1.5 text-sm font-semibold text-neutral-800 [&::-webkit-details-marker]:hidden marker:hidden hover:bg-neutral-50">
+                              <span className="inline-block shrink-0 text-neutral-400 transition-transform group-open:rotate-90">
+                                ▶
                               </span>
-                              {canManageCompetition && (
-                                <span className="flex shrink-0 gap-1">
-                                  <form action={moveCategoryGroup}>
-                                    <input type="hidden" name="competition_id" value={c.id} />
-                                    <input type="hidden" name="kata_base" value={base} />
-                                    <input type="hidden" name="direction" value="up" />
-                                    <input type="hidden" name="return_to" value={categoryReturnTo(c.id, base)} />
-                                    <button
-                                      type="submit"
-                                      disabled={groupIdx === 0}
-                                      title="Move this kata event earlier in the list"
-                                      className="rounded border border-neutral-300 px-1.5 py-0.5 text-xs text-neutral-600 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-30"
-                                    >
-                                      ▲
-                                    </button>
-                                  </form>
-                                  <form action={moveCategoryGroup}>
-                                    <input type="hidden" name="competition_id" value={c.id} />
-                                    <input type="hidden" name="kata_base" value={base} />
-                                    <input type="hidden" name="direction" value="down" />
-                                    <input type="hidden" name="return_to" value={categoryReturnTo(c.id, base)} />
-                                    <button
-                                      type="submit"
-                                      disabled={groupIdx === groupsArr.length - 1}
-                                      title="Move this kata event later in the list"
-                                      className="rounded border border-neutral-300 px-1.5 py-0.5 text-xs text-neutral-600 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-30"
-                                    >
-                                      ▼
-                                    </button>
-                                  </form>
+                              {canManageCompetition ? (
+                                <KataGroupDragZone competitionId={c.id} base={base} returnTo={categoryReturnTo(c.id, base)}>
+                                  <span>
+                                    <NoTranslate>{base}</NoTranslate>{" "}
+                                    <span className="font-normal text-neutral-400">({cats.length} sub-categories)</span>
+                                  </span>
+                                </KataGroupDragZone>
+                              ) : (
+                                <span>
+                                  <NoTranslate>{base}</NoTranslate>{" "}
+                                  <span className="font-normal text-neutral-400">({cats.length} sub-categories)</span>
                                 </span>
                               )}
                             </summary>
                             <ul className="space-y-1 px-2 pb-2 pl-5">
-                              {cats.map((cat, catIdx) => {
+                              {cats.map((cat) => {
                                 const taken = categoryPaidCount.get(cat.id) ?? 0;
                                 const left = cat.max_participants != null ? Math.max(0, cat.max_participants - taken) : null;
-                                return (
-                                  <li key={cat.id} className="flex items-center justify-between gap-2 text-sm">
+                                const rowContent = (
+                                  <>
                                     <span className="text-neutral-600">
                                       {cat.name.split(" — ").slice(1).join(" — ") || cat.name}
                                     </span>
@@ -317,36 +298,6 @@ export default async function AdminCompetitions({
                                           : `${taken} taken (no cap)`}
                                       </span>
                                       <span className="flex gap-1">
-                                        {canManageCompetition && (
-                                          <>
-                                            <form action={moveCategorySubcategory}>
-                                              <input type="hidden" name="category_id" value={cat.id} />
-                                              <input type="hidden" name="direction" value="up" />
-                                              <input type="hidden" name="return_to" value={categoryReturnTo(c.id, base)} />
-                                              <button
-                                                type="submit"
-                                                disabled={catIdx === 0}
-                                                title="Move this row up within the kata event"
-                                                className="rounded border border-neutral-300 px-1.5 py-0.5 text-xs text-neutral-600 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-30"
-                                              >
-                                                ▲
-                                              </button>
-                                            </form>
-                                            <form action={moveCategorySubcategory}>
-                                              <input type="hidden" name="category_id" value={cat.id} />
-                                              <input type="hidden" name="direction" value="down" />
-                                              <input type="hidden" name="return_to" value={categoryReturnTo(c.id, base)} />
-                                              <button
-                                                type="submit"
-                                                disabled={catIdx === cats.length - 1}
-                                                title="Move this row down within the kata event"
-                                                className="rounded border border-neutral-300 px-1.5 py-0.5 text-xs text-neutral-600 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-30"
-                                              >
-                                                ▼
-                                              </button>
-                                            </form>
-                                          </>
-                                        )}
                                         {(cat.gender === "male" || cat.gender === "female") && (
                                           <form action={mergeCategoryToMix}>
                                             <input type="hidden" name="category_id" value={cat.id} />
@@ -397,6 +348,17 @@ export default async function AdminCompetitions({
                                         </form>
                                       </span>
                                     </span>
+                                  </>
+                                );
+                                return (
+                                  <li key={cat.id} className="flex items-center gap-2 text-sm">
+                                    {canManageCompetition ? (
+                                      <SubcategoryDragZone categoryId={cat.id} returnTo={categoryReturnTo(c.id, base)}>
+                                        {rowContent}
+                                      </SubcategoryDragZone>
+                                    ) : (
+                                      <div className="flex flex-1 items-center justify-between gap-2">{rowContent}</div>
+                                    )}
                                   </li>
                                 );
                               })}
