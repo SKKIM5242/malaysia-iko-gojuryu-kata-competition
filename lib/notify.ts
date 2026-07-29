@@ -341,12 +341,76 @@ async function postAnnouncementToGroup(
   }
 }
 
+/** Every table an announcement email goes out to, mirroring exactly which
+ * Telegram groups get the post (senseis ride along with schools -- same
+ * "school" category the rest of the app uses for them; "staff" covers
+ * Organizer/Admin/Participant-Support profiles, which is also the intended
+ * organizer/admin heads-up -- no separate email needed since staff already
+ * gets the same blast as everyone else). */
+async function announcementEmailRecipients(): Promise<string[]> {
+  const admin = createAdminClient();
+  const [participants, schools, senseis, referees, audiences, staff] = await Promise.all([
+    admin.from("participants").select("email"),
+    admin.from("schools").select("email"),
+    admin.from("senseis").select("email"),
+    admin.from("referees").select("email"),
+    admin.from("audiences").select("email"),
+    admin.from("profiles").select("email").in("role", ["organizer", "admin", "customer_support"]).eq("approved", true),
+  ]);
+  const collect = (rows: { data: Array<{ email: string | null }> | null }) =>
+    (rows.data ?? []).map((r) => r.email).filter((e): e is string => !!e);
+  return [
+    ...collect(participants), ...collect(schools), ...collect(senseis),
+    ...collect(referees), ...collect(audiences), ...collect(staff),
+  ];
+}
+
+/** Same Resend Batch API + 100-per-request chunking as sendConfirmationEmailBatch
+ * (see its comment for why: one-request-per-recipient blows through Resend's
+ * 10 req/s rate limit past ~10 recipients) -- a plain identical email to
+ * every address, no per-recipient template needed since an announcement's
+ * content doesn't vary by recipient. */
+async function sendPlainEmailBatch(toEmails: string[], subject: string, text: string): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return;
+  const from = process.env.EMAIL_FROM || "onboarding@resend.dev";
+  const unique = [...new Set(toEmails)];
+  if (unique.length === 0) return;
+  for (let i = 0; i < unique.length; i += RESEND_BATCH_SIZE) {
+    const chunk = unique.slice(i, i + RESEND_BATCH_SIZE);
+    try {
+      const res = await fetch("https://api.resend.com/emails/batch", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify(chunk.map((to) => ({ from, to, subject, text }))),
+      });
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        console.error(`[notify] Resend batch send failed (${res.status}) for ${chunk.length} recipients: ${body.slice(0, 500)}`);
+      }
+    } catch (err) {
+      console.error(`[notify] Resend batch send threw for ${chunk.length} recipients:`, err);
+    }
+  }
+}
+
 /** Fires when an announcement is published (tick "visible on public site")
- * — posts the same announcement into every group's Announcements topic. */
+ * — posts the same announcement into every group's Announcements topic,
+ * AND (previously missing entirely) emails every Participant, School,
+ * Sensei, Referee, Audience member, and Organizer/Admin/Participant-Support
+ * account on file. */
 export async function notifyAnnouncementPublished(title: string, body: string | null): Promise<void> {
-  await Promise.allSettled(
-    ANNOUNCEMENT_TELEGRAM_CATEGORIES.map((cat) => postAnnouncementToGroup(cat, title, body)),
-  );
+  await Promise.allSettled([
+    ...ANNOUNCEMENT_TELEGRAM_CATEGORIES.map((cat) => postAnnouncementToGroup(cat, title, body)),
+    (async () => {
+      const emails = await announcementEmailRecipients();
+      const text = [
+        "Hi,", "", title, ...(body ? ["", body] : []), "",
+        "— Malaysia Open Virtual Karate-do Kata Competition",
+      ].join("\n");
+      await sendPlainEmailBatch(emails, `📣 ${title}`, text);
+    })(),
+  ]);
 }
 
 const WINNER_TELEGRAM_CATEGORIES: TelegramCategory[] = [
@@ -653,6 +717,30 @@ async function notifyOrganizers(subject: string, bodyLines: string[], telegramTe
       o.email ? sendEmail(o.email, subject, emailText) : Promise.resolve(),
       sendDirectTelegramDM(o.telegramChatId, telegramText),
     ]),
+  );
+}
+
+/** Fires after any admin-panel directory CSV bulk upload (Schools, Senseis,
+ * Referees, Audience, Participants — see the bulkUpload* actions in
+ * app/actions/admin.ts) that created at least one row. These uploads
+ * previously notified nobody at all. `adminPath` points at the listing
+ * page so an organizer can jump straight to reviewing what came in. */
+export async function notifyOrganizersDirectoryBulkUpload(input: {
+  kind: string;
+  succeeded: number;
+  failed: number;
+  adminPath: string;
+}): Promise<void> {
+  if (input.succeeded === 0) return;
+  const link = `${appUrl()}${input.adminPath}`;
+  const failedNote = input.failed > 0 ? `, ${input.failed} row${input.failed === 1 ? "" : "s"} failed` : "";
+  await notifyOrganizers(
+    `Bulk CSV uploaded — ${input.kind} (${input.succeeded} added)`,
+    [
+      `A ${input.kind} CSV bulk upload just added ${input.succeeded} row${input.succeeded === 1 ? "" : "s"}${failedNote}.`,
+      `Review it here: ${link}`,
+    ],
+    `📥 Bulk CSV uploaded — ${input.kind}: ${input.succeeded} added${failedNote}. ${link}`,
   );
 }
 

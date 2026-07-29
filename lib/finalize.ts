@@ -1,7 +1,10 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStripe } from "@/lib/payments";
 import { writeAudit } from "@/lib/audit";
-import { sendConfirmationEmail, notifySubscriptionRenewed } from "@/lib/notify";
+import {
+  sendConfirmationEmail, notifySubscriptionRenewed,
+  notifySenseiBulkPaymentConfirmed, notifyOrganizersBulkPaymentConfirmed,
+} from "@/lib/notify";
 import { formatUSD } from "@/components/ui";
 
 export type FinalizeResult =
@@ -320,7 +323,7 @@ export async function finalizeBulkUploadBatchSession(sessionId: string): Promise
   const admin = createAdminClient();
   const { data: batchRows } = await admin
     .from("bulk_upload_payments")
-    .select("id, sensei_id, amount_usd, status")
+    .select("id, sensei_id, school_id, amount_usd, status")
     .eq("batch_id", batchId);
   if (!batchRows || batchRows.length === 0) return { status: "error", message: "Batch not found." };
 
@@ -337,22 +340,39 @@ export async function finalizeBulkUploadBatchSession(sessionId: string): Promise
       new_value: { batch_id: batchId, tiers: batchRows.length, stripe_session: sessionId },
     });
 
+    // Same organizer email+DM the manual "Confirm payment received" admin
+    // button sends (markBulkUploadPaymentPaid) -- the online Stripe path
+    // used to only email the sensei and never tell organizers at all.
     const senseiId = batchRows[0].sensei_id;
-    const { data: sensei } = await admin.from("senseis").select("name, email").eq("id", senseiId).maybeSingle();
-    if (sensei?.email) {
-      const totalAmount = batchRows.reduce((sum, r) => sum + Number(r.amount_usd), 0);
-      await sendConfirmationEmail({
-        toEmail: sensei.email,
-        recipientName: sensei.name ?? "Sensei",
-        subject: "Payment received — bulk registration unlocked",
-        bodyLines: [
-          `Your payment of ${formatUSD(totalAmount)} covering ${batchRows.length} tier${batchRows.length === 1 ? "" : "s"} is confirmed. A Stripe receipt was also sent to the email you entered at checkout.`,
-          `Batch reference: ${batchId.slice(0, 8).toUpperCase()}.`,
-          "Go back to the Bulk Registration page and upload your CSV or table using the same School and Sensei — no further payment needed for these participants.",
-          "Note: this batch reference is only for payment/upload tracking. Each participant gets their own individual Reference ID (sent separately once uploaded) — that is what they use with their IC/passport to sign in and record their kata.",
-        ],
-      });
+    const schoolId = batchRows[0].school_id;
+    const [{ data: sensei }, { data: school }] = await Promise.all([
+      admin.from("senseis").select("name, email, user_id").eq("id", senseiId).maybeSingle(),
+      admin.from("schools").select("name").eq("id", schoolId).maybeSingle(),
+    ]);
+    let senseiTelegramChatId: string | null = null;
+    if (sensei?.user_id) {
+      const { data: senseiProfile } = await admin
+        .from("profiles")
+        .select("telegram_chat_id")
+        .eq("user_id", sensei.user_id)
+        .maybeSingle();
+      senseiTelegramChatId = (senseiProfile?.telegram_chat_id as string | null) ?? null;
     }
+    const totalAmount = batchRows.reduce((sum, r) => sum + Number(r.amount_usd), 0);
+    const batchRef = batchId.slice(0, 8).toUpperCase();
+    await notifySenseiBulkPaymentConfirmed({
+      email: sensei?.email ?? null,
+      telegramChatId: senseiTelegramChatId,
+      senseiName: sensei?.name ?? "Sensei",
+      totalAmountLabel: formatUSD(totalAmount),
+      tierCount: batchRows.length,
+    });
+    await notifyOrganizersBulkPaymentConfirmed({
+      senseiName: sensei?.name ?? "Sensei",
+      schoolName: school?.name ?? "School",
+      batchRef,
+      tierSummary: `${batchRows.length} tier${batchRows.length === 1 ? "" : "s"} (${formatUSD(totalAmount)} total)`,
+    });
   }
 
   return { status: "paid", referenceIds: [batchId.slice(0, 8).toUpperCase()] };

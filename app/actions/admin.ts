@@ -11,7 +11,7 @@ import {
   notifyRefereeAssignment, notifyRefereeUnassigned, sendConfirmationEmail, notifyAnnouncementPublished,
   notifyCertificatesPublished, notifyInvitationCodeIssued, notifyStatusChanged,
   notifyOrganizersBulkPaymentConfirmed, notifyOrganizersBulkTallyDone, notifySenseiBulkPaymentConfirmed,
-  notifySenseiBulkCsvConfirmed,
+  notifySenseiBulkCsvConfirmed, notifyOrganizersDirectoryBulkUpload,
 } from "@/lib/notify";
 import { applySubscriptionRenewalTerms } from "@/lib/finalize";
 import type { PaymentStatus } from "@/lib/types";
@@ -3118,6 +3118,7 @@ export async function bulkUploadSchools(_prev: CsvUploadResult, formData: FormDa
     table_name: "schools", record_id: null, action: "bulk_csv_schools",
     new_value: { rows: dataRows.length, succeeded, failed: failures.length }, actor_id: actorId,
   });
+  await notifyOrganizersDirectoryBulkUpload({ kind: "Schools", succeeded, failed: failures.length, adminPath: "/admin/schools" });
   revalidatePath("/admin/schools");
   return { done: true, succeeded, failed: failures.length, failures: failures.slice(0, 50) };
 }
@@ -3212,6 +3213,7 @@ export async function bulkUploadSenseis(_prev: CsvUploadResult, formData: FormDa
     table_name: "senseis", record_id: null, action: "bulk_csv_senseis",
     new_value: { rows: dataRows.length, succeeded, failed: failures.length }, actor_id: actorId,
   });
+  await notifyOrganizersDirectoryBulkUpload({ kind: "Senseis", succeeded, failed: failures.length, adminPath: "/admin/senseis" });
   revalidatePath("/admin/senseis");
   return { done: true, succeeded, failed: failures.length, failures: failures.slice(0, 50) };
 }
@@ -3278,6 +3280,7 @@ export async function bulkUploadReferees(_prev: CsvUploadResult, formData: FormD
     table_name: "referees", record_id: null, action: "bulk_csv_referees",
     new_value: { rows: dataRows.length, succeeded, failed: failures.length }, actor_id: actorId,
   });
+  await notifyOrganizersDirectoryBulkUpload({ kind: "Referees", succeeded, failed: failures.length, adminPath: "/admin/referees" });
   revalidatePath("/admin/referees");
   return { done: true, succeeded, failed: failures.length, failures: failures.slice(0, 50) };
 }
@@ -3335,6 +3338,7 @@ export async function bulkUploadAudience(_prev: CsvUploadResult, formData: FormD
     table_name: "audiences", record_id: null, action: "bulk_csv_audience",
     new_value: { rows: dataRows.length, succeeded, failed: failures.length }, actor_id: actorId,
   });
+  await notifyOrganizersDirectoryBulkUpload({ kind: "Audience", succeeded, failed: failures.length, adminPath: "/admin/audience" });
   revalidatePath("/admin/audience");
   return { done: true, succeeded, failed: failures.length, failures: failures.slice(0, 50) };
 }
@@ -3455,6 +3459,7 @@ export async function bulkUploadParticipants(_prev: CsvUploadResult, formData: F
     table_name: "participants", record_id: null, action: "bulk_csv_participants",
     new_value: { rows: dataRows.length, succeeded, failed: failures.length }, actor_id: actorId,
   });
+  await notifyOrganizersDirectoryBulkUpload({ kind: "Participants", succeeded, failed: failures.length, adminPath: "/admin/participants" });
   revalidatePath("/admin/participants");
   return { done: true, succeeded, failed: failures.length, failures: failures.slice(0, 50) };
 }
