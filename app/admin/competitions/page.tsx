@@ -10,6 +10,7 @@ import { EmptyState, NoTranslate, SetupNotice, formatDate, formatUSD } from "@/c
 import DownloadCsvButton from "@/components/DownloadCsvButton";
 import KataGroupDragZone from "@/components/KataGroupDragZone";
 import SubcategoryDragZone from "@/components/SubcategoryDragZone";
+import ScrollToAnchor from "@/components/ScrollToAnchor";
 import { groupByKata, kataBaseOf } from "@/lib/division";
 import type { Category } from "@/lib/types";
 
@@ -80,6 +81,21 @@ export default async function AdminCompetitions({
   function categoryReturnTo(competitionId: string, base?: string | null): string {
     return `/admin/competitions?opencomp=${competitionId}${base ? `&openkata=${encodeURIComponent(base)}` : ""}`;
   }
+  function competitionAnchorId(competitionId: string): string {
+    return `comp-${competitionId}`;
+  }
+  function kataGroupAnchorId(competitionId: string, base: string): string {
+    return `kata-${competitionId}-${encodeURIComponent(base)}`;
+  }
+  // Reopening the right panel via opencomp/openkata isn't enough on its own
+  // -- the redirect from a category action still lands the browser scrolled
+  // to the very top of the page, same as any other navigation. This tells
+  // ScrollToAnchor which element to bring back into view once mounted.
+  const scrollAnchorId = params.opencomp
+    ? params.openkata
+      ? kataGroupAnchorId(params.opencomp, params.openkata)
+      : competitionAnchorId(params.opencomp)
+    : null;
 
   const categoryModalCloseHref = (() => {
     const base = params.edit ? `/admin/competitions?edit=${params.edit}` : "/admin/competitions";
@@ -96,6 +112,7 @@ export default async function AdminCompetitions({
       active="/admin/competitions"
       flash={{ ok: params.ok, error: params.error }}
     >
+      <ScrollToAnchor anchorId={scrollAnchorId} />
       <div className="space-y-8">
         {canManageCompetition && (
           <div>
@@ -207,6 +224,7 @@ export default async function AdminCompetitions({
                 .map((c) => (
                 <details
                   key={c.id}
+                  id={competitionAnchorId(c.id)}
                   className="rounded-lg border border-neutral-200 bg-white shadow-sm"
                   open={editing?.id === c.id || categoryModalCompetition?.id === c.id || params.opencomp === c.id}
                 >
@@ -257,6 +275,7 @@ export default async function AdminCompetitions({
                         {groupByKata(categoriesByCompetition.get(c.id) ?? []).map(([base, cats]) => (
                           <details
                             key={base}
+                            id={kataGroupAnchorId(c.id, base)}
                             className="group rounded border border-neutral-100"
                             open={params.openkata === base || cats.some((cat) => cat.id === params.editcat)}
                           >
