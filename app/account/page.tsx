@@ -42,14 +42,15 @@ interface ProfileRow {
   sign_in_valid_until: string | null;
 }
 
-/** Every OTHER paid registration whose participant email matches this
- * account's sign-in email and that has no recording yet — lets a
- * participant who registered up to 3 times switch which one they're
- * currently recording without retyping reference ID + IC each time. */
+/** Every paid registration whose participant email matches this account's
+ * sign-in email and that has no recording yet — including whatever
+ * registration is currently "active" for the recorder, since the
+ * tier-grouped summary (PendingRecordingsList) now covers every tier
+ * uniformly rather than singling one out. "Start Recording" on any of them
+ * swaps which registration is active without retyping reference ID + IC. */
 async function getPendingRegistrations(
   supabase: Awaited<ReturnType<typeof createClient>>,
   email: string | null,
-  excludeRegistrationId: string | null,
 ): Promise<PendingRegistration[]> {
   if (!email) return [];
   const { data: myParticipants } = await supabase.from("participants").select("id").ilike("email", email);
@@ -58,14 +59,16 @@ async function getPendingRegistrations(
 
   const { data: regs } = await supabase
     .from("registrations")
-    .select("id, category:categories(name), competition:competitions(name, event_date, registration_deadline)")
+    .select(
+      "id, category:categories(name, sort_order), competition:competitions(id, name, event_date, registration_deadline)",
+    )
     .in("participant_id", participantIds)
     .eq("payment_status", "paid");
   const regList =
     (regs as unknown as Array<{
       id: string;
-      category: { name: string } | null;
-      competition: { name: string; event_date: string | null; registration_deadline: string | null } | null;
+      category: { name: string; sort_order: number } | null;
+      competition: { id: string; name: string; event_date: string | null; registration_deadline: string | null } | null;
     }>) ?? [];
   if (regList.length === 0) return [];
 
@@ -74,10 +77,12 @@ async function getPendingRegistrations(
   const recorded = new Set((videos ?? []).map((v) => v.registration_id as string));
 
   return regList
-    .filter((r) => !recorded.has(r.id) && r.id !== excludeRegistrationId)
+    .filter((r) => !recorded.has(r.id) && r.competition)
     .map((r) => ({
       id: r.id,
       categoryName: r.category?.name ?? null,
+      categorySortOrder: r.category?.sort_order ?? 0,
+      competitionId: r.competition!.id,
       competitionName: r.competition?.name ?? null,
       eventDate: r.competition?.event_date ?? null,
       registrationDeadline: r.competition?.registration_deadline ?? null,
@@ -98,7 +103,6 @@ interface RecordingContext {
   hasPendingPurchase: boolean;
   eventDate: string | null;
   registrationDeadline: string | null;
-  competitionName: string | null;
   pendingOthers: PendingRegistration[];
 }
 
@@ -113,7 +117,7 @@ async function getRecordingContext(
   profile: Pick<ProfileRow, "email" | "registration_id" | "bonus_record_attempts">,
 ): Promise<RecordingContext> {
   const registrationId = profile.registration_id!;
-  const pendingOthers = await getPendingRegistrations(supabase, profile.email, registrationId);
+  const pendingOthers = await getPendingRegistrations(supabase, profile.email);
   const maxAttempts = 3 + (profile.bonus_record_attempts ?? 0);
   const { data: pendingPurchase } = await supabase
     .from("attempt_purchases")
@@ -130,12 +134,12 @@ async function getRecordingContext(
 
   const { data: registration } = await supabase
     .from("registrations")
-    .select("competition:competitions(id, name, event_date, registration_deadline)")
+    .select("competition:competitions(id, event_date, registration_deadline)")
     .eq("id", registrationId)
     .maybeSingle();
   const competition = (
     registration as unknown as {
-      competition: { id: string; name: string | null; event_date: string | null; registration_deadline: string | null } | null;
+      competition: { id: string; event_date: string | null; registration_deadline: string | null } | null;
     } | null
   )?.competition ?? null;
 
@@ -154,7 +158,6 @@ async function getRecordingContext(
     hasPendingPurchase: !!pendingPurchase,
     eventDate: competition?.event_date ?? null,
     registrationDeadline: competition?.registration_deadline ?? null,
-    competitionName: competition?.name ?? null,
     pendingOthers,
   };
 }
@@ -204,7 +207,6 @@ function PersonalRecordingSection({
             watermark={watermarkText(ctx.eventDate)}
             recordingStart={ctx.eventDate}
             recordingEnd={ctx.registrationDeadline}
-            competitionName={ctx.competitionName}
           />
           <PendingRecordingsList items={ctx.pendingOthers} />
         </div>
@@ -661,7 +663,7 @@ export default async function AccountPage({
 
   // ── Participant ──────────────────────────────────────────────────────────
   if (!profile.registration_id) {
-    const pending = await getPendingRegistrations(supabase, profile.email, null);
+    const pending = await getPendingRegistrations(supabase, profile.email);
     return (
       <>
         <SiteHeader />
@@ -691,7 +693,7 @@ export default async function AccountPage({
     );
   }
 
-  const pendingOthers = await getPendingRegistrations(supabase, profile.email, profile.registration_id);
+  const pendingOthers = await getPendingRegistrations(supabase, profile.email);
 
   const maxAttempts = 3 + (profile.bonus_record_attempts ?? 0);
   const { data: pendingPurchase } = await supabase
@@ -710,17 +712,16 @@ export default async function AccountPage({
 
   const { data: registration } = await supabase
     .from("registrations")
-    .select("competition:competitions(id, name, event_date, registration_deadline)")
+    .select("competition:competitions(id, event_date, registration_deadline)")
     .eq("id", profile.registration_id)
     .maybeSingle();
   const competition = (
     registration as unknown as {
-      competition: { id: string; name: string | null; event_date: string | null; registration_deadline: string | null } | null;
+      competition: { id: string; event_date: string | null; registration_deadline: string | null } | null;
     } | null
   )?.competition ?? null;
   const eventDate = competition?.event_date ?? null;
   const registrationDeadline = competition?.registration_deadline ?? null;
-  const competitionName = competition?.name ?? null;
 
   let ownVideoUrl: string | null = null;
   if (existingVideo) {
@@ -805,7 +806,6 @@ export default async function AccountPage({
               watermark={watermarkText(eventDate)}
               recordingStart={eventDate}
               recordingEnd={registrationDeadline}
-              competitionName={competitionName}
             />
             <div>
               <p className="mb-2 text-sm text-neutral-500">

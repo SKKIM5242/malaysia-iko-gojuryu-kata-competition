@@ -89,7 +89,6 @@ export default function KataRecorder({
   watermark,
   recordingStart,
   recordingEnd,
-  competitionName,
 }: {
   initialAttempts: number;
   maxAttempts: number;
@@ -97,11 +96,6 @@ export default function KataRecorder({
   watermark: string;
   recordingStart?: string | null;
   recordingEnd?: string | null;
-  /** Full competition/tier name (e.g. "...2026 — USD 100 Tier"), named
-   * explicitly in the not-yet-open/window-closed messages below so a
-   * participant registered for more than one tier can tell them apart —
-   * falls back to the generic "your competition tier" when omitted. */
-  competitionName?: string | null;
 }) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [attempts, setAttempts] = useState(initialAttempts);
@@ -286,21 +280,12 @@ export default function KataRecorder({
     );
   }
 
-  if (notYetOpen || windowClosed) {
-    return (
-      <div className="rounded-lg border border-amber-300 bg-amber-50 p-8 text-center">
-        <p className="text-3xl">{notYetOpen ? "⏳" : "🔒"}</p>
-        <h2 className="mt-2 text-xl font-bold text-amber-900">
-          {notYetOpen ? "Recording hasn't opened yet" : "Recording window closed"}
-        </h2>
-        <p className="mt-2 text-sm text-amber-800">
-          {notYetOpen
-            ? `Recording opens on ${recordingStart ? formatDate(recordingStart) : "the event date"} for your ${competitionName ? `competition tier — ${competitionName}` : "competition tier"} — based on today's date where you are.`
-            : `The deadline (${recordingEnd ? formatDate(recordingEnd) : "the registration deadline"}) has passed for your ${competitionName ? `competition tier — ${competitionName}` : "competition tier"}, based on today's date where you are. No further recording or submission is possible for this tier.`}
-        </p>
-      </div>
-    );
-  }
+  // The not-yet-open/window-closed messaging for THIS registration's tier
+  // now lives in the tier-grouped summary rendered alongside this component
+  // (see PendingRecordingsList) -- that summary covers every tier a
+  // participant has pending kata in, including this one, instead of this
+  // component repeating the same message for just its own single tier.
+  if (notYetOpen || windowClosed) return null;
 
   return (
     <div className="space-y-4">

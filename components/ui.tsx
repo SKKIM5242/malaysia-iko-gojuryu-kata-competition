@@ -281,6 +281,17 @@ export function formatDate(d: string | null | undefined): string {
   return `${day}/${m}/${y}`;
 }
 
+/** DD/MM/YYYY with the weekday name in front (e.g. "Wednesday, 30/09/2026")
+ * -- for dates where knowing the day of the week actually matters (e.g. "so
+ * you know recording opens on a Wednesday"), not just the calendar date. */
+export function formatDateWithDay(d: string | null | undefined): string {
+  if (!d) return "TBA";
+  const date = new Date(`${d.slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return formatDate(d);
+  const weekday = date.toLocaleDateString("en-US", { weekday: "long" });
+  return `${weekday}, ${formatDate(d)}`;
+}
+
 export function formatDOB(d: string | null | undefined): string {
   if (!d) return "—";
   const [y, m, day] = d.slice(0, 10).split("-");

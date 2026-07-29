@@ -1,96 +1,141 @@
 "use client";
 
 import { claimAndStartRecording } from "@/app/actions/account";
-import { formatDate } from "@/components/ui";
+import { formatDateWithDay } from "@/components/ui";
 
 export interface PendingRegistration {
   id: string;
   categoryName: string | null;
+  /** This category's position in the admin's own Kata Category list (see
+   * Competitions page) — kata within a tier are listed in that same order,
+   * not whatever order they happen to come back from the database. */
+  categorySortOrder: number;
+  competitionId: string;
   competitionName: string | null;
   eventDate: string | null;
   registrationDeadline: string | null;
 }
 
-function daysLeftFor(registrationDeadline: string | null): number | null {
-  if (!registrationDeadline) return null;
-  // Runs in the viewer's own browser, so "today" is their own local date —
-  // each tier's countdown is evaluated in their own country's time frame,
-  // never the server's.
-  const deadline = new Date(`${registrationDeadline}T23:59:59`);
-  return Math.ceil((deadline.getTime() - Date.now()) / (24 * 60 * 60 * 1000));
-}
+type TierStatus = "not_yet_open" | "open" | "closed";
 
-/** Mirrors KataRecorder's own notYetOpen/windowClosed check, so a tier
- * listed here gets the exact same "hasn't opened yet"/"window closed"
- * treatment it would get if it were the active recorder above -- each
- * tier evaluated independently since one participant's tiers can have
- * completely different windows. */
-function recordingStatus(eventDate: string | null, registrationDeadline: string | null): "not_yet_open" | "closed" | null {
+/** Mirrors KataRecorder's own notYetOpen/windowClosed check. Runs in the
+ * viewer's own browser, so "today" is their own local date — each tier's
+ * status is evaluated in their own country's time frame, never the
+ * server's. */
+function tierStatus(eventDate: string | null, registrationDeadline: string | null): TierStatus {
   const now = new Date();
   if (eventDate && now < new Date(`${eventDate}T00:00:00`)) return "not_yet_open";
   if (registrationDeadline && now > new Date(`${registrationDeadline}T23:59:59`)) return "closed";
-  return null;
+  return "open";
 }
 
-/** Every other paid registration (a participant may register for more than
- * one competition tier) still waiting for a recording — each shown with
- * its OWN tier's event date, deadline, and days left to record, never
- * combined into one blended figure across tiers. "Start Recording" swaps
- * which registration is currently active in the recorder above without
- * retyping reference ID + IC. */
+interface TierGroup {
+  competitionId: string;
+  competitionName: string | null;
+  eventDate: string | null;
+  registrationDeadline: string | null;
+  items: PendingRegistration[];
+}
+
+/** One box per competition tier instead of one per registration — a
+ * participant registered for 3 kata in the same tier used to see the same
+ * "recording opens on X" paragraph repeated 3 times over; now each tier's
+ * window is stated once, with its kata listed underneath in Kata Category
+ * order. A tier with nothing pending in it never gets a box at all. */
+function groupByTier(items: PendingRegistration[]): TierGroup[] {
+  const map = new Map<string, TierGroup>();
+  for (const item of items) {
+    let group = map.get(item.competitionId);
+    if (!group) {
+      group = {
+        competitionId: item.competitionId,
+        competitionName: item.competitionName,
+        eventDate: item.eventDate,
+        registrationDeadline: item.registrationDeadline,
+        items: [],
+      };
+      map.set(item.competitionId, group);
+    }
+    group.items.push(item);
+  }
+  const groups = [...map.values()];
+  for (const g of groups) g.items.sort((a, b) => a.categorySortOrder - b.categorySortOrder);
+  groups.sort((a, b) => (a.eventDate ?? "").localeCompare(b.eventDate ?? ""));
+  return groups;
+}
+
 export default function PendingRecordingsList({ items }: { items: PendingRegistration[] }) {
-  if (items.length === 0) return null;
+  const groups = groupByTier(items);
+  if (groups.length === 0) return null;
   return (
-    <div className="rounded-lg border border-amber-300 bg-amber-50 p-4">
-      <p className="font-bold text-amber-900">
-        {items.length} more registration{items.length === 1 ? "" : "s"} waiting for a recording
-      </p>
-      <div className="mt-3 space-y-2">
-        {items.map((r) => {
-          const daysLeft = daysLeftFor(r.registrationDeadline);
-          const status = recordingStatus(r.eventDate, r.registrationDeadline);
-          return (
-            <div key={r.id} className="rounded-md border border-amber-200 bg-white px-3 py-2">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <p className="text-sm font-semibold text-neutral-800">{r.categoryName ?? "Category not set"}</p>
-                  <p className="text-xs text-neutral-500">{r.competitionName ?? ""}</p>
-                  {(r.eventDate || r.registrationDeadline) && (
-                    <p className="mt-0.5 text-[10px] text-neutral-400">
-                      {r.eventDate ? formatDate(r.eventDate) : "—"} to{" "}
-                      {r.registrationDeadline ? formatDate(r.registrationDeadline) : "—"}
-                      {daysLeft != null &&
-                        (daysLeft >= 0
-                          ? ` · ${daysLeft} day${daysLeft === 1 ? "" : "s"} left`
-                          : " · recording window closed")}
-                    </p>
-                  )}
-                </div>
-                <form action={claimAndStartRecording} className="ml-auto self-center">
-                  <input type="hidden" name="registration_id" value={r.id} />
-                  <button className="rounded-md bg-red-700 px-4 py-1.5 text-xs font-semibold text-white hover:bg-red-600">
-                    Start Recording
-                  </button>
-                </form>
+    <div className="space-y-4">
+      {groups.map((g) => {
+        const status = tierStatus(g.eventDate, g.registrationDeadline);
+        const tierName = g.competitionName ?? "this competition tier";
+        return (
+          <div key={g.competitionId} className="rounded-lg border border-amber-300 bg-amber-50 p-4">
+            {status === "not_yet_open" && (
+              <div className="text-center">
+                <p className="text-4xl">⏳</p>
+                <p className="mt-1 text-lg font-bold text-amber-900">Recording hasn&apos;t opened yet</p>
+                <p className="mt-1 text-sm text-amber-800">
+                  Recording opens on {formatDateWithDay(g.eventDate)} for your competition tier —{" "}
+                  {tierName} — based on today&apos;s date where you are, and closes on{" "}
+                  {formatDateWithDay(g.registrationDeadline)}.
+                </p>
               </div>
-              {status === "not_yet_open" && (
-                <p className="mt-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                  ⏳ <strong>Recording hasn&apos;t opened yet</strong> — opens on{" "}
-                  {r.eventDate ? formatDate(r.eventDate) : "the event date"} for your competition tier —{" "}
-                  {r.competitionName ?? "this tier"} — based on today&apos;s date where you are.
+            )}
+            {status === "closed" && (
+              <div className="text-center">
+                <p className="text-4xl">🔒</p>
+                <p className="mt-1 text-lg font-bold text-amber-900">Recording window closed</p>
+                <p className="mt-1 text-sm text-amber-800">
+                  The deadline ({formatDateWithDay(g.registrationDeadline)}) has passed for your
+                  competition tier — {tierName}. No further recording or submission is possible for
+                  this tier.
                 </p>
-              )}
-              {status === "closed" && (
-                <p className="mt-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                  🔒 <strong>Recording window closed</strong> — the deadline (
-                  {r.registrationDeadline ? formatDate(r.registrationDeadline) : "the registration deadline"}) has
-                  passed for your competition tier — {r.competitionName ?? "this tier"}.
+              </div>
+            )}
+            {status === "open" && (
+              <div>
+                <p className="font-bold text-amber-900">{tierName}</p>
+                <p className="mt-1 text-sm text-amber-800">
+                  🎬 Recording is open now — {formatDateWithDay(g.eventDate)} to{" "}
+                  {formatDateWithDay(g.registrationDeadline)}.
                 </p>
-              )}
-            </div>
-          );
-        })}
-      </div>
+              </div>
+            )}
+            <p className="mt-3 text-sm font-semibold text-amber-900">
+              {g.items.length} registration{g.items.length === 1 ? "" : "s"} waiting for a recording:
+            </p>
+            <ul className="mt-2 space-y-1.5">
+              {g.items.map((item) => (
+                <li
+                  key={item.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-200 bg-white px-3 py-2 text-sm"
+                >
+                  <span className="text-neutral-700">{item.categoryName ?? "Category not set"}</span>
+                  {status === "open" && (
+                    <form action={claimAndStartRecording} className="ml-auto self-center">
+                      <input type="hidden" name="registration_id" value={item.id} />
+                      <button className="rounded-md bg-red-700 px-4 py-1.5 text-xs font-semibold text-white hover:bg-red-600">
+                        Start Recording
+                      </button>
+                    </form>
+                  )}
+                </li>
+              ))}
+            </ul>
+            {status === "not_yet_open" && (
+              <p className="mt-3 text-xs text-amber-800">
+                Please start recording as soon as possible when recording is allowed, then remember to
+                submit the recording. In the meantime, do your training first while waiting for the
+                recording open date. Wish you a smooth recording &amp; submission.
+              </p>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
