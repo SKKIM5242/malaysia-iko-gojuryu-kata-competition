@@ -55,20 +55,22 @@ export default function SubcategoryDragZone({
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`flex flex-1 items-center justify-between gap-2 rounded ${dragOver ? "bg-blue-50 ring-2 ring-blue-300" : ""}`}
+      className={`flex flex-1 items-center gap-2 rounded ${dragOver ? "bg-blue-50 ring-2 ring-blue-300" : ""}`}
     >
-      <span className="flex shrink-0 items-center gap-1.5">
-        <span
-          draggable
-          onDragStart={handleDragStart}
-          title="Drag to reorder this row within its kata event"
-          aria-label="Drag to reorder this row within its kata event"
-          className="cursor-grab select-none rounded px-1 text-neutral-400 hover:bg-neutral-200 hover:text-neutral-600 active:cursor-grabbing"
-        >
-          ⠿
-        </span>
+      <span
+        draggable
+        onDragStart={handleDragStart}
+        title="Drag to reorder this row within its kata event"
+        aria-label="Drag to reorder this row within its kata event"
+        className="shrink-0 cursor-grab select-none rounded px-1 text-neutral-400 hover:bg-neutral-200 hover:text-neutral-600 active:cursor-grabbing"
+      >
+        ⠿
       </span>
-      {children}
+      {/* justify-between belongs on just these two (name left, actions
+          right) -- putting the grip in the same flex row as this would make
+          justify-between spread all three children instead, so the name's
+          starting position drifted depending on how much space that left. */}
+      <div className="flex flex-1 items-center justify-between gap-2">{children}</div>
     </div>
   );
 }
