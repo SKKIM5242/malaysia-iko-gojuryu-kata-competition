@@ -77,6 +77,30 @@ const MEDAL_THEME: Record<1 | 2 | 3, { discDark: string; label: string }> = {
   3: { discDark: "#7A4A1E", label: "3RD" },
 };
 
+/** Crystal-shine 3D look for the rank label, per rank's own metal color --
+ * a banded top-to-bottom gradient (light -> bright -> a darker "groove" ->
+ * bright again -> dark edge) reads as a polished, reflective surface, the
+ * same way a chrome/gem 3D text effect works. `shadowDeep` builds the
+ * beveled extrusion behind it; `outline` is a thin 4-directional ring that
+ * keeps every letter reading crisply against the medal art it sits on. */
+const MEDAL_LABEL_STYLE: Record<1 | 2 | 3, { gradient: string; shadowDeep: string; outline: string }> = {
+  1: {
+    gradient: "linear-gradient(180deg, #FFFFFF 0%, #FFF3B0 14%, #FFD700 28%, #FFEC8B 42%, #C9960C 56%, #FFD700 74%, #A67C0A 100%)",
+    shadowDeep: "#4A3305",
+    outline: "#6B4C08",
+  },
+  2: {
+    gradient: "linear-gradient(180deg, #FFFFFF 0%, #F2F2F4 14%, #D6D8DB 28%, #FFFFFF 42%, #9A9DA3 56%, #E0E2E5 74%, #71747A 100%)",
+    shadowDeep: "#2E3033",
+    outline: "#4A4D52",
+  },
+  3: {
+    gradient: "linear-gradient(180deg, #FFF0DD 0%, #F2C994 14%, #E8A659 28%, #FFD9A8 42%, #A9662E 56%, #E0A566 74%, #6B3F1B 100%)",
+    shadowDeep: "#361F0C",
+    outline: "#5C3814",
+  },
+};
+
 function readAsDataUri(relPath: string, mime: string): string | null {
   try {
     const buf = fs.readFileSync(path.join(process.cwd(), "public", relPath));
@@ -161,21 +185,77 @@ function Medal({ rank, width }: { rank: 1 | 2 | 3; width: number }) {
           justifyContent: "center",
         }}
       >
+        <RankLabel3D rank={rank} width={width} />
+      </div>
+    </div>
+  );
+}
+
+/** The "1ST"/"2ND"/"3RD" rank label, rendered as a crystal-shine 3D block:
+ * a stack of solid copies offset diagonally builds the beveled extrusion
+ * (deep-shadow-colored, like a chiseled edge), a single thin highlight
+ * copy on the opposite corner catches the light, and the glossy banded
+ * gradient face sits on top -- same construction as a chrome/gem 3D text
+ * effect, per the organizer's reference image. */
+function RankLabel3D({ rank, width }: { rank: 1 | 2 | 3; width: number }) {
+  const t = MEDAL_THEME[rank];
+  const s = MEDAL_LABEL_STYLE[rank];
+  const fontSize = Math.round(width * 0.24);
+  const step = Math.max(1, Math.round(width * 0.009));
+  const depthSteps = 6;
+  return (
+    <div style={{ position: "relative", display: "flex" }}>
+      {Array.from({ length: depthSteps }, (_, i) => depthSteps - i).map((i) => (
         <span
+          key={i}
           style={{
+            position: "absolute",
+            left: i * step,
+            top: i * step,
             display: "flex",
-            fontSize: Math.round(width * 0.24),
+            fontSize,
             fontWeight: 900,
-            color: t.discDark,
-            // fontWeight alone tops out at 900 -- stacked shadows in the 4
-            // cardinal directions thicken the glyph strokes further, aiming
-            // to read as heavy as the medal's own outer ring.
-            textShadow: `${Math.round(width * 0.012)}px 0 0 ${t.discDark}, -${Math.round(width * 0.012)}px 0 0 ${t.discDark}, 0 ${Math.round(width * 0.012)}px 0 ${t.discDark}, 0 -${Math.round(width * 0.012)}px 0 ${t.discDark}`,
+            color: s.shadowDeep,
           }}
         >
           {t.label}
         </span>
-      </div>
+      ))}
+      {/* Thin outline in a 4-directional ring, close to the face -- keeps
+          every letter reading crisply against the medal art behind it,
+          which the depth stack alone (offset only down-right) doesn't
+          guarantee on the up-left side. */}
+      {[
+        [1, 0], [-1, 0], [0, 1], [0, -1],
+      ].map(([dx, dy]) => (
+        <span
+          key={`${dx}-${dy}`}
+          style={{
+            position: "absolute",
+            left: dx,
+            top: dy,
+            display: "flex",
+            fontSize,
+            fontWeight: 900,
+            color: s.outline,
+          }}
+        >
+          {t.label}
+        </span>
+      ))}
+      <span
+        style={{
+          display: "flex",
+          fontSize,
+          fontWeight: 900,
+          backgroundImage: s.gradient,
+          backgroundClip: "text",
+          WebkitBackgroundClip: "text",
+          color: "transparent",
+        }}
+      >
+        {t.label}
+      </span>
     </div>
   );
 }
