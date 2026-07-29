@@ -230,7 +230,10 @@ export default async function AdminCompetitions({
                 >
                   <summary className="flex cursor-pointer flex-wrap items-start justify-between gap-2 px-4 py-3 hover:bg-neutral-50">
                     <div>
-                      <p className="font-bold text-neutral-900">▾ {c.name}</p>
+                      <p className="font-bold text-neutral-900">
+                        <span className="mr-1 inline-block align-middle text-[2em] leading-none">▾</span>
+                        {c.name}
+                      </p>
                       <p className="mt-0.5 text-sm text-neutral-500">
                         {formatDate(c.event_date)} · {c.venue ?? "Venue TBA"} · {formatUSD(c.registration_fee_usd)}
                       </p>
