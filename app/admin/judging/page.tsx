@@ -452,14 +452,14 @@ export default async function AdminJudging({
             rowKey="id"
             downloadName="referee-workload"
             columns={[
-              { key: "referee", label: "Referee" },
-              { key: "rank", label: "Rank" },
-              { key: "email", label: "Email" },
-              { key: "phone", label: "Mobile Phone" },
-              { key: "telegram", label: "Telegram" },
-              { key: "country", label: "Country" },
-              { key: "assigned", label: "Assigned" },
-              { key: "scored", label: "Scored" },
+              { key: "referee", label: "Referee", width: 200 },
+              { key: "rank", label: "Rank", width: 100 },
+              { key: "email", label: "Email", width: 220 },
+              { key: "phone", label: "Mobile Phone", width: 150 },
+              { key: "telegram", label: "Telegram", width: 130 },
+              { key: "country", label: "Country", width: 130 },
+              { key: "assigned", label: "Assigned", width: 130 },
+              { key: "scored", label: "Scored", width: 160 },
             ]}
             csvColumns={[
               { key: "referee", label: "Referee" },
