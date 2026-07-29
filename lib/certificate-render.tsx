@@ -161,7 +161,18 @@ function Medal({ rank, width }: { rank: 1 | 2 | 3; width: number }) {
           justifyContent: "center",
         }}
       >
-        <span style={{ display: "flex", fontSize: Math.round(width * 0.16), fontWeight: 900, color: t.discDark }}>
+        <span
+          style={{
+            display: "flex",
+            fontSize: Math.round(width * 0.24),
+            fontWeight: 900,
+            color: t.discDark,
+            // fontWeight alone tops out at 900 -- stacked shadows in the 4
+            // cardinal directions thicken the glyph strokes further, aiming
+            // to read as heavy as the medal's own outer ring.
+            textShadow: `${Math.round(width * 0.012)}px 0 0 ${t.discDark}, -${Math.round(width * 0.012)}px 0 0 ${t.discDark}, 0 ${Math.round(width * 0.012)}px 0 ${t.discDark}, 0 -${Math.round(width * 0.012)}px 0 ${t.discDark}`,
+          }}
+        >
           {t.label}
         </span>
       </div>
