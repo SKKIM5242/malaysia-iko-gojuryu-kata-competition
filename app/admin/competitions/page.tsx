@@ -2,15 +2,14 @@ import Link from "next/link";
 import { getAllCompetitions } from "@/lib/admin-data";
 import { getCategories, schemaReady } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
-import {
-  saveCompetition, saveCategory, deleteCategory, mergeCategoryToMix, mergeCategoryAgeGroup,
-} from "@/app/actions/admin";
+import { saveCompetition, saveCategory } from "@/app/actions/admin";
 import { AdminShell, Card, adminBtn, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, NoTranslate, SetupNotice, formatDate, formatUSD } from "@/components/ui";
 import DownloadCsvButton from "@/components/DownloadCsvButton";
 import KataGroupDragZone from "@/components/KataGroupDragZone";
 import SubcategoryDragZone from "@/components/SubcategoryDragZone";
 import ScrollToAnchor from "@/components/ScrollToAnchor";
+import CategoryActionButton from "@/components/CategoryActionButton";
 import { groupByKata, kataBaseOf } from "@/lib/division";
 import type { Category } from "@/lib/types";
 
@@ -112,7 +111,11 @@ export default async function AdminCompetitions({
       active="/admin/competitions"
       flash={{ ok: params.ok, error: params.error }}
     >
-      <ScrollToAnchor anchorId={scrollAnchorId} />
+      {/* key forces a fresh mount (and a fresh scroll-into-view) even when a
+          merge/edit/delete redirect lands back on the same anchor as before
+          -- otherwise React sees an unchanged anchorId and skips the effect,
+          leaving the page at Next's default scroll-to-top after the action. */}
+      <ScrollToAnchor key={`${scrollAnchorId ?? ""}-${params.ok ?? ""}-${params.error ?? ""}`} anchorId={scrollAnchorId} />
       <div className="space-y-8">
         {canManageCompetition && (
           <div>
@@ -321,39 +324,31 @@ export default async function AdminCompetitions({
                                       </span>
                                       <span className="flex gap-1">
                                         {(cat.gender === "male" || cat.gender === "female") && (
-                                          <form action={mergeCategoryToMix}>
-                                            <input type="hidden" name="category_id" value={cat.id} />
-                                            <input type="hidden" name="return_to" value={categoryReturnTo(c.id, base)} />
-                                            <button
-                                              className="rounded border border-amber-300 px-2 py-0.5 text-xs text-amber-700 hover:bg-amber-50"
-                                              title="Move this category's (and its Male/Female sibling's) registrations into a shared Mix (Male & Female) category"
-                                            >
-                                              Merge → Mix
-                                            </button>
-                                          </form>
+                                          <CategoryActionButton
+                                            actionName="mergeToMix"
+                                            fields={{ category_id: cat.id, return_to: categoryReturnTo(c.id, base) }}
+                                            className="rounded border border-amber-300 px-2 py-0.5 text-xs text-amber-700 hover:bg-amber-50"
+                                            title="Move this category's (and its Male/Female sibling's) registrations into a shared Mix (Male & Female) category"
+                                          >
+                                            Merge → Mix
+                                          </CategoryActionButton>
                                         )}
-                                        <form action={mergeCategoryAgeGroup}>
-                                          <input type="hidden" name="category_id" value={cat.id} />
-                                          <input type="hidden" name="direction" value="before" />
-                                          <input type="hidden" name="return_to" value={categoryReturnTo(c.id, base)} />
-                                          <button
-                                            className="rounded border border-purple-300 px-2 py-0.5 text-xs text-purple-700 hover:bg-purple-50"
-                                            title="Merge with the earlier age group (same kata, belt, and gender) — the age range widens to cover both; repeat to combine 2 or 3 age groups"
-                                          >
-                                            ⇤ Merge age
-                                          </button>
-                                        </form>
-                                        <form action={mergeCategoryAgeGroup}>
-                                          <input type="hidden" name="category_id" value={cat.id} />
-                                          <input type="hidden" name="direction" value="after" />
-                                          <input type="hidden" name="return_to" value={categoryReturnTo(c.id, base)} />
-                                          <button
-                                            className="rounded border border-purple-300 px-2 py-0.5 text-xs text-purple-700 hover:bg-purple-50"
-                                            title="Merge with the later age group (same kata, belt, and gender) — the age range widens to cover both; repeat to combine 2 or 3 age groups"
-                                          >
-                                            Merge age ⇥
-                                          </button>
-                                        </form>
+                                        <CategoryActionButton
+                                          actionName="mergeAgeGroup"
+                                          fields={{ category_id: cat.id, direction: "before", return_to: categoryReturnTo(c.id, base) }}
+                                          className="rounded border border-purple-300 px-2 py-0.5 text-xs text-purple-700 hover:bg-purple-50"
+                                          title="Merge with the earlier age group (same kata, belt, and gender) — the age range widens to cover both; repeat to combine 2 or 3 age groups"
+                                        >
+                                          ⇤ Merge age
+                                        </CategoryActionButton>
+                                        <CategoryActionButton
+                                          actionName="mergeAgeGroup"
+                                          fields={{ category_id: cat.id, direction: "after", return_to: categoryReturnTo(c.id, base) }}
+                                          className="rounded border border-purple-300 px-2 py-0.5 text-xs text-purple-700 hover:bg-purple-50"
+                                          title="Merge with the later age group (same kata, belt, and gender) — the age range widens to cover both; repeat to combine 2 or 3 age groups"
+                                        >
+                                          Merge age ⇥
+                                        </CategoryActionButton>
                                         <Link
                                           href={`/admin/competitions?editcat=${cat.id}`}
                                           scroll={false}
@@ -361,13 +356,13 @@ export default async function AdminCompetitions({
                                         >
                                           Edit
                                         </Link>
-                                        <form action={deleteCategory}>
-                                          <input type="hidden" name="id" value={cat.id} />
-                                          <input type="hidden" name="return_to" value={categoryReturnTo(c.id, base)} />
-                                          <button className="rounded border border-red-200 px-2 py-0.5 text-xs text-red-600 hover:bg-red-50">
-                                            Delete
-                                          </button>
-                                        </form>
+                                        <CategoryActionButton
+                                          actionName="delete"
+                                          fields={{ id: cat.id, return_to: categoryReturnTo(c.id, base) }}
+                                          className="rounded border border-red-200 px-2 py-0.5 text-xs text-red-600 hover:bg-red-50"
+                                        >
+                                          Delete
+                                        </CategoryActionButton>
                                       </span>
                                     </span>
                                   </>
