@@ -5,6 +5,7 @@ import Link from "next/link";
 import { registerSchool, registerSensei, type DirectoryState } from "@/app/actions/directory";
 import { TelegramJoinButton } from "@/components/ui";
 import { shortTierName } from "@/lib/invitation-codes";
+import ParticipatingTiersField from "@/components/ParticipatingTiersField";
 import CertificateUploadField from "@/components/CertificateUploadField";
 import { NoCommaTextarea } from "@/components/NoCommaAddressField";
 import type { School } from "@/lib/types";
@@ -145,6 +146,7 @@ export function SchoolForm({ telegramLink, tiers }: { telegramLink: string | nul
         <label htmlFor="name" className={labelCls}>School / Dojo name *</label>
         <input id="name" name="name" required className={inputCls} placeholder="e.g. Dojo Goju-ryu Johor Bahru" />
       </div>
+      <ParticipatingTiersField competitions={tiers} idPrefix="school_" who="school" />
 
       <div className="rounded-md border border-neutral-200 bg-neutral-50 p-4">
         <p className="text-sm font-bold text-neutral-800">Person in-charge / Chief Instructor</p>
@@ -278,6 +280,7 @@ export function SenseiForm({
         fees.
       </div>
       <TierSelect tiers={tiers} idPrefix="sensei" />
+      <ParticipatingTiersField competitions={tiers} idPrefix="sensei_" who="sensei" />
       <div>
         <label htmlFor="registered_by" className={labelCls}>Who is registering? *</label>
         <select

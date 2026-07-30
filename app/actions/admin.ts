@@ -298,8 +298,17 @@ export async function saveCompetition(formData: FormData) {
     description: String(formData.get("description") ?? "").trim() || null,
     winners_announce_date: String(formData.get("winners_announce_date") ?? "") || null,
     audience_signin_date: String(formData.get("audience_signin_date") ?? "") || null,
+    default_sign_in_valid_from: String(formData.get("default_sign_in_valid_from") ?? "") || null,
+    default_sign_in_valid_until: String(formData.get("default_sign_in_valid_until") ?? "") || null,
   };
   if (!values.name) backTo(returnTo, { error: "Competition name is required." });
+  if (
+    values.default_sign_in_valid_from &&
+    values.default_sign_in_valid_until &&
+    values.default_sign_in_valid_until < values.default_sign_in_valid_from
+  ) {
+    backTo(returnTo, { error: "Sign-in valid until must be on or after Sign-in valid from." });
+  }
   if (values.registration_fee_usd != null && Number.isNaN(values.registration_fee_usd)) {
     backTo(returnTo, { error: "Fee must be a number." });
   }
@@ -1027,6 +1036,7 @@ export async function saveSchool(formData: FormData) {
     bank_account_name: String(formData.get("bank_account_name") ?? "").trim() || null,
     invitation_code: String(formData.get("invitation_code") ?? "").trim() || null,
     referral_source: String(formData.get("referral_source") ?? "").trim() || null,
+    participating_tier_ids: formData.getAll("participating_tier_ids").map((v) => String(v)),
   };
   if (!values.name) backTo(returnTo, { error: "School name is required." });
   if (!values.contact_title || !values.contact_name || !values.contact_karate_title || !values.contact_rank) {
@@ -1104,6 +1114,7 @@ export async function saveSensei(formData: FormData) {
     bank_account_name: String(formData.get("bank_account_name") ?? "").trim() || null,
     invitation_code: String(formData.get("invitation_code") ?? "").trim() || null,
     referral_source: String(formData.get("referral_source") ?? "").trim() || null,
+    participating_tier_ids: formData.getAll("participating_tier_ids").map((v) => String(v)),
   };
   if (!values.name) backTo(returnTo, { error: "Sensei name is required." });
   if (!values.ic_passport) backTo(returnTo, { error: "IC / Passport is required." });

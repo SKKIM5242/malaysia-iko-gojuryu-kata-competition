@@ -10,6 +10,7 @@ import { winnersRevealed } from "@/lib/winners";
 import AuthForms from "@/components/AuthForms";
 import ClaimForm from "@/components/ClaimForm";
 import VideoWatchButton from "@/components/VideoWatchButton";
+import SignInQuotaLine from "@/components/SignInQuotaLine";
 import { isWithinSignInQuota } from "@/lib/sign-in-quota";
 import SubscriptionBlocked from "@/components/SubscriptionBlocked";
 import EmailVerificationBlocked from "@/components/EmailVerificationBlocked";
@@ -539,20 +540,13 @@ export default async function KataArenaPage({
     <>
       <SiteHeader />
       <main className="mx-auto max-w-3xl px-4 py-10">
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs font-semibold text-neutral-500">
-          <span>
-            {profile.sign_in_limit != null
-              ? `Sign-ins: ${profile.sign_in_count} of ${profile.sign_in_limit} used`
-              : "Sign-ins: unlimited"}
-          </span>
-          <span>
-            {profile.sign_in_valid_from || profile.sign_in_valid_until
-              ? `Valid ${profile.sign_in_valid_from ? formatDate(profile.sign_in_valid_from) : "—"} to ${
-                  profile.sign_in_valid_until ? formatDate(profile.sign_in_valid_until) : "—"
-                }`
-              : "Valid: no expiry set"}
-          </span>
-        </div>
+        <SignInQuotaLine
+          signInCount={profile.sign_in_count}
+          signInLimit={profile.sign_in_limit}
+          validFrom={profile.sign_in_valid_from}
+          validUntil={profile.sign_in_valid_until}
+          className="mb-2"
+        />
         <h1 className="text-2xl font-bold tracking-tight">Kata Arena</h1>
         <p className="mt-1 mb-6 text-sm text-neutral-500">
           {competition.name}. Every submitted recording is listed below by kata event, in

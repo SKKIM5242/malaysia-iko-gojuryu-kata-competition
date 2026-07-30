@@ -178,6 +178,49 @@ export default async function AdminCompetitions({
                   <label htmlFor="description" className={adminLabel}>Description</label>
                   <textarea id="description" name="description" rows={3} defaultValue={editing?.description ?? ""} className={adminInput} />
                 </div>
+
+                {/* Participant sign-in window for this tier. Every account whose
+                    quota is auto-managed and that resolves to this tier inherits
+                    these two dates (see recompute_sign_in_quota). */}
+                <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3">
+                  <p className="text-xs font-bold uppercase tracking-wide text-neutral-500">
+                    Participant sign-in validity for this tier
+                  </p>
+                  <div className="mt-2 grid gap-4 sm:grid-cols-3">
+                    <div>
+                      <label htmlFor="default_sign_in_valid_from" className={adminLabel}>Sign-in valid from</label>
+                      <input
+                        id="default_sign_in_valid_from"
+                        name="default_sign_in_valid_from"
+                        type="date"
+                        defaultValue={editing?.default_sign_in_valid_from ?? ""}
+                        className={adminInput}
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="default_sign_in_valid_until" className={adminLabel}>Sign-in valid until</label>
+                      <input
+                        id="default_sign_in_valid_until"
+                        name="default_sign_in_valid_until"
+                        type="date"
+                        defaultValue={editing?.default_sign_in_valid_until ?? ""}
+                        className={adminInput}
+                      />
+                    </div>
+                    <div>
+                      <label className={adminLabel}>Sign-ins allowed</label>
+                      <p className={`${adminInput} bg-white text-neutral-500`}>250 (Participant)</p>
+                    </div>
+                  </div>
+                  <p className="mt-1 text-xs text-neutral-400">
+                    A participant on this tier may sign in <strong>250</strong> times, within the window
+                    above — whichever runs out first. The 250 comes from the Participant role default
+                    (Accounts → Access Matrix), not from this tier, so it is shown here read-only.
+                    Leave the dates blank to fall back to the event date and the &quot;winners announce
+                    + 30 days&quot; rule.
+                  </p>
+                </div>
+
                 <div className="flex gap-2">
                   <button type="submit" className={adminBtn}>
                     {editing ? "Save changes" : "Create competition"}

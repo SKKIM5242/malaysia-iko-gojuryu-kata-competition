@@ -17,6 +17,7 @@ import EmailVerificationBlocked from "@/components/EmailVerificationBlocked";
 import { isEmailVerified } from "@/lib/email-verification";
 import SignInInfoTables from "@/components/SignInInfoTables";
 import PendingRecordingsList, { type PendingRegistration } from "@/components/PendingRecordingsList";
+import SignInQuotaLine from "@/components/SignInQuotaLine";
 import { shortTierName } from "@/lib/invitation-codes";
 
 export const dynamic = "force-dynamic";
@@ -361,6 +362,13 @@ export default async function AccountPage({
       <>
         <SiteHeader />
         <main className="mx-auto max-w-2xl px-4 py-10">
+          <SignInQuotaLine
+            signInCount={profile.sign_in_count}
+            signInLimit={profile.sign_in_limit}
+            validFrom={profile.sign_in_valid_from}
+            validUntil={profile.sign_in_valid_until}
+            className="mb-2"
+          />
           <h1 className="text-2xl font-bold">Admin / Organizer / Participant Support</h1>
           <SignInInfoTables canManage={["admin", "organizer", "staff"].includes(profile.role)} />
           {profile.approved ? (
@@ -428,6 +436,13 @@ export default async function AccountPage({
         <>
           <SiteHeader />
           <main className="mx-auto max-w-2xl px-4 py-10">
+            <SignInQuotaLine
+              signInCount={profile.sign_in_count}
+              signInLimit={profile.sign_in_limit}
+              validFrom={profile.sign_in_valid_from}
+              validUntil={profile.sign_in_valid_until}
+              className="mb-2"
+            />
             <h1 className="text-2xl font-bold">Referee / Judge</h1>
             <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-6">
               <p className="font-semibold text-amber-900">Waiting for approval.</p>
@@ -494,6 +509,13 @@ export default async function AccountPage({
       <>
         <SiteHeader />
         <main className="mx-auto max-w-3xl px-4 py-10">
+          <SignInQuotaLine
+            signInCount={profile.sign_in_count}
+            signInLimit={profile.sign_in_limit}
+            validFrom={profile.sign_in_valid_from}
+            validUntil={profile.sign_in_valid_until}
+            className="mb-2"
+          />
           <h1 className="text-2xl font-bold">Referee / Judge Scoring</h1>
           <SignInInfoTables canManage={false} />
           <div className="mt-4 flex flex-wrap gap-2">
@@ -566,6 +588,13 @@ export default async function AccountPage({
       <>
         <SiteHeader />
         <main className="mx-auto max-w-2xl px-4 py-10">
+          <SignInQuotaLine
+            signInCount={profile.sign_in_count}
+            signInLimit={profile.sign_in_limit}
+            validFrom={profile.sign_in_valid_from}
+            validUntil={profile.sign_in_valid_until}
+            className="mb-2"
+          />
           <h1 className="text-2xl font-bold">Audience / Spectator</h1>
           <SignInInfoTables canManage={false} />
           {profile.approved ? (
@@ -621,6 +650,13 @@ export default async function AccountPage({
       <>
         <SiteHeader />
         <main className="mx-auto max-w-2xl px-4 py-10">
+          <SignInQuotaLine
+            signInCount={profile.sign_in_count}
+            signInLimit={profile.sign_in_limit}
+            validFrom={profile.sign_in_valid_from}
+            validUntil={profile.sign_in_valid_until}
+            className="mb-2"
+          />
           <h1 className="text-2xl font-bold">{label}</h1>
           <SignInInfoTables canManage={false} />
           {record ? (
@@ -673,6 +709,13 @@ export default async function AccountPage({
       <>
         <SiteHeader />
         <main className="mx-auto max-w-2xl px-4 py-10">
+          <SignInQuotaLine
+            signInCount={profile.sign_in_count}
+            signInLimit={profile.sign_in_limit}
+            validFrom={profile.sign_in_valid_from}
+            validUntil={profile.sign_in_valid_until}
+            className="mb-2"
+          />
           <h1 className="text-2xl font-bold">Link Your Registration</h1>
           <p className="mt-1 mb-6 text-sm text-neutral-500">
             Signed in as {profile.full_name ?? user.email}.
@@ -740,6 +783,13 @@ export default async function AccountPage({
     <>
       <SiteHeader />
       <main className="mx-auto max-w-3xl px-4 py-10">
+        <SignInQuotaLine
+          signInCount={profile.sign_in_count}
+          signInLimit={profile.sign_in_limit}
+          validFrom={profile.sign_in_valid_from}
+          validUntil={profile.sign_in_valid_until}
+          className="mb-2"
+        />
         <h1 className="text-2xl font-bold">{existingVideo ? "Your Kata Recording" : "Record Your Kata"}</h1>
         <SignInInfoTables canManage={false} />
         <p className="mt-1 mb-6 text-sm text-neutral-500">

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getSchools, schemaReady } from "@/lib/data";
-import { getSchoolSenseiTierFees, getAllCompetitions } from "@/lib/admin-data";
+import { getSchoolSenseiTierFees, getSchoolSenseiTierEntryCounts, getAllCompetitions } from "@/lib/admin-data";
 import { createClient } from "@/lib/supabase/server";
 import { saveSchool, deleteSchool, generateRecordInvitationCode, updateCommunityStatus, bulkUploadSchools } from "@/app/actions/admin";
 import { AdminShell, Card, adminBtn, adminBtnSecondary, adminInput, adminLabel } from "@/components/admin";
@@ -12,6 +12,8 @@ import SignInControlBox from "@/components/SignInControlBox";
 import InvitationCodeForm from "@/components/InvitationCodeForm";
 import InvitationCodeList from "@/components/InvitationCodeList";
 import InvitationCodeRunField from "@/components/InvitationCodeRunField";
+import ParticipatingTiersField from "@/components/ParticipatingTiersField";
+import { tierEntriesLabel } from "@/lib/tier-entries";
 import { NoCommaInput } from "@/components/NoCommaAddressField";
 import IbanInput from "@/components/IbanInput";
 import IbanConfirmCheckbox from "@/components/IbanConfirmCheckbox";
@@ -62,10 +64,11 @@ export default async function AdminSchools({
     );
   }
 
-  const [schools, { schoolFees }, competitions] = await Promise.all([
+  const [schools, { schoolFees }, competitions, { schoolEntries }] = await Promise.all([
     getSchools(),
     getSchoolSenseiTierFees(),
     getAllCompetitions(),
+    getSchoolSenseiTierEntryCounts(),
   ]);
   const editing = params.edit ? schools.find((s) => s.id === params.edit) : undefined;
 
@@ -182,6 +185,12 @@ export default async function AdminSchools({
                   <label htmlFor="referral_source" className={adminLabel}>Referral (optional)</label>
                   <input id="referral_source" name="referral_source" defaultValue={editing?.referral_source ?? ""} className={adminInput} placeholder="e.g. a friend's name" />
                 </div>
+                <ParticipatingTiersField
+                  competitions={competitions}
+                  selected={editing?.participating_tier_ids}
+                  idPrefix="admin_school_"
+                  who="school"
+                />
               </div>
 
               {editing && (
@@ -282,6 +291,7 @@ export default async function AdminSchools({
                 { key: "email", label: "Email" },
                 { key: "phone", label: "Phone" },
                 { key: "bank", label: "Bank" },
+                { key: "tier_entries", label: "Competition Tier (paid entries)" },
                 { key: "expected_fee", label: "Required Fee" },
                 { key: "payment", label: "Fee Status" },
                 ...(isAdminTier ? [{ key: "sign_in_control", label: "Sign-in Control" }] : []),
@@ -304,6 +314,7 @@ export default async function AdminSchools({
                 { key: "bank_name", label: "Bank Name" },
                 { key: "bank_account_no", label: "International Bank Account No. (IBAN)" },
                 { key: "bank_account_name", label: "Bank Account Holder Name" },
+                { key: "tier_entries", label: "Competition Tier (paid entries)" },
                 { key: "expected_fee", label: "Required Fee" },
                 { key: "payment_status_text", label: "Fee Status" },
               ]}
@@ -329,6 +340,7 @@ export default async function AdminSchools({
                 bank_name: s.bank_name ?? "",
                 bank_account_no: s.bank_account_no ?? "",
                 bank_account_name: s.bank_account_name ?? "",
+                tier_entries: tierEntriesLabel(schoolEntries.get(s.id), competitions),
                 expected_fee: schoolFees.has(s.id) ? formatUSD(schoolFees.get(s.id)) : "— no participants yet",
                 payment_status_text: s.payment_status,
                 payment: <PaymentButtons key="payment" id={s.id} current={s.payment_status} />,

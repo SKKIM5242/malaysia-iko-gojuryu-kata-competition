@@ -339,6 +339,42 @@ export async function getSchoolSenseiTierFees(): Promise<{
   return { schoolFees, senseiFees };
 }
 
+/** Per-tier paid ENTRY counts for every school and sensei — one count per
+ * (record, tier) pair, where an "entry" is one paid registration (i.e. one
+ * kata event), not one participant. This is what the commission rule is
+ * expressed in ("more than 10 events per competition tier"), and unlike the
+ * declared participating_tier_ids checkboxes it reflects what actually
+ * happened, so it can be trusted to decide a payout. */
+export async function getSchoolSenseiTierEntryCounts(): Promise<{
+  schoolEntries: Map<string, Map<string, number>>;
+  senseiEntries: Map<string, Map<string, number>>;
+}> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("registrations")
+    .select("competition_id, payment_status, participant:participants(school_id, sensei_id)");
+  const rows =
+    (data as unknown as Array<{
+      competition_id: string | null;
+      payment_status: string;
+      participant: { school_id: string | null; sensei_id: string | null } | null;
+    }>) ?? [];
+
+  const schoolEntries = new Map<string, Map<string, number>>();
+  const senseiEntries = new Map<string, Map<string, number>>();
+  const bump = (outer: Map<string, Map<string, number>>, key: string, tierId: string) => {
+    if (!outer.has(key)) outer.set(key, new Map());
+    const inner = outer.get(key)!;
+    inner.set(tierId, (inner.get(tierId) ?? 0) + 1);
+  };
+  for (const r of rows) {
+    if (r.payment_status !== "paid" || !r.competition_id) continue;
+    if (r.participant?.school_id) bump(schoolEntries, r.participant.school_id, r.competition_id);
+    if (r.participant?.sensei_id) bump(senseiEntries, r.participant.sensei_id, r.competition_id);
+  }
+  return { schoolEntries, senseiEntries };
+}
+
 /** Login accounts for the three roles without their own community
  * registration table — Admin/Organizer and Participant Support are created
  * directly (see app/actions/admin.ts createStaffAccount). */

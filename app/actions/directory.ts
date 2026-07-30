@@ -33,6 +33,21 @@ async function loadTier(
   return { id: data.id, name: data.name, fee: Number(data.registration_fee_usd ?? 0) };
 }
 
+/** The tick-boxed "tiers I'll have participants in" (see
+ * components/ParticipatingTiersField). Validated against real open
+ * competition ids so a hand-crafted POST can't store arbitrary uuids, and
+ * de-duplicated. */
+async function readParticipatingTierIds(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  formData: FormData,
+): Promise<string[]> {
+  const submitted = formData.getAll("participating_tier_ids").map((v) => String(v));
+  if (submitted.length === 0) return [];
+  const { data } = await supabase.from("competitions").select("id").eq("status", "open");
+  const valid = new Set((data ?? []).map((c) => c.id as string));
+  return [...new Set(submitted.filter((id) => valid.has(id)))];
+}
+
 /** Best-effort Stripe checkout for the tier fee; null when payments are
  * not configured (record stays pending for a manual payment instead). */
 async function directoryCheckout(
@@ -134,6 +149,7 @@ export async function registerSchool(
     home_country,
     referral_source: referral_source || null,
     registration_competition_id: tier.id,
+    participating_tier_ids: await readParticipatingTierIds(supabase, formData),
   });
   if (error) return { ok: false, error: "Could not register the school. Please try again." };
 
@@ -288,6 +304,7 @@ export async function registerSensei(
     home_country,
     referral_source: referral_source || null,
     registration_competition_id: tier.id,
+    participating_tier_ids: await readParticipatingTierIds(supabase, formData),
   });
   if (error) return { ok: false, error: "Could not register the sensei. Please try again." };
 

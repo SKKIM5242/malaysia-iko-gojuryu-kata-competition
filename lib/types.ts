@@ -21,6 +21,11 @@ export interface Competition {
    * announcement — usually on/after the announce date so one paid sign-in
    * sees everything including judge scores. */
   audience_signin_date: string | null;
+  /** Sign-in window inherited by every auto-managed account that resolves
+   * to this tier (see recompute_sign_in_quota). The per-sign-in COUNT comes
+   * from the account's role default, not from here. */
+  default_sign_in_valid_from: string | null;
+  default_sign_in_valid_until: string | null;
   /** Date printed on this tier's certificates — set by the organizer
    * alongside "Publish all Certificates" on /admin/certificates. Null falls
    * back to event_date wherever a certificate's date field is rendered. */
@@ -50,6 +55,9 @@ export interface School {
   bank_account_name: string | null;
   invitation_code: string | null;
   referral_source: string | null;
+  /** Tiers this school declares it will have participants in — declared
+   * intent from the registration form, not a commission input. */
+  participating_tier_ids: string[] | null;
   payment_status: "pending" | "paid" | "waived";
   created_at: string;
 }
@@ -76,6 +84,9 @@ export interface Sensei {
   bank_account_name: string | null;
   invitation_code: string | null;
   referral_source: string | null;
+  /** Tiers this sensei declares they will have participants in — declared
+   * intent from the registration form, not a commission input. */
+  participating_tier_ids: string[] | null;
   payment_status: "pending" | "paid" | "waived";
   created_at: string;
   school?: Pick<School, "id" | "name"> | null;
