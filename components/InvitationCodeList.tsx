@@ -5,6 +5,7 @@ import { EmptyState, formatDate } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
 import InvitationCodeForm, { ROLE_LABELS } from "@/components/InvitationCodeForm";
+import { shortTierName } from "@/lib/invitation-codes";
 
 /** Numbered listing of invitation codes (optionally scoped to one role) —
  * No. and Email stay pinned as the first two columns during horizontal
@@ -30,7 +31,7 @@ export default async function InvitationCodeList({
   if (role) query = query.eq("role", role);
   const { data } = await query;
   const codes = data ?? [];
-  const competitionNameById = new Map(competitions.map((c) => [c.id, c.name]));
+  const competitionNameById = new Map(competitions.map((c) => [c.id, shortTierName(c.name)]));
 
   const {
     data: { user },
@@ -90,8 +91,8 @@ export default async function InvitationCodeList({
             { key: "email", label: "Email" },
             { key: "phone", label: "Phone" },
             { key: "code", label: "Code" },
+            { key: "competition", label: "Competition Tier" },
             ...(role ? [] : [{ key: "role", label: "Role" }]),
-            { key: "competition", label: "Competition" },
             { key: "valid_from", label: "Valid From" },
             { key: "valid_until", label: "Valid Until" },
             { key: "sign_in_limit", label: "Sign-in Limit" },
@@ -106,8 +107,8 @@ export default async function InvitationCodeList({
             { key: "email", label: "Email" },
             { key: "phone", label: "Phone" },
             { key: "code", label: "Code" },
+            { key: "competition", label: "Competition Tier" },
             { key: "role", label: "Role" },
-            { key: "competition", label: "Competition" },
             { key: "valid_from", label: "Valid From" },
             { key: "valid_until", label: "Valid Until" },
             { key: "sign_in_limit", label: "Sign-in Limit" },

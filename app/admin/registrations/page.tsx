@@ -7,6 +7,7 @@ import { AdminShell, adminBtnSecondary } from "@/components/admin";
 import { CategoryName, EmptyState, SetupNotice, StatusBadge } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
 import InvitationCodeForm from "@/components/InvitationCodeForm";
+import { shortTierName } from "@/lib/invitation-codes";
 import type { PaymentStatus } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -95,6 +96,7 @@ export default async function AdminRegistrations({
             { key: "participant", label: "Participant", width: 170 },
             { key: "ref", label: "Ref", width: 100 },
             { key: "ic_passport", label: "IC / Passport", width: 140 },
+            { key: "tier", label: "Competition Tier", width: 130 },
             { key: "category", label: "Category", width: 240, wrap: true },
             { key: "division", label: "Division", width: 150 },
             { key: "school", label: "School", width: 170 },
@@ -106,6 +108,7 @@ export default async function AdminRegistrations({
             { key: "participant", label: "Participant" },
             { key: "ref", label: "Reference ID" },
             { key: "ic_passport", label: "IC / Passport" },
+            { key: "tier", label: "Competition Tier" },
             { key: "category_text", label: "Category" },
             { key: "division", label: "Division" },
             { key: "school", label: "School" },
@@ -117,6 +120,7 @@ export default async function AdminRegistrations({
             participant: r.participant?.full_name ?? "",
             ref: r.id.slice(0, 8).toUpperCase(),
             ic_passport: r.participant?.ic_passport ?? "",
+            tier: r.competition?.name ? shortTierName(r.competition.name) : "",
             category: <CategoryName name={r.category?.name} />,
             category_text: r.category?.name ?? "",
             division: r.division ?? "",

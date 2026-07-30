@@ -9,6 +9,7 @@ import {
 import { EmptyState, SetupNotice, SiteFooter, SiteHeader, formatUSD } from "@/components/ui";
 import { kataBases } from "@/lib/division";
 import ParticipantsTable from "@/components/ParticipantsTable";
+import { shortTierName } from "@/lib/invitation-codes";
 
 export const dynamic = "force-dynamic";
 
@@ -158,7 +159,7 @@ export default async function ParticipantsPage({
                 id: r.id,
                 no: (page - 1) * PAGE_SIZE + i + 1,
                 name: r.participant?.full_name ?? "—",
-                tier: r.competition?.name ?? null,
+                tier: r.competition?.name ? shortTierName(r.competition.name) : null,
                 categoryName: r.category?.name ?? null,
                 division: r.division,
                 belt: r.participant?.belt_rank ?? null,
