@@ -25,7 +25,7 @@ import IbanConfirmCheckbox from "@/components/IbanConfirmCheckbox";
 import BankDetailsNote from "@/components/BankDetailsNote";
 import BankAccountNameField from "@/components/BankAccountNameField";
 import { IBAN_CSV_NOTE } from "@/lib/bank";
-import { EDUCATION_LEVELS, SPOKEN_LANGUAGES } from "@/lib/reference-data";
+import { EDUCATION_LEVELS, SPOKEN_LANGUAGES, REFERRAL_LABEL, REFERRAL_PLACEHOLDER } from "@/lib/reference-data";
 
 export const dynamic = "force-dynamic";
 
@@ -246,8 +246,8 @@ export default async function AdminSupport({
                   />
                 </div>
                 <div>
-                  <label htmlFor="cs_referral_source" className={adminLabel}>Referral (optional)</label>
-                  <input id="cs_referral_source" name="referral_source" className={adminInput} placeholder="e.g. a friend's name" />
+                  <label htmlFor="cs_referral_source" className={adminLabel}>{REFERRAL_LABEL} <span className="font-normal text-neutral-400">(optional)</span></label>
+                  <input id="cs_referral_source" name="referral_source" className={adminInput} placeholder={REFERRAL_PLACEHOLDER} />
                 </div>
                 <div>
                   <label htmlFor="cs_highest_education" className={adminLabel}>Highest Education Attended *</label>

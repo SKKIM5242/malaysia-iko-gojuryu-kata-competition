@@ -19,6 +19,8 @@ import BankDetailsNote from "@/components/BankDetailsNote";
 import BankAccountNameField from "@/components/BankAccountNameField";
 import { IBAN_CSV_NOTE } from "@/lib/bank";
 
+import { REFERRAL_LABEL, REFERRAL_PLACEHOLDER } from "@/lib/reference-data";
+
 export const dynamic = "force-dynamic";
 
 export default async function AdminParticipants({
@@ -179,8 +181,8 @@ export default async function AdminParticipants({
                   />
                 </div>
                 <div>
-                  <label htmlFor="referral_source" className={adminLabel}>Referral (optional)</label>
-                  <input id="referral_source" name="referral_source" defaultValue={editing?.referral_source ?? ""} className={adminInput} placeholder="e.g. a friend's name" />
+                  <label htmlFor="referral_source" className={adminLabel}>{REFERRAL_LABEL} <span className="font-normal text-neutral-400">(optional)</span></label>
+                  <input id="referral_source" name="referral_source" defaultValue={editing?.referral_source ?? ""} className={adminInput} placeholder={REFERRAL_PLACEHOLDER} />
                 </div>
               </div>
               <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3">

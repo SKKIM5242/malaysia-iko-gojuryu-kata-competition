@@ -13,6 +13,8 @@ import { ageAt, beltGroup, genderCode, kataBaseOf, kataBases as allKataBasesOf }
 import { shortTierName } from "@/lib/invitation-codes";
 import type { Category, Competition, School, Sensei } from "@/lib/types";
 
+import { REFERRAL_LABEL, REFERRAL_PLACEHOLDER } from "@/lib/reference-data";
+
 const initialState: RegisterState = { ok: false };
 
 const inputCls =
@@ -526,10 +528,10 @@ export default function RegisterForm({
         )}
         <div className="sm:col-span-2">
           <label htmlFor="referral_source" className={labelCls}>
-            Referral / Where did you hear about this competition?{" "}
+            {REFERRAL_LABEL}{" "}
             <span className="font-normal text-neutral-400">(optional)</span>
           </label>
-          <input id="referral_source" name="referral_source" className={inputCls} placeholder="e.g. a friend's name" />
+          <input id="referral_source" name="referral_source" className={inputCls} placeholder={REFERRAL_PLACEHOLDER} />
           <p className="mt-1 text-xs text-neutral-400">
             Please don&apos;t name your own Dojo&apos;s PIC or Sensei here — if a friend told you
             about this competition, give their name instead.

@@ -19,3 +19,10 @@ export const SPOKEN_LANGUAGES = [
 ] as const;
 
 export const EDUCATION_LEVELS = ["Primary", "Secondary", "A-Level", "Tertiary", "Master", "PhD"] as const;
+
+/** Label and example text for the "how did you hear about us" field, shared
+ * by every registration form on both the public site and the admin panel so
+ * the two never drift apart. */
+export const REFERRAL_LABEL = "Referral / Where did you hear about this competition?";
+export const REFERRAL_PLACEHOLDER =
+  "e.g. friend's name, social media name, relative name, any event name, or any channel name or competition support name etc.";

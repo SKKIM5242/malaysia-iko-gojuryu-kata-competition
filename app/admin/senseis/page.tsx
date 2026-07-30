@@ -22,6 +22,8 @@ import BankDetailsNote from "@/components/BankDetailsNote";
 import BankAccountNameField from "@/components/BankAccountNameField";
 import { IBAN_CSV_NOTE } from "@/lib/bank";
 
+import { REFERRAL_LABEL, REFERRAL_PLACEHOLDER } from "@/lib/reference-data";
+
 export const dynamic = "force-dynamic";
 
 function PaymentButtons({ id, current }: { id: string; current: string }) {
@@ -196,8 +198,8 @@ export default async function AdminSenseis({
                   />
                 </div>
                 <div>
-                  <label htmlFor="referral_source" className={adminLabel}>Referral (optional)</label>
-                  <input id="referral_source" name="referral_source" defaultValue={editing?.referral_source ?? ""} className={adminInput} placeholder="e.g. a friend's name" />
+                  <label htmlFor="referral_source" className={adminLabel}>{REFERRAL_LABEL} <span className="font-normal text-neutral-400">(optional)</span></label>
+                  <input id="referral_source" name="referral_source" defaultValue={editing?.referral_source ?? ""} className={adminInput} placeholder={REFERRAL_PLACEHOLDER} />
                 </div>
                 <ParticipatingTiersField
                   competitions={competitions}

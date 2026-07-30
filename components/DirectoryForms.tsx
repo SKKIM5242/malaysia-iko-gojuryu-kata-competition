@@ -16,6 +16,8 @@ export interface TierOption {
   fee: number;
 }
 
+import { REFERRAL_LABEL, REFERRAL_PLACEHOLDER } from "@/lib/reference-data";
+
 const initial: DirectoryState = { ok: false };
 const inputCls =
   "w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm focus:border-red-600 focus:outline-none focus:ring-1 focus:ring-red-600";
@@ -214,10 +216,10 @@ export function SchoolForm({ telegramLink, tiers }: { telegramLink: string | nul
       </div>
       <div>
         <label htmlFor="referral_source" className={labelCls}>
-          Referral / Where did you hear about this competition?{" "}
+          {REFERRAL_LABEL}{" "}
           <span className="font-normal text-neutral-400">(optional)</span>
         </label>
-        <input id="referral_source" name="referral_source" className={inputCls} placeholder="e.g. a friend's name" />
+        <input id="referral_source" name="referral_source" className={inputCls} placeholder={REFERRAL_PLACEHOLDER} />
         <p className="mt-1 text-xs text-neutral-400">
           Please don&apos;t name your own Dojo&apos;s PIC or Sensei here — if a friend told you
           about this competition, give their name instead.
@@ -366,10 +368,10 @@ export function SenseiForm({
       </p>
       <div>
         <label htmlFor="referral_source" className={labelCls}>
-          Referral / Where did you hear about this competition?{" "}
+          {REFERRAL_LABEL}{" "}
           <span className="font-normal text-neutral-400">(optional)</span>
         </label>
-        <input id="referral_source" name="referral_source" className={inputCls} placeholder="e.g. a friend's name" />
+        <input id="referral_source" name="referral_source" className={inputCls} placeholder={REFERRAL_PLACEHOLDER} />
         <p className="mt-1 text-xs text-neutral-400">
           Please don&apos;t name your own Dojo&apos;s PIC or Sensei here — if a friend told you
           about this competition, give their name instead.

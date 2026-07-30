@@ -13,6 +13,8 @@ import InvitationCodeList from "@/components/InvitationCodeList";
 import InvitationCodeRunField from "@/components/InvitationCodeRunField";
 import { getTelegramLink } from "@/lib/telegram";
 
+import { REFERRAL_LABEL, REFERRAL_PLACEHOLDER } from "@/lib/reference-data";
+
 export const dynamic = "force-dynamic";
 
 interface Audience {
@@ -138,8 +140,8 @@ export default async function AdminAudience({
                 <input id="aud_support_referral" name="support_referral" className={adminInput} placeholder="e.g. Amy / KSK" />
               </div>
               <div>
-                <label htmlFor="aud_referral_source" className={adminLabel}>Referral (optional)</label>
-                <input id="aud_referral_source" name="referral_source" className={adminInput} placeholder="e.g. a friend's name" />
+                <label htmlFor="aud_referral_source" className={adminLabel}>{REFERRAL_LABEL} <span className="font-normal text-neutral-400">(optional)</span></label>
+                <input id="aud_referral_source" name="referral_source" className={adminInput} placeholder={REFERRAL_PLACEHOLDER} />
               </div>
             </div>
             <button type="submit" className={adminBtn}>Add Audience / Spectator</button>
