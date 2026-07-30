@@ -14,6 +14,7 @@ import ParticipantRecordsTable, { type ParticipantRecordRow } from "@/components
 import FilterableTable from "@/components/FilterableTable";
 import DownloadCsvButton from "@/components/DownloadCsvButton";
 import { ageAt } from "@/lib/division";
+import { shortTierName } from "@/lib/invitation-codes";
 import {
   markAttemptPurchasePaid, markBulkUploadPaymentPaid, markSubscriptionRenewalFulfilled,
   confirmBulkUploadSubmission, markBulkUploadTallyDone,
@@ -151,7 +152,9 @@ export default async function AdminParticipantRecords({
   ]);
   const senseiNameById = new Map((bulkSenseis ?? []).map((s) => [s.id as string, s.name as string]));
   const schoolNameById = new Map((bulkSchools ?? []).map((s) => [s.id as string, s.name as string]));
-  const bulkCompetitionNameById = new Map((bulkCompetitions ?? []).map((c) => [c.id as string, c.name as string]));
+  const bulkCompetitionNameById = new Map(
+    (bulkCompetitions ?? []).map((c) => [c.id as string, shortTierName(c.name as string)]),
+  );
 
   // One enquiry can cover up to 3 tiers at once, sharing a batch_id with
   // one combined bill — group siblings together so admin confirms (or
@@ -203,7 +206,7 @@ export default async function AdminParticipantRecords({
         registrationId: r.registrationId,
         fullName: r.participant.full_name,
         email: r.participant.email ?? "",
-        competition: r.competitionName ?? "—",
+        competition: r.competitionName ? shortTierName(r.competitionName) : "—",
         deadline: r.registrationDeadline ? formatDate(r.registrationDeadline) : "—",
         deadlineRaw: r.registrationDeadline ?? "",
         daysLeft:
@@ -218,7 +221,7 @@ export default async function AdminParticipantRecords({
 
   const participantRows: ParticipantRecordRow[] = participantRecords.map((r) => ({
     registrationId: r.registrationId,
-    competition: r.competitionName ?? "—",
+    competition: r.competitionName ? shortTierName(r.competitionName) : "—",
     category: r.categoryName ?? "—",
     fullName: r.participant.full_name,
     icPassport: r.participant.ic_passport,

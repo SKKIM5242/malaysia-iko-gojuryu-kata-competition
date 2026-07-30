@@ -17,6 +17,7 @@ import EmailVerificationBlocked from "@/components/EmailVerificationBlocked";
 import { isEmailVerified } from "@/lib/email-verification";
 import SignInInfoTables from "@/components/SignInInfoTables";
 import PendingRecordingsList, { type PendingRegistration } from "@/components/PendingRecordingsList";
+import { shortTierName } from "@/lib/invitation-codes";
 
 export const dynamic = "force-dynamic";
 
@@ -83,7 +84,11 @@ async function getPendingRegistrations(
       categoryName: r.category?.name ?? null,
       categorySortOrder: r.category?.sort_order ?? 0,
       competitionId: r.competition!.id,
-      competitionName: r.competition?.name ?? null,
+      // Shortened to just the tier ("USD 10 Tier"): this reads inline in
+      // sentences like "for your competition tier — X — based on today's
+      // date", where the full event name is both redundant and collides
+      // with the surrounding em-dashes.
+      competitionName: r.competition?.name ? shortTierName(r.competition.name) : null,
       eventDate: r.competition?.event_date ?? null,
       registrationDeadline: r.competition?.registration_deadline ?? null,
     }));
