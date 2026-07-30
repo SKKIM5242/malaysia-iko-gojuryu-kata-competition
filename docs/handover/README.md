@@ -9,6 +9,7 @@ Competition. Read in order; each is short and standalone.
 | 02 | [Rollback Runbook](02-ROLLBACK-RUNBOOK.md) | **The site is broken right now.** Keep this reachable offline. |
 | 03 | [Credentials & Access](03-CREDENTIALS-AND-ACCESS.md) | Handing over or verifying account ownership |
 | 04 | [Test Data](04-TEST-DATA.md) | What the TEST 001–100 rows are, and the SQL to remove them before launch |
+| 05 | [Public vs Admin audit](05-PUBLIC-VS-ADMIN-AUDIT.md) | Checking the two sides match; records the one structural gap found |
 
 ## Two things to do before calling the handover complete
 
