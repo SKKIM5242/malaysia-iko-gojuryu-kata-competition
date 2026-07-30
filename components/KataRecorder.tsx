@@ -104,6 +104,7 @@ export default function KataRecorder({
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [agreementOpen, setAgreementOpen] = useState(false);
   const [agreed, setAgreed] = useState(false);
+  const [recordingStartedAt, setRecordingStartedAt] = useState<Date | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -197,6 +198,7 @@ export default function KataRecorder({
     recorder.start(1000);
     recorderRef.current = recorder;
     setSeconds(0);
+    setRecordingStartedAt(new Date());
     setPhase("recording");
     timerRef.current = setInterval(() => {
       setSeconds((s) => {
@@ -379,9 +381,19 @@ export default function KataRecorder({
             Camera preview appears here once started.
           </div>
         )}
+        {phase !== "idle" && (
+          <div className="absolute right-2 top-[13%] rounded bg-black/70 px-2 py-1 text-right text-[11px] font-semibold leading-tight text-white">
+            Deleted Recording: {attempts} / Available: {maxAttempts}
+          </div>
+        )}
         {phase === "recording" && (
-          <div className="absolute left-3 top-3 flex items-center gap-2 rounded-full bg-black/70 px-3 py-1 text-sm font-semibold text-white">
-            <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-red-500" /> REC {mm}:{ss} / 05:00
+          <div className="absolute left-3 top-[13%] flex items-center gap-2 rounded-full bg-black/70 px-3 py-1 text-sm font-semibold text-white">
+            <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-red-500" /> LIVE REC {mm}:{ss} / 05:00
+          </div>
+        )}
+        {phase === "recording" && recordingStartedAt && (
+          <div className="absolute bottom-2 left-3 text-[12px] text-white" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.85)" }}>
+            Recording started {recordingStartedAt.toLocaleDateString()} {recordingStartedAt.toLocaleTimeString()}
           </div>
         )}
       </div>
