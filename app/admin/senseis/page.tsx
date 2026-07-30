@@ -11,6 +11,7 @@ import CsvUploadForm from "@/components/CsvUploadForm";
 import SignInControlBox from "@/components/SignInControlBox";
 import InvitationCodeForm from "@/components/InvitationCodeForm";
 import InvitationCodeList from "@/components/InvitationCodeList";
+import InvitationCodeRunField from "@/components/InvitationCodeRunField";
 import { NoCommaInput } from "@/components/NoCommaAddressField";
 import DateOfBirthField from "@/components/DateOfBirthField";
 import IbanInput from "@/components/IbanInput";
@@ -184,8 +185,12 @@ export default async function AdminSenseis({
                   <input id="phone" name="phone" type="tel" required defaultValue={editing?.phone ?? ""} className={adminInput} placeholder="+60…" />
                 </div>
                 <div>
-                  <label htmlFor="invitation_code" className={adminLabel}>Invitation code (optional)</label>
-                  <input id="invitation_code" name="invitation_code" defaultValue={editing?.invitation_code ?? ""} className={`${adminInput} max-w-[65%]`} />
+                  <InvitationCodeRunField
+                    id="invitation_code"
+                    role="sensei"
+                    competitions={competitions}
+                    defaultValue={editing?.invitation_code}
+                  />
                 </div>
                 <div>
                   <label htmlFor="referral_source" className={adminLabel}>Referral (optional)</label>

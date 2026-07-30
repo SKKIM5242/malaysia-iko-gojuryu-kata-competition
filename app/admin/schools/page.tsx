@@ -11,6 +11,7 @@ import CsvUploadForm from "@/components/CsvUploadForm";
 import SignInControlBox from "@/components/SignInControlBox";
 import InvitationCodeForm from "@/components/InvitationCodeForm";
 import InvitationCodeList from "@/components/InvitationCodeList";
+import InvitationCodeRunField from "@/components/InvitationCodeRunField";
 import { NoCommaInput } from "@/components/NoCommaAddressField";
 import IbanInput from "@/components/IbanInput";
 import IbanConfirmCheckbox from "@/components/IbanConfirmCheckbox";
@@ -171,10 +172,12 @@ export default async function AdminSchools({
                   <label htmlFor="phone" className={adminLabel}>Mobile phone *</label>
                   <input id="phone" name="phone" type="tel" required defaultValue={editing?.phone ?? ""} className={adminInput} placeholder="+60…" />
                 </div>
-                <div>
-                  <label htmlFor="invitation_code" className={adminLabel}>Invitation code (optional)</label>
-                  <input id="invitation_code" name="invitation_code" defaultValue={editing?.invitation_code ?? ""} className={`${adminInput} max-w-[65%]`} />
-                </div>
+                <InvitationCodeRunField
+                  id="invitation_code"
+                  role="school"
+                  competitions={competitions}
+                  defaultValue={editing?.invitation_code}
+                />
                 <div>
                   <label htmlFor="referral_source" className={adminLabel}>Referral (optional)</label>
                   <input id="referral_source" name="referral_source" defaultValue={editing?.referral_source ?? ""} className={adminInput} placeholder="e.g. a friend's name" />

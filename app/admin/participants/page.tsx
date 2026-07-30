@@ -9,6 +9,7 @@ import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
 import InvitationCodeForm from "@/components/InvitationCodeForm";
 import InvitationCodeList from "@/components/InvitationCodeList";
+import InvitationCodeRunField from "@/components/InvitationCodeRunField";
 import DobAgeField from "@/components/DobAgeField";
 import { NoCommaInput } from "@/components/NoCommaAddressField";
 import { ageAt } from "@/lib/division";
@@ -170,8 +171,12 @@ export default async function AdminParticipants({
                   </select>
                 </div>
                 <div>
-                  <label htmlFor="invitation_code" className={adminLabel}>Invitation code (optional)</label>
-                  <input id="invitation_code" name="invitation_code" defaultValue={editing?.invitation_code ?? ""} className={`${adminInput} max-w-[65%]`} />
+                  <InvitationCodeRunField
+                    id="invitation_code"
+                    role="participant"
+                    competitions={competitions}
+                    defaultValue={editing?.invitation_code}
+                  />
                 </div>
                 <div>
                   <label htmlFor="referral_source" className={adminLabel}>Referral (optional)</label>

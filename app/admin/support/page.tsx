@@ -19,6 +19,7 @@ import { NoCommaInput } from "@/components/NoCommaAddressField";
 import DateOfBirthField from "@/components/DateOfBirthField";
 import InvitationCodeForm from "@/components/InvitationCodeForm";
 import InvitationCodeList from "@/components/InvitationCodeList";
+import InvitationCodeRunField from "@/components/InvitationCodeRunField";
 import IbanInput from "@/components/IbanInput";
 import IbanConfirmCheckbox from "@/components/IbanConfirmCheckbox";
 import BankDetailsNote from "@/components/BankDetailsNote";
@@ -238,8 +239,11 @@ export default async function AdminSupport({
                   <input id="cs_phone" name="phone" type="tel" required className={adminInput} placeholder="+60…" />
                 </div>
                 <div>
-                  <label htmlFor="cs_invitation_code" className={adminLabel}>Invitation code (optional)</label>
-                  <input id="cs_invitation_code" name="invitation_code" className={`${adminInput} max-w-[65%]`} />
+                  <InvitationCodeRunField
+                    id="cs_invitation_code"
+                    role="customer_support"
+                    competitions={competitions}
+                  />
                 </div>
                 <div>
                   <label htmlFor="cs_referral_source" className={adminLabel}>Referral (optional)</label>

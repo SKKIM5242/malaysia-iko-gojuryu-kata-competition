@@ -14,6 +14,7 @@ import CsvUploadForm from "@/components/CsvUploadForm";
 import SignInControlBox from "@/components/SignInControlBox";
 import InvitationCodeForm from "@/components/InvitationCodeForm";
 import InvitationCodeList from "@/components/InvitationCodeList";
+import InvitationCodeRunField from "@/components/InvitationCodeRunField";
 import IbanInput from "@/components/IbanInput";
 import IbanConfirmCheckbox from "@/components/IbanConfirmCheckbox";
 import BankDetailsNote from "@/components/BankDetailsNote";
@@ -193,8 +194,13 @@ export default async function AdminReferees({
                   <input id="phone" name="phone" required defaultValue={editing?.phone ?? ""} className={adminInput} placeholder="+60…" />
                 </div>
                 <div>
-                  <label htmlFor="invitation_code" className={adminLabel}>Invitation code</label>
-                  <input id="invitation_code" name="invitation_code" defaultValue={editing?.invitation_code ?? ""} className={`${adminInput} max-w-[65%]`} />
+                  <InvitationCodeRunField
+                    id="invitation_code"
+                    role="referee"
+                    competitions={competitions}
+                    defaultValue={editing?.invitation_code}
+                    label="Invitation code"
+                  />
                 </div>
                 <div>
                   <label htmlFor="referral_source" className={adminLabel}>Referral (optional)</label>

@@ -8,6 +8,7 @@ import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
 import InvitationCodeForm from "@/components/InvitationCodeForm";
 import InvitationCodeList from "@/components/InvitationCodeList";
+import InvitationCodeRunField from "@/components/InvitationCodeRunField";
 import { NoCommaInput } from "@/components/NoCommaAddressField";
 import DateOfBirthField from "@/components/DateOfBirthField";
 import IbanInput from "@/components/IbanInput";
@@ -128,8 +129,11 @@ export default async function AdminOrganizers({
                   <input id="org_phone" name="phone" type="tel" required className={adminInput} placeholder="+60…" />
                 </div>
                 <div>
-                  <label htmlFor="org_invitation_code" className={adminLabel}>Invitation code (optional)</label>
-                  <input id="org_invitation_code" name="invitation_code" className={`${adminInput} max-w-[65%]`} />
+                  <InvitationCodeRunField
+                    id="org_invitation_code"
+                    role="organizer"
+                    competitions={competitions}
+                  />
                 </div>
               </div>
               <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3">

@@ -10,6 +10,7 @@ import SignInControlBox from "@/components/SignInControlBox";
 import GeneratePersonalCodeBox from "@/components/GeneratePersonalCodeBox";
 import InvitationCodeForm from "@/components/InvitationCodeForm";
 import InvitationCodeList from "@/components/InvitationCodeList";
+import InvitationCodeRunField from "@/components/InvitationCodeRunField";
 import { getTelegramLink } from "@/lib/telegram";
 
 export const dynamic = "force-dynamic";
@@ -125,8 +126,12 @@ export default async function AdminAudience({
                 <input id="aud_home_country" name="home_country" defaultValue="Malaysia" className={adminInput} />
               </div>
               <div>
-                <label htmlFor="aud_invitation_code" className={adminLabel}>Invitation code (optional)</label>
-                <input id="aud_invitation_code" name="invitation_code" className={`${adminInput} max-w-[65%]`} placeholder="Waives the USD 10 fee" />
+                <InvitationCodeRunField
+                  id="aud_invitation_code"
+                  role="audience"
+                  competitions={competitions}
+                  placeholder="Waives the USD 10 fee"
+                />
               </div>
               <div>
                 <label htmlFor="aud_support_referral" className={adminLabel}>Participant Support referral (optional)</label>
