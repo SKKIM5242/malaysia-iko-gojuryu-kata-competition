@@ -1,11 +1,12 @@
 "use client";
 
 import { useTransition } from "react";
-import { deleteCategory, mergeCategoryToMix, mergeCategoryAgeGroup } from "@/app/actions/admin";
+import { deleteCategory, mergeCategoryToMix, mergeCategoryAgeGroup, mergeKataFamily } from "@/app/actions/admin";
 
 const ACTIONS = {
   mergeToMix: mergeCategoryToMix,
   mergeAgeGroup: mergeCategoryAgeGroup,
+  mergeFamily: mergeKataFamily,
   delete: deleteCategory,
 } as const;
 
@@ -29,12 +30,17 @@ export default function CategoryActionButton({
   fields,
   className,
   title,
+  confirmMessage,
   children,
 }: {
   actionName: keyof typeof ACTIONS;
   fields: Record<string, string>;
   className?: string;
   title?: string;
+  /** When set, a native browser confirm() must be accepted before the
+   * action runs — for actions bigger than a single row (e.g. mergeFamily,
+   * which can consolidate 100+ categories in one click). */
+  confirmMessage?: string;
   children: React.ReactNode;
 }) {
   const [pending, startTransition] = useTransition();
@@ -46,6 +52,7 @@ export default function CategoryActionButton({
       title={title}
       disabled={pending}
       onClick={() => {
+        if (confirmMessage && !window.confirm(confirmMessage)) return;
         const formData = new FormData();
         for (const [key, value] of Object.entries(fields)) formData.set(key, value);
         startTransition(() => {

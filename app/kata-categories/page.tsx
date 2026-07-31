@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { schemaReady, getCategories } from "@/lib/data";
 import { getAllCompetitions } from "@/lib/admin-data";
 import { loadRecordingsByCategory } from "@/lib/arena";
-import { groupByKata } from "@/lib/division";
+import { groupByFamily } from "@/lib/kata-families";
 import { NoTranslate, SetupNotice, SiteFooter, SiteHeader } from "@/components/ui";
 import AuthForms from "@/components/AuthForms";
 import type { Category } from "@/lib/types";
@@ -117,61 +117,70 @@ export default async function KataCategoriesPage() {
                   {cats.length === 0 ? (
                     <p className="text-sm text-neutral-400">Categories have not been published yet.</p>
                   ) : (
-                    <div className="space-y-2">
-                      {groupByKata(cats).map(([base, subCats]) => (
-                        <details key={base} className="rounded-lg border border-neutral-200 bg-white shadow-sm">
-                          <summary className="cursor-pointer px-4 py-2.5 text-sm font-semibold text-neutral-800 hover:bg-neutral-50">
-                            <NoTranslate>{base}</NoTranslate>{" "}
-                            <span className="font-normal text-neutral-400">({subCats.length} sub-categories)</span>
-                          </summary>
-                          <div className="space-y-3 px-4 pb-4">
-                            {subCats.map((cat) => {
-                              const taken = categoryTaken.get(cat.id) ?? 0;
-                              const left = cat.max_participants != null ? Math.max(0, cat.max_participants - taken) : null;
-                              const recordings = recordingsByCategory.get(cat.id) ?? [];
-                              return (
-                                <div key={cat.id} className="border-t border-neutral-100 pt-3 first:border-t-0 first:pt-0">
-                                  <div className="flex items-center justify-between gap-2">
-                                    <span className="text-sm font-semibold text-neutral-700">
-                                      {cat.name.split(" — ").slice(1).join(" — ") || cat.name}
-                                    </span>
-                                    <span
-                                      className={`shrink-0 text-xs whitespace-nowrap ${left === 0 ? "font-semibold text-red-600" : "text-neutral-400"}`}
-                                    >
-                                      {cat.max_participants != null
-                                        ? `${taken}/${cat.max_participants} taken (${left} left)`
-                                        : `${taken} taken (no cap)`}
-                                    </span>
-                                  </div>
-                                  {recordings.length === 0 ? (
-                                    <p className="mt-1 text-xs text-neutral-400">No recordings submitted yet.</p>
-                                  ) : (
-                                    <ul className="mt-1.5 space-y-1">
-                                      {recordings.map((r, i) => (
-                                        <li
-                                          key={`${cat.id}-${i}`}
-                                          className="flex items-center justify-between gap-2 text-sm"
-                                        >
-                                          <span className="text-neutral-600">{r.participantName}</span>
-                                          {r.playbackUrl && (
-                                            <a
-                                              href={r.playbackUrl}
-                                              target="_blank"
-                                              rel="noopener noreferrer"
-                                              className="shrink-0 rounded border border-neutral-300 px-2.5 py-0.5 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
-                                            >
-                                              Watch
-                                            </a>
-                                          )}
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  )}
+                    <div className="space-y-6">
+                      {groupByFamily(cats).map(([family, kataGroups]) => (
+                        <div key={family}>
+                          <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-neutral-500">
+                            {family} Kata
+                          </h3>
+                          <div className="space-y-2">
+                            {kataGroups.map(([base, subCats]) => (
+                              <details key={base} className="rounded-lg border border-neutral-200 bg-white shadow-sm">
+                                <summary className="cursor-pointer px-4 py-2.5 text-sm font-semibold text-neutral-800 hover:bg-neutral-50">
+                                  <NoTranslate>{base}</NoTranslate>{" "}
+                                  <span className="font-normal text-neutral-400">({subCats.length} sub-categories)</span>
+                                </summary>
+                                <div className="space-y-3 px-4 pb-4">
+                                  {subCats.map((cat) => {
+                                    const taken = categoryTaken.get(cat.id) ?? 0;
+                                    const left = cat.max_participants != null ? Math.max(0, cat.max_participants - taken) : null;
+                                    const recordings = recordingsByCategory.get(cat.id) ?? [];
+                                    return (
+                                      <div key={cat.id} className="border-t border-neutral-100 pt-3 first:border-t-0 first:pt-0">
+                                        <div className="flex items-center justify-between gap-2">
+                                          <span className="text-sm font-semibold text-neutral-700">
+                                            {cat.name.split(" — ").slice(1).join(" — ") || cat.name}
+                                          </span>
+                                          <span
+                                            className={`shrink-0 text-xs whitespace-nowrap ${left === 0 ? "font-semibold text-red-600" : "text-neutral-400"}`}
+                                          >
+                                            {cat.max_participants != null
+                                              ? `${taken}/${cat.max_participants} taken (${left} left)`
+                                              : `${taken} taken (no cap)`}
+                                          </span>
+                                        </div>
+                                        {recordings.length === 0 ? (
+                                          <p className="mt-1 text-xs text-neutral-400">No recordings submitted yet.</p>
+                                        ) : (
+                                          <ul className="mt-1.5 space-y-1">
+                                            {recordings.map((r, i) => (
+                                              <li
+                                                key={`${cat.id}-${i}`}
+                                                className="flex items-center justify-between gap-2 text-sm"
+                                              >
+                                                <span className="text-neutral-600">{r.participantName}</span>
+                                                {r.playbackUrl && (
+                                                  <a
+                                                    href={r.playbackUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="shrink-0 rounded border border-neutral-300 px-2.5 py-0.5 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
+                                                  >
+                                                    Watch
+                                                  </a>
+                                                )}
+                                              </li>
+                                            ))}
+                                          </ul>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
                                 </div>
-                              );
-                            })}
+                              </details>
+                            ))}
                           </div>
-                        </details>
+                        </div>
                       ))}
                     </div>
                   )}

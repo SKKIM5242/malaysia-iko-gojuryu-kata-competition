@@ -10,7 +10,8 @@ import KataGroupDragZone from "@/components/KataGroupDragZone";
 import SubcategoryDragZone from "@/components/SubcategoryDragZone";
 import ScrollToAnchor from "@/components/ScrollToAnchor";
 import CategoryActionButton from "@/components/CategoryActionButton";
-import { groupByKata, kataBaseOf } from "@/lib/division";
+import { kataBaseOf } from "@/lib/division";
+import { groupByFamily } from "@/lib/kata-families";
 import type { Category } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -320,8 +321,31 @@ export default async function AdminCompetitions({
                     {(categoriesByCompetition.get(c.id) ?? []).length === 0 ? (
                       <p className="text-sm text-neutral-400">None yet — click &quot;+ Add category&quot; above to add one.</p>
                     ) : (
-                      <div className="space-y-2">
-                        {groupByKata(categoriesByCompetition.get(c.id) ?? []).map(([base, cats]) => (
+                      <div className="space-y-4">
+                        {groupByFamily(categoriesByCompetition.get(c.id) ?? []).map(([family, kataGroups]) => {
+                          const totalCats = kataGroups.reduce((sum, [, cats]) => sum + cats.length, 0);
+                          const alreadyMerged =
+                            kataGroups.length === 1 &&
+                            kataGroups[0][1].length === 1 &&
+                            kataGroups[0][0] === `${family} Kata — Combined (All Kata, Belts, Ages & Genders)`;
+                          return (
+                            <div key={family}>
+                              <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+                                <p className="text-xs font-bold uppercase tracking-wide text-neutral-500">{family} Kata</p>
+                                {canManageCompetition && !alreadyMerged && (
+                                  <CategoryActionButton
+                                    actionName="mergeFamily"
+                                    fields={{ competition_id: c.id, family, return_to: categoryReturnTo(c.id) }}
+                                    className="rounded border border-sky-300 px-2 py-0.5 text-xs font-semibold text-sky-700 hover:bg-sky-50"
+                                    title={`Combine every ${family} Kata sub-category — any kata, belt, age, or gender within this group — into one category`}
+                                    confirmMessage={`Merge all ${totalCats} ${family} Kata categories (every kata, belt, age, and gender in this group) into ONE combined category for this tier?\n\nExisting registrations move over automatically — no resubmission needed. This also means new registrants can no longer be placed into a specific ${family} kata/belt/age slot afterward, the same as the existing Merge → Mix and Merge age buttons. Best done once registration for this tier is effectively closed.`}
+                                  >
+                                    Merge all {family} Kata ({totalCats}) → one category
+                                  </CategoryActionButton>
+                                )}
+                              </div>
+                              <div className="space-y-2">
+                                {kataGroups.map(([base, cats]) => (
                           <details
                             key={base}
                             id={kataGroupAnchorId(c.id, base)}
@@ -424,7 +448,11 @@ export default async function AdminCompetitions({
                               })}
                             </ul>
                           </details>
-                        ))}
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                     <p className="mt-2 text-[11px] text-neutral-400">

@@ -8,6 +8,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { writeAudit } from "@/lib/audit";
 import { headers } from "next/headers";
 import { kataBaseOf, groupByKata, ageAt, resolveCategory } from "@/lib/division";
+import { KATA_FAMILIES, categoriesInFamily, type KataFamily } from "@/lib/kata-families";
 import { getStripe, paymentsEnabled, REFEREE_DEPOSIT_USD, AUDIENCE_FEE_USD } from "@/lib/payments";
 import {
   notifyRefereeAssignment, notifyRefereeUnassigned, sendConfirmationEmail, notifyAnnouncementPublished,
@@ -659,6 +660,92 @@ export async function mergeCategoryAgeGroup(formData: FormData) {
   });
   revalidatePath("/");
   backTo(returnTo, { ok: `Merged “${neighbor!.name}” into “${newName}”.` });
+}
+
+/**
+ * Collapses EVERY category belonging to one kata family (Elementary,
+ * Intermediate, Advanced, or Kobudo — see lib/kata-families.ts) for one
+ * competition tier into a single combined category, regardless of kata,
+ * belt group, age bracket, or gender. Every registration currently sitting
+ * in any of that family's categories is moved onto the combined one (same
+ * registration/recording rows, just repointed — no resubmission needed),
+ * then the now-empty source categories are deleted, mirroring
+ * mergeCategoryToMix/mergeCategoryAgeGroup's established pattern above.
+ *
+ * Like those two merges, this closes the door on new registrations for the
+ * merged kata going forward — resolveCategory() can no longer find a
+ * belt/age/gender-specific category for "Kata Taikyoku Jodan" once its rows
+ * are gone. This is intended as a late-stage/deadline-time consolidation
+ * (the same assumption the existing per-kata merges already make, and the
+ * app's own automatic below-cap merge already documents on the home page),
+ * not something to click while registration is still open.
+ */
+export async function mergeKataFamily(formData: FormData) {
+  const competitionId = String(formData.get("competition_id") ?? "");
+  const family = String(formData.get("family") ?? "") as KataFamily;
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/competitions";
+  const { supabase, actorId } = await getActor();
+
+  if (!KATA_FAMILIES.includes(family)) backTo(returnTo, { error: "Unknown kata family." });
+  if (!competitionId) backTo(returnTo, { error: "Missing competition." });
+
+  const { data: allCats } = await supabase
+    .from("categories")
+    .select("*")
+    .eq("competition_id", competitionId);
+  const sourceCats = categoriesInFamily((allCats as Category[]) ?? [], family);
+  if (sourceCats.length === 0) backTo(returnTo, { error: `No ${family} Kata categories found for this tier.` });
+
+  const mergedName = `${family} Kata — Combined (All Kata, Belts, Ages & Genders)`;
+  const already = sourceCats.find((c) => c.name === mergedName);
+  if (already && sourceCats.length === 1) {
+    backTo(returnTo, { ok: `${family} Kata is already merged into one category.` });
+  }
+
+  let targetId: string;
+  if (already) {
+    targetId = already.id;
+  } else {
+    const { data: created, error: createErr } = await supabase
+      .from("categories")
+      .insert({
+        competition_id: competitionId,
+        name: mergedName,
+        belt_group: "mix",
+        gender: "mix",
+        age_min: 4,
+        age_max: 99,
+        max_participants: null,
+        sort_order: Math.min(...sourceCats.map((c) => c.sort_order)),
+      })
+      .select("id")
+      .single();
+    if (createErr || !created) backTo(returnTo, { error: "Could not create the combined category." });
+    targetId = created!.id;
+  }
+
+  const sourceIds = sourceCats.filter((c) => c.id !== targetId).map((c) => c.id);
+  if (sourceIds.length > 0) {
+    const { error: moveErr } = await supabase
+      .from("registrations")
+      .update({ category_id: targetId })
+      .in("category_id", sourceIds);
+    if (moveErr) backTo(returnTo, { error: "Could not move registrations into the combined category." });
+
+    await supabase.from("categories").delete().in("id", sourceIds);
+  }
+
+  await writeAudit(supabase, {
+    table_name: "categories", record_id: targetId, action: "kata_family_merged",
+    new_value: { family, competition_id: competitionId, categories_consolidated: sourceIds.length },
+    actor_id: actorId,
+  });
+  revalidatePath("/");
+  backTo(returnTo, {
+    ok: sourceIds.length > 0
+      ? `${family} Kata merged — ${sourceIds.length} categor${sourceIds.length === 1 ? "y" : "ies"} consolidated into one.`
+      : `${family} Kata is already merged into one category.`,
+  });
 }
 
 /** Re-sequences sort_order for exactly the rows whose position actually

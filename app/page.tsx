@@ -18,7 +18,8 @@ import {
   protectKataNames,
 } from "@/components/ui";
 import { Markdown } from "@/lib/markdown";
-import { groupByKata, kataBases } from "@/lib/division";
+import { kataBases } from "@/lib/division";
+import { groupByFamily } from "@/lib/kata-families";
 import { createClient } from "@/lib/supabase/server";
 import { winnersRevealDateFor } from "@/lib/winners";
 import type { Category } from "@/lib/types";
@@ -189,32 +190,41 @@ export default async function Home() {
                           </>
                         )}
                       </p>
-                      <div className="space-y-2">
-                        {groupByKata(cats).map(([base, subCats]) => (
-                          <details key={base} className="rounded-lg border border-neutral-200 bg-white shadow-sm">
-                            <summary className="cursor-pointer px-4 py-2.5 text-sm font-semibold text-neutral-800 hover:bg-neutral-50">
-                              <NoTranslate>{base}</NoTranslate>{" "}
-                              <span className="font-normal text-neutral-400">({subCats.length} sub-categories)</span>
-                            </summary>
-                            <ul className="space-y-1 px-4 pb-3">
-                              {subCats.map((cat) => {
-                                const taken = categoryTaken.get(cat.id) ?? 0;
-                                const left = cat.max_participants != null ? Math.max(0, cat.max_participants - taken) : null;
-                                return (
-                                  <li key={cat.id} className="flex items-center justify-between gap-2 text-sm">
-                                    <span className="text-neutral-600">
-                                      {cat.name.split(" — ").slice(1).join(" — ") || cat.name}
-                                    </span>
-                                    <span className={`shrink-0 text-xs whitespace-nowrap ${left === 0 ? "font-semibold text-red-600" : "text-neutral-400"}`}>
-                                      {cat.max_participants != null
-                                        ? `${taken}/${cat.max_participants} taken (${left} left)`
-                                        : `${taken} taken (no cap)`}
-                                    </span>
-                                  </li>
-                                );
-                              })}
-                            </ul>
-                          </details>
+                      <div className="space-y-6">
+                        {groupByFamily(cats).map(([family, kataGroups]) => (
+                          <div key={family}>
+                            <h4 className="mb-2 text-xs font-bold uppercase tracking-wide text-neutral-500">
+                              {family} Kata
+                            </h4>
+                            <div className="space-y-2">
+                              {kataGroups.map(([base, subCats]) => (
+                                <details key={base} className="rounded-lg border border-neutral-200 bg-white shadow-sm">
+                                  <summary className="cursor-pointer px-4 py-2.5 text-sm font-semibold text-neutral-800 hover:bg-neutral-50">
+                                    <NoTranslate>{base}</NoTranslate>{" "}
+                                    <span className="font-normal text-neutral-400">({subCats.length} sub-categories)</span>
+                                  </summary>
+                                  <ul className="space-y-1 px-4 pb-3">
+                                    {subCats.map((cat) => {
+                                      const taken = categoryTaken.get(cat.id) ?? 0;
+                                      const left = cat.max_participants != null ? Math.max(0, cat.max_participants - taken) : null;
+                                      return (
+                                        <li key={cat.id} className="flex items-center justify-between gap-2 text-sm">
+                                          <span className="text-neutral-600">
+                                            {cat.name.split(" — ").slice(1).join(" — ") || cat.name}
+                                          </span>
+                                          <span className={`shrink-0 text-xs whitespace-nowrap ${left === 0 ? "font-semibold text-red-600" : "text-neutral-400"}`}>
+                                            {cat.max_participants != null
+                                              ? `${taken}/${cat.max_participants} taken (${left} left)`
+                                              : `${taken} taken (no cap)`}
+                                          </span>
+                                        </li>
+                                      );
+                                    })}
+                                  </ul>
+                                </details>
+                              ))}
+                            </div>
+                          </div>
                         ))}
                       </div>
                     </>
