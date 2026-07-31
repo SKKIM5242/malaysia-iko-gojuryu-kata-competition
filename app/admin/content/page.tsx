@@ -15,12 +15,40 @@ import { AdminShell, Card, adminBtn, adminInput, adminLabel } from "@/components
 import { EmptyState, SetupNotice, formatDate } from "@/components/ui";
 import { Markdown } from "@/lib/markdown";
 import { shortTierName } from "@/lib/invitation-codes";
+import { PROFILE_ROLE_KEYS, PROFILE_ROLE_KEY_LABELS } from "@/lib/reference-data";
 import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
 
 export const dynamic = "force-dynamic";
 
 const RETURN_TO = "/admin/content";
+
+const cellInput = "w-full rounded-md border border-neutral-300 px-2 py-1 text-xs";
+
+/** Picks the Sign-in Access Matrix row's join key onto `profiles.role`.
+ *
+ * A select, not a text box, because this used to be the same free-text field
+ * as the display label: renaming the labels detached every row from its
+ * accounts and silently dropped all nine roles to the hardcoded 250-sign-in
+ * fallback, Admin and Organizer included. See migration 0093. */
+function RoleKeySelect({ form, value = "" }: { form: string; value?: string }) {
+  return (
+    <select
+      form={form}
+      name="role_key"
+      defaultValue={value}
+      className={cellInput}
+      title="Which account role this row governs. Blank = a display-only row that governs no account."
+    >
+      <option value="">— display only (governs no account)</option>
+      {PROFILE_ROLE_KEYS.map((k) => (
+        <option key={k} value={k}>
+          {PROFILE_ROLE_KEY_LABELS[k]} ({k})
+        </option>
+      ))}
+    </select>
+  );
+}
 
 /** One place for Admin/Organizer to publish everything readers see:
  * announcements, notes/messages (same mechanism — a note stays a draft, a
@@ -81,7 +109,6 @@ export default async function AdminContent({
     "Unlimited once approved", "Unlimited once fee paid", "By application",
     "Paid per sign-in, per competition tier (USD 10 / 100 / 200)",
   ];
-  const cellInput = "w-full rounded-md border border-neutral-300 px-2 py-1 text-xs";
 
   return (
     <AdminShell title="Content" active="/admin/content" flash={{ ok: params.ok, error: params.error }}>
@@ -405,6 +432,12 @@ export default async function AdminContent({
               an account that already has a custom invitation-code value or a manual Sign-in
               Control override. Shown read-only on the Account page for everyone.
             </p>
+            <p className="mt-2 text-sm font-normal text-amber-800">
+              <strong>Role (label)</strong> is display text — rename it freely.{" "}
+              <strong>Matches account role</strong>{" "}
+              is what actually connects the row to real accounts, so a row set to
+              &ldquo;display only&rdquo; governs nobody and that role falls back to 250 sign-ins.
+            </p>
           </div>
           <span className="shrink-0 rounded-md border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-500 hover:bg-neutral-50">
             ✕ Close
@@ -429,7 +462,8 @@ export default async function AdminContent({
             downloadName="sign-in-access-matrix"
             stickyColumns={1}
             columns={[
-              { key: "role", label: "Role", width: 150 },
+              { key: "role", label: "Role (label)", width: 150 },
+              { key: "role_key", label: "Matches account role", width: 175 },
               { key: "default_sign_in_limit", label: "Default sign-ins", width: 140 },
               { key: "tier_tied", label: "Tier-tied?", width: 90 },
               { key: "valid_from", label: "Valid From", width: 130 },
@@ -439,6 +473,7 @@ export default async function AdminContent({
             ]}
             csvColumns={[
               { key: "role_csv", label: "Role" },
+              { key: "role_key_csv", label: "Matches account role" },
               { key: "default_sign_in_limit_csv", label: "Default sign-ins" },
               { key: "tier_tied_csv", label: "Tier-tied?" },
               { key: "valid_from_csv", label: "Valid from" },
@@ -448,7 +483,8 @@ export default async function AdminContent({
             rows={[
               {
                 id: "signin-new-row",
-                role: <input form="signin-new" name="role" required placeholder="role_key *" className={cellInput} />,
+                role: <input form="signin-new" name="role" required placeholder="Display label *" className={cellInput} />,
+                role_key: <RoleKeySelect form="signin-new" />,
                 default_sign_in_limit: (
                   <input form="signin-new" name="default_sign_in_limit" type="number" min="0" placeholder="blank = unlimited" className={cellInput} />
                 ),
@@ -465,11 +501,12 @@ export default async function AdminContent({
                 ),
                 notes: <input form="signin-new" name="notes" placeholder="Note (optional)" className={cellInput} />,
                 actions: <span className="text-xs text-neutral-400">New row — Save above</span>,
-                role_csv: "", default_sign_in_limit_csv: "", tier_tied_csv: "", valid_from_csv: "", valid_until_csv: "", notes_csv: "",
+                role_csv: "", role_key_csv: "", default_sign_in_limit_csv: "", tier_tied_csv: "", valid_from_csv: "", valid_until_csv: "", notes_csv: "",
               },
               ...(signInDefaults ?? []).map((r) => ({
                 id: r.id as string,
                 role: <input form={`signin-${r.id}`} name="role" required defaultValue={r.role} className={`${cellInput} font-semibold`} />,
+                role_key: <RoleKeySelect form={`signin-${r.id}`} value={(r.role_key as string | null) ?? ""} />,
                 default_sign_in_limit: (
                   <input
                     form={`signin-${r.id}`}
@@ -523,6 +560,7 @@ export default async function AdminContent({
                   </span>
                 ),
                 role_csv: r.role as string,
+                role_key_csv: ((r.role_key as string | null) ?? "") || "— display only",
                 default_sign_in_limit_csv: r.default_sign_in_limit == null ? "Unlimited" : String(r.default_sign_in_limit),
                 tier_tied_csv: r.tier_tied ? "Yes" : "No",
                 valid_from_csv: r.valid_from ? formatDate(r.valid_from as string) : "",

@@ -1,2 +1,5 @@
-role|default_sign_in_limit|tier_tied|valid_from|valid_until|notes|sort_order
-participant|250|true|||Tier follows their linked registration.|1
+﻿role|role_key|default_sign_in_limit|tier_tied|valid_from|valid_until|notes|sort_order
+Participant|participant|250|true|||Tier follows their linked registration.|1
+Referee / Judge|referee|1000|true|||Tier window applies.|4
+Admin|admin||false|||Unlimited - leave default_sign_in_limit blank.|7
+Winner||||||Display-only row: blank role_key matches no account.|0

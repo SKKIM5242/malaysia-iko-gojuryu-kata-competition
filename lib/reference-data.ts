@@ -26,3 +26,33 @@ export const EDUCATION_LEVELS = ["Primary", "Secondary", "A-Level", "Tertiary", 
 export const REFERRAL_LABEL = "Referral / Where did you hear about this competition?";
 export const REFERRAL_PLACEHOLDER =
   "e.g. friend's name, social media name, relative name, any event name, or any channel name or competition support name etc.";
+
+/** The account roles stored in `profiles.role` / `profiles.roles`. These are
+ * the ONLY values that resolve a Sign-in Access Matrix row to an account, via
+ * `sign_in_role_defaults.role_key`.
+ *
+ * That table's `role` column is a free-text display label the organizer may
+ * rename at will on /admin/content. It used to double as the join key, so
+ * relabelling the rows ("participant" -> "Participant", "customer_support" ->
+ * "Participant_Support") silently detached every row and dropped every role to
+ * the hardcoded 250-sign-in fallback — including Admin and Organizer, which
+ * must be unlimited. See migration 0093. */
+export const PROFILE_ROLE_KEYS = [
+  "participant", "school", "sensei", "referee",
+  "customer_support", "organizer", "admin", "staff", "audience",
+] as const;
+
+export type ProfileRoleKey = (typeof PROFILE_ROLE_KEYS)[number];
+
+/** Human label for a role key, for the Sign-in Access Matrix picker. */
+export const PROFILE_ROLE_KEY_LABELS: Record<ProfileRoleKey, string> = {
+  participant: "Participant",
+  school: "School / Dojo",
+  sensei: "Sensei",
+  referee: "Referee / Judge",
+  customer_support: "Participant Support",
+  organizer: "Organizer",
+  admin: "Admin",
+  staff: "Staff (legacy)",
+  audience: "Audience / Spectator",
+};

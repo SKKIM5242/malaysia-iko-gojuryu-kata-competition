@@ -2,17 +2,19 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { formatDate } from "@/components/ui";
 import { shortTierName } from "@/lib/invitation-codes";
 
-const ROLE_LABELS: Record<string, string> = {
-  participant: "Participant",
-  school: "School / Dojo",
-  sensei: "Sensei / Coach",
-  referee: "Referee / Judge",
-  customer_support: "Participant Support",
-  organizer: "Organizer",
-  admin: "Admin",
-  staff: "Admin / Organizer / Participant Support (legacy)",
-  audience: "Audience / Spectator",
-};
+import { PROFILE_ROLE_KEY_LABELS, type ProfileRoleKey } from "@/lib/reference-data";
+
+/** `role` is the organizer's own display label (editable on /admin/content),
+ * so it wins; the role_key label is only a fallback for a row saved without
+ * one. This used to be a hardcoded lowercase-key map, which stopped matching
+ * the moment the labels were renamed. */
+function roleLabel(role: string | null, roleKey: string | null): string {
+  if (role) return role;
+  if (roleKey && roleKey in PROFILE_ROLE_KEY_LABELS) {
+    return PROFILE_ROLE_KEY_LABELS[roleKey as ProfileRoleKey];
+  }
+  return roleKey ?? "—";
+}
 
 /** Read-only render of the Sign-in Access Matrix and the Competition Valid
  * Date table — shown to every signed-in viewer on the Account page for
@@ -68,7 +70,7 @@ export default async function SignInInfoTables({ canManage }: { canManage: boole
                 {(roleDefaults ?? []).map((r) => (
                   <tr key={r.id as string}>
                     <td className="py-1.5 pr-2 font-semibold text-neutral-800">
-                      {ROLE_LABELS[r.role as string] ?? r.role}
+                      {roleLabel(r.role as string | null, r.role_key as string | null)}
                     </td>
                     <td className="py-1.5 pr-2">
                       {r.default_sign_in_limit == null ? "Unlimited" : String(r.default_sign_in_limit)}

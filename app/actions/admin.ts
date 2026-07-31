@@ -18,6 +18,7 @@ import {
 import { applySubscriptionRenewalTerms } from "@/lib/finalize";
 import type { PaymentStatus, Category } from "@/lib/types";
 import { parseCsvWithHeader, parseDDMMYYYY, type CsvUploadResult } from "@/lib/csv-bulk";
+import { PROFILE_ROLE_KEYS } from "@/lib/reference-data";
 import { normalizeIban } from "@/lib/bank";
 import { codePrefix, nextSequentialCode } from "@/lib/invitation-codes";
 import { listTelegramGroups, type TelegramCategory } from "@/lib/telegram";
@@ -2059,11 +2060,19 @@ export async function saveSignInRoleDefault(formData: FormData) {
   const { supabase, actorId } = await getActor();
   await requireAccessTableEditor(supabase, actorId, returnTo);
   const role = String(formData.get("role") ?? "").trim();
+  // The join key onto profiles.role, kept separate from the free-text `role`
+  // label above precisely so renaming the label can't detach the row — which
+  // is exactly what happened before migration 0093. Blank = display-only row.
+  const roleKeyRaw = String(formData.get("role_key") ?? "").trim().toLowerCase();
+  const role_key = (PROFILE_ROLE_KEYS as readonly string[]).includes(roleKeyRaw)
+    ? roleKeyRaw
+    : null;
   const limitRaw = String(formData.get("default_sign_in_limit") ?? "").trim();
   const validFrom = String(formData.get("valid_from") ?? "").trim();
   const validUntil = String(formData.get("valid_until") ?? "").trim();
   const values = {
     role,
+    role_key,
     default_sign_in_limit: limitRaw ? Number(limitRaw) : null,
     tier_tied: formData.get("tier_tied") === "on",
     notes: String(formData.get("notes") ?? "").trim() || null,
@@ -2143,7 +2152,7 @@ export async function bulkUploadAccessMatrixRows(_prev: CsvUploadResult, formDat
   return { done: true, succeeded, failed: failures.length, failures: failures.slice(0, 50) };
 }
 
-const SIGN_IN_ROLE_DEFAULTS_CSV_COLUMNS = ["role", "default_sign_in_limit", "tier_tied", "valid_from", "valid_until", "notes", "sort_order"] as const;
+const SIGN_IN_ROLE_DEFAULTS_CSV_COLUMNS = ["role", "role_key", "default_sign_in_limit", "tier_tied", "valid_from", "valid_until", "notes", "sort_order"] as const;
 
 /** Upserts by role (its unique key) — re-uploading the same CSV updates
  * existing rows instead of duplicating them, unlike the other two tables
@@ -2172,8 +2181,17 @@ export async function bulkUploadSignInRoleDefaults(_prev: CsvUploadResult, formD
     const role = get(r, "role");
     if (!role) { failures.push({ row: rowNo, name: `Row ${rowNo}`, error: "role is required" }); continue; }
     const limitRaw = get(r, "default_sign_in_limit");
+    const roleKeyRaw = get(r, "role_key").trim().toLowerCase();
+    if (roleKeyRaw && !(PROFILE_ROLE_KEYS as readonly string[]).includes(roleKeyRaw)) {
+      failures.push({
+        row: rowNo, name: role,
+        error: `role_key must be one of: ${PROFILE_ROLE_KEYS.join(", ")} (or blank for a display-only row)`,
+      });
+      continue;
+    }
     const values = {
       role,
+      role_key: roleKeyRaw || null,
       default_sign_in_limit: limitRaw ? Number(limitRaw) : null,
       tier_tied: /^(true|yes|1)$/i.test(get(r, "tier_tied")),
       valid_from: parseDDMMYYYY(get(r, "valid_from")) || null,
