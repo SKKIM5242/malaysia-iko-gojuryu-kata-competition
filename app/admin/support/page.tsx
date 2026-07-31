@@ -21,6 +21,8 @@ import DateOfBirthField from "@/components/DateOfBirthField";
 import InvitationCodeForm from "@/components/InvitationCodeForm";
 import InvitationCodeList from "@/components/InvitationCodeList";
 import InvitationCodeRunField from "@/components/InvitationCodeRunField";
+import { ageAt } from "@/lib/division";
+import { SUPPORT_REGIONS, WORLD_COUNTRIES } from "@/lib/reference-data";
 import IbanInput from "@/components/IbanInput";
 import IbanConfirmCheckbox from "@/components/IbanConfirmCheckbox";
 import BankDetailsNote from "@/components/BankDetailsNote";
@@ -35,6 +37,8 @@ interface StaffApp {
   role_requested: string; message: string | null; status: string; created_at: string;
   support_tier_1_id: string | null; support_tier_2_id: string | null; support_tier_3_id: string | null;
   invitation_code: string | null;
+  date_of_birth: string | null;
+  preferred_region: string | null; based_country: string | null;
 }
 
 export default async function AdminSupport({
@@ -241,6 +245,24 @@ export default async function AdminSupport({
                   <input id="cs_country" name="country" required defaultValue="Malaysia" className={adminInput} />
                 </div>
                 <div>
+                  <label htmlFor="cs_based_country" className={adminLabel}>Which country are they currently based at? *</label>
+                  <select id="cs_based_country" name="based_country" required defaultValue="" className={adminInput}>
+                    <option value="" disabled>Select country</option>
+                    {WORLD_COUNTRIES.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="cs_preferred_region" className={adminLabel}>Which region would they prefer to support? *</label>
+                  <select id="cs_preferred_region" name="preferred_region" required defaultValue="" className={adminInput}>
+                    <option value="" disabled>Select region</option>
+                    {SUPPORT_REGIONS.map((r) => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
                   <label htmlFor="cs_phone" className={adminLabel}>Mobile phone *</label>
                   <input id="cs_phone" name="phone" type="tel" required className={adminInput} placeholder="+60…" />
                 </div>
@@ -362,7 +384,10 @@ export default async function AdminSupport({
                 { key: "reference_id", label: "Reference ID" },
                 { key: "email", label: "Email" },
                 { key: "phone", label: "Phone" },
+                { key: "age", label: "Age" },
                 { key: "country", label: "Country" },
+                { key: "based_country", label: "Currently Based In" },
+                { key: "preferred_region", label: "Preferred Region" },
                 ...competitions.map((c) => ({ key: `tier_${c.id}`, label: `Tier ${formatUSD(c.registration_fee_usd)}` })),
                 { key: "actions", label: "Actions" },
               ]}
@@ -373,7 +398,10 @@ export default async function AdminSupport({
                 short_name: s.short_name ?? "",
                 email: s.email ?? "",
                 phone: s.phone ?? "",
+                age: s.date_of_birth ? String(ageAt(s.date_of_birth, null)) : "",
                 country: s.country ?? "",
+                based_country: s.based_country ?? "",
+                preferred_region: s.preferred_region ?? "",
                 ...Object.fromEntries(
                   competitions.map((c) => [
                     `tier_${c.id}`,
@@ -422,6 +450,9 @@ export default async function AdminSupport({
             { key: "reference_id", label: "Reference ID" },
             { key: "email", label: "Email" },
             { key: "phone", label: "Phone" },
+            { key: "age", label: "Age" },
+            { key: "based_country", label: "Currently Based In" },
+            { key: "preferred_region", label: "Preferred Region" },
             ...competitions.map((c) => ({ key: `tier_${c.id}`, label: `Tier ${formatUSD(c.registration_fee_usd)}` })),
             { key: "message", label: "Message" },
             { key: "status", label: "Status" },
@@ -444,6 +475,9 @@ export default async function AdminSupport({
             short_name: s.short_name ?? "",
             email: s.email ?? "",
             phone: s.phone ?? "",
+            age: s.date_of_birth ? String(ageAt(s.date_of_birth, null)) : "",
+            based_country: s.based_country ?? "",
+            preferred_region: s.preferred_region ?? "",
             ...Object.fromEntries(
               competitions.map((c) => [
                 `tier_${c.id}`,

@@ -3371,6 +3371,8 @@ export async function createStaffAccount(formData: FormData) {
     support_tier_1_id: String(formData.get("support_tier_1_id") ?? "").trim() || null,
     support_tier_2_id: String(formData.get("support_tier_2_id") ?? "").trim() || null,
     support_tier_3_id: String(formData.get("support_tier_3_id") ?? "").trim() || null,
+    preferred_region: String(formData.get("preferred_region") ?? "").trim() || null,
+    based_country: String(formData.get("based_country") ?? "").trim() || null,
   };
   if (!extra.ic_passport || !extra.date_of_birth || !extra.gender) {
     backTo(returnTo, { error: "IC / Passport, date of birth, and gender are required." });
@@ -3386,6 +3388,9 @@ export async function createStaffAccount(formData: FormData) {
   }
   if (role === "customer_support" && (!extra.highest_education || extra.languages_count == null)) {
     backTo(returnTo, { error: "Highest Education Attended and number of languages are required." });
+  }
+  if (role === "customer_support" && (!extra.preferred_region || !extra.based_country)) {
+    backTo(returnTo, { error: "Preferred region and current country are required." });
   }
 
   const { supabase, actorId } = await getActor();
@@ -3493,6 +3498,8 @@ export async function saveStaffAccount(formData: FormData) {
     values.support_tier_1_id = String(formData.get("support_tier_1_id") ?? "").trim() || null;
     values.support_tier_2_id = String(formData.get("support_tier_2_id") ?? "").trim() || null;
     values.support_tier_3_id = String(formData.get("support_tier_3_id") ?? "").trim() || null;
+    values.preferred_region = String(formData.get("preferred_region") ?? "").trim() || null;
+    values.based_country = String(formData.get("based_country") ?? "").trim() || null;
   }
 
   const admin = createAdminClient();

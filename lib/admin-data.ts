@@ -38,6 +38,7 @@ export interface StaffAccountRecord {
   referral_source: string | null; highest_education: string | null;
   languages_count: number | null; languages: string[] | null;
   support_tier_1_id: string | null; support_tier_2_id: string | null; support_tier_3_id: string | null;
+  preferred_region: string | null; based_country: string | null;
 }
 
 export interface AdminCounts {
@@ -391,7 +392,7 @@ export async function getStaffAccountRecords(): Promise<StaffAccountRecord[]> {
   const { data } = await supabase
     .from("profiles")
     .select(
-      "user_id, role, full_name, country, email, approved, created_at, short_name, ic_passport, date_of_birth, gender, belt_rank, home_address, city_town, postcode, phone, bank_name, bank_account_no, bank_account_name, referral_source, highest_education, languages_count, languages, support_tier_1_id, support_tier_2_id, support_tier_3_id",
+      "user_id, role, full_name, country, email, approved, created_at, short_name, ic_passport, date_of_birth, gender, belt_rank, home_address, city_town, postcode, phone, bank_name, bank_account_no, bank_account_name, referral_source, highest_education, languages_count, languages, support_tier_1_id, support_tier_2_id, support_tier_3_id, preferred_region, based_country",
     )
     .in("role", ["admin", "organizer", "staff", "customer_support"])
     .order("created_at", { ascending: false });

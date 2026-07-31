@@ -14,7 +14,10 @@ import IbanInput from "@/components/IbanInput";
 import IbanConfirmCheckbox from "@/components/IbanConfirmCheckbox";
 import { NoCommaTextarea } from "@/components/NoCommaAddressField";
 import DateOfBirthField from "@/components/DateOfBirthField";
-import { EDUCATION_LEVELS, SPOKEN_LANGUAGES, REFERRAL_LABEL, REFERRAL_PLACEHOLDER } from "@/lib/reference-data";
+import {
+  EDUCATION_LEVELS, SPOKEN_LANGUAGES, REFERRAL_LABEL, REFERRAL_PLACEHOLDER,
+  SUPPORT_REGIONS, WORLD_COUNTRIES,
+} from "@/lib/reference-data";
 import type { Competition } from "@/lib/types";
 import TierSlotsField from "@/components/TierSlotsField";
 
@@ -483,6 +486,26 @@ export function StaffForm({
           </div>
         </div>
 
+        <div>
+          <label htmlFor="based_country" className={labelCls}>Which country are you currently based at? *</label>
+          <select id="based_country" name="based_country" required defaultValue="" className={inputCls}>
+            <option value="" disabled>Select country</option>
+            {WORLD_COUNTRIES.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+          <Err m={e.based_country} />
+        </div>
+        <div>
+          <label htmlFor="preferred_region" className={labelCls}>Which region would you prefer to support? *</label>
+          <select id="preferred_region" name="preferred_region" required defaultValue="" className={inputCls}>
+            <option value="" disabled>Select region</option>
+            {SUPPORT_REGIONS.map((r) => (
+              <option key={r} value={r}>{r}</option>
+            ))}
+          </select>
+          <Err m={e.preferred_region} />
+        </div>
         <div>
           <label htmlFor="highest_education" className={labelCls}>Highest Education Attended *</label>
           <select id="highest_education" name="highest_education" required defaultValue="" className={inputCls}>

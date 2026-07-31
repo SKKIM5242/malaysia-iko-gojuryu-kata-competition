@@ -7,7 +7,10 @@ import IbanInput from "@/components/IbanInput";
 import IbanConfirmCheckbox from "@/components/IbanConfirmCheckbox";
 import BankDetailsNote from "@/components/BankDetailsNote";
 import BankAccountNameField from "@/components/BankAccountNameField";
-import { EDUCATION_LEVELS, SPOKEN_LANGUAGES, REFERRAL_LABEL, REFERRAL_PLACEHOLDER } from "@/lib/reference-data";
+import {
+  EDUCATION_LEVELS, SPOKEN_LANGUAGES, REFERRAL_LABEL, REFERRAL_PLACEHOLDER,
+  SUPPORT_REGIONS, WORLD_COUNTRIES,
+} from "@/lib/reference-data";
 import { shortTierName } from "@/lib/invitation-codes";
 import { formatUSD } from "@/components/ui";
 import type { StaffAccountRecord } from "@/lib/admin-data";
@@ -129,6 +132,24 @@ export default function StaffAccountEditForm({
                 <select id={`${idPrefix}_languages`} name="languages" multiple size={6} defaultValue={account.languages ?? []} className={adminInput}>
                   {SPOKEN_LANGUAGES.map((lang) => (
                     <option key={lang} value={lang}>{lang}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor={`${idPrefix}_based_country`} className={adminLabel}>Which country are they currently based at? *</label>
+                <select id={`${idPrefix}_based_country`} name="based_country" required defaultValue={account.based_country ?? ""} className={adminInput}>
+                  <option value="" disabled>Select country</option>
+                  {WORLD_COUNTRIES.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor={`${idPrefix}_preferred_region`} className={adminLabel}>Which region would they prefer to support? *</label>
+                <select id={`${idPrefix}_preferred_region`} name="preferred_region" required defaultValue={account.preferred_region ?? ""} className={adminInput}>
+                  <option value="" disabled>Select region</option>
+                  {SUPPORT_REGIONS.map((r) => (
+                    <option key={r} value={r}>{r}</option>
                   ))}
                 </select>
               </div>

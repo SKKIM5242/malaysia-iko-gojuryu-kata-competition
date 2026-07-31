@@ -287,6 +287,8 @@ export async function applyStaff(
     ["role_requested", "Role"],
     ["highest_education", "Highest Education Attended"],
     ["languages_count", "Number of languages"],
+    ["preferred_region", "Preferred region to support"],
+    ["based_country", "Country currently based in"],
   ]);
   if (Object.keys(fieldErrors).length > 0) {
     return { ok: false, error: "Please fix the highlighted fields.", fieldErrors };
@@ -371,6 +373,8 @@ export async function applyStaff(
     support_tier_1_id,
     support_tier_2_id,
     support_tier_3_id,
+    preferred_region: values.preferred_region,
+    based_country: values.based_country,
   });
   if (error) return { ok: false, error: "Could not submit your application. Please try again." };
 
