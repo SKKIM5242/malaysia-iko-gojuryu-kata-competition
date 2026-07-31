@@ -15,6 +15,7 @@ import {
   notifyCertificatesPublished, notifyInvitationCodeIssued, notifyStatusChanged,
   notifyOrganizersBulkPaymentConfirmed, notifyOrganizersBulkTallyDone, notifySenseiBulkPaymentConfirmed,
   notifySenseiBulkCsvConfirmed, notifyOrganizersDirectoryBulkUpload, sendAdminTelegramDM,
+  notifyParticipantEmailChanged,
 } from "@/lib/notify";
 import { applySubscriptionRenewalTerms } from "@/lib/finalize";
 import type { PaymentStatus, Category } from "@/lib/types";
@@ -1778,6 +1779,19 @@ export async function saveParticipant(formData: FormData) {
       table_name: "participants", record_id: id, action: "participant_updated",
       old_value: before, new_value: values, actor_id: actorId,
     });
+    // Changing which email a paid registration is tied to is more
+    // consequential than most edits -- whoever controls that inbox can now
+    // claim it via "Link to account" -- so both addresses and the
+    // organizers get a heads-up. Distinct from Link to account itself,
+    // which never changes a participant's email.
+    if (before && before.email !== values.email) {
+      await notifyParticipantEmailChanged({
+        participantName: values.full_name,
+        oldEmail: before.email,
+        newEmail: values.email,
+        changedBy: null,
+      });
+    }
   } else {
     const { data, error } = await supabase
       .from("participants")

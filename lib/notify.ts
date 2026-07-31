@@ -897,6 +897,65 @@ export async function notifyOrganizersBulkTallyDone(notice: BulkBatchNotice): Pr
   );
 }
 
+/**
+ * Fires whenever staff edit a participant record and the email on file
+ * actually changes (see saveParticipant in app/actions/admin.ts) — this is
+ * a distinct action from "Link to account" (which never touches a
+ * participant's email; it only connects an existing registration to an
+ * existing login sharing the same email already on file). Changing which
+ * email a paid registration is associated with is more consequential —
+ * whoever controls that inbox can now claim the registration — so both the
+ * old and new address get a heads-up, and every approved Organizer gets a
+ * Telegram DM + email so an unrequested change doesn't go unnoticed.
+ */
+export async function notifyParticipantEmailChanged(input: {
+  participantName: string;
+  oldEmail: string | null;
+  newEmail: string | null;
+  changedBy: string | null;
+}): Promise<void> {
+  const { participantName, oldEmail, newEmail, changedBy } = input;
+  if (!oldEmail && !newEmail) return;
+  const who = changedBy ? `by ${changedBy}` : "by an admin";
+  const subject = `Email changed on your Kata Competition registration — ${participantName}`;
+  const sends: Promise<unknown>[] = [];
+  if (oldEmail) {
+    sends.push(
+      sendEmail(
+        oldEmail,
+        subject,
+        `Hi,\n\nThe email address on ${participantName}'s Kata Competition registration was just changed ` +
+          `${who}, from this address (${oldEmail}) to ${newEmail ?? "(removed)"}.\n\n` +
+          `If you did not request this, please contact the organizer immediately — reply to this email or ` +
+          `reach out via Telegram.\n\n— Malaysia Open Virtual Karate-do Kata Competition`,
+      ),
+    );
+  }
+  if (newEmail && newEmail !== oldEmail) {
+    sends.push(
+      sendEmail(
+        newEmail,
+        subject,
+        `Hi,\n\n${participantName}'s Kata Competition registration is now associated with this email address ` +
+          `(changed ${who}${oldEmail ? ` from ${oldEmail}` : ""}).\n\n` +
+          `If you did not request this, please contact the organizer immediately.\n\n` +
+          `Sign in to Kata Arena: ${appUrl()}/account\n\n— Malaysia Open Virtual Karate-do Kata Competition`,
+      ),
+    );
+  }
+  sends.push(
+    notifyOrganizers(
+      `Participant email changed — ${participantName}`,
+      [
+        `${participantName}'s registration email was changed ${who}: ${oldEmail ?? "(none)"} → ${newEmail ?? "(none)"}.`,
+        `Worth a quick check if this wasn't an organizer/support-initiated change.`,
+      ],
+      `✏️ Email changed — ${participantName}: ${oldEmail ?? "(none)"} → ${newEmail ?? "(none)"} (${who}).`,
+    ),
+  );
+  await Promise.allSettled(sends);
+}
+
 /** Fires when Admin/Organizer confirms a sensei's bulk-upload payment (see
  * markBulkUploadPaymentPaid in app/actions/admin.ts) — email (with the
  * usual Telegram-group-join-links via sendConfirmationEmail) plus a direct
