@@ -31,6 +31,13 @@ export interface AudienceRecord {
 export interface StaffAccountRecord {
   user_id: string; role: string; full_name: string | null; country: string | null;
   email: string | null; approved: boolean; created_at: string;
+  short_name: string | null; ic_passport: string | null; date_of_birth: string | null;
+  gender: string | null; belt_rank: string | null; home_address: string | null;
+  city_town: string | null; postcode: string | null; phone: string | null;
+  bank_name: string | null; bank_account_no: string | null; bank_account_name: string | null;
+  referral_source: string | null; highest_education: string | null;
+  languages_count: number | null; languages: string[] | null;
+  support_tier_1_id: string | null; support_tier_2_id: string | null; support_tier_3_id: string | null;
 }
 
 export interface AdminCounts {
@@ -383,7 +390,9 @@ export async function getStaffAccountRecords(): Promise<StaffAccountRecord[]> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("profiles")
-    .select("user_id, role, full_name, country, email, approved, created_at")
+    .select(
+      "user_id, role, full_name, country, email, approved, created_at, short_name, ic_passport, date_of_birth, gender, belt_rank, home_address, city_town, postcode, phone, bank_name, bank_account_no, bank_account_name, referral_source, highest_education, languages_count, languages, support_tier_1_id, support_tier_2_id, support_tier_3_id",
+    )
     .in("role", ["admin", "organizer", "staff", "customer_support"])
     .order("created_at", { ascending: false });
   return (data as StaffAccountRecord[]) ?? [];

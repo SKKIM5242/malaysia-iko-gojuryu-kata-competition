@@ -1365,8 +1365,14 @@ export async function updateCommunityStatus(formData: FormData) {
 /** Admin/Organizer/Participant Support/Referee directly adds an Audience /
  * Spectator (rather than the person self-registering) — e.g. someone paid
  * or was invited in person. An invitation code here waives the USD 10 fee
- * exactly like self-registration does. */
-export async function createAudienceMember(formData: FormData) {
+ * exactly like self-registration does.
+ *
+ * Also handles editing an existing member (when `id` is present) — a plain
+ * field update, since a record that already exists has already had its
+ * invitation code redeemed or its fee charged and neither should re-fire on
+ * every edit. */
+export async function saveAudienceMember(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
   const returnTo = "/admin/audience";
   const full_name = String(formData.get("full_name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim();
@@ -1380,6 +1386,21 @@ export async function createAudienceMember(formData: FormData) {
   }
   const { supabase, actorId } = await getActor();
 
+  if (id) {
+    const { error } = await supabase
+      .from("audiences")
+      .update({ full_name, email, phone, home_country, invitation_code, support_referral, referral_source })
+      .eq("id", id);
+    if (error) backTo(returnTo, { error: "Could not save changes — please try again." });
+    await writeAudit(supabase, {
+      table_name: "audiences", record_id: id, action: "audience_updated_by_admin",
+      new_value: { full_name, email, invitation_code }, actor_id: actorId,
+    });
+    revalidatePath(returnTo);
+    backTo(returnTo, { ok: `${full_name} updated.` });
+    return;
+  }
+
   let payment_status: "pending" | "waived" = "pending";
   if (invitation_code) {
     const { data: redeemed } = await supabase.rpc("redeem_invitation_code", {
@@ -1390,26 +1411,39 @@ export async function createAudienceMember(formData: FormData) {
     if (redeemed === true) payment_status = "waived";
   }
 
-  const id = crypto.randomUUID();
+  const newId = crypto.randomUUID();
   const { error } = await supabase.from("audiences").insert({
-    id, full_name, email, phone, home_country, invitation_code, support_referral, referral_source, payment_status,
+    id: newId, full_name, email, phone, home_country, invitation_code, support_referral, referral_source, payment_status,
   });
   if (error) backTo(returnTo, { error: "Could not add audience member — please try again." });
   await writeAudit(supabase, {
-    table_name: "audiences", record_id: id, action: "audience_added_by_admin",
+    table_name: "audiences", record_id: newId, action: "audience_added_by_admin",
     new_value: { full_name, email, invitation_code }, actor_id: actorId,
   });
   await notifyAddedByAdmin("audience", email, full_name);
-  revalidatePath("/admin/audience");
+  revalidatePath(returnTo);
   // payment_status is already 'waived' when a code was redeemed above, so
   // only an un-coded add owes the flat sign-in fee.
   if (payment_status !== "waived") {
     const url = await communityRecordCheckoutUrl(
-      "audience", id, full_name, AUDIENCE_FEE_USD, "Audience / Spectator sign-in fee",
+      "audience", newId, full_name, AUDIENCE_FEE_USD, "Audience / Spectator sign-in fee",
     );
     if (url) redirect(url);
   }
   backTo(returnTo, { ok: `${full_name} added to Audience / Spectators.` });
+}
+
+export async function deleteAudienceMember(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const returnTo = "/admin/audience";
+  const { supabase, actorId } = await getActor();
+  const { error } = await supabase.from("audiences").delete().eq("id", id);
+  if (error) backTo(returnTo, { error: "Could not delete — please try again." });
+  await writeAudit(supabase, {
+    table_name: "audiences", record_id: id, action: "audience_deleted", actor_id: actorId,
+  });
+  revalidatePath(returnTo);
+  backTo(returnTo, { ok: "Audience / Spectator record deleted." });
 }
 
 export async function saveReferee(formData: FormData) {
@@ -3400,6 +3434,124 @@ export async function createStaffAccount(formData: FormData) {
 
   revalidatePath(returnTo);
   backTo(returnTo, { ok: `${ROLE_LABEL[role]} account created for ${full_name} — login details emailed.` });
+}
+
+/** Edits an existing Admin / Organizer / Participant Support account's own
+ * details. Deliberately does NOT touch `role` or `approved` — reassigning a
+ * staff role is a bigger decision than a contact-details edit and stays out
+ * of this form; role is fixed at creation via createStaffAccount.
+ *
+ * Editing `email` also updates the real Supabase Auth login (not just the
+ * denormalized profiles.email column), since that's what this person
+ * actually signs in with — leaving the two out of sync would let them see a
+ * new email on their own profile while still logging in with the old one. */
+export async function saveStaffAccount(formData: FormData) {
+  const userId = String(formData.get("user_id") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/organizers";
+  const { supabase, actorId } = await getActor();
+  const actorRole = await getActorRole(supabase, actorId);
+  if (!["admin", "organizer", "staff"].includes(actorRole ?? "")) {
+    backTo(returnTo, { error: "Only Admin/Organizer can edit staff accounts." });
+  }
+
+  const full_name = String(formData.get("full_name") ?? "").trim();
+  const email = String(formData.get("email") ?? "").trim();
+  if (!userId || !full_name || !email) {
+    backTo(returnTo, { error: "Full name and email are required." });
+  }
+
+  const values: Record<string, unknown> = {
+    full_name,
+    email,
+    short_name: String(formData.get("short_name") ?? "").trim() || null,
+    ic_passport: String(formData.get("ic_passport") ?? "").trim() || null,
+    date_of_birth: String(formData.get("date_of_birth") ?? "").trim() || null,
+    gender: String(formData.get("gender") ?? "").trim() || null,
+    belt_rank: String(formData.get("belt_rank") ?? "").trim() || null,
+    home_address: String(formData.get("home_address") ?? "").trim() || null,
+    city_town: String(formData.get("city_town") ?? "").trim() || null,
+    postcode: String(formData.get("postcode") ?? "").trim() || null,
+    country: String(formData.get("country") ?? "").trim() || null,
+    phone: String(formData.get("phone") ?? "").trim() || null,
+    bank_name: String(formData.get("bank_name") ?? "").trim() || null,
+    bank_account_no: normalizeIban(String(formData.get("bank_account_no") ?? "")) || null,
+    bank_account_name: String(formData.get("bank_account_name") ?? "").trim() || null,
+    referral_source: String(formData.get("referral_source") ?? "").trim() || null,
+  };
+  // Participant Support only.
+  if (formData.has("highest_education")) {
+    values.highest_education = String(formData.get("highest_education") ?? "").trim() || null;
+    values.languages_count = formData.get("languages_count") ? Number(formData.get("languages_count")) : null;
+    values.languages = formData.getAll("languages").map((l) => String(l)).filter(Boolean);
+    values.support_tier_1_id = String(formData.get("support_tier_1_id") ?? "").trim() || null;
+    values.support_tier_2_id = String(formData.get("support_tier_2_id") ?? "").trim() || null;
+    values.support_tier_3_id = String(formData.get("support_tier_3_id") ?? "").trim() || null;
+  }
+
+  const admin = createAdminClient();
+  const { data: current } = await admin.from("profiles").select("email").eq("user_id", userId).maybeSingle();
+  if (current && current.email !== email) {
+    const { error: authError } = await admin.auth.admin.updateUserById(userId, { email });
+    if (authError) backTo(returnTo, { error: "Could not update the login email — it may already be in use." });
+  }
+
+  const { error } = await admin.from("profiles").update(values).eq("user_id", userId);
+  if (error) backTo(returnTo, { error: "Could not save changes — please try again." });
+
+  await writeAudit(supabase, {
+    table_name: "profiles", record_id: userId, action: "staff_account_updated",
+    new_value: values, actor_id: actorId,
+  });
+  // Only Participant Support edits can move a support tier link, and that's
+  // exactly what recompute_sign_in_quota needs to re-run for — the window
+  // and count it derives depend on which tiers this account supports.
+  if (formData.has("highest_education")) {
+    await admin.rpc("recompute_sign_in_quota", { p_user_id: userId });
+  }
+  revalidatePath(returnTo);
+  backTo(returnTo, { ok: `${full_name} updated.` });
+}
+
+/** Deletes a staff login outright — via the actual Supabase Auth user, whose
+ * ON DELETE CASCADE on profiles.user_id removes the profile row too, so
+ * there is no separate profiles delete to keep in sync.
+ *
+ * Two guardrails a plain "delete row" button doesn't need elsewhere: an
+ * account can't delete itself (the actor would lose access mid-request with
+ * no way to undo it), and the Super Admin can't be deleted while they're the
+ * only one — the app would otherwise have no account left able to approve
+ * another Admin. */
+export async function deleteStaffAccount(formData: FormData) {
+  const userId = String(formData.get("user_id") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/organizers";
+  const { supabase, actorId } = await getActor();
+  const actorRole = await getActorRole(supabase, actorId);
+  if (actorRole !== "admin") {
+    backTo(returnTo, { error: "Only the Super Admin can delete staff accounts." });
+  }
+  if (userId === actorId) {
+    backTo(returnTo, { error: "You can't delete your own account while signed in as it." });
+  }
+
+  const admin = createAdminClient();
+  const { data: target } = await admin.from("profiles").select("role, full_name").eq("user_id", userId).maybeSingle();
+  if (!target) backTo(returnTo, { error: "Account not found." });
+  if (target!.role === "admin") {
+    const { count } = await admin.from("profiles").select("user_id", { count: "exact", head: true }).eq("role", "admin");
+    if ((count ?? 0) <= 1) {
+      backTo(returnTo, { error: "Can't delete the last Admin account — create another Admin first." });
+    }
+  }
+
+  const { error } = await admin.auth.admin.deleteUser(userId);
+  if (error) backTo(returnTo, { error: "Could not delete the account — please try again." });
+
+  await writeAudit(supabase, {
+    table_name: "profiles", record_id: userId, action: "staff_account_deleted",
+    old_value: { role: target!.role, full_name: target!.full_name }, actor_id: actorId,
+  });
+  revalidatePath(returnTo);
+  backTo(returnTo, { ok: `${target!.full_name ?? "Account"} deleted.` });
 }
 
 // ── CSV bulk upload — Schools / Senseis / Referees / Audience / Staff ───────

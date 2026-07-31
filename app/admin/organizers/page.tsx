@@ -1,7 +1,8 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { schemaReady } from "@/lib/data";
-import { getAllCompetitions } from "@/lib/admin-data";
-import { updateCommunityStatus, createStaffAccount, bulkUploadOrganizers } from "@/app/actions/admin";
+import { getAllCompetitions, getStaffAccountRecords } from "@/lib/admin-data";
+import { updateCommunityStatus, createStaffAccount, deleteStaffAccount, bulkUploadOrganizers } from "@/app/actions/admin";
 import { AdminShell, Card, CertificateField, adminBtn, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
@@ -9,6 +10,7 @@ import CsvUploadForm from "@/components/CsvUploadForm";
 import InvitationCodeForm from "@/components/InvitationCodeForm";
 import InvitationCodeList from "@/components/InvitationCodeList";
 import InvitationCodeRunField from "@/components/InvitationCodeRunField";
+import StaffAccountEditForm from "@/components/StaffAccountEditForm";
 import { NoCommaInput } from "@/components/NoCommaAddressField";
 import DateOfBirthField from "@/components/DateOfBirthField";
 import IbanInput from "@/components/IbanInput";
@@ -27,7 +29,7 @@ interface StaffApp {
 export default async function AdminOrganizers({
   searchParams,
 }: {
-  searchParams: Promise<{ editcode?: string; ok?: string; error?: string }>;
+  searchParams: Promise<{ edit?: string; editcode?: string; ok?: string; error?: string }>;
 }) {
   const params = await searchParams;
   const ready = await schemaReady();
@@ -47,6 +49,7 @@ export default async function AdminOrganizers({
     ? await supabase.from("profiles").select("role").eq("user_id", user.id).maybeSingle()
     : { data: null };
   const isSuperAdmin = myProfile?.role === "admin";
+  const myUserId = user?.id ?? null;
 
   const { data: apps } = await supabase
     .from("staff_applications")
@@ -55,6 +58,10 @@ export default async function AdminOrganizers({
     .order("created_at", { ascending: false });
   const applications = (apps as StaffApp[]) ?? [];
   const competitions = await getAllCompetitions();
+  const staffAccounts = isSuperAdmin
+    ? (await getStaffAccountRecords()).filter((s) => s.role !== "customer_support")
+    : [];
+  const editingAccount = params.edit ? staffAccounts.find((s) => s.user_id === params.edit) : undefined;
 
   return (
     <AdminShell title="Admin / Organizer" active="/admin/organizers" flash={{ ok: params.ok, error: params.error }}>
@@ -173,6 +180,73 @@ export default async function AdminOrganizers({
         <p className="mb-8 text-sm text-neutral-500">
           Only the Super Admin can create new Admin / Organizer accounts directly.
         </p>
+      )}
+
+      {isSuperAdmin && (
+        <div className="mb-8">
+          <h2 className="mb-3 text-lg font-bold">
+            {editingAccount ? `Edit ${editingAccount.full_name ?? "Account"}` : "Admin / Organizer Accounts"}
+          </h2>
+          {editingAccount ? (
+            <StaffAccountEditForm
+              account={editingAccount}
+              competitions={competitions}
+              returnTo="/admin/organizers"
+              showSupportFields={false}
+            />
+          ) : staffAccounts.length === 0 ? (
+            <EmptyState>No Admin / Organizer accounts yet — create one above.</EmptyState>
+          ) : (
+            <FilterableTable
+              rowKey="user_id"
+              downloadName="admin-organizer-accounts"
+              columns={[
+                { key: "full_name", label: "Name" },
+                { key: "reference_id", label: "Reference ID" },
+                { key: "role", label: "Role" },
+                { key: "email", label: "Email" },
+                { key: "phone", label: "Phone" },
+                { key: "country", label: "Country" },
+                { key: "approved", label: "Status" },
+                { key: "actions", label: "Actions" },
+              ]}
+              rows={staffAccounts.map((s) => ({
+                user_id: s.user_id,
+                reference_id: s.user_id.slice(0, 8).toUpperCase(),
+                full_name: s.full_name ?? "",
+                role: s.role === "staff" ? "Admin / Organizer (legacy)" : s.role === "admin" ? "Super Admin" : "Organizer",
+                email: s.email ?? "",
+                phone: s.phone ?? "",
+                country: s.country ?? "",
+                approved: s.approved ? "Approved" : "Pending",
+                actions: (
+                  <div key="actions" className="flex gap-1.5">
+                    <Link
+                      href={`/admin/organizers?edit=${s.user_id}`}
+                      className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
+                    >
+                      Edit
+                    </Link>
+                    {s.user_id !== myUserId && (
+                      <form action={deleteStaffAccount}>
+                        <input type="hidden" name="user_id" value={s.user_id} />
+                        <input type="hidden" name="return_to" value="/admin/organizers" />
+                        <button className="rounded border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50">
+                          Delete
+                        </button>
+                      </form>
+                    )}
+                  </div>
+                ),
+              }))}
+            />
+          )}
+          <p className="mt-2 text-xs text-neutral-400">
+            Deleting removes the login entirely — the account can&apos;t sign in again. You
+            can&apos;t delete your own account, and the last remaining Super Admin can&apos;t be
+            deleted either.
+          </p>
+        </div>
       )}
 
       <h2 className="mb-3 text-lg font-bold">Admin / Organizer Applications</h2>

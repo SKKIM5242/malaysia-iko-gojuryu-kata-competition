@@ -1,7 +1,8 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { schemaReady } from "@/lib/data";
 import { getAllCompetitions } from "@/lib/admin-data";
-import { updateCommunityStatus, createAudienceMember, bulkUploadAudience } from "@/app/actions/admin";
+import { updateCommunityStatus, saveAudienceMember, deleteAudienceMember, bulkUploadAudience } from "@/app/actions/admin";
 import { AdminShell, Card, adminBtn, adminInput, adminLabel } from "@/components/admin";
 import { AUDIENCE_FEE_USD } from "@/lib/payments";
 import { EmptyState, SetupNotice } from "@/components/ui";
@@ -59,7 +60,7 @@ function StatusButtons({
 export default async function AdminAudience({
   searchParams,
 }: {
-  searchParams: Promise<{ editcode?: string; ok?: string; error?: string }>;
+  searchParams: Promise<{ edit?: string; editcode?: string; ok?: string; error?: string }>;
 }) {
   const params = await searchParams;
   const ready = await schemaReady();
@@ -73,6 +74,7 @@ export default async function AdminAudience({
 
   const supabase = await createClient();
   const { data: audiences } = await supabase.from("audiences").select("*").order("created_at", { ascending: false });
+  const editing = params.edit ? (audiences as Audience[] | null)?.find((a) => a.id === params.edit) : undefined;
   const telegramLink = await getTelegramLink("audience");
 
   const {
@@ -108,49 +110,61 @@ export default async function AdminAudience({
       )}
 
       <div className="mb-8">
-        <h2 className="mb-3 text-lg font-bold">Add Audience / Spectator</h2>
+        <h2 className="mb-3 text-lg font-bold">{editing ? "Edit Audience / Spectator" : "Add Audience / Spectator"}</h2>
         <Card>
-          <form action={createAudienceMember} className="space-y-4">
+          <form key={editing?.id ?? "new"} action={saveAudienceMember} className="space-y-4">
+            {editing && <input type="hidden" name="id" value={editing.id} />}
+            {editing && <input type="hidden" name="return_to" value={`/admin/audience?edit=${editing.id}`} />}
             <div>
               <label htmlFor="aud_full_name" className={adminLabel}>Full name *</label>
-              <input id="aud_full_name" name="full_name" required className={adminInput} />
+              <input id="aud_full_name" name="full_name" required defaultValue={editing?.full_name ?? ""} className={adminInput} />
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label htmlFor="aud_email" className={adminLabel}>Email address *</label>
-                <input id="aud_email" name="email" type="email" required className={adminInput} />
+                <input id="aud_email" name="email" type="email" required defaultValue={editing?.email ?? ""} className={adminInput} />
               </div>
               <div>
                 <label htmlFor="aud_phone" className={adminLabel}>Mobile phone *</label>
-                <input id="aud_phone" name="phone" type="tel" required className={adminInput} placeholder="+60…" />
+                <input id="aud_phone" name="phone" type="tel" required defaultValue={editing?.phone ?? ""} className={adminInput} placeholder="+60…" />
               </div>
               <div>
                 <label htmlFor="aud_home_country" className={adminLabel}>Country</label>
-                <input id="aud_home_country" name="home_country" defaultValue="Malaysia" className={adminInput} />
+                <input id="aud_home_country" name="home_country" defaultValue={editing?.home_country ?? (editing ? "" : "Malaysia")} className={adminInput} />
               </div>
               <div>
                 <InvitationCodeRunField
                   id="aud_invitation_code"
                   role="audience"
                   competitions={competitions}
+                  defaultValue={editing?.invitation_code}
                   placeholder="Waives the USD 10 fee"
                 />
               </div>
               <div>
                 <label htmlFor="aud_support_referral" className={adminLabel}>Participant Support referral (optional)</label>
-                <input id="aud_support_referral" name="support_referral" className={adminInput} placeholder="e.g. Amy / KSK" />
+                <input id="aud_support_referral" name="support_referral" defaultValue={editing?.support_referral ?? ""} className={adminInput} placeholder="e.g. Amy / KSK" />
               </div>
               <div>
                 <label htmlFor="aud_referral_source" className={adminLabel}>{REFERRAL_LABEL} <span className="font-normal text-neutral-400">(optional)</span></label>
-                <input id="aud_referral_source" name="referral_source" className={adminInput} placeholder={REFERRAL_PLACEHOLDER} />
+                <input id="aud_referral_source" name="referral_source" defaultValue={editing?.referral_source ?? ""} className={adminInput} placeholder={REFERRAL_PLACEHOLDER} />
               </div>
             </div>
-            <p className="text-xs text-neutral-500">
-              With no invitation code (or a code that fails to redeem), saving opens Stripe
-              for the USD {AUDIENCE_FEE_USD} sign-in fee. A valid code marks the record
-              waived and skips payment.
-            </p>
-            <button type="submit" className={adminBtn}>Add Audience / Spectator</button>
+            {!editing && (
+              <p className="text-xs text-neutral-500">
+                With no invitation code (or a code that fails to redeem), saving opens Stripe
+                for the USD {AUDIENCE_FEE_USD} sign-in fee. A valid code marks the record
+                waived and skips payment.
+              </p>
+            )}
+            <div className="flex gap-2">
+              <button type="submit" className={adminBtn}>{editing ? "Save changes" : "Add Audience / Spectator"}</button>
+              {editing && (
+                <Link href="/admin/audience" className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-semibold text-neutral-600 hover:bg-neutral-50">
+                  Cancel
+                </Link>
+              )}
+            </div>
           </form>
         </Card>
       </div>
@@ -179,6 +193,7 @@ export default async function AdminAudience({
                   { key: "personal_code", label: "Personal Code" },
                 ]
               : []),
+            { key: "actions", label: "Actions" },
           ]}
           csvColumns={[
             { key: "full_name", label: "Name" },
@@ -247,6 +262,22 @@ export default async function AdminAudience({
                   ),
                 }
               : {}),
+            actions: (
+              <div key="actions" className="flex gap-1.5">
+                <Link
+                  href={`/admin/audience?edit=${a.id}`}
+                  className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
+                >
+                  Edit
+                </Link>
+                <form action={deleteAudienceMember}>
+                  <input type="hidden" name="id" value={a.id} />
+                  <button className="rounded border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50">
+                    Delete
+                  </button>
+                </form>
+              </div>
+            ),
           }))}
         />
       )}
