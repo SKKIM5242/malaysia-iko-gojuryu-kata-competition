@@ -473,3 +473,49 @@ export async function finalizeSubscriptionRenewalSession(sessionId: string): Pro
   });
   return { status: "paid", referenceIds: [renewalId.slice(0, 8).toUpperCase()] };
 }
+
+/**
+ * Marks the registrations created by the admin Add Participant form paid,
+ * after its Stripe Checkout session succeeds.
+ *
+ * Those rows are inserted 'pending' before checkout (unlike the public flow,
+ * which defers creation to a draft), so this only flips status — it never
+ * creates anything. Idempotent: rows already paid are left alone, so both the
+ * webhook and a manual replay are safe.
+ */
+export async function finalizeAdminRegistrationSession(sessionId: string): Promise<FinalizeResult> {
+  const stripe = getStripe();
+  let session;
+  try {
+    session = await stripe.checkout.sessions.retrieve(sessionId);
+  } catch {
+    return { status: "error", message: "Payment session not found." };
+  }
+  if (session.payment_status !== "paid") return { status: "unpaid" };
+
+  const ids = String(session.metadata?.admin_registration_ids ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (ids.length === 0) return { status: "error", message: "No registration reference on this payment." };
+
+  const admin = createAdminClient();
+  const { data: rows } = await admin
+    .from("registrations")
+    .select("id, payment_status")
+    .in("id", ids);
+  const unpaid = (rows ?? []).filter((r) => r.payment_status !== "paid").map((r) => r.id as string);
+  if (unpaid.length > 0) {
+    await admin
+      .from("registrations")
+      .update({ payment_status: "paid", payment_reference: sessionId })
+      .in("id", unpaid);
+    await writeAudit(admin, {
+      table_name: "registrations",
+      record_id: unpaid[0],
+      action: "admin_registration_paid_online",
+      new_value: { stripe_session: sessionId, registration_ids: unpaid },
+    });
+  }
+  return { status: "paid", referenceIds: ids.map((i) => i.slice(0, 8).toUpperCase()) };
+}

@@ -8,6 +8,7 @@ import {
   finalizeInvoiceSession,
   finalizeStripeSession,
   finalizeSubscriptionRenewalSession,
+  finalizeAdminRegistrationSession,
 } from "@/lib/finalize";
 
 export const dynamic = "force-dynamic";
@@ -53,6 +54,8 @@ export async function POST(request: Request) {
       await finalizeBulkUploadBatchSession(session.id);
     } else if (session.metadata?.subscription_renewal_id) {
       await finalizeSubscriptionRenewalSession(session.id);
+    } else if (session.metadata?.admin_registration_ids) {
+      await finalizeAdminRegistrationSession(session.id);
     } else {
       await finalizeStripeSession(session.id);
     }

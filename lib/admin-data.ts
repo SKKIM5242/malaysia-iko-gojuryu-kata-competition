@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import type {
   Announcement,
   AuditLog,
+  Category,
   Competition,
   Participant,
   PaymentStatus,
@@ -421,4 +422,45 @@ export async function getAuditLogsPage(query: AuditLogQuery = {}): Promise<{ row
   if (to) q = q.lte("created_at", `${to}T23:59:59.999`);
   const { data, count } = await q.range(offset, offset + limit - 1);
   return { rows: (data as AuditLog[]) ?? [], total: count ?? 0 };
+}
+
+/** Open tiers (cheapest first) plus their categories and per-category paid
+ * counts — everything KataEventPicker needs to decide which kata events are
+ * still available for a given belt/age/gender.
+ *
+ * Shared by the public participant form and the admin Add Participant form
+ * so both offer exactly the same eligible events. */
+export async function getKataPickerData(): Promise<{
+  competitions: Competition[];
+  categoriesByCompetition: Record<string, Category[]>;
+  categoryTakenByCompetition: Record<string, Record<string, number>>;
+}> {
+  const { getOpenCompetitions, getCategories, isCompetitionOpen } = await import("@/lib/data");
+  const competitions = (await getOpenCompetitions())
+    .filter(isCompetitionOpen)
+    .sort((a, b) => Number(a.registration_fee_usd ?? 0) - Number(b.registration_fee_usd ?? 0));
+
+  const categoryLists = await Promise.all(competitions.map((c) => getCategories(c.id)));
+  const categoriesByCompetition: Record<string, Category[]> = {};
+  competitions.forEach((c, i) => {
+    categoriesByCompetition[c.id] = categoryLists[i];
+  });
+
+  const supabase = await createClient();
+  const categoryTakenByCompetition: Record<string, Record<string, number>> = {};
+  const allCategoryIds = categoryLists.flat().map((c) => c.id);
+  if (allCategoryIds.length > 0) {
+    const { data: counts } = await supabase.rpc("category_paid_counts", { p_category_ids: allCategoryIds });
+    const takenByCategory = new Map<string, number>();
+    for (const row of (counts as Array<{ category_id: string; cnt: number }>) ?? []) {
+      takenByCategory.set(row.category_id, row.cnt);
+    }
+    competitions.forEach((c, i) => {
+      const taken: Record<string, number> = {};
+      for (const cat of categoryLists[i]) taken[cat.id] = takenByCategory.get(cat.id) ?? 0;
+      categoryTakenByCompetition[c.id] = taken;
+    });
+  }
+
+  return { competitions, categoriesByCompetition, categoryTakenByCompetition };
 }

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getAllParticipants, getAllCompetitions } from "@/lib/admin-data";
+import { getAllParticipants, getAllCompetitions, getKataPickerData } from "@/lib/admin-data";
 import { getSchools, getSenseis, schemaReady } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
 import { saveParticipant, deleteParticipant, bulkUploadParticipants } from "@/app/actions/admin";
@@ -10,7 +10,7 @@ import CsvUploadForm from "@/components/CsvUploadForm";
 import InvitationCodeForm from "@/components/InvitationCodeForm";
 import InvitationCodeList from "@/components/InvitationCodeList";
 import InvitationCodeRunField from "@/components/InvitationCodeRunField";
-import DobAgeField from "@/components/DobAgeField";
+import AdminParticipantKataFields from "@/components/AdminParticipantKataFields";
 import { NoCommaInput } from "@/components/NoCommaAddressField";
 import { ageAt } from "@/lib/division";
 import IbanInput from "@/components/IbanInput";
@@ -38,12 +38,20 @@ export default async function AdminParticipants({
     );
   }
 
-  const [participants, schools, senseis, competitions] = await Promise.all([
+  const [participants, schools, senseis, competitions, kataPicker] = await Promise.all([
     getAllParticipants(),
     getSchools(),
     getSenseis(),
     getAllCompetitions(),
+    getKataPickerData(),
   ]);
+  // Open tiers only, for the Kata events picker — distinct from
+  // `competitions` above (every tier, used by the tier dropdowns).
+  const {
+    competitions: openCompetitions,
+    categoriesByCompetition,
+    categoryTakenByCompetition,
+  } = kataPicker;
   const editing = params.edit ? participants.find((p) => p.id === params.edit) : undefined;
 
   const supabase = await createClient();
@@ -100,19 +108,15 @@ export default async function AdminParticipants({
                   <label htmlFor="ic_passport" className={adminLabel}>IC / Passport *</label>
                   <input id="ic_passport" name="ic_passport" required defaultValue={editing?.ic_passport ?? ""} className={adminInput} />
                 </div>
-                <DobAgeField defaultValue={editing?.date_of_birth ?? ""} />
-                <div>
-                  <label htmlFor="gender" className={adminLabel}>Gender *</label>
-                  <select id="gender" name="gender" required defaultValue={editing?.gender ?? ""} className={adminInput}>
-                    <option value="" disabled>— Select —</option>
-                    <option value="male">Male</option>
-                    <option value="female">Female</option>
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="belt_rank" className={adminLabel}>Latest Belt rank *</label>
-                  <input id="belt_rank" name="belt_rank" required defaultValue={editing?.belt_rank ?? ""} className={adminInput} placeholder="e.g. 3rd Kyu" />
-                </div>
+                <AdminParticipantKataFields
+                  competitions={openCompetitions}
+                  categoriesByCompetition={categoriesByCompetition}
+                  categoryTakenByCompetition={categoryTakenByCompetition}
+                  defaultDateOfBirth={editing?.date_of_birth ?? ""}
+                  defaultGender={editing?.gender ?? ""}
+                  defaultBeltRank={editing?.belt_rank ?? ""}
+                  showKataPicker={!editing}
+                />
                 <div>
                   <label htmlFor="rank_confirmation" className={adminLabel}>Rank confirmation *</label>
                   <select id="rank_confirmation" name="rank_confirmation" required defaultValue={editing?.rank_confirmation ?? ""} className={adminInput}>

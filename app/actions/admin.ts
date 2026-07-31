@@ -6,7 +6,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { writeAudit } from "@/lib/audit";
-import { kataBaseOf, groupByKata, ageAt } from "@/lib/division";
+import { headers } from "next/headers";
+import { kataBaseOf, groupByKata, ageAt, resolveCategory } from "@/lib/division";
+import { getStripe, paymentsEnabled } from "@/lib/payments";
 import {
   notifyRefereeAssignment, notifyRefereeUnassigned, sendConfirmationEmail, notifyAnnouncementPublished,
   notifyCertificatesPublished, notifyInvitationCodeIssued, notifyStatusChanged,
@@ -1554,8 +1556,144 @@ export async function saveParticipant(formData: FormData) {
       action: "bank_details_saved", actor_id: actorId,
     });
   }
+
+  // Kata entries, when the Add form's Kata events picker was used. Only on
+  // create -- editing an existing participant must not silently mint a second
+  // set of registrations, which is why the picker is hidden when editing.
+  if (targetId && !id) {
+    const created = await createAdminRegistrations(supabase, actorId, formData, {
+      participantId: targetId,
+      dateOfBirth: values.date_of_birth,
+      beltRank: values.belt_rank,
+      gender: values.gender,
+      invitationCode: values.invitation_code,
+    });
+    if ("error" in created) {
+      backTo(returnTo, { error: created.error });
+      return;
+    }
+    if (created.checkoutUrl) redirect(created.checkoutUrl);
+    if (created.count > 0) {
+      revalidatePath("/participants");
+      backTo(returnTo, {
+        ok: created.waived
+          ? `Participant saved with ${created.count} kata event${created.count === 1 ? "" : "s"} — fee waived by invitation code, marked pending.`
+          : `Participant saved with ${created.count} kata event${created.count === 1 ? "" : "s"}.`,
+      });
+    }
+  }
+
   revalidatePath("/participants");
   backTo(returnTo, { ok: "Participant saved." });
+}
+
+/** Turns the Add Participant form's Kata events picks into real
+ * `registrations` rows — the admin equivalent of what the public
+ * submitRegistration does, so a participant added by the organizer is
+ * actually entered in events rather than existing as a person entered in
+ * nothing.
+ *
+ * Payment follows the invitation code, per the organizer's rule:
+ *   • no code  -> Stripe Checkout, rows created 'pending' and confirmed by
+ *                 the webhook exactly like a public registration
+ *   • has code -> fee waived / settled another way, rows created 'pending'
+ *                 for the organizer to mark paid or waived manually
+ *
+ * Nothing is ever created 'paid' here: a registration that counts toward a
+ * school's or sensei's 10% commission must reflect money actually received.
+ */
+async function createAdminRegistrations(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  actorId: string | null,
+  formData: FormData,
+  ctx: {
+    participantId: string;
+    dateOfBirth: string | null;
+    beltRank: string | null;
+    gender: string | null;
+    invitationCode: string | null;
+  },
+): Promise<{ count: number; waived: boolean; checkoutUrl?: string } | { error: string }> {
+  const { data: openComps } = await supabase
+    .from("competitions")
+    .select("id, name, event_date, registration_fee_usd, status")
+    .eq("status", "open")
+    .order("registration_fee_usd", { ascending: true });
+  const comps = (openComps ?? []) as Array<{
+    id: string; name: string; event_date: string | null; registration_fee_usd: number | null;
+  }>;
+  if (comps.length === 0) return { count: 0, waived: false };
+
+  // The picker names its selects by tier INDEX, in the same cheapest-first
+  // order this query returns.
+  const picks: Array<{ competitionId: string; kataBase: string; fee: number }> = [];
+  comps.forEach((c, i) => {
+    for (const slot of [1, 2, 3]) {
+      const kataBase = String(formData.get(`kata_${i}_${slot}`) ?? "").trim();
+      if (kataBase) picks.push({ competitionId: c.id, kataBase, fee: Number(c.registration_fee_usd ?? 0) });
+    }
+  });
+  if (picks.length === 0) return { count: 0, waived: false };
+
+  if (!ctx.dateOfBirth || !ctx.beltRank || !ctx.gender) {
+    return { error: "Date of birth, belt rank, and gender are all required to enter a kata event." };
+  }
+
+  const rows: Array<{ competition_id: string; category_id: string; division: string }> = [];
+  for (const pick of picks) {
+    const { data: cats } = await supabase.from("categories").select("*").eq("competition_id", pick.competitionId);
+    const comp = comps.find((c) => c.id === pick.competitionId)!;
+    const resolved = resolveCategory(
+      (cats ?? []) as unknown as Parameters<typeof resolveCategory>[0],
+      pick.kataBase,
+      ctx.dateOfBirth,
+      ctx.beltRank,
+      ctx.gender,
+      comp.event_date,
+    );
+    if (resolved.error || !resolved.category) {
+      return { error: `${pick.kataBase}: ${resolved.error ?? "no matching sub-category for this belt / age / gender."}` };
+    }
+    rows.push({
+      competition_id: pick.competitionId,
+      category_id: resolved.category.id,
+      division: ctx.gender.toLowerCase() === "female" ? "Female" : "Male",
+    });
+  }
+
+  const { data: inserted, error } = await supabase
+    .from("registrations")
+    .insert(
+      rows.map((r) => ({
+        ...r,
+        participant_id: ctx.participantId,
+        payment_status: "pending",
+        slot_status: "active",
+        notes: ctx.invitationCode ? `Added by admin — invitation code ${ctx.invitationCode}` : "Added by admin",
+      })),
+    )
+    .select("id");
+  if (error) return { error: "Saved the participant, but could not create the kata entries." };
+
+  await writeAudit(supabase, {
+    table_name: "registrations", record_id: ctx.participantId,
+    action: "admin_registrations_created",
+    new_value: { count: rows.length, invitation_code: ctx.invitationCode }, actor_id: actorId,
+  });
+
+  // An invitation code means the fee is waived or settled off-platform, so
+  // no checkout. Without one, send the organizer straight to Stripe.
+  if (ctx.invitationCode) return { count: rows.length, waived: true };
+
+  const totalUsd = picks.reduce((sum, p) => sum + p.fee, 0);
+  if (totalUsd <= 0 || !paymentsEnabled()) return { count: rows.length, waived: false };
+
+  const checkoutUrl = await adminRegistrationCheckoutUrl(
+    (inserted ?? []).map((r) => r.id as string),
+    totalUsd,
+    picks.length,
+  );
+  return { count: rows.length, waived: false, checkoutUrl: checkoutUrl ?? undefined };
 }
 
 export async function deleteParticipant(formData: FormData) {
@@ -4357,4 +4495,44 @@ export async function markSubscriptionRenewalFulfilled(formData: FormData) {
     actor_id: actorId,
   });
   backTo(returnTo, { ok: "Marked as fulfilled." });
+}
+
+/** Stripe Checkout for kata entries the organizer just created from the admin
+ * Add Participant form. Carries the new registration ids in metadata so
+ * finalizeAdminRegistrationSession can flip exactly those rows to paid —
+ * distinct from the public flow, which defers row creation to a draft. */
+async function adminRegistrationCheckoutUrl(
+  registrationIds: string[],
+  totalUsd: number,
+  eventCount: number,
+): Promise<string | null> {
+  if (registrationIds.length === 0) return null;
+  const origin =
+    (await headers()).get("origin") ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  try {
+    const session = await getStripe().checkout.sessions.create({
+      mode: "payment",
+      line_items: [
+        {
+          price_data: {
+            currency: "usd",
+            unit_amount: Math.round((totalUsd / eventCount) * 100),
+            product_data: {
+              name: "Kata event registration",
+              description: `${eventCount} kata event${eventCount === 1 ? "" : "s"} added by the organizer`,
+            },
+          },
+          quantity: eventCount,
+        },
+      ],
+      metadata: { admin_registration_ids: registrationIds.join(",") },
+      success_url: `${origin}/admin/participants?ok=${encodeURIComponent("Payment received — kata entries are now paid.")}`,
+      cancel_url: `${origin}/admin/participants?error=${encodeURIComponent("Payment cancelled — the kata entries are saved as pending.")}`,
+    });
+    return session.url;
+  } catch {
+    // Rows are already saved as pending, so a gateway failure is recoverable:
+    // the organizer can mark them paid or retry from Registrations.
+    return null;
+  }
 }
