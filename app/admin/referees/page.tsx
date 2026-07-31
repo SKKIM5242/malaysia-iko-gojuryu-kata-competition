@@ -20,6 +20,7 @@ import IbanConfirmCheckbox from "@/components/IbanConfirmCheckbox";
 import BankDetailsNote from "@/components/BankDetailsNote";
 import BankAccountNameField from "@/components/BankAccountNameField";
 import { IBAN_CSV_NOTE } from "@/lib/bank";
+import { REFEREE_DEPOSIT_USD } from "@/lib/payments";
 import { NoCommaInput } from "@/components/NoCommaAddressField";
 import DateOfBirthField from "@/components/DateOfBirthField";
 
@@ -297,6 +298,13 @@ export default async function AdminReferees({
                       : `Single-use, bound only to ${editing.email || "this referee's email"} — for creating that one login, not a shared code. Sign-in access after account creation depends on the Valid from/until window and Sign-in limit above, whichever is reached first.`}
                   </p>
                 </div>
+              )}
+              {!editing && (
+                <p className="text-xs text-neutral-500">
+                  With no invitation code, saving opens Stripe for the USD {REFEREE_DEPOSIT_USD}{" "}
+                  referee/judge deposit. With a code the deposit is waived or settled another
+                  way and the record is saved as pending.
+                </p>
               )}
               <div className="flex gap-2">
                 <button type="submit" className={adminBtn}>{editing ? "Save changes" : "Add Referee/Judge"}</button>

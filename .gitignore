@@ -11,3 +11,6 @@ npm-debug.log*
 *.tsbuildinfo
 next-env.d.ts
 .env*
+
+# Vendored Claude Code plugin skill docs — installed locally, not app source
+.claude/skills/

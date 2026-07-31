@@ -114,6 +114,30 @@ export default async function AdminSchools({
                 <label htmlFor="name" className={adminLabel}>Dojo / club name *</label>
                 <input id="name" name="name" required defaultValue={editing?.name ?? ""} className={adminInput} />
               </div>
+              <div>
+                <label htmlFor="competition_id" className={adminLabel}>
+                  Competition tier — one-time registration fee *
+                </label>
+                <select
+                  id="competition_id"
+                  name="competition_id"
+                  required
+                  defaultValue={editing?.registration_competition_id ?? ""}
+                  className={adminInput}
+                >
+                  <option value="" disabled>Select tier</option>
+                  {competitions.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {shortTierName(c.name)} ({formatUSD(c.registration_fee_usd)})
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-neutral-400">
+                  Sets the fee owed. Saving a NEW school with no invitation code goes straight to
+                  Stripe for this amount; with a code the fee is waived or settled another way and
+                  the record stays pending.
+                </p>
+              </div>
               <div className="rounded-md border border-neutral-200 bg-neutral-50 p-4">
                 <p className="text-sm font-semibold text-neutral-700">Person in-charge / Chief Instructor</p>
                 <div className="mt-3 grid gap-4 sm:grid-cols-2">

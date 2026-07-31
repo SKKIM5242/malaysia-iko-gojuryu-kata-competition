@@ -126,6 +126,30 @@ export default async function AdminSenseis({
                 <label htmlFor="name" className={adminLabel}>Name *</label>
                 <input id="name" name="name" required defaultValue={editing?.name ?? ""} className={adminInput} />
               </div>
+              <div>
+                <label htmlFor="competition_id" className={adminLabel}>
+                  Competition tier — one-time registration fee *
+                </label>
+                <select
+                  id="competition_id"
+                  name="competition_id"
+                  required
+                  defaultValue={editing?.registration_competition_id ?? ""}
+                  className={adminInput}
+                >
+                  <option value="" disabled>Select tier</option>
+                  {competitions.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {shortTierName(c.name)} ({formatUSD(c.registration_fee_usd)})
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-neutral-400">
+                  Sets the fee owed. Saving a NEW sensei with no invitation code goes straight to
+                  Stripe for this amount; with a code the fee is waived or settled another way and
+                  the record stays pending.
+                </p>
+              </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label htmlFor="ic_passport" className={adminLabel}>IC / Passport *</label>

@@ -64,10 +64,23 @@ export async function finalizeDirectorySession(sessionId: string): Promise<Final
     return { status: "error", message: "Payment session not found." };
   }
   if (session.payment_status !== "paid") return { status: "unpaid" };
+  // Covers all four community record types that carry their own
+  // payment_status: the public School/Sensei self-registration flow, and the
+  // admin Add forms for School / Sensei / Referee / Audience.
   const schoolId = session.metadata?.school_id;
   const senseiId = session.metadata?.sensei_id;
-  const table = schoolId ? "schools" : senseiId ? "senseis" : null;
-  const recordId = schoolId ?? senseiId;
+  const refereeId = session.metadata?.referee_id;
+  const audienceId = session.metadata?.audience_id;
+  const table = schoolId
+    ? "schools"
+    : senseiId
+      ? "senseis"
+      : refereeId
+        ? "referees"
+        : audienceId
+          ? "audiences"
+          : null;
+  const recordId = schoolId ?? senseiId ?? refereeId ?? audienceId;
   if (!table || !recordId) return { status: "error", message: "No record reference on this payment." };
 
   const admin = createAdminClient();

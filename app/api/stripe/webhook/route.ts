@@ -46,7 +46,12 @@ export async function POST(request: Request) {
     const session = event.data.object as Stripe.Checkout.Session;
     if (session.metadata?.invoice_id) {
       await finalizeInvoiceSession(session.id);
-    } else if (session.metadata?.school_id || session.metadata?.sensei_id) {
+    } else if (
+      session.metadata?.school_id ||
+      session.metadata?.sensei_id ||
+      session.metadata?.referee_id ||
+      session.metadata?.audience_id
+    ) {
       await finalizeDirectorySession(session.id);
     } else if (session.metadata?.attempt_purchase_id) {
       await finalizeAttemptPurchaseSession(session.id);

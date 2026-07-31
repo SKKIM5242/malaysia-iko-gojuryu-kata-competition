@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc *)",
+      "Bash(npm run typecheck)",
+      "Bash(vercel env pull *)",
+      "Bash(vercel env ls *)",
+      "Bash(vercel logs *)",
+      "Bash(xxd *)",
+      "PowerShell(Get-ChildItem *)",
+      "mcp__1f16fcac-407b-4985-b2b7-5239c611e76c__get_logs",
+      "mcp__1f16fcac-407b-4985-b2b7-5239c611e76c__list_projects",
+      "mcp__1f16fcac-407b-4985-b2b7-5239c611e76c__list_migrations",
+      "mcp__1f16fcac-407b-4985-b2b7-5239c611e76c__get_advisors",
+      "mcp__1f16fcac-407b-4985-b2b7-5239c611e76c__list_tables",
+      "mcp__1f16fcac-407b-4985-b2b7-5239c611e76c__get_project",
+      "mcp__1f16fcac-407b-4985-b2b7-5239c611e76c__search_docs",
+      "mcp__claude-in-chrome__tabs_context_mcp"
+    ]
+  }
+}

@@ -19,3 +19,11 @@ export function getStripe(): Stripe {
   }
   return stripe;
 }
+
+/** Fees for the community record types the organizer can add from the admin
+ * panel. School/Sensei follow their chosen tier (see tierFeeUsd); Referee and
+ * Audience are flat, matching what the public-facing copy already tells
+ * people. Kept here rather than in app/actions/admin.ts because a
+ * "use server" module may only export async functions. */
+export const REFEREE_DEPOSIT_USD = 100;
+export const AUDIENCE_FEE_USD = 10;

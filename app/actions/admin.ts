@@ -8,7 +8,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { writeAudit } from "@/lib/audit";
 import { headers } from "next/headers";
 import { kataBaseOf, groupByKata, ageAt, resolveCategory } from "@/lib/division";
-import { getStripe, paymentsEnabled } from "@/lib/payments";
+import { getStripe, paymentsEnabled, REFEREE_DEPOSIT_USD, AUDIENCE_FEE_USD } from "@/lib/payments";
 import {
   notifyRefereeAssignment, notifyRefereeUnassigned, sendConfirmationEmail, notifyAnnouncementPublished,
   notifyCertificatesPublished, notifyInvitationCodeIssued, notifyStatusChanged,
@@ -1037,6 +1037,7 @@ export async function saveSchool(formData: FormData) {
     bank_account_no: normalizeIban(String(formData.get("bank_account_no") ?? "")) || null,
     bank_account_name: String(formData.get("bank_account_name") ?? "").trim() || null,
     invitation_code: String(formData.get("invitation_code") ?? "").trim() || null,
+    registration_competition_id: String(formData.get("competition_id") ?? "") || null,
     referral_source: String(formData.get("referral_source") ?? "").trim() || null,
     participating_tier_ids: formData.getAll("participating_tier_ids").map((v) => String(v)),
   };
@@ -1077,6 +1078,16 @@ export async function saveSchool(formData: FormData) {
       new_value: values, actor_id: actorId,
     });
     await notifyAddedByAdmin("school", values.email, values.contact_name || values.name);
+    // No invitation code means the fee is due now — straight to Stripe. With a
+    // code the fee is waived or settled off-platform, so the record just stays
+    // pending for the organizer to mark waived/paid.
+    if (!values.invitation_code) {
+      const fee = await tierFeeUsd(supabase, values.registration_competition_id ?? null);
+      const url = await communityRecordCheckoutUrl(
+        "school", data!.id, values.name, fee, "School / Dojo registration fee",
+      );
+      if (url) redirect(url);
+    }
   }
   backTo(returnTo, { ok: "School saved." });
 }
@@ -1115,6 +1126,7 @@ export async function saveSensei(formData: FormData) {
     bank_account_no: normalizeIban(String(formData.get("bank_account_no") ?? "")) || null,
     bank_account_name: String(formData.get("bank_account_name") ?? "").trim() || null,
     invitation_code: String(formData.get("invitation_code") ?? "").trim() || null,
+    registration_competition_id: String(formData.get("competition_id") ?? "") || null,
     referral_source: String(formData.get("referral_source") ?? "").trim() || null,
     participating_tier_ids: formData.getAll("participating_tier_ids").map((v) => String(v)),
   };
@@ -1174,6 +1186,13 @@ export async function saveSensei(formData: FormData) {
       new_value: values, actor_id: actorId,
     });
     await notifyAddedByAdmin("sensei", values.email, values.name);
+    if (!values.invitation_code) {
+      const fee = await tierFeeUsd(supabase, values.registration_competition_id ?? null);
+      const url = await communityRecordCheckoutUrl(
+        "sensei", data!.id, values.name, fee, "Sensei / Coach registration fee",
+      );
+      if (url) redirect(url);
+    }
   }
   backTo(returnTo, { ok: "Sensei saved." });
 }
@@ -1381,6 +1400,14 @@ export async function createAudienceMember(formData: FormData) {
   });
   await notifyAddedByAdmin("audience", email, full_name);
   revalidatePath("/admin/audience");
+  // payment_status is already 'waived' when a code was redeemed above, so
+  // only an un-coded add owes the flat sign-in fee.
+  if (payment_status !== "waived") {
+    const url = await communityRecordCheckoutUrl(
+      "audience", id, full_name, AUDIENCE_FEE_USD, "Audience / Spectator sign-in fee",
+    );
+    if (url) redirect(url);
+  }
   backTo(returnTo, { ok: `${full_name} added to Audience / Spectators.` });
 }
 
@@ -1453,6 +1480,15 @@ export async function saveReferee(formData: FormData) {
       new_value: values, actor_id: actorId,
     });
     await notifyAddedByAdmin("referee", values.email, values.full_name);
+    // Flat USD 100 deposit, not a tier fee — refundable to referees who also
+    // participate, forfeited otherwise (see the public referee copy).
+    if (!values.invitation_code) {
+      const url = await communityRecordCheckoutUrl(
+        "referee", data!.id, values.full_name, REFEREE_DEPOSIT_USD,
+        "Referee / Judge deposit",
+      );
+      if (url) redirect(url);
+    }
   }
   backTo(returnTo, { ok: "Referee saved." });
 }
@@ -4535,4 +4571,73 @@ async function adminRegistrationCheckoutUrl(
     // the organizer can mark them paid or retry from Registrations.
     return null;
   }
+}
+
+/** Stripe Checkout for a community record the organizer just added from the
+ * admin panel (School / Sensei / Referee / Audience).
+ *
+ * Reuses the same metadata shape the public School/Sensei flow already
+ * uses, so finalizeDirectorySession marks the record paid on webhook —
+ * nothing new to keep in sync. Returns null when payments are off or the fee
+ * is zero, in which case the record simply stays pending for the organizer
+ * to settle by hand. */
+async function communityRecordCheckoutUrl(
+  kind: "school" | "sensei" | "referee" | "audience",
+  recordId: string,
+  displayName: string,
+  amountUsd: number,
+  label: string,
+): Promise<string | null> {
+  if (!paymentsEnabled() || amountUsd <= 0) return null;
+  const origin =
+    (await headers()).get("origin") ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const metadata: Record<string, string> =
+    kind === "school"
+      ? { school_id: recordId }
+      : kind === "sensei"
+        ? { sensei_id: recordId }
+        : kind === "referee"
+          ? { referee_id: recordId }
+          : { audience_id: recordId };
+  const backTo = `/admin/${kind === "audience" ? "audience" : `${kind}s`}`;
+  try {
+    const session = await getStripe().checkout.sessions.create({
+      mode: "payment",
+      line_items: [
+        {
+          price_data: {
+            currency: "usd",
+            unit_amount: Math.round(amountUsd * 100),
+            product_data: {
+              name: label,
+              description: `${displayName} — IKO GOJU-RYU KARATE-DO MALAYSIA SDN BHD`,
+            },
+          },
+          quantity: 1,
+        },
+      ],
+      metadata,
+      success_url: `${origin}${backTo}?ok=${encodeURIComponent("Payment received — the record is now marked paid.")}`,
+      cancel_url: `${origin}${backTo}?error=${encodeURIComponent("Payment cancelled — the record is saved as pending.")}`,
+    });
+    return session.url;
+  } catch {
+    // Record is already saved as pending, so a gateway failure is
+    // recoverable: the organizer can mark it paid or retry.
+    return null;
+  }
+}
+
+/** The fee a School/Sensei owes, from the tier they were registered under. */
+async function tierFeeUsd(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  competitionId: string | null,
+): Promise<number> {
+  if (!competitionId) return 0;
+  const { data } = await supabase
+    .from("competitions")
+    .select("registration_fee_usd")
+    .eq("id", competitionId)
+    .maybeSingle();
+  return Number(data?.registration_fee_usd ?? 0);
 }

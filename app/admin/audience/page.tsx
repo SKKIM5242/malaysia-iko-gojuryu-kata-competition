@@ -3,6 +3,7 @@ import { schemaReady } from "@/lib/data";
 import { getAllCompetitions } from "@/lib/admin-data";
 import { updateCommunityStatus, createAudienceMember, bulkUploadAudience } from "@/app/actions/admin";
 import { AdminShell, Card, adminBtn, adminInput, adminLabel } from "@/components/admin";
+import { AUDIENCE_FEE_USD } from "@/lib/payments";
 import { EmptyState, SetupNotice } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
@@ -144,6 +145,11 @@ export default async function AdminAudience({
                 <input id="aud_referral_source" name="referral_source" className={adminInput} placeholder={REFERRAL_PLACEHOLDER} />
               </div>
             </div>
+            <p className="text-xs text-neutral-500">
+              With no invitation code (or a code that fails to redeem), saving opens Stripe
+              for the USD {AUDIENCE_FEE_USD} sign-in fee. A valid code marks the record
+              waived and skips payment.
+            </p>
             <button type="submit" className={adminBtn}>Add Audience / Spectator</button>
           </form>
         </Card>

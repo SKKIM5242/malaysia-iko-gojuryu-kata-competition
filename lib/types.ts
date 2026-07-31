@@ -55,6 +55,8 @@ export interface School {
   bank_account_name: string | null;
   invitation_code: string | null;
   referral_source: string | null;
+  /** Tier this record was registered/paid under — sets the fee owed. */
+  registration_competition_id: string | null;
   /** Tiers this school declares it will have participants in — declared
    * intent from the registration form, not a commission input. */
   participating_tier_ids: string[] | null;
@@ -84,6 +86,8 @@ export interface Sensei {
   bank_account_name: string | null;
   invitation_code: string | null;
   referral_source: string | null;
+  /** Tier this record was registered/paid under — sets the fee owed. */
+  registration_competition_id: string | null;
   /** Tiers this sensei declares they will have participants in — declared
    * intent from the registration form, not a commission input. */
   participating_tier_ids: string[] | null;

@@ -216,6 +216,15 @@ export default async function AdminParticipants({
                   </div>
                 </div>
               </div>
+              {!editing && (
+                <p className="text-xs text-neutral-500">
+                  With no invitation code, saving opens Stripe for the total kata-event fee
+                  shown above. With a code the fee is waived or settled another way. Either
+                  way the entries are created as <strong>pending</strong> — mark them paid from
+                  Registrations once money is received, since only paid entries count toward
+                  school/sensei commission.
+                </p>
+              )}
               <div className="flex gap-2">
                 <button type="submit" className={adminBtn}>{editing ? "Save changes" : "Add participant"}</button>
                 {editing && (
