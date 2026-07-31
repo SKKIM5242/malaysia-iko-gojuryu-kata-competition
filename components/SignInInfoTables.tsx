@@ -43,7 +43,12 @@ export default async function SignInInfoTables({ canManage }: { canManage: boole
         <div className="border-t border-neutral-100 p-4">
           <p className="mb-3 text-xs text-neutral-400">
             Each role&apos;s default sign-in cap and whether its valid window follows a competition
-            tier&apos;s dates.
+            tier&apos;s dates. If you hold more than one role, your allowances are{" "}
+            <strong>added together</strong> (e.g. Referee/Judge + Participant = 1,000 + 250 =
+            1,250), and your validity window spans <strong>every</strong> tier you have a paid
+            entry in — earliest start date to latest end date. The count and the dates apply{" "}
+            <strong>at the same time</strong>: whichever runs out first ends your access. One
+            unlimited role makes the whole account unlimited.
             {canManage && (
               <>
                 {" "}

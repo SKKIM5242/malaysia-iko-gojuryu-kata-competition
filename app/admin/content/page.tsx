@@ -432,6 +432,14 @@ export default async function AdminContent({
               an account that already has a custom invitation-code value or a manual Sign-in
               Control override. Shown read-only on the Account page for everyone.
             </p>
+            <p className="mt-2 text-sm font-normal text-neutral-500">
+              A multi-role account gets the <strong>sum</strong>{" "}
+              of its roles&apos; allowances
+              (Referee/Judge + Participant = 1,000 + 250 = 1,250), and a window spanning every
+              tier it holds — earliest start to latest end. The count and the window are
+              enforced <strong>concurrently</strong>: whichever is reached first ends access. One
+              unlimited role makes the whole account unlimited.
+            </p>
             <p className="mt-2 text-sm font-normal text-amber-800">
               <strong>Role (label)</strong> is display text — rename it freely.{" "}
               <strong>Matches account role</strong>{" "}

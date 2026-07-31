@@ -1,9 +1,9 @@
 import { shortTierName } from "@/lib/invitation-codes";
 
-/** Schools/Senseis need MORE than this many paid entries to qualify for a
- * revenue share. Mirrors SCHOOL_SENSEI_THRESHOLD in lib/commissions.ts —
- * kept in step so the admin table's ✓/✗ marker never disagrees with the
- * Commissions page. */
+/** Schools/Senseis need MORE than this many paid entries WITHIN ONE TIER to
+ * earn a revenue share on that tier. The single source of truth — imported by
+ * lib/commissions.ts as SCHOOL_SENSEI_THRESHOLD, so the admin tables' ✓
+ * marker can never disagree with what the Commissions page actually pays. */
 export const COMMISSION_ENTRY_THRESHOLD = 10;
 
 /** Renders a school's/sensei's paid entries per competition tier for the

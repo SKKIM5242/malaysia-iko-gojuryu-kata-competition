@@ -5,6 +5,8 @@ import { setCommissionPayoutStatus, setWinnerPayoutStatus } from "@/app/actions/
 import { AdminShell } from "@/components/admin";
 import { EmptyState, SetupNotice } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
+import { getAllCompetitions } from "@/lib/admin-data";
+import { shortTierName } from "@/lib/invitation-codes";
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 
@@ -81,16 +83,21 @@ export default async function AdminCommissions({
   const rows = await computeCommissions();
   const payable = rows.filter((r) => r.commissionUsd > 0);
   const rewardRows = await computeWinnerRewards();
+  const allCompetitions = await getAllCompetitions();
+  const tierNameById = new Map(allCompetitions.map((c) => [c.id, c.name]));
 
   return (
     <AdminShell title="Commissions" active="/admin/commissions" flash={{ ok: params.ok, error: params.error }}>
       <p className="mb-6 max-w-3xl text-sm text-neutral-500">
         Computed live from paid registrations — never stored, so it can&apos;t go stale. School/Dojo
-        and Sensei need <strong>more than 10 participants</strong> to qualify for any share at all
-        (10% flat once qualified); 10 or fewer earns nothing. Referee/Judge earns 10% of every
-        judged student&apos;s fee with no minimum. &quot;Paid&quot; below is just your own record of
-        who you&apos;ve actually paid out via bank transfer — use the bank details shown to do that
-        transfer yourself.
+        and Sensei qualify <strong>per competition tier</strong>: more than 10 paid kata
+        <strong> events</strong> by their students within one tier earns 10% of{" "}
+        <strong>that tier&apos;s</strong> fees. A tier with 10 or fewer events earns nothing even
+        when another tier qualifies, so the 10% is taken only from the qualifying tiers — see the
+        Events by Tier column, where ✓ marks a tier that pays. Referee/Judge earns 10% of every
+        judged student&apos;s fee with no minimum and no tier test.
+        &quot;Paid&quot; below is just your own record of who you&apos;ve actually paid out via
+        bank transfer — use the bank details shown to do that transfer yourself.
       </p>
 
       {rows.length === 0 ? (
@@ -102,8 +109,11 @@ export default async function AdminCommissions({
           columns={[
             { key: "type", label: "Type" },
             { key: "name", label: "Name" },
-            { key: "participant_count", label: "Participants" },
+            { key: "participant_count", label: "Students" },
+            { key: "entry_count", label: "Paid Events" },
+            { key: "tier_split", label: "Events by Tier (✓ = pays)", width: 260, wrap: true },
             { key: "total_fees", label: "Total Fees (Paid)" },
+            { key: "qualifying_fees", label: "Qualifying Fees" },
             { key: "commission", label: "Commission (10%)" },
             { key: "bank", label: "Bank" },
             { key: "payout", label: "Payout" },
@@ -111,8 +121,11 @@ export default async function AdminCommissions({
           csvColumns={[
             { key: "type", label: "Type" },
             { key: "name", label: "Name" },
-            { key: "participant_count", label: "Participants" },
+            { key: "participant_count", label: "Students" },
+            { key: "entry_count", label: "Paid Events" },
+            { key: "tier_split", label: "Events by Tier" },
             { key: "total_fees", label: "Total Fees USD (Paid)" },
+            { key: "qualifying_fees", label: "Qualifying Fees USD" },
             { key: "commission", label: "Commission USD (10%)" },
             { key: "bank_name", label: "Bank Name" },
             { key: "bank_account_no", label: "International Bank Account No. (IBAN)" },
@@ -124,7 +137,18 @@ export default async function AdminCommissions({
             type: TYPE_LABEL[r.recipientType],
             name: r.name,
             participant_count: String(r.participantCount),
+            entry_count: String(r.entryCount),
+            tier_split: r.recipientType === "referee"
+              ? "— not tier-scoped"
+              : r.tiers.length === 0
+                ? "— none yet"
+                : r.tiers
+                    .map((t) =>
+                      `${shortTierName(tierNameById.get(t.competitionId) ?? "—")}: ${t.entryCount}${t.qualifies ? " ✓" : ""}`,
+                    )
+                    .join(" · "),
             total_fees: `$${r.totalFeesUsd.toFixed(2)}`,
+            qualifying_fees: `$${r.qualifyingFeesUsd.toFixed(2)}`,
             commission: `$${r.commissionUsd.toFixed(2)}`,
             bank: [r.bankName, r.bankAccountNo, r.bankAccountName].filter(Boolean).join(" · ") || "—",
             bank_name: r.bankName ?? "",

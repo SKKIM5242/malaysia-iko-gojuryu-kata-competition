@@ -347,12 +347,30 @@ export async function submitKataVideo(
   // using their own correct local time is never wrongly rejected here.
   const { data: regRow } = await supabase
     .from("registrations")
-    .select("competition:competitions(event_date, registration_deadline)")
+    .select("payment_status, competition:competitions(event_date, registration_deadline)")
     .eq("id", profile.registration_id)
     .maybeSingle();
-  const competition = (
-    regRow as unknown as { competition: { event_date: string | null; registration_deadline: string | null } | null } | null
-  )?.competition;
+  const reg = regRow as unknown as {
+    payment_status: string;
+    competition: { event_date: string | null; registration_deadline: string | null } | null;
+  } | null;
+
+  // Re-check payment here, not just at link time. claim_registration and
+  // auto_link_other_roles_by_email both require 'paid' before setting
+  // profiles.registration_id, but that is a one-time gate: a registration
+  // flipped back to pending or rejected afterwards (a refund, a chargeback,
+  // an organizer correcting a row marked paid by mistake, or an admin-created
+  // entry whose Stripe Checkout was abandoned) would otherwise keep its
+  // recording rights indefinitely. Recording is what the entry fee buys, so
+  // it has to follow the money on every submission.
+  if (reg && reg.payment_status !== "paid") {
+    return {
+      ok: false,
+      error:
+        "Your linked registration is not paid, so recording is on hold. Once payment is confirmed you can submit straight away.",
+    };
+  }
+  const competition = reg?.competition;
   const opensAt = competition?.event_date ? new Date(`${competition.event_date}T00:00:00+14:00`) : null;
   const closesAt = competition?.registration_deadline
     ? new Date(`${competition.registration_deadline}T23:59:59-12:00`)
