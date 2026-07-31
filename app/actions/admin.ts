@@ -772,6 +772,7 @@ export async function reorderCategoryGroups(formData: FormData) {
   const competitionId = String(formData.get("competition_id") ?? "");
   const sourceBase = String(formData.get("source_base") ?? "");
   const targetBase = String(formData.get("target_base") ?? "");
+  const position = formData.get("position") === "after" ? "after" : "before";
   const returnTo = String(formData.get("return_to") ?? "") || "/admin/competitions";
   if (!sourceBase || !targetBase || sourceBase === targetBase) {
     backTo(returnTo, { error: "Could not reorder — try again." });
@@ -792,7 +793,7 @@ export async function reorderCategoryGroups(formData: FormData) {
   // spot whether the drop target was earlier or later in the list.
   const targetIdx = groups.findIndex(([base]) => base === targetBase);
   if (targetIdx === -1) backTo(returnTo, { error: "Could not reorder — try again." });
-  groups.splice(targetIdx, 0, moved);
+  groups.splice(position === "after" ? targetIdx + 1 : targetIdx, 0, moved);
 
   const flattened = groups.flatMap(([, cats]) => cats);
   const changes = flattened
@@ -810,6 +811,7 @@ export async function reorderCategoryGroups(formData: FormData) {
 export async function reorderSubcategories(formData: FormData) {
   const sourceId = String(formData.get("source_id") ?? "");
   const targetId = String(formData.get("target_id") ?? "");
+  const position = formData.get("position") === "after" ? "after" : "before";
   const returnTo = String(formData.get("return_to") ?? "") || "/admin/competitions";
   if (!sourceId || !targetId || sourceId === targetId) {
     backTo(returnTo, { error: "Could not reorder — try again." });
@@ -836,7 +838,7 @@ export async function reorderSubcategories(formData: FormData) {
   const [moved] = cats.splice(srcIdx, 1);
   const tgtIdx = cats.findIndex((c) => c.id === targetId);
   if (tgtIdx === -1) backTo(returnTo, { error: "Could not reorder — try again." });
-  cats.splice(tgtIdx, 0, moved);
+  cats.splice(position === "after" ? tgtIdx + 1 : tgtIdx, 0, moved);
   groups[groupIdx] = [groups[groupIdx][0], cats];
 
   const flattened = groups.flatMap(([, c]) => c);

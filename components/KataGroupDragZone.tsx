@@ -1,17 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useTransition } from "react";
 import { reorderCategoryGroups } from "@/app/actions/admin";
-
-const DRAG_MIME = "application/x-kata-group-base";
+import { useDragReorder } from "@/lib/useDragReorder";
 
 /**
- * Makes a kata group's header both a drag source (via the small grip handle)
- * and a drop target (the whole row) -- dropping one group onto another asks
- * the server to move the dragged group to sit where the drop target is,
- * pushing everything from there on down (or up) by one. Only the tiny grip
- * is `draggable`, so a plain click still toggles the <details> open/closed
- * as normal instead of starting a drag.
+ * Makes a kata group's header a drag source via its small grip handle,
+ * using pointer events (mouse AND touch) instead of native HTML5
+ * draggable/dragstart/dragover — see lib/useDragReorder.ts for why. Drop
+ * near another kata's top half inserts before it, near its bottom half
+ * inserts after — a floating chip and a snapping insertion line track the
+ * drag the whole way, both removed on release regardless of outcome.
+ *
+ * Requires the immediate reorderable ancestor (the kata group's own
+ * <details>) to carry `data-drag-item={base}`, and a shared ancestor
+ * (the list of kata groups) to carry `data-drag-list` — see
+ * app/admin/competitions/page.tsx, app/page.tsx, and
+ * app/kata-categories/page.tsx for where those are set.
+ *
+ * Only the tiny grip is draggable, so a plain click still toggles the
+ * <details> open/closed as normal instead of starting a drag.
  */
 export default function KataGroupDragZone({
   competitionId,
@@ -24,50 +32,27 @@ export default function KataGroupDragZone({
   returnTo: string;
   children: React.ReactNode;
 }) {
-  const [dragOver, setDragOver] = useState(false);
-
-  function handleDragStart(e: React.DragEvent) {
-    e.dataTransfer.setData(DRAG_MIME, base);
-    e.dataTransfer.effectAllowed = "move";
-  }
-
-  function handleDragOver(e: React.DragEvent) {
-    if (!e.dataTransfer.types.includes(DRAG_MIME)) return;
-    e.preventDefault();
-    if (!dragOver) setDragOver(true);
-  }
-
-  function handleDragLeave() {
-    setDragOver(false);
-  }
-
-  async function handleDrop(e: React.DragEvent) {
-    if (!e.dataTransfer.types.includes(DRAG_MIME)) return;
-    e.preventDefault();
-    setDragOver(false);
-    const sourceBase = e.dataTransfer.getData(DRAG_MIME);
-    if (!sourceBase || sourceBase === base) return;
+  const [, startTransition] = useTransition();
+  const { startDrag } = useDragReorder((sourceBase, targetBase, position) => {
     const fd = new FormData();
     fd.set("competition_id", competitionId);
     fd.set("source_base", sourceBase);
-    fd.set("target_base", base);
+    fd.set("target_base", targetBase);
+    fd.set("position", position);
     fd.set("return_to", returnTo);
-    await reorderCategoryGroups(fd);
-  }
+    startTransition(() => {
+      reorderCategoryGroups(fd);
+    });
+  });
 
   return (
-    <div
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-      className={`flex flex-1 items-center gap-2 rounded ${dragOver ? "bg-blue-50 ring-2 ring-blue-300" : ""}`}
-    >
+    <div className="flex flex-1 items-center gap-2 rounded">
       <span
-        draggable
-        onDragStart={handleDragStart}
+        onPointerDown={(e) => startDrag(e, base, base)}
         onClick={(e) => e.stopPropagation()}
         title="Drag to reorder this kata event"
         aria-label="Drag to reorder this kata event"
+        style={{ touchAction: "none" }}
         className="shrink-0 cursor-grab select-none rounded px-1 text-neutral-400 hover:bg-neutral-200 hover:text-neutral-600 active:cursor-grabbing"
       >
         ⠿

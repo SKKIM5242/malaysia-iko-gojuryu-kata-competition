@@ -1,67 +1,51 @@
 "use client";
 
-import { useState } from "react";
+import { useTransition } from "react";
 import { reorderSubcategories } from "@/app/actions/admin";
-
-const DRAG_MIME = "application/x-subcategory-id";
+import { useDragReorder } from "@/lib/useDragReorder";
 
 /**
- * Same drag-to-reorder pattern as KataGroupDragZone, one level down: makes
- * one belt/age/gender row within a kata group both a drag source (grip
- * handle) and drop target (the whole row), asking the server to move the
- * dragged row to sit where the drop target is within that same group.
+ * Same pointer-events drag-to-reorder as KataGroupDragZone (see
+ * lib/useDragReorder.ts), one level down: makes one belt/age/gender row
+ * within a kata group draggable, asking the server to move it to sit
+ * before or after wherever it's dropped, within that same kata group only.
+ *
+ * Requires the row's own <li> to carry `data-drag-item={categoryId}`, and
+ * the kata group's <ul> to carry `data-drag-list`.
  */
 export default function SubcategoryDragZone({
   categoryId,
+  label,
   returnTo,
   children,
 }: {
   categoryId: string;
+  /** Row text shown on the floating chip while dragging — pass the row's
+   * belt/age/gender label (the part of the category name after the kata),
+   * not the raw category id. */
+  label: string;
   returnTo: string;
   children: React.ReactNode;
 }) {
-  const [dragOver, setDragOver] = useState(false);
-
-  function handleDragStart(e: React.DragEvent) {
-    e.dataTransfer.setData(DRAG_MIME, categoryId);
-    e.dataTransfer.effectAllowed = "move";
-  }
-
-  function handleDragOver(e: React.DragEvent) {
-    if (!e.dataTransfer.types.includes(DRAG_MIME)) return;
-    e.preventDefault();
-    if (!dragOver) setDragOver(true);
-  }
-
-  function handleDragLeave() {
-    setDragOver(false);
-  }
-
-  async function handleDrop(e: React.DragEvent) {
-    if (!e.dataTransfer.types.includes(DRAG_MIME)) return;
-    e.preventDefault();
-    setDragOver(false);
-    const sourceId = e.dataTransfer.getData(DRAG_MIME);
-    if (!sourceId || sourceId === categoryId) return;
+  const [, startTransition] = useTransition();
+  const { startDrag } = useDragReorder((sourceId, targetId, position) => {
     const fd = new FormData();
     fd.set("source_id", sourceId);
-    fd.set("target_id", categoryId);
+    fd.set("target_id", targetId);
+    fd.set("position", position);
     fd.set("return_to", returnTo);
-    await reorderSubcategories(fd);
-  }
+    startTransition(() => {
+      reorderSubcategories(fd);
+    });
+  });
 
   return (
-    <div
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-      className={`flex flex-1 items-center gap-2 rounded ${dragOver ? "bg-blue-50 ring-2 ring-blue-300" : ""}`}
-    >
+    <div className="flex flex-1 items-center gap-2 rounded">
       <span
-        draggable
-        onDragStart={handleDragStart}
+        onPointerDown={(e) => startDrag(e, categoryId, label)}
         title="Drag to reorder this row within its kata event"
         aria-label="Drag to reorder this row within its kata event"
+        style={{ touchAction: "none" }}
         className="shrink-0 cursor-grab select-none rounded px-1 text-neutral-400 hover:bg-neutral-200 hover:text-neutral-600 active:cursor-grabbing"
       >
         ⠿

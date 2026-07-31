@@ -344,11 +344,12 @@ export default async function AdminCompetitions({
                                   </CategoryActionButton>
                                 )}
                               </div>
-                              <div className="space-y-2">
+                              <div className="space-y-2" data-drag-list={`kata-groups-${c.id}-${family}`}>
                                 {kataGroups.map(([base, cats]) => (
                           <details
                             key={base}
                             id={kataGroupAnchorId(c.id, base)}
+                            data-drag-item={base}
                             className="group rounded border border-neutral-100"
                             open={params.openkata === base || cats.some((cat) => cat.id === params.editcat)}
                           >
@@ -370,14 +371,15 @@ export default async function AdminCompetitions({
                                 </span>
                               )}
                             </summary>
-                            <ul className="space-y-1 px-2 pb-2 pl-5">
+                            <ul className="space-y-1 px-2 pb-2 pl-5" data-drag-list={`kata-subcats-${base}`}>
                               {cats.map((cat) => {
                                 const taken = categoryPaidCount.get(cat.id) ?? 0;
                                 const left = cat.max_participants != null ? Math.max(0, cat.max_participants - taken) : null;
+                                const subLabel = cat.name.split(" — ").slice(1).join(" — ") || cat.name;
                                 const rowContent = (
                                   <>
                                     <span className="text-neutral-600">
-                                      {cat.name.split(" — ").slice(1).join(" — ") || cat.name}
+                                      {subLabel}
                                     </span>
                                     <span className="flex shrink-0 items-center gap-3">
                                       <span
@@ -435,9 +437,9 @@ export default async function AdminCompetitions({
                                   </>
                                 );
                                 return (
-                                  <li key={cat.id} className="flex items-center gap-2 text-sm">
+                                  <li key={cat.id} data-drag-item={cat.id} className="flex items-center gap-2 text-sm">
                                     {canManageCompetition ? (
-                                      <SubcategoryDragZone categoryId={cat.id} returnTo={categoryReturnTo(c.id, base)}>
+                                      <SubcategoryDragZone categoryId={cat.id} label={subLabel} returnTo={categoryReturnTo(c.id, base)}>
                                         {rowContent}
                                       </SubcategoryDragZone>
                                     ) : (

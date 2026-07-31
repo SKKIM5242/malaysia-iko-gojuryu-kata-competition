@@ -4,6 +4,7 @@ import { schemaReady, getCategories } from "@/lib/data";
 import { getAllCompetitions } from "@/lib/admin-data";
 import { loadRecordingsByCategory } from "@/lib/arena";
 import { groupByFamily } from "@/lib/kata-families";
+import KataGroupDragZone from "@/components/KataGroupDragZone";
 import { NoTranslate, SetupNotice, SiteFooter, SiteHeader } from "@/components/ui";
 import AuthForms from "@/components/AuthForms";
 import type { Category } from "@/lib/types";
@@ -82,6 +83,11 @@ export default async function KataCategoriesPage() {
   }
 
   const competitions = await getAllCompetitions();
+  // Viewing this page is open to every PRIVILEGED_ROLES member above, but
+  // reordering the actual category structure is a bigger capability —
+  // limited to the same admin tier that can already edit categories on the
+  // Competitions page. Referee/Audience/Support keep view-only access.
+  const canManageKata = ["admin", "organizer", "staff"].includes(profile.role);
 
   return (
     <>
@@ -90,7 +96,7 @@ export default async function KataCategoriesPage() {
         <h1 className="text-2xl font-bold tracking-tight">Kata Categories</h1>
         <p className="mt-1 mb-8 text-sm text-neutral-500">
           Every kata event&apos;s 16 sub-categories, in order, with live slot counts and every
-          submitted recording. View only.
+          submitted recording. {canManageKata ? "Drag the grip (⠿) next to a kata event to reorder it." : "View only."}
         </p>
         {competitions.length === 0 ? (
           <p className="text-sm text-neutral-400">No competitions yet.</p>
@@ -123,12 +129,23 @@ export default async function KataCategoriesPage() {
                           <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-neutral-500">
                             {family} Kata
                           </h3>
-                          <div className="space-y-2">
+                          <div className="space-y-2" data-drag-list={`kata-cat-groups-${competition.id}-${family}`}>
                             {kataGroups.map(([base, subCats]) => (
-                              <details key={base} className="rounded-lg border border-neutral-200 bg-white shadow-sm">
-                                <summary className="cursor-pointer px-4 py-2.5 text-sm font-semibold text-neutral-800 hover:bg-neutral-50">
-                                  <NoTranslate>{base}</NoTranslate>{" "}
-                                  <span className="font-normal text-neutral-400">({subCats.length} sub-categories)</span>
+                              <details key={base} data-drag-item={base} className="rounded-lg border border-neutral-200 bg-white shadow-sm">
+                                <summary className="flex cursor-pointer items-center gap-2 px-4 py-2.5 text-sm font-semibold text-neutral-800 hover:bg-neutral-50">
+                                  {canManageKata ? (
+                                    <KataGroupDragZone competitionId={competition.id} base={base} returnTo="/kata-categories">
+                                      <span>
+                                        <NoTranslate>{base}</NoTranslate>{" "}
+                                        <span className="font-normal text-neutral-400">({subCats.length} sub-categories)</span>
+                                      </span>
+                                    </KataGroupDragZone>
+                                  ) : (
+                                    <span>
+                                      <NoTranslate>{base}</NoTranslate>{" "}
+                                      <span className="font-normal text-neutral-400">({subCats.length} sub-categories)</span>
+                                    </span>
+                                  )}
                                 </summary>
                                 <div className="space-y-3 px-4 pb-4">
                                   {subCats.map((cat) => {
