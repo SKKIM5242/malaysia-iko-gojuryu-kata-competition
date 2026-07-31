@@ -22,7 +22,11 @@ export async function claimRegistration(
   _prev: AccountActionState,
   formData: FormData,
 ): Promise<AccountActionState> {
-  const reference = String(formData.get("reference") ?? "").trim().toLowerCase();
+  // The confirmation email shows the reference ID with a space after the
+  // first 4 characters purely for readability (e.g. "AC04 5C1A") -- strip
+  // any whitespace here so a direct copy-paste of that spaced text works
+  // without the participant needing to manually delete the space first.
+  const reference = String(formData.get("reference") ?? "").replace(/\s+/g, "").toLowerCase();
   const ic = String(formData.get("ic_passport") ?? "").trim();
   if (!/^[0-9a-f]{8}$/.test(reference)) {
     return { ok: false, error: "Enter the 8-character reference ID from your registration." };

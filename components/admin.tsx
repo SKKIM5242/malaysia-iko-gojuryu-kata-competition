@@ -4,6 +4,7 @@ import { signOut } from "@/app/actions/auth";
 import { createClient } from "@/lib/supabase/server";
 import CertificateUploadField from "@/components/CertificateUploadField";
 import FlashToast from "@/components/FlashToast";
+import ClickAnchorCapture from "@/components/ClickAnchorCapture";
 import { adminInput, adminLabel, adminBtn, adminBtnSecondary, Card } from "@/components/admin-styles";
 
 const FULL_NAV: Array<[string, string]> = [
@@ -107,6 +108,7 @@ export async function AdminShell({
       </header>
       <main className="mx-auto max-w-6xl px-4 py-8">
         <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
+        <ClickAnchorCapture />
         <FlashToast ok={flash?.ok} error={flash?.error} />
         <div className="mt-6">{children}</div>
       </main>

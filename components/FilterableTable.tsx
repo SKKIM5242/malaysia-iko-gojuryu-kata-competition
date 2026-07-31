@@ -309,6 +309,7 @@ export default function FilterableTable({
                 return (
                   <tr
                     key={key}
+                    id={`row-${key}`}
                     className={`group hover:bg-neutral-50 ${!rowClosed && rowSelected ? "bg-sky-50" : ""} ${grid.rowSizeClass(key)}`}
                     style={grid.rowSizeStyle(key)}
                   >

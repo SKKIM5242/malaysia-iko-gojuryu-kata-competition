@@ -20,8 +20,13 @@ function appUrl(): string {
   return process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 }
 
-/** Sends one plain-text email via Resend. No-ops until RESEND_API_KEY is set. */
-async function sendEmail(to: string, subject: string, text: string): Promise<void> {
+/** Sends one email via Resend, in plain text by default. Pass `html` for
+ * the rare email (currently just the registration confirmation) that needs
+ * inline styling Resend's plain `text` field can't carry — every email
+ * client that renders HTML uses `html`, everything else falls back to
+ * `text`, so both are always safe to send together. No-ops until
+ * RESEND_API_KEY is set. */
+async function sendEmail(to: string, subject: string, text: string, html?: string): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) return;
   try {
@@ -33,6 +38,7 @@ async function sendEmail(to: string, subject: string, text: string): Promise<voi
         to,
         subject,
         text,
+        ...(html ? { html } : {}),
       }),
     });
     if (!res.ok) {
@@ -224,6 +230,67 @@ function buildConfirmationBody(input: ConfirmationEmailInput, telegram: Telegram
   return lines.join("\n");
 }
 
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/** "AC045C1A" -> "AC04 5C1A" -- a space after the first 4 characters, purely
+ * for readability in the email. Safe to copy-paste directly: the claim
+ * form's reference field (components/ClaimForm.tsx) and claimRegistration
+ * (app/actions/account.ts) both strip whitespace before matching, so the
+ * space doesn't need to be manually removed first. */
+function spacedReferenceId(id: string): string {
+  return id.length === 8 ? `${id.slice(0, 4)} ${id.slice(4)}` : id;
+}
+
+/** HTML companion to buildConfirmationBody -- same content and order, sent
+ * alongside the plain-text version (email clients that render HTML use
+ * this; everything else falls back to text). The only real difference is
+ * the reference ID: bold, larger, and spaced for readability, which plain
+ * text can't express. Every dynamic value is HTML-escaped since, unlike
+ * the plain-text version, this content is parsed as markup. */
+function buildConfirmationHtml(input: ConfirmationEmailInput, telegram: TelegramLinksForEmail): string {
+  const p = (html: string) => `<p style="margin:0 0 12px;">${html}</p>`;
+  const parts: string[] = [p(`Hi ${escapeHtml(input.recipientName)},`)];
+  for (const line of input.bodyLines) {
+    if (line === "") continue;
+    parts.push(p(escapeHtml(line)));
+  }
+  if (input.referenceId) {
+    parts.push(
+      p(
+        `Reference ID: ` +
+          `<strong style="font-size:18px;font-weight:900;letter-spacing:0.5px;">` +
+          `${escapeHtml(spacedReferenceId(input.referenceId))}</strong>`,
+      ),
+    );
+  }
+  parts.push(p("Keep this email for your records."));
+  parts.push(p(`Kata Arena log in: <a href="${appUrl()}/account">${appUrl()}/account</a>`));
+  parts.push(p(`App: <a href="${appUrl()}">${appUrl()}</a>`));
+  if (telegram.url) {
+    parts.push(p(`Join the Telegram group: <a href="${telegram.url}">${escapeHtml(telegram.url)}</a>`));
+    parts.push(
+      p(
+        "Make sure you are in the Telegram group to receive any announcements from the organizer " +
+          "— it's also where you communicate with the organizer and all other participants.",
+      ),
+    );
+  }
+  if (telegram.memberUrl) {
+    parts.push(
+      p(`Already in the group? Jump straight to Announcements: <a href="${telegram.memberUrl}">${escapeHtml(telegram.memberUrl)}</a>`),
+    );
+  }
+  parts.push(p("— Malaysia Open Virtual Karate-do Kata Competition"));
+  return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#111;line-height:1.5;">${parts.join("")}</div>`;
+}
+
 /**
  * Record-purpose confirmation sent right after any registration (participant,
  * referee, audience, staff, school, sensei) is created. Every email includes
@@ -236,10 +303,12 @@ export async function sendConfirmationEmail(input: ConfirmationEmailInput): Prom
   if (!input.toEmail) return;
   const groups = await listTelegramGroups();
   const group = input.telegramCategory ? groups.find((g) => g.category === input.telegramCategory) : undefined;
+  const telegram = { url: group?.url ?? null, memberUrl: group?.memberUrl ?? null };
   await sendEmail(
     input.toEmail,
     input.subject,
-    buildConfirmationBody(input, { url: group?.url ?? null, memberUrl: group?.memberUrl ?? null }),
+    buildConfirmationBody(input, telegram),
+    buildConfirmationHtml(input, telegram),
   );
 }
 
@@ -267,9 +336,11 @@ export async function sendConfirmationEmailBatch(inputs: ConfirmationEmailInput[
     .filter((i): i is ConfirmationEmailInput & { toEmail: string } => !!i.toEmail)
     .map((i) => {
       const group = i.telegramCategory ? groupsByCategory.get(i.telegramCategory) : undefined;
+      const telegram = { url: group?.url ?? null, memberUrl: group?.memberUrl ?? null };
       return {
         from, to: i.toEmail, subject: i.subject,
-        text: buildConfirmationBody(i, { url: group?.url ?? null, memberUrl: group?.memberUrl ?? null }),
+        text: buildConfirmationBody(i, telegram),
+        html: buildConfirmationHtml(i, telegram),
       };
     });
   if (emails.length === 0) return;

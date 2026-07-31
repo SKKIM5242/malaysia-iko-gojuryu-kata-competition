@@ -27,9 +27,9 @@ export default function ClaimForm() {
             id="reference"
             name="reference"
             required
-            maxLength={8}
+            maxLength={9}
             className="w-full rounded-md border border-neutral-300 px-3 py-2 font-mono text-sm uppercase"
-            placeholder="e.g. 4C8A3B21"
+            placeholder="e.g. 4C8A 3B21"
           />
         </div>
         <div>
