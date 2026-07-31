@@ -345,7 +345,12 @@ export default async function AdminCompetitions({
                                 )}
                               </div>
                               <div className="space-y-2" data-drag-list={`kata-groups-${c.id}-${family}`}>
-                                {kataGroups.map(([base, cats]) => (
+                                {kataGroups.map(([base, cats]) => {
+                          const kyuCats = cats.filter((cat) => cat.belt_group === "kyu");
+                          const danCats = cats.filter((cat) => cat.belt_group === "dan");
+                          const kyuMerged = kyuCats.length === 1 && kyuCats[0].name === `${base} — Color/Kyu Belt — Combined (All Ages & Genders)`;
+                          const danMerged = danCats.length === 1 && danCats[0].name === `${base} — Black Belt & Dan Holders — Combined (All Ages & Genders)`;
+                          return (
                           <details
                             key={base}
                             id={kataGroupAnchorId(c.id, base)}
@@ -368,6 +373,32 @@ export default async function AdminCompetitions({
                                 <span>
                                   <NoTranslate>{base}</NoTranslate>{" "}
                                   <span className="font-normal text-neutral-400">({cats.length} sub-categories)</span>
+                                </span>
+                              )}
+                              {canManageCompetition && (kyuCats.length > 1 || danCats.length > 1) && (
+                                <span className="ml-auto flex gap-1" onClick={(e) => e.stopPropagation()}>
+                                  {kyuCats.length > 1 && !kyuMerged && (
+                                    <CategoryActionButton
+                                      actionName="mergeBeltGroup"
+                                      fields={{ competition_id: c.id, kata_base: base, belt_group: "kyu", return_to: categoryReturnTo(c.id, base) }}
+                                      className="rounded border border-teal-300 px-2 py-0.5 text-xs font-normal text-teal-700 hover:bg-teal-50"
+                                      title={`Combine every Color/Kyu Belt sub-category (any age or gender) for ${base} into one`}
+                                      confirmMessage={`Merge all ${kyuCats.length} Color/Kyu Belt categories for "${base}" (every age and gender) into ONE combined category?\n\nExisting registrations move over automatically.`}
+                                    >
+                                      Merge Color/Kyu Belt ({kyuCats.length})
+                                    </CategoryActionButton>
+                                  )}
+                                  {danCats.length > 1 && !danMerged && (
+                                    <CategoryActionButton
+                                      actionName="mergeBeltGroup"
+                                      fields={{ competition_id: c.id, kata_base: base, belt_group: "dan", return_to: categoryReturnTo(c.id, base) }}
+                                      className="rounded border border-indigo-300 px-2 py-0.5 text-xs font-normal text-indigo-700 hover:bg-indigo-50"
+                                      title={`Combine every Black Belt & Dan Holders sub-category (any age or gender) for ${base} into one`}
+                                      confirmMessage={`Merge all ${danCats.length} Black Belt & Dan Holders categories for "${base}" (every age and gender) into ONE combined category?\n\nExisting registrations move over automatically.`}
+                                    >
+                                      Merge Black Belt & Dan ({danCats.length})
+                                    </CategoryActionButton>
+                                  )}
                                 </span>
                               )}
                             </summary>
@@ -450,7 +481,8 @@ export default async function AdminCompetitions({
                               })}
                             </ul>
                           </details>
-                                ))}
+                                  );
+                                })}
                               </div>
                             </div>
                           );
@@ -511,9 +543,9 @@ export default async function AdminCompetitions({
                   <label htmlFor="belt_group" className={adminLabel}>Belt group</label>
                   <select id="belt_group" name="belt_group" defaultValue={editingCategory?.belt_group ?? ""} className={adminInput}>
                     <option value="">Any</option>
-                    <option value="open">Open (divisions auto-split Kyu/Dan)</option>
-                    <option value="kyu">Kyu</option>
-                    <option value="dan">Dan</option>
+                    <option value="open">Open (divisions auto-split Color/Kyu Belt and Black Belt & Dan Holders)</option>
+                    <option value="kyu">Color/Kyu Belt</option>
+                    <option value="dan">Black Belt & Dan Holders</option>
                   </select>
                 </div>
                 <div>

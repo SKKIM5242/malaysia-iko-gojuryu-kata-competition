@@ -748,6 +748,85 @@ export async function mergeKataFamily(formData: FormData) {
   });
 }
 
+/**
+ * Collapses one kata event's Color/Kyu Belt (or Black Belt & Dan Holders)
+ * categories into a single one, across every age bracket and gender —
+ * narrower than mergeKataFamily above (which spans every kata in a whole
+ * family): this stays within one kata event, merging only across its own
+ * belt/age/gender sub-categories. Same move-then-delete mechanism as every
+ * other merge action in this file.
+ */
+export async function mergeKataBeltGroup(formData: FormData) {
+  const competitionId = String(formData.get("competition_id") ?? "");
+  const kataBase = String(formData.get("kata_base") ?? "");
+  const beltGroupValue = formData.get("belt_group") === "dan" ? "dan" : "kyu";
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/competitions";
+  const { supabase, actorId } = await getActor();
+
+  if (!competitionId || !kataBase) backTo(returnTo, { error: "Missing competition or kata." });
+
+  const { data: allCats } = await supabase
+    .from("categories")
+    .select("*")
+    .eq("competition_id", competitionId);
+  const sourceCats = ((allCats as Category[]) ?? []).filter(
+    (c) => kataBaseOf(c.name) === kataBase && c.belt_group === beltGroupValue,
+  );
+  const beltLabel = beltGroupValue === "dan" ? "Black Belt & Dan Holders" : "Color/Kyu Belt";
+  if (sourceCats.length === 0) backTo(returnTo, { error: `No ${beltLabel} categories found for this kata.` });
+
+  const mergedName = `${kataBase} — ${beltLabel} — Combined (All Ages & Genders)`;
+  const already = sourceCats.find((c) => c.name === mergedName);
+  if (already && sourceCats.length === 1) {
+    backTo(returnTo, { ok: `${beltLabel} is already merged into one category for this kata.` });
+  }
+
+  let targetId: string;
+  if (already) {
+    targetId = already.id;
+  } else {
+    const { data: created, error: createErr } = await supabase
+      .from("categories")
+      .insert({
+        competition_id: competitionId,
+        name: mergedName,
+        belt_group: beltGroupValue,
+        gender: "mix",
+        age_min: 4,
+        age_max: 99,
+        max_participants: null,
+        sort_order: Math.min(...sourceCats.map((c) => c.sort_order)),
+      })
+      .select("id")
+      .single();
+    if (createErr || !created) backTo(returnTo, { error: "Could not create the combined category." });
+    targetId = created!.id;
+  }
+
+  const sourceIds = sourceCats.filter((c) => c.id !== targetId).map((c) => c.id);
+  if (sourceIds.length > 0) {
+    const { error: moveErr } = await supabase
+      .from("registrations")
+      .update({ category_id: targetId })
+      .in("category_id", sourceIds);
+    if (moveErr) backTo(returnTo, { error: "Could not move registrations into the combined category." });
+
+    await supabase.from("categories").delete().in("id", sourceIds);
+  }
+
+  await writeAudit(supabase, {
+    table_name: "categories", record_id: targetId, action: "kata_belt_group_merged",
+    new_value: { kataBase, beltGroup: beltGroupValue, competition_id: competitionId, categories_consolidated: sourceIds.length },
+    actor_id: actorId,
+  });
+  revalidatePath("/");
+  backTo(returnTo, {
+    ok: sourceIds.length > 0
+      ? `${beltLabel} merged for “${kataBase}” — ${sourceIds.length} categor${sourceIds.length === 1 ? "y" : "ies"} consolidated into one.`
+      : `${beltLabel} is already merged into one category for this kata.`,
+  });
+}
+
 /** Re-sequences sort_order for exactly the rows whose position actually
  * changed in `newOrder` (compared to their current sort_order) -- swapping
  * two adjacent kata groups only touches that many rows, not the whole
