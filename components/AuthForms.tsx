@@ -137,8 +137,11 @@ export default function AuthForms({ defaultMode = "signin" }: { defaultMode?: "s
           subscription is necessary.
         </p>
         <p className="mt-1">
-          <strong>Participants</strong> competing in the Kata Competition have unlimited sign-in
-          to view their own recording only.
+          <strong>Participants</strong> competing in the Kata Competition get 250 sign-ins to view
+          their own recording only, within the validity period shown at Kata Arena log-in. Need
+          more sign-ins? Renew your subscription for 30 more sign-ins over a 3-month period, per
+          competition tier — or register as Audience to sign in per-visit, per competition tier.
+          Thank you for your support!
         </p>
       </div>
 
