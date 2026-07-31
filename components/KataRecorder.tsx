@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRecordAttempt, submitKataVideo } from "@/app/actions/account";
 import BuyExtraAttemptsButton from "@/components/BuyExtraAttemptsButton";
-import { formatDate } from "@/components/ui";
+import { formatDate, formatDateTime } from "@/components/ui";
 
 const MAX_SECONDS = 5 * 60;
 
@@ -393,7 +393,7 @@ export default function KataRecorder({
         )}
         {phase === "recording" && recordingStartedAt && (
           <div className="absolute bottom-2 left-3 text-[12px] text-white" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.85)" }}>
-            Recording started {recordingStartedAt.toLocaleDateString()} {recordingStartedAt.toLocaleTimeString()}
+            Recording started {formatDateTime(recordingStartedAt.toISOString())}
           </div>
         )}
       </div>
