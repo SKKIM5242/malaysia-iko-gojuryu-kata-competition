@@ -16,6 +16,7 @@ import { NoCommaTextarea } from "@/components/NoCommaAddressField";
 import DateOfBirthField from "@/components/DateOfBirthField";
 import { EDUCATION_LEVELS, SPOKEN_LANGUAGES, REFERRAL_LABEL, REFERRAL_PLACEHOLDER } from "@/lib/reference-data";
 import type { Competition } from "@/lib/types";
+import TierSlotsField from "@/components/TierSlotsField";
 
 const initial: CommunityState = { ok: false };
 const inputCls =
@@ -53,7 +54,13 @@ function Success({
   );
 }
 
-export function RefereeForm({ telegramLink }: { telegramLink: string | null }) {
+export function RefereeForm({
+  telegramLink,
+  competitions,
+}: {
+  telegramLink: string | null;
+  competitions: Competition[];
+}) {
   const [state, formAction, pending] = useActionState(registerReferee, initial);
   if (state.ok && state.referenceId) {
     return (
@@ -159,6 +166,16 @@ export function RefereeForm({ telegramLink }: { telegramLink: string | null }) {
           <input id="home_country" name="home_country" required defaultValue="Malaysia" className={inputCls} />
           <Err m={e.home_country} />
         </div>
+
+        <TierSlotsField
+          competitions={competitions.map((c) => ({ id: c.id, name: c.name, fee: c.registration_fee_usd }))}
+          idPrefix="ref_"
+          names={["participating_tier_1_id", "participating_tier_2_id", "participating_tier_3_id"]}
+          heading="Kata Competition Tier(s) you'll judge"
+          helperNote="Tier 1 is required — pick every tier you're available to judge, up to 3. The USD 100 deposit below already covers all 3 tiers regardless of what you pick here; this is only so the organizer can schedule you correctly."
+          inputCls={inputCls}
+          labelCls={labelCls}
+        />
 
         <div className="sm:col-span-2 rounded-md border border-neutral-200 bg-neutral-50 p-4">
           <p className="text-sm font-bold text-neutral-800">

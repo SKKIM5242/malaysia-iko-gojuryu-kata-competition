@@ -1,13 +1,17 @@
 import { SiteFooter, SiteHeader } from "@/components/ui";
 import { RefereeForm } from "@/components/CommunityForms";
 import { getTelegramLink } from "@/lib/telegram";
+import { getOpenCompetitions } from "@/lib/data";
 
 export const dynamic = "force-dynamic";
 
 export const metadata = { title: "Referee / Judge registration" };
 
 export default async function RegisterRefereePage() {
-  const telegramLink = await getTelegramLink("referee");
+  const [telegramLink, competitions] = await Promise.all([
+    getTelegramLink("referee"),
+    getOpenCompetitions(),
+  ]);
   return (
     <>
       <SiteHeader />
@@ -24,7 +28,7 @@ export default async function RegisterRefereePage() {
           </p>
         </div>
         <div className="mt-8">
-          <RefereeForm telegramLink={telegramLink} />
+          <RefereeForm telegramLink={telegramLink} competitions={competitions} />
         </div>
       </main>
       <SiteFooter />

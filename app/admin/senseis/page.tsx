@@ -12,7 +12,7 @@ import SignInControlBox from "@/components/SignInControlBox";
 import InvitationCodeForm from "@/components/InvitationCodeForm";
 import InvitationCodeList from "@/components/InvitationCodeList";
 import InvitationCodeRunField from "@/components/InvitationCodeRunField";
-import ParticipatingTiersField from "@/components/ParticipatingTiersField";
+import TierSlotsField from "@/components/TierSlotsField";
 import { tierEntriesLabel } from "@/lib/tier-entries";
 import { NoCommaInput } from "@/components/NoCommaAddressField";
 import DateOfBirthField from "@/components/DateOfBirthField";
@@ -225,11 +225,15 @@ export default async function AdminSenseis({
                   <label htmlFor="referral_source" className={adminLabel}>{REFERRAL_LABEL} <span className="font-normal text-neutral-400">(optional)</span></label>
                   <input id="referral_source" name="referral_source" defaultValue={editing?.referral_source ?? ""} className={adminInput} placeholder={REFERRAL_PLACEHOLDER} />
                 </div>
-                <ParticipatingTiersField
-                  competitions={competitions}
-                  selected={editing?.participating_tier_ids}
+                <TierSlotsField
+                  competitions={competitions.map((c) => ({ id: c.id, name: c.name, fee: c.registration_fee_usd }))}
                   idPrefix="admin_sensei_"
-                  who="sensei"
+                  names={["participating_tier_1_id", "participating_tier_2_id", "participating_tier_3_id"]}
+                  heading="Kata Competition Tier(s) this sensei will have participants in"
+                  helperNote="Tier 1 is required. Declared intent only — does not change the sensei's one-time registration fee, and does not decide commission."
+                  values={[editing?.participating_tier_1_id, editing?.participating_tier_2_id, editing?.participating_tier_3_id]}
+                  inputCls={adminInput}
+                  labelCls={adminLabel}
                 />
               </div>
 

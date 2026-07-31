@@ -57,9 +57,12 @@ export interface School {
   referral_source: string | null;
   /** Tier this record was registered/paid under — sets the fee owed. */
   registration_competition_id: string | null;
-  /** Tiers this school declares it will have participants in — declared
-   * intent from the registration form, not a commission input. */
-  participating_tier_ids: string[] | null;
+  /** Tiers this school declares it will have participants in (1 required,
+   * 2-3 optional) — declared intent from the registration form, not a
+   * commission input. */
+  participating_tier_1_id: string | null;
+  participating_tier_2_id: string | null;
+  participating_tier_3_id: string | null;
   payment_status: "pending" | "paid" | "waived";
   created_at: string;
 }
@@ -88,9 +91,12 @@ export interface Sensei {
   referral_source: string | null;
   /** Tier this record was registered/paid under — sets the fee owed. */
   registration_competition_id: string | null;
-  /** Tiers this sensei declares they will have participants in — declared
-   * intent from the registration form, not a commission input. */
-  participating_tier_ids: string[] | null;
+  /** Tiers this sensei declares they will have participants in (1 required,
+   * 2-3 optional) — declared intent from the registration form, not a
+   * commission input. */
+  participating_tier_1_id: string | null;
+  participating_tier_2_id: string | null;
+  participating_tier_3_id: string | null;
   payment_status: "pending" | "paid" | "waived";
   created_at: string;
   school?: Pick<School, "id" | "name"> | null;

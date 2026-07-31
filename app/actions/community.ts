@@ -61,6 +61,27 @@ export async function registerReferee(
 
   const supabase = await createClient();
 
+  // "Kata Competition Tier(s) you'll judge" (see components/TierSlotsField)
+  // -- Tier 1 required, validated against real open competitions. Purely
+  // declared intent for scheduling: the USD 100 deposit below already
+  // covers all 3 tiers regardless of what's picked here.
+  const { data: openTiers } = await supabase.from("competitions").select("id").eq("status", "open");
+  const validTierIds = new Set((openTiers ?? []).map((c) => c.id as string));
+  const readTier = (name: string) => {
+    const v = String(formData.get(name) ?? "").trim();
+    return v && validTierIds.has(v) ? v : null;
+  };
+  const participating_tier_1_id = readTier("participating_tier_1_id");
+  const participating_tier_2_id = readTier("participating_tier_2_id");
+  const participating_tier_3_id = readTier("participating_tier_3_id");
+  if (!participating_tier_1_id) {
+    return {
+      ok: false,
+      error: "Select at least Tier 1 for the kata competition tier(s) you'll judge.",
+      fieldErrors: {},
+    };
+  }
+
   // Latest rank certificate — required.
   const certificate = formData.get("certificate");
   if (!(certificate instanceof File) || certificate.size === 0) {
@@ -131,6 +152,9 @@ export async function registerReferee(
     international_certificate_paths,
     invitation_code: invitation_code || null,
     referral_source: referral_source || null,
+    participating_tier_1_id,
+    participating_tier_2_id,
+    participating_tier_3_id,
     payment_status: paymentStatus,
   });
   if (error) return { ok: false, error: "Could not save your registration. Please try again." };

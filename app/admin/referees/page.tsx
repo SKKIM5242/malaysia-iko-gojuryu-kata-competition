@@ -15,6 +15,7 @@ import SignInControlBox from "@/components/SignInControlBox";
 import InvitationCodeForm from "@/components/InvitationCodeForm";
 import InvitationCodeList from "@/components/InvitationCodeList";
 import InvitationCodeRunField from "@/components/InvitationCodeRunField";
+import TierSlotsField from "@/components/TierSlotsField";
 import IbanInput from "@/components/IbanInput";
 import IbanConfirmCheckbox from "@/components/IbanConfirmCheckbox";
 import BankDetailsNote from "@/components/BankDetailsNote";
@@ -38,6 +39,9 @@ interface Referee {
   certificate_path: string | null; international_certificate_paths: string[] | null;
   invitation_code: string | null;
   referral_source: string | null;
+  participating_tier_1_id: string | null;
+  participating_tier_2_id: string | null;
+  participating_tier_3_id: string | null;
   user_id: string | null;
   payment_status: string; status: string; created_at: string;
 }
@@ -209,6 +213,16 @@ export default async function AdminReferees({
                   <label htmlFor="referral_source" className={adminLabel}>{REFERRAL_LABEL} <span className="font-normal text-neutral-400">(optional)</span></label>
                   <input id="referral_source" name="referral_source" defaultValue={editing?.referral_source ?? ""} className={adminInput} placeholder={REFERRAL_PLACEHOLDER} />
                 </div>
+                <TierSlotsField
+                  competitions={competitions.map((c) => ({ id: c.id, name: c.name, fee: c.registration_fee_usd }))}
+                  idPrefix="admin_referee_"
+                  names={["participating_tier_1_id", "participating_tier_2_id", "participating_tier_3_id"]}
+                  heading="Kata Competition Tier(s) this referee will judge"
+                  helperNote="Tier 1 is required. The USD 100 deposit already covers all 3 tiers regardless of what's picked here — this is for scheduling only."
+                  values={[editing?.participating_tier_1_id, editing?.participating_tier_2_id, editing?.participating_tier_3_id]}
+                  inputCls={adminInput}
+                  labelCls={adminLabel}
+                />
                 <div className="sm:col-span-2">
                   <label htmlFor="home_address" className={adminLabel}>
                     Home address *{" "}

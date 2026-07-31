@@ -33,19 +33,28 @@ async function loadTier(
   return { id: data.id, name: data.name, fee: Number(data.registration_fee_usd ?? 0) };
 }
 
-/** The tick-boxed "tiers I'll have participants in" (see
- * components/ParticipatingTiersField). Validated against real open
- * competition ids so a hand-crafted POST can't store arbitrary uuids, and
- * de-duplicated. */
-async function readParticipatingTierIds(
+/** The 3-slot "Kata Competition Tier(s) you'll participate in" (see
+ * components/TierSlotsField): tier 1 required, 2 and 3 optional. Validated
+ * against real open competition ids so a hand-crafted POST can't store an
+ * arbitrary uuid. Returns an error string on the one failure case (tier 1
+ * missing or invalid) so the caller can surface it the same way as every
+ * other required-field check in this file. */
+async function readTierSlots(
   supabase: Awaited<ReturnType<typeof createClient>>,
   formData: FormData,
-): Promise<string[]> {
-  const submitted = formData.getAll("participating_tier_ids").map((v) => String(v));
-  if (submitted.length === 0) return [];
+): Promise<
+  | { tier1: string; tier2: string | null; tier3: string | null }
+  | { error: string }
+> {
   const { data } = await supabase.from("competitions").select("id").eq("status", "open");
   const valid = new Set((data ?? []).map((c) => c.id as string));
-  return [...new Set(submitted.filter((id) => valid.has(id)))];
+  const read = (name: string) => {
+    const v = String(formData.get(name) ?? "").trim();
+    return v && valid.has(v) ? v : null;
+  };
+  const tier1 = read("participating_tier_1_id");
+  if (!tier1) return { error: "Select at least Tier 1 for the kata competition tier(s) you'll participate in." };
+  return { tier1, tier2: read("participating_tier_2_id"), tier3: read("participating_tier_3_id") };
 }
 
 /** Best-effort Stripe checkout for the tier fee; null when payments are
@@ -122,6 +131,8 @@ export async function registerSchool(
   const supabase = await createClient();
   const tier = await loadTier(supabase, competition_id);
   if (!tier) return { ok: false, error: "Select the competition tier you are registering under." };
+  const slots = await readTierSlots(supabase, formData);
+  if ("error" in slots) return { ok: false, error: slots.error };
   const { data: existing } = await supabase
     .from("schools")
     .select("id")
@@ -149,7 +160,9 @@ export async function registerSchool(
     home_country,
     referral_source: referral_source || null,
     registration_competition_id: tier.id,
-    participating_tier_ids: await readParticipatingTierIds(supabase, formData),
+    participating_tier_1_id: slots.tier1,
+    participating_tier_2_id: slots.tier2,
+    participating_tier_3_id: slots.tier3,
   });
   if (error) return { ok: false, error: "Could not register the school. Please try again." };
 
@@ -270,6 +283,8 @@ export async function registerSensei(
   const supabase = await createClient();
   const tier = await loadTier(supabase, competition_id);
   if (!tier) return { ok: false, error: "Select the competition tier you are registering under." };
+  const slots = await readTierSlots(supabase, formData);
+  if ("error" in slots) return { ok: false, error: slots.error };
   const { data: existing } = await supabase
     .from("senseis")
     .select("id")
@@ -304,7 +319,9 @@ export async function registerSensei(
     home_country,
     referral_source: referral_source || null,
     registration_competition_id: tier.id,
-    participating_tier_ids: await readParticipatingTierIds(supabase, formData),
+    participating_tier_1_id: slots.tier1,
+    participating_tier_2_id: slots.tier2,
+    participating_tier_3_id: slots.tier3,
   });
   if (error) return { ok: false, error: "Could not register the sensei. Please try again." };
 

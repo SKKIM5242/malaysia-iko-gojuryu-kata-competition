@@ -1040,7 +1040,9 @@ export async function saveSchool(formData: FormData) {
     invitation_code: String(formData.get("invitation_code") ?? "").trim() || null,
     registration_competition_id: String(formData.get("competition_id") ?? "") || null,
     referral_source: String(formData.get("referral_source") ?? "").trim() || null,
-    participating_tier_ids: formData.getAll("participating_tier_ids").map((v) => String(v)),
+    participating_tier_1_id: String(formData.get("participating_tier_1_id") ?? "").trim() || null,
+    participating_tier_2_id: String(formData.get("participating_tier_2_id") ?? "").trim() || null,
+    participating_tier_3_id: String(formData.get("participating_tier_3_id") ?? "").trim() || null,
   };
   if (!values.name) backTo(returnTo, { error: "School name is required." });
   if (!values.contact_title || !values.contact_name || !values.contact_karate_title || !values.contact_rank) {
@@ -1129,7 +1131,9 @@ export async function saveSensei(formData: FormData) {
     invitation_code: String(formData.get("invitation_code") ?? "").trim() || null,
     registration_competition_id: String(formData.get("competition_id") ?? "") || null,
     referral_source: String(formData.get("referral_source") ?? "").trim() || null,
-    participating_tier_ids: formData.getAll("participating_tier_ids").map((v) => String(v)),
+    participating_tier_1_id: String(formData.get("participating_tier_1_id") ?? "").trim() || null,
+    participating_tier_2_id: String(formData.get("participating_tier_2_id") ?? "").trim() || null,
+    participating_tier_3_id: String(formData.get("participating_tier_3_id") ?? "").trim() || null,
   };
   if (!values.name) backTo(returnTo, { error: "Sensei name is required." });
   if (!values.ic_passport) backTo(returnTo, { error: "IC / Passport is required." });
@@ -1470,6 +1474,9 @@ export async function saveReferee(formData: FormData) {
     bank_account_name: String(formData.get("bank_account_name") ?? "").trim() || null,
     invitation_code: String(formData.get("invitation_code") ?? "").trim() || null,
     referral_source: String(formData.get("referral_source") ?? "").trim() || null,
+    participating_tier_1_id: String(formData.get("participating_tier_1_id") ?? "").trim() || null,
+    participating_tier_2_id: String(formData.get("participating_tier_2_id") ?? "").trim() || null,
+    participating_tier_3_id: String(formData.get("participating_tier_3_id") ?? "").trim() || null,
   };
   if (!values.full_name || !values.ic_passport) {
     backTo(returnTo, { error: "Name and IC/passport are required." });
