@@ -107,6 +107,12 @@ interface RecordingContext {
   eventDate: string | null;
   registrationDeadline: string | null;
   pendingOthers: PendingRegistration[];
+  /** Which kata this specific linked registration is for -- shown on the
+   * recorder itself so it's obvious a "Start Recording" click on a
+   * different pending item actually switched something, instead of
+   * looking identical to whatever was showing before (the recorder never
+   * displayed which kata it was for at all). */
+  categoryName: string | null;
 }
 
 /** Everything needed to render the personal recording card for whichever
@@ -137,14 +143,21 @@ async function getRecordingContext(
 
   const { data: registration } = await supabase
     .from("registrations")
-    .select("competition:competitions(id, event_date, registration_deadline)")
+    .select("category:categories(name), competition:competitions(id, event_date, registration_deadline)")
     .eq("id", registrationId)
     .maybeSingle();
   const competition = (
     registration as unknown as {
+      category: { name: string } | null;
       competition: { id: string; event_date: string | null; registration_deadline: string | null } | null;
     } | null
   )?.competition ?? null;
+  const categoryName =
+    (
+      registration as unknown as {
+        category: { name: string } | null;
+      } | null
+    )?.category?.name ?? null;
 
   let ownVideoUrl: string | null = null;
   if (existingVideo) {
@@ -162,6 +175,7 @@ async function getRecordingContext(
     eventDate: competition?.event_date ?? null,
     registrationDeadline: competition?.registration_deadline ?? null,
     pendingOthers,
+    categoryName,
   };
 }
 
@@ -210,6 +224,7 @@ function PersonalRecordingSection({
             watermark={watermarkText()}
             recordingStart={ctx.eventDate}
             recordingEnd={ctx.registrationDeadline}
+            categoryName={ctx.categoryName}
           />
           <PendingRecordingsList items={ctx.pendingOthers} />
         </div>
@@ -757,14 +772,21 @@ export default async function AccountPage({
 
   const { data: registration } = await supabase
     .from("registrations")
-    .select("competition:competitions(id, event_date, registration_deadline)")
+    .select("category:categories(name), competition:competitions(id, event_date, registration_deadline)")
     .eq("id", profile.registration_id)
     .maybeSingle();
   const competition = (
     registration as unknown as {
+      category: { name: string } | null;
       competition: { id: string; event_date: string | null; registration_deadline: string | null } | null;
     } | null
   )?.competition ?? null;
+  const categoryName =
+    (
+      registration as unknown as {
+        category: { name: string } | null;
+      } | null
+    )?.category?.name ?? null;
   const eventDate = competition?.event_date ?? null;
   const registrationDeadline = competition?.registration_deadline ?? null;
 
@@ -858,6 +880,7 @@ export default async function AccountPage({
               watermark={watermarkText()}
               recordingStart={eventDate}
               recordingEnd={registrationDeadline}
+              categoryName={categoryName}
             />
             <div>
               <p className="mb-2 text-sm text-neutral-500">

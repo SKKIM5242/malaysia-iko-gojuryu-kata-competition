@@ -108,6 +108,7 @@ export default function KataRecorder({
   watermark,
   recordingStart,
   recordingEnd,
+  categoryName,
 }: {
   initialAttempts: number;
   maxAttempts: number;
@@ -115,6 +116,11 @@ export default function KataRecorder({
   watermark: string;
   recordingStart?: string | null;
   recordingEnd?: string | null;
+  /** Which kata this specific registration is for — shown on the recorder
+   * itself so switching which pending item is active (via the "Start
+   * Recording" button on the pending list) is actually visible, instead
+   * of the screen looking identical no matter which one is now current. */
+  categoryName?: string | null;
 }) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [attempts, setAttempts] = useState(initialAttempts);
@@ -381,6 +387,9 @@ export default function KataRecorder({
       ref={containerRef}
       className={fullscreen ? "fixed inset-0 z-[300] bg-black" : "space-y-4"}
     >
+      {!fullscreen && categoryName && (
+        <p className="text-sm font-bold text-neutral-800">Recording: {categoryName}</p>
+      )}
       {!fullscreen && (
       <>
       <div className="space-y-2 rounded-md border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
@@ -483,7 +492,9 @@ export default function KataRecorder({
           <div className="absolute inset-x-0 top-0 z-20 flex flex-col">
             {fullscreen && (
               <div className="flex items-center justify-between gap-2 px-3 py-2 text-white" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.85)" }}>
-                <p className="text-sm font-bold">Kata Recording</p>
+                <p className="truncate text-sm font-bold">
+                  Kata Recording{categoryName ? ` — ${categoryName}` : ""}
+                </p>
                 <button
                   type="button"
                   onClick={exitFullscreen}
