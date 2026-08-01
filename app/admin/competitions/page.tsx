@@ -334,17 +334,26 @@ export default async function AdminCompetitions({
                           >
                             + Add category
                           </Link>
-                          {latestMergeByCompetition.has(c.id) && (
-                            <CategoryActionButton
-                              actionName="undoMerge"
-                              fields={{ competition_id: c.id, return_to: categoryReturnTo(c.id) }}
-                              className="rounded border border-orange-300 px-2 py-0.5 text-xs font-semibold text-orange-700 hover:bg-orange-50"
-                              title={latestMergeByCompetition.get(c.id)?.description ?? "Undo the most recent merge for this tier"}
-                              confirmMessage={`Undo the most recent merge for this tier?\n\n${latestMergeByCompetition.get(c.id)?.description ?? ""}\n\nThis restores the categories it combined and moves registrations back to where they were. Click again afterward to step back one merge further, if more than one was done.`}
-                            >
-                              ↺ Undo last merge
-                            </CategoryActionButton>
-                          )}
+                          <CategoryActionButton
+                            actionName="undoMerge"
+                            fields={{ competition_id: c.id, return_to: categoryReturnTo(c.id) }}
+                            className={
+                              latestMergeByCompetition.has(c.id)
+                                ? "rounded border border-orange-300 px-2 py-0.5 text-xs font-semibold text-orange-700 hover:bg-orange-50"
+                                : "rounded border border-neutral-200 px-2 py-0.5 text-xs font-semibold text-neutral-400 hover:bg-neutral-50"
+                            }
+                            title={
+                              latestMergeByCompetition.get(c.id)?.description ??
+                              "No merge has been done for this tier yet — nothing to undo."
+                            }
+                            confirmMessage={
+                              latestMergeByCompetition.has(c.id)
+                                ? `Undo the most recent merge for this tier?\n\n${latestMergeByCompetition.get(c.id)?.description ?? ""}\n\nThis restores the categories it combined and moves registrations back to where they were. Click again afterward to step back one merge further, if more than one was done.`
+                                : undefined
+                            }
+                          >
+                            ↺ Undo last merge
+                          </CategoryActionButton>
                         </span>
                       )}
                     </div>
