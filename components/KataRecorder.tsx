@@ -379,25 +379,8 @@ export default function KataRecorder({
   return (
     <div
       ref={containerRef}
-      className={fullscreen ? "fixed inset-0 z-[300] flex h-[100dvh] flex-col bg-black" : "space-y-4"}
+      className={fullscreen ? "fixed inset-0 z-[300] bg-black" : "space-y-4"}
     >
-      {error && (
-        <div className="rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>
-      )}
-
-      {fullscreen && (
-        <div className="flex shrink-0 items-center justify-between gap-2 bg-neutral-900 px-3 py-2 text-white">
-          <p className="text-sm font-bold">Kata Recording</p>
-          <button
-            type="button"
-            onClick={toggleFullscreen}
-            className="rounded border border-white/30 px-2.5 py-1 text-xs font-semibold hover:bg-white/10"
-          >
-            ✕ Exit full screen
-          </button>
-        </div>
-      )}
-
       {!fullscreen && (
       <>
       <div className="space-y-2 rounded-md border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
@@ -483,20 +466,38 @@ export default function KataRecorder({
       <div
         className={
           fullscreen
-            ? "relative min-h-0 flex-1 overflow-hidden bg-black"
-            : "relative mx-auto max-w-md overflow-hidden rounded-lg border border-neutral-300 bg-black"
+            ? "relative h-[100dvh] w-full overflow-hidden bg-black"
+            : "relative mx-auto min-h-[70dvh] max-w-md overflow-hidden rounded-lg border border-neutral-300 bg-black [@media(orientation:landscape)]:max-w-4xl"
         }
       >
+        {/* Title bar and error banner float directly on the recording area
+            itself (absolute, top of the box) instead of taking their own
+            row above it -- in full screen especially, every bit of height
+            given to a separate row is height taken away from the actual
+            preview, which is the whole point of full screen. */}
+        {(fullscreen || error) && (
+          <div className="absolute inset-x-0 top-0 z-20 flex flex-col">
+            {fullscreen && (
+              <div className="flex items-center justify-between gap-2 bg-neutral-900/85 px-3 py-2 text-white backdrop-blur-sm">
+                <p className="text-sm font-bold">Kata Recording</p>
+                <button
+                  type="button"
+                  onClick={toggleFullscreen}
+                  className="rounded border border-white/30 px-2.5 py-1 text-xs font-semibold hover:bg-white/10"
+                >
+                  ✕ Exit full screen
+                </button>
+              </div>
+            )}
+            {error && (
+              <div className="bg-red-50/95 px-4 py-2 text-sm text-red-800 backdrop-blur-sm">{error}</div>
+            )}
+          </div>
+        )}
         <video ref={videoRef} playsInline muted className="hidden" />
         <canvas
           ref={canvasRef}
-          className={
-            phase === "live" || phase === "recording"
-              ? fullscreen
-                ? "block h-full w-full object-contain"
-                : "block w-full"
-              : "hidden"
-          }
+          className={phase === "live" || phase === "recording" ? "block h-full w-full object-contain" : "hidden"}
         />
         {/* Review (and uploading) shows the actual recorded file, in this
             SAME box, instead of a separate plain video underneath it --
@@ -505,15 +506,10 @@ export default function KataRecorder({
             the background (still needed if the participant re-records)
             and would otherwise show through underneath. */}
         {(phase === "review" || phase === "uploading") && blobUrl && (
-          <video
-            src={blobUrl}
-            controls
-            playsInline
-            className={fullscreen ? "block h-full w-full object-contain" : "block w-full"}
-          />
+          <video src={blobUrl} controls playsInline className="block h-full w-full object-contain" />
         )}
         {phase === "idle" && (
-          <div className="flex aspect-[3/4] items-center justify-center p-8 text-center text-neutral-300">
+          <div className="flex h-full items-center justify-center p-8 text-center text-neutral-300">
             Camera preview appears here once started.
           </div>
         )}
