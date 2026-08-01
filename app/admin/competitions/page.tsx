@@ -553,9 +553,10 @@ export default async function AdminCompetitions({
                       </div>
                     )}
                     <p className="mt-2 text-[11px] text-neutral-400">
-                      Policy: any event with fewer than 70 recording submissions may have its
+                      Policy: any event with fewer than 100 recording submissions may have its
                       categories or divisions merged with others — use Merge → Mix for gender and
-                      ⇤/⇥ Merge age to combine 2 or 3 age groups within the same event.
+                      ⇤/⇥ Merge age to combine 2 or 3 age groups within the same event, for all 3
+                      competition tiers.
                     </p>
                   </div>
                 </details>

@@ -617,7 +617,7 @@ export async function mergeCategoryToMix(formData: FormData) {
  * Merges a category with its ADJACENT age group in the same kata event,
  * belt division, and gender — the "merge before/after age group" button,
  * used when an age group has too few submissions (the organizer's policy:
- * events under 70 recordings get merged). Builds a fresh widened category
+ * events under 100 recordings get merged). Builds a fresh widened category
  * (its name's "Age lo–hi" part rewritten to cover both), moves both
  * sides' registrations onto it, and deletes both original age brackets —
  * always creating rather than mutating one of the two in place, so this
