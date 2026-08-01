@@ -5,6 +5,7 @@ import { getAllCompetitions } from "@/lib/admin-data";
 import {
   updateCommunityStatus, saveReferee, deleteReferee, linkRefereeAccount, bulkUploadReferees,
   saveAutoAssignTerm, deleteAutoAssignTerm, bulkUploadAutoAssignTerms, generateRecordInvitationCode,
+  linkRefereeToAccount, unlinkRefereeFromAccount,
 } from "@/app/actions/admin";
 import { AdminShell, Card, CertificateField, adminBtn, adminBtnSecondary, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice, formatDOB } from "@/components/ui";
@@ -12,6 +13,7 @@ import { shortTierName } from "@/lib/invitation-codes";
 import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
 import SignInControlBox from "@/components/SignInControlBox";
+import AccountLinkCell from "@/components/AccountLinkCell";
 import InvitationCodeForm from "@/components/InvitationCodeForm";
 import InvitationCodeList from "@/components/InvitationCodeList";
 import InvitationCodeRunField from "@/components/InvitationCodeRunField";
@@ -104,6 +106,7 @@ export default async function AdminReferees({
     : { data: null };
   const isAdminTier = ["admin", "organizer", "staff"].includes(myProfile?.role ?? "");
   const canBulkUpload = ["admin", "organizer"].includes(myProfile?.role ?? "");
+  const canManageLink = ["admin", "organizer", "staff", "customer_support", "referee"].includes(myProfile?.role ?? "");
 
   const competitions = await getAllCompetitions();
   const refereeUserIds = refereeList.map((r) => r.user_id).filter((id): id is string => !!id);
@@ -111,7 +114,7 @@ export default async function AdminReferees({
     refereeUserIds.length > 0
       ? await supabase
           .from("profiles")
-          .select("user_id, sign_in_count, sign_in_limit, sign_in_competition_id, sign_in_valid_from, sign_in_valid_until")
+          .select("user_id, email, sign_in_count, sign_in_limit, sign_in_competition_id, sign_in_valid_from, sign_in_valid_until")
           .in("user_id", refereeUserIds)
       : { data: [] };
   const loginByUserId = new Map((refereeLogins ?? []).map((p) => [p.user_id as string, p]));
@@ -340,8 +343,10 @@ export default async function AdminReferees({
               ) : (
                 <>
                   <p className="mt-1 text-xs text-neutral-400">
-                    Not linked yet. Auto-links at sign-up if they use the same email as above — if
-                    they signed in with a different email, enter it here to link manually.
+                    Not linked yet. Auto-links at sign-up if they use the same email as above — use
+                    the &quot;Link to account&quot; button in the table below if an account with that
+                    exact email already exists, or enter a different sign-in email here if they
+                    signed up with one that doesn&apos;t match this record.
                   </p>
                   <form action={linkRefereeAccount} className="mt-2 flex flex-wrap items-end gap-3">
                     <input type="hidden" name="id" value={editing.id} />
@@ -383,6 +388,7 @@ export default async function AdminReferees({
                 { key: "referral_source", label: "Referral" },
                 { key: "deposit", label: "Deposit" },
                 { key: "approval", label: "Approval" },
+                { key: "account_link", label: "Account Link" },
                 ...(isAdminTier ? [{ key: "sign_in_control", label: "Sign-in Control" }] : []),
                 { key: "actions", label: "Actions" },
               ]}
@@ -459,6 +465,18 @@ export default async function AdminReferees({
                 approval: (
                   <StatusButtons key="approval" table="referees" id={r.id} field="status" current={r.status}
                     options={["pending", "approved", "rejected"]} />
+                ),
+                account_link: (
+                  <AccountLinkCell
+                    key="account_link"
+                    linkedEmail={loginByUserId.get(r.user_id ?? "")?.email ?? null}
+                    entityId={r.id}
+                    idFieldName="referee_id"
+                    linkAction={linkRefereeToAccount}
+                    unlinkAction={unlinkRefereeFromAccount}
+                    returnTo="/admin/referees"
+                    canManage={canManageLink}
+                  />
                 ),
                 ...(isAdminTier
                   ? {

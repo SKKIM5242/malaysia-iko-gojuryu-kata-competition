@@ -2,13 +2,17 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { schemaReady } from "@/lib/data";
 import { getAllCompetitions } from "@/lib/admin-data";
-import { updateCommunityStatus, saveAudienceMember, deleteAudienceMember, bulkUploadAudience } from "@/app/actions/admin";
+import {
+  updateCommunityStatus, saveAudienceMember, deleteAudienceMember, bulkUploadAudience,
+  linkAudienceToAccount, unlinkAudienceFromAccount,
+} from "@/app/actions/admin";
 import { AdminShell, Card, adminBtn, adminInput, adminLabel } from "@/components/admin";
 import { AUDIENCE_FEE_USD } from "@/lib/payments";
 import { EmptyState, SetupNotice } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
 import SignInControlBox from "@/components/SignInControlBox";
+import AccountLinkCell from "@/components/AccountLinkCell";
 import GeneratePersonalCodeBox from "@/components/GeneratePersonalCodeBox";
 import InvitationCodeForm from "@/components/InvitationCodeForm";
 import InvitationCodeList from "@/components/InvitationCodeList";
@@ -85,6 +89,7 @@ export default async function AdminAudience({
     : { data: null };
   const isAdminTier = ["admin", "organizer", "staff"].includes(myProfile?.role ?? "");
   const canBulkUpload = ["admin", "organizer"].includes(myProfile?.role ?? "");
+  const canManageLink = ["admin", "organizer", "staff", "customer_support", "referee"].includes(myProfile?.role ?? "");
 
   const competitions = await getAllCompetitions();
   const audienceUserIds = ((audiences as Audience[]) ?? []).map((a) => a.user_id).filter((id): id is string => !!id);
@@ -92,7 +97,7 @@ export default async function AdminAudience({
     audienceUserIds.length > 0
       ? await supabase
           .from("profiles")
-          .select("user_id, sign_in_count, sign_in_limit, sign_in_competition_id, sign_in_valid_from, sign_in_valid_until")
+          .select("user_id, email, sign_in_count, sign_in_limit, sign_in_competition_id, sign_in_valid_from, sign_in_valid_until")
           .in("user_id", audienceUserIds)
       : { data: [] };
   const loginByUserId = new Map((audienceLogins ?? []).map((p) => [p.user_id as string, p]));
@@ -187,6 +192,7 @@ export default async function AdminAudience({
             { key: "referral_source", label: "Referral" },
             { key: "payment", label: "Payment" },
             { key: "telegram", label: "Telegram" },
+            { key: "account_link", label: "Account Link" },
             ...(isAdminTier
               ? [
                   { key: "sign_in_control", label: "Sign-in Control" },
@@ -233,6 +239,18 @@ export default async function AdminAudience({
               </a>
             ) : (
               <span key="telegram" className="text-neutral-400">—</span>
+            ),
+            account_link: (
+              <AccountLinkCell
+                key="account_link"
+                linkedEmail={loginByUserId.get(a.user_id ?? "")?.email ?? null}
+                entityId={a.id}
+                idFieldName="audience_id"
+                linkAction={linkAudienceToAccount}
+                unlinkAction={unlinkAudienceFromAccount}
+                returnTo="/admin/audience"
+                canManage={canManageLink}
+              />
             ),
             ...(isAdminTier
               ? {

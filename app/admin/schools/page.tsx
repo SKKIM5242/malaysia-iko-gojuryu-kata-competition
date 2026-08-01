@@ -2,13 +2,17 @@ import Link from "next/link";
 import { getSchools, schemaReady } from "@/lib/data";
 import { getSchoolSenseiTierFees, getSchoolSenseiTierEntryCounts, getAllCompetitions } from "@/lib/admin-data";
 import { createClient } from "@/lib/supabase/server";
-import { saveSchool, deleteSchool, generateRecordInvitationCode, updateCommunityStatus, bulkUploadSchools } from "@/app/actions/admin";
+import {
+  saveSchool, deleteSchool, generateRecordInvitationCode, updateCommunityStatus, bulkUploadSchools,
+  linkSchoolToAccount, unlinkSchoolFromAccount,
+} from "@/app/actions/admin";
 import { AdminShell, Card, adminBtn, adminBtnSecondary, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice, formatUSD } from "@/components/ui";
 import { shortTierName } from "@/lib/invitation-codes";
 import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
 import SignInControlBox from "@/components/SignInControlBox";
+import AccountLinkCell from "@/components/AccountLinkCell";
 import InvitationCodeForm from "@/components/InvitationCodeForm";
 import InvitationCodeList from "@/components/InvitationCodeList";
 import InvitationCodeRunField from "@/components/InvitationCodeRunField";
@@ -83,10 +87,11 @@ export default async function AdminSchools({
     : { data: null };
   const isAdminTier = ["admin", "organizer", "staff"].includes(myProfile?.role ?? "");
   const canBulkUpload = ["admin", "organizer"].includes(myProfile?.role ?? "");
+  const canManageLink = ["admin", "organizer", "staff", "customer_support", "referee"].includes(myProfile?.role ?? "");
 
   const { data: schoolLogins } = await supabase
     .from("profiles")
-    .select("user_id, school_id, sign_in_count, sign_in_limit, sign_in_competition_id, sign_in_valid_from, sign_in_valid_until")
+    .select("user_id, school_id, email, sign_in_count, sign_in_limit, sign_in_competition_id, sign_in_valid_from, sign_in_valid_until")
     .eq("role", "school");
   const loginBySchoolId = new Map((schoolLogins ?? []).map((p) => [p.school_id as string, p]));
 
@@ -324,6 +329,7 @@ export default async function AdminSchools({
                 { key: "tier_entries", label: "Competition Tier (paid entries)" },
                 { key: "expected_fee", label: "Required Fee" },
                 { key: "payment", label: "Fee Status" },
+                { key: "account_link", label: "Account Link" },
                 ...(isAdminTier ? [{ key: "sign_in_control", label: "Sign-in Control" }] : []),
                 { key: "actions", label: "Actions" },
               ]}
@@ -374,6 +380,18 @@ export default async function AdminSchools({
                 expected_fee: schoolFees.has(s.id) ? formatUSD(schoolFees.get(s.id)) : "— no participants yet",
                 payment_status_text: s.payment_status,
                 payment: <PaymentButtons key="payment" id={s.id} current={s.payment_status} />,
+                account_link: (
+                  <AccountLinkCell
+                    key="account_link"
+                    linkedEmail={loginBySchoolId.get(s.id)?.email ?? null}
+                    entityId={s.id}
+                    idFieldName="school_id"
+                    linkAction={linkSchoolToAccount}
+                    unlinkAction={unlinkSchoolFromAccount}
+                    returnTo="/admin/schools"
+                    canManage={canManageLink}
+                  />
+                ),
                 ...(isAdminTier
                   ? {
                       sign_in_control: (

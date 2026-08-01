@@ -5057,6 +5057,129 @@ export async function unlinkRegistrationFromAccount(formData: FormData) {
   backTo(returnTo, { ok: "Unlinked — that account is now free to be linked to a different registration." });
 }
 
+/**
+ * The same manual "Link to account" / "Unlink" pair as Participant Records,
+ * extended to School, Sensei, Referee, and Audience — the other four
+ * registrant types that only connect to a login by email match (at signup,
+ * or via auto_link_other_roles_by_email), with no manual fallback until
+ * now when that match never happened. Unlike Participant, these four store
+ * the link on their OWN table's user_id column (schools.user_id etc.), not
+ * on profiles — see admin_link_school and its siblings in the migration
+ * for why, and why linking one also picks up every other role sharing that
+ * email in one action, same as admin_link_registration already does.
+ */
+export async function linkSchoolToAccount(formData: FormData) {
+  const schoolId = String(formData.get("school_id") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "/admin/schools");
+  const { supabase, actorId } = await getActor();
+  const { data, error } = await supabase.rpc("admin_link_school", { p_school_id: schoolId });
+  if (error || data !== "OK") {
+    backTo(returnTo, { error: String(data ?? "Could not link that school — please try again.") });
+  }
+  await writeAudit(supabase, {
+    table_name: "schools", record_id: schoolId, action: "school_linked_by_staff", actor_id: actorId,
+  });
+  backTo(returnTo, { ok: "Linked — they can now sign in." });
+}
+
+export async function unlinkSchoolFromAccount(formData: FormData) {
+  const schoolId = String(formData.get("school_id") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "/admin/schools");
+  const { supabase, actorId } = await getActor();
+  const { data, error } = await supabase.rpc("admin_unlink_school", { p_school_id: schoolId });
+  if (error || data !== "OK") {
+    backTo(returnTo, { error: String(data ?? "Could not unlink that school — please try again.") });
+  }
+  await writeAudit(supabase, {
+    table_name: "schools", record_id: schoolId, action: "school_unlinked_by_staff", actor_id: actorId,
+  });
+  backTo(returnTo, { ok: "Unlinked — that account is now free to be linked to a different school." });
+}
+
+export async function linkSenseiToAccount(formData: FormData) {
+  const senseiId = String(formData.get("sensei_id") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "/admin/senseis");
+  const { supabase, actorId } = await getActor();
+  const { data, error } = await supabase.rpc("admin_link_sensei", { p_sensei_id: senseiId });
+  if (error || data !== "OK") {
+    backTo(returnTo, { error: String(data ?? "Could not link that sensei — please try again.") });
+  }
+  await writeAudit(supabase, {
+    table_name: "senseis", record_id: senseiId, action: "sensei_linked_by_staff", actor_id: actorId,
+  });
+  backTo(returnTo, { ok: "Linked — they can now sign in." });
+}
+
+export async function unlinkSenseiFromAccount(formData: FormData) {
+  const senseiId = String(formData.get("sensei_id") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "/admin/senseis");
+  const { supabase, actorId } = await getActor();
+  const { data, error } = await supabase.rpc("admin_unlink_sensei", { p_sensei_id: senseiId });
+  if (error || data !== "OK") {
+    backTo(returnTo, { error: String(data ?? "Could not unlink that sensei — please try again.") });
+  }
+  await writeAudit(supabase, {
+    table_name: "senseis", record_id: senseiId, action: "sensei_unlinked_by_staff", actor_id: actorId,
+  });
+  backTo(returnTo, { ok: "Unlinked — that account is now free to be linked to a different sensei." });
+}
+
+export async function linkRefereeToAccount(formData: FormData) {
+  const refereeId = String(formData.get("referee_id") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "/admin/referees");
+  const { supabase, actorId } = await getActor();
+  const { data, error } = await supabase.rpc("admin_link_referee", { p_referee_id: refereeId });
+  if (error || data !== "OK") {
+    backTo(returnTo, { error: String(data ?? "Could not link that referee — please try again.") });
+  }
+  await writeAudit(supabase, {
+    table_name: "referees", record_id: refereeId, action: "referee_linked_by_staff", actor_id: actorId,
+  });
+  backTo(returnTo, { ok: "Linked — they can now sign in." });
+}
+
+export async function unlinkRefereeFromAccount(formData: FormData) {
+  const refereeId = String(formData.get("referee_id") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "/admin/referees");
+  const { supabase, actorId } = await getActor();
+  const { data, error } = await supabase.rpc("admin_unlink_referee", { p_referee_id: refereeId });
+  if (error || data !== "OK") {
+    backTo(returnTo, { error: String(data ?? "Could not unlink that referee — please try again.") });
+  }
+  await writeAudit(supabase, {
+    table_name: "referees", record_id: refereeId, action: "referee_unlinked_by_staff", actor_id: actorId,
+  });
+  backTo(returnTo, { ok: "Unlinked — that account is now free to be linked to a different referee." });
+}
+
+export async function linkAudienceToAccount(formData: FormData) {
+  const audienceId = String(formData.get("audience_id") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "/admin/audience");
+  const { supabase, actorId } = await getActor();
+  const { data, error } = await supabase.rpc("admin_link_audience", { p_audience_id: audienceId });
+  if (error || data !== "OK") {
+    backTo(returnTo, { error: String(data ?? "Could not link that audience record — please try again.") });
+  }
+  await writeAudit(supabase, {
+    table_name: "audiences", record_id: audienceId, action: "audience_linked_by_staff", actor_id: actorId,
+  });
+  backTo(returnTo, { ok: "Linked — they can now sign in." });
+}
+
+export async function unlinkAudienceFromAccount(formData: FormData) {
+  const audienceId = String(formData.get("audience_id") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "/admin/audience");
+  const { supabase, actorId } = await getActor();
+  const { data, error } = await supabase.rpc("admin_unlink_audience", { p_audience_id: audienceId });
+  if (error || data !== "OK") {
+    backTo(returnTo, { error: String(data ?? "Could not unlink that audience record — please try again.") });
+  }
+  await writeAudit(supabase, {
+    table_name: "audiences", record_id: audienceId, action: "audience_unlinked_by_staff", actor_id: actorId,
+  });
+  backTo(returnTo, { ok: "Unlinked — that account is now free to be linked to a different audience record." });
+}
+
 /** Manually resends a registration's confirmation email — for when the
  * automatic one never arrived (e.g. an email-provider misconfiguration) and
  * the organizer wants to get the participant their reference ID without

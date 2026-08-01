@@ -2,13 +2,17 @@ import Link from "next/link";
 import { getSchools, getSenseis, schemaReady } from "@/lib/data";
 import { getSchoolSenseiTierFees, getSchoolSenseiTierEntryCounts, getAllCompetitions } from "@/lib/admin-data";
 import { createClient } from "@/lib/supabase/server";
-import { saveSensei, deleteSensei, generateRecordInvitationCode, updateCommunityStatus, bulkUploadSenseis } from "@/app/actions/admin";
+import {
+  saveSensei, deleteSensei, generateRecordInvitationCode, updateCommunityStatus, bulkUploadSenseis,
+  linkSenseiToAccount, unlinkSenseiFromAccount,
+} from "@/app/actions/admin";
 import { AdminShell, Card, CertificateField, adminBtn, adminBtnSecondary, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice, formatDOB, formatUSD } from "@/components/ui";
 import { shortTierName } from "@/lib/invitation-codes";
 import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
 import SignInControlBox from "@/components/SignInControlBox";
+import AccountLinkCell from "@/components/AccountLinkCell";
 import InvitationCodeForm from "@/components/InvitationCodeForm";
 import InvitationCodeList from "@/components/InvitationCodeList";
 import InvitationCodeRunField from "@/components/InvitationCodeRunField";
@@ -85,10 +89,11 @@ export default async function AdminSenseis({
     : { data: null };
   const isAdminTier = ["admin", "organizer", "staff"].includes(myProfile?.role ?? "");
   const canBulkUpload = ["admin", "organizer"].includes(myProfile?.role ?? "");
+  const canManageLink = ["admin", "organizer", "staff", "customer_support", "referee"].includes(myProfile?.role ?? "");
 
   const { data: senseiLogins } = await supabase
     .from("profiles")
-    .select("user_id, sensei_id, sign_in_count, sign_in_limit, sign_in_competition_id, sign_in_valid_from, sign_in_valid_until")
+    .select("user_id, sensei_id, email, sign_in_count, sign_in_limit, sign_in_competition_id, sign_in_valid_from, sign_in_valid_until")
     .eq("role", "sensei");
   const loginBySenseiId = new Map((senseiLogins ?? []).map((p) => [p.sensei_id as string, p]));
 
@@ -342,6 +347,7 @@ export default async function AdminSenseis({
                 { key: "tier_entries", label: "Competition Tier (paid entries)" },
                 { key: "expected_fee", label: "Required Fee" },
                 { key: "payment", label: "Fee Status" },
+                { key: "account_link", label: "Account Link" },
                 ...(isAdminTier ? [{ key: "sign_in_control", label: "Sign-in Control" }] : []),
                 { key: "actions", label: "Actions" },
               ]}
@@ -404,6 +410,18 @@ export default async function AdminSenseis({
                 expected_fee: senseiFees.has(s.id) ? formatUSD(senseiFees.get(s.id)) : "— no participants yet",
                 payment_status_text: s.payment_status,
                 payment: <PaymentButtons key="payment" id={s.id} current={s.payment_status} />,
+                account_link: (
+                  <AccountLinkCell
+                    key="account_link"
+                    linkedEmail={loginBySenseiId.get(s.id)?.email ?? null}
+                    entityId={s.id}
+                    idFieldName="sensei_id"
+                    linkAction={linkSenseiToAccount}
+                    unlinkAction={unlinkSenseiFromAccount}
+                    returnTo="/admin/senseis"
+                    canManage={canManageLink}
+                  />
+                ),
                 ...(isAdminTier
                   ? {
                       sign_in_control: (
