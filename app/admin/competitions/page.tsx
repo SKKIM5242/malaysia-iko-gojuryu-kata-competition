@@ -376,7 +376,7 @@ export default async function AdminCompetitions({
                                 </span>
                               )}
                               {canManageCompetition && (kyuCats.length > 1 || danCats.length > 1) && (
-                                <span className="ml-auto flex gap-1" onClick={(e) => e.stopPropagation()}>
+                                <span className="ml-auto flex gap-1">
                                   {kyuCats.length > 1 && !kyuMerged && (
                                     <CategoryActionButton
                                       actionName="mergeBeltGroup"

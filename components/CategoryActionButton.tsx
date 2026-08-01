@@ -52,7 +52,12 @@ export default function CategoryActionButton({
       className={className}
       title={title}
       disabled={pending}
-      onClick={() => {
+      onClick={(e) => {
+        // Several call sites sit inside a <summary> (kata group header),
+        // whose native behavior is to toggle the parent <details> on any
+        // click — without this, clicking a merge button also closed/opened
+        // the kata group as a side effect.
+        e.stopPropagation();
         if (confirmMessage && !window.confirm(confirmMessage)) return;
         const formData = new FormData();
         for (const [key, value] of Object.entries(fields)) formData.set(key, value);
