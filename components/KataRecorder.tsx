@@ -10,16 +10,35 @@ const MAX_SECONDS = 5 * 60;
 
 type Phase = "idle" | "live" | "recording" | "review" | "uploading" | "done";
 
+/** Safari (and every browser on iOS/iPadOS — Chrome, Telegram's in-app
+ * browser, etc. all run on the same WebKit engine there, Apple requires
+ * it) has never supported MediaRecorder with a webm mimeType at all, only
+ * mp4 -- MediaRecorder.isTypeSupported correctly returns false for every
+ * webm candidate below on those browsers, but the old fallback ignored
+ * that and returned "video/webm" anyway, unconditionally. `new
+ * MediaRecorder(stream, { mimeType: "video/webm" })` then threw
+ * immediately on construction, with nothing checking for that error --
+ * exactly the "Could not access/start recording" symptom reported only
+ * on iPhone, across every browser tried there, and only there. */
 function pickMimeType(): string {
   const candidates = [
     "video/webm;codecs=vp9,opus",
     "video/webm;codecs=vp8,opus",
     "video/webm",
+    "video/mp4;codecs=avc1,mp4a",
+    "video/mp4",
   ];
   for (const c of candidates) {
     if (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(c)) return c;
   }
   return "video/webm";
+}
+
+/** The file's real extension, matching whichever mimeType MediaRecorder
+ * actually used to produce it — used to be hardcoded to .webm regardless,
+ * which produced a .webm-named file containing mp4 data on Safari. */
+function extensionForMimeType(mimeType: string): string {
+  return mimeType.startsWith("video/mp4") ? "mp4" : "webm";
 }
 
 /** Draws the branded competition frame: colorful title banner, live camera
@@ -308,7 +327,7 @@ export default function KataRecorder({
         setPhase("review");
         return;
       }
-      const path = `${user.id}/${crypto.randomUUID()}.webm`;
+      const path = `${user.id}/${crypto.randomUUID()}.${extensionForMimeType(blob.type)}`;
       const { error: upErr } = await supabase.storage
         .from("kata-videos")
         .upload(path, blob, { contentType: blob.type || "video/webm" });
