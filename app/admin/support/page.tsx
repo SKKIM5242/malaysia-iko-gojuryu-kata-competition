@@ -17,7 +17,7 @@ import CsvUploadForm from "@/components/CsvUploadForm";
 import SignInControlBox from "@/components/SignInControlBox";
 import GeneratePersonalCodeBox from "@/components/GeneratePersonalCodeBox";
 import { NoCommaInput } from "@/components/NoCommaAddressField";
-import DateOfBirthField from "@/components/DateOfBirthField";
+import DobAgeField from "@/components/DobAgeField";
 import InvitationCodeForm from "@/components/InvitationCodeForm";
 import InvitationCodeList from "@/components/InvitationCodeList";
 import InvitationCodeRunField from "@/components/InvitationCodeRunField";
@@ -205,10 +205,7 @@ export default async function AdminSupport({
                   <label htmlFor="cs_ic_passport" className={adminLabel}>IC / Passport *</label>
                   <input id="cs_ic_passport" name="ic_passport" required className={adminInput} />
                 </div>
-                <div>
-                  <label htmlFor="cs_date_of_birth" className={adminLabel}>Date of Birth: DD/MM/YYYY *</label>
-                  <DateOfBirthField id="cs_date_of_birth" name="date_of_birth" className={adminInput} />
-                </div>
+                <DobAgeField idPrefix="cs_" />
                 <div>
                   <label htmlFor="cs_gender" className={adminLabel}>Gender *</label>
                   <select id="cs_gender" name="gender" required defaultValue="" className={adminInput}>

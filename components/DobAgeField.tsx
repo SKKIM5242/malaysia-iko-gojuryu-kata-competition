@@ -6,32 +6,54 @@ import { adminInput, adminLabel } from "@/components/admin-styles";
 import DateOfBirthField from "@/components/DateOfBirthField";
 
 /** Date of birth + a read-only, live-computed Age (based on D.O.B) field
- * shown right beside it — used on admin add/edit forms that collect a
- * participant's date of birth. */
-export default function DobAgeField({ defaultValue }: { defaultValue?: string }) {
+ * shown right beside it. Styling defaults to the admin panel's own
+ * (adminInput/adminLabel) so every existing admin call site is unaffected;
+ * pass inputCls/labelCls to reuse this on a public-site form instead. */
+export default function DobAgeField({
+  defaultValue,
+  idPrefix = "",
+  inputCls = adminInput,
+  labelCls = adminLabel,
+  errorSlot,
+}: {
+  defaultValue?: string;
+  /** Prefixes both field ids, for a page with more than one date-of-birth
+   * field (e.g. admin Support's "cs_" prefix, to avoid colliding with
+   * other forms' plain "date_of_birth" id on the same page). */
+  idPrefix?: string;
+  inputCls?: string;
+  labelCls?: string;
+  /** Rendered right under the date input — for a public form's own field-
+   * error component (e.g. <Err m={e.date_of_birth} />), so it lands in the
+   * right grid cell instead of trailing after both fields. */
+  errorSlot?: React.ReactNode;
+}) {
   const [dob, setDob] = useState(defaultValue ?? "");
   const age = dob && !Number.isNaN(Date.parse(dob)) ? ageAt(dob, null) : null;
+  const dobId = `${idPrefix}date_of_birth`;
+  const ageId = `${idPrefix}age`;
 
   return (
     <>
       <div>
-        <label htmlFor="date_of_birth" className={adminLabel}>Date of Birth: DD/MM/YYYY *</label>
+        <label htmlFor={dobId} className={labelCls}>Date of Birth: DD/MM/YYYY *</label>
         <DateOfBirthField
-          id="date_of_birth"
+          id={dobId}
           name="date_of_birth"
           defaultValueISO={defaultValue}
           onISOChange={setDob}
-          className={adminInput}
+          className={inputCls}
         />
+        {errorSlot}
       </div>
       <div>
-        <label htmlFor="age" className={adminLabel}>Age (based on D.O.B) *</label>
+        <label htmlFor={ageId} className={labelCls}>Age (based on D.O.B) *</label>
         <input
-          id="age"
+          id={ageId}
           readOnly
           value={age ?? ""}
           placeholder="Fill in date of birth first"
-          className={`${adminInput} cursor-not-allowed bg-neutral-100 text-neutral-500`}
+          className={`${inputCls} cursor-not-allowed bg-neutral-100 text-neutral-500`}
         />
       </div>
     </>

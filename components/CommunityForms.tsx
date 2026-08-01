@@ -14,6 +14,7 @@ import IbanInput from "@/components/IbanInput";
 import IbanConfirmCheckbox from "@/components/IbanConfirmCheckbox";
 import { NoCommaTextarea } from "@/components/NoCommaAddressField";
 import DateOfBirthField from "@/components/DateOfBirthField";
+import DobAgeField from "@/components/DobAgeField";
 import {
   EDUCATION_LEVELS, SPOKEN_LANGUAGES, REFERRAL_LABEL, REFERRAL_PLACEHOLDER,
   SUPPORT_REGIONS, WORLD_COUNTRIES,
@@ -355,11 +356,7 @@ export function StaffForm({
           <input id="ic_passport" name="ic_passport" required className={inputCls} />
           <Err m={e.ic_passport} />
         </div>
-        <div>
-          <label htmlFor="date_of_birth" className={labelCls}>Date of Birth: DD/MM/YYYY *</label>
-          <DateOfBirthField id="date_of_birth" name="date_of_birth" className={inputCls} />
-          <Err m={e.date_of_birth} />
-        </div>
+        <DobAgeField inputCls={inputCls} labelCls={labelCls} errorSlot={<Err m={e.date_of_birth} />} />
         <div>
           <label htmlFor="gender" className={labelCls}>Gender *</label>
           <select id="gender" name="gender" required defaultValue="" className={inputCls}>
