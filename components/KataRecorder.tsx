@@ -222,46 +222,65 @@ export default function KataRecorder({
     rafRef.current = requestAnimationFrame(renderLoop);
   }
 
+  /** Had no error handling at all -- any failure here (captureStream
+   * unsupported on this device/browser, MediaRecorder rejecting the
+   * mimeType, etc.) threw silently in the click handler: the button looked
+   * like it did nothing, with no error shown and nothing to diagnose from.
+   * Now mirrors startCamera's own try/catch, so a real failure is at least
+   * visible instead of indistinguishable from a touch/hit-area problem. */
   function startRecording() {
+    setError(null);
     const canvas = canvasRef.current;
     const camStream = streamRef.current;
     if (!canvas || !camStream) return;
-    const canvasStream = canvas.captureStream(30);
-    const audioTrack = camStream.getAudioTracks()[0];
-    if (audioTrack) canvasStream.addTrack(audioTrack);
+    try {
+      if (typeof canvas.captureStream !== "function") {
+        setError("Your browser doesn't support in-app recording — please update it, or try the latest Chrome or Safari.");
+        return;
+      }
+      const canvasStream = canvas.captureStream(30);
+      const audioTrack = camStream.getAudioTracks()[0];
+      if (audioTrack) canvasStream.addTrack(audioTrack);
 
-    const mimeType = pickMimeType();
-    const recorder = new MediaRecorder(canvasStream, { mimeType });
-    chunksRef.current = [];
-    recorder.ondataavailable = (e) => {
-      if (e.data.size > 0) chunksRef.current.push(e.data);
-    };
-    recorder.onstop = () => {
-      const blob = new Blob(chunksRef.current, { type: mimeType });
-      recordedBlobRef.current = blob;
-      const url = URL.createObjectURL(blob);
-      setBlobUrl(url);
-      setPhase("review");
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-    recorder.start(1000);
-    recorderRef.current = recorder;
-    setSeconds(0);
-    setRecordingStartedAt(new Date());
-    setPhase("recording");
-    timerRef.current = setInterval(() => {
-      setSeconds((s) => {
-        if (s + 1 >= MAX_SECONDS) {
-          stopRecording();
-          return MAX_SECONDS;
-        }
-        return s + 1;
-      });
-    }, 1000);
+      const mimeType = pickMimeType();
+      const recorder = new MediaRecorder(canvasStream, { mimeType });
+      chunksRef.current = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+      recorder.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: mimeType });
+        recordedBlobRef.current = blob;
+        const url = URL.createObjectURL(blob);
+        setBlobUrl(url);
+        setPhase("review");
+        if (timerRef.current) clearInterval(timerRef.current);
+      };
+      recorder.start(1000);
+      recorderRef.current = recorder;
+      setSeconds(0);
+      setRecordingStartedAt(new Date());
+      setPhase("recording");
+      timerRef.current = setInterval(() => {
+        setSeconds((s) => {
+          if (s + 1 >= MAX_SECONDS) {
+            stopRecording();
+            return MAX_SECONDS;
+          }
+          return s + 1;
+        });
+      }, 1000);
+    } catch {
+      setError("Could not start recording. Please try again, or use a different browser (latest Chrome or Safari).");
+    }
   }
 
   function stopRecording() {
-    recorderRef.current?.stop();
+    try {
+      recorderRef.current?.stop();
+    } catch {
+      setError("Could not stop recording. Please try again.");
+    }
   }
 
   async function handleReRecord() {
@@ -452,14 +471,34 @@ export default function KataRecorder({
         <video ref={videoRef} playsInline muted className="hidden" />
         <canvas
           ref={canvasRef}
-          className={phase === "idle" ? "hidden" : fullscreen ? "block h-full w-full object-contain" : "block w-full"}
+          className={
+            phase === "live" || phase === "recording"
+              ? fullscreen
+                ? "block h-full w-full object-contain"
+                : "block w-full"
+              : "hidden"
+          }
         />
+        {/* Review (and uploading) shows the actual recorded file, in this
+            SAME box, instead of a separate plain video underneath it --
+            "the same recording screen for the replay." The canvas above is
+            hidden here since the live camera feed keeps rendering to it in
+            the background (still needed if the participant re-records)
+            and would otherwise show through underneath. */}
+        {(phase === "review" || phase === "uploading") && blobUrl && (
+          <video
+            src={blobUrl}
+            controls
+            playsInline
+            className={fullscreen ? "block h-full w-full object-contain" : "block w-full"}
+          />
+        )}
         {phase === "idle" && (
           <div className="flex aspect-[3/4] items-center justify-center p-8 text-center text-neutral-300">
             Camera preview appears here once started.
           </div>
         )}
-        {phase !== "idle" && (
+        {phase !== "idle" && phase !== "review" && phase !== "uploading" && (
           <div className="absolute right-2 top-[13%] rounded bg-black/70 px-2 py-1 text-right text-[11px] font-semibold leading-tight text-white">
             Deleted Recording: {attempts} / Available: {maxAttempts}
           </div>
@@ -476,50 +515,66 @@ export default function KataRecorder({
             )}
           </div>
         )}
-        {/* Start/Stop + full-screen toggle live INSIDE the recording area
-            itself (translucent, over the camera feed) instead of a
-            separate row below it -- that row used to eat into the height
-            available for the actual preview, most noticeable in full
-            screen mode where every pixel of vertical space matters. */}
-        {(phase === "live" || phase === "recording") && (
-          <div className="absolute inset-x-0 bottom-3 flex items-center justify-center gap-3 px-4">
-            {phase === "live" && (
-              <button
-                onClick={startRecording}
-                className="flex-1 max-w-xs rounded-lg bg-red-700/85 px-6 py-3 text-lg font-bold text-white shadow-lg backdrop-blur-sm hover:bg-red-600/90"
-              >
-                ● Start
-              </button>
-            )}
-            {phase === "recording" && (
-              <button
-                onClick={stopRecording}
-                className="flex-1 max-w-xs rounded-lg bg-neutral-900/85 px-6 py-3 text-lg font-bold text-white shadow-lg backdrop-blur-sm hover:bg-neutral-700/90"
-              >
-                ■ Stop
-              </button>
-            )}
-            {phase === "live" && !fullscreen && (
-              <button
-                type="button"
-                onClick={toggleFullscreen}
-                title="Fill the whole phone/tablet screen for recording, header and footer temporarily hidden"
-                className="shrink-0 rounded-lg border border-white/40 bg-black/50 px-4 py-3 text-sm font-semibold text-white shadow-lg backdrop-blur-sm hover:bg-black/60"
-              >
-                ⛶ Full screen
-              </button>
-            )}
+        {/* Start/Stop (round) + full-screen toggle (square, bottom-right)
+            live INSIDE the recording area itself instead of a separate row
+            below it -- that row used to eat into the height available for
+            the actual preview, most noticeable in full screen mode where
+            every pixel of vertical space matters. */}
+        {phase === "live" && (
+          <button
+            onClick={startRecording}
+            aria-label="Start recording"
+            className="absolute bottom-5 left-1/2 flex h-16 w-16 -translate-x-1/2 items-center justify-center rounded-full border-4 border-white/80 bg-red-600/90 text-2xl text-white shadow-lg active:scale-95"
+          >
+            ●
+          </button>
+        )}
+        {phase === "recording" && (
+          <button
+            onClick={stopRecording}
+            aria-label="Stop recording"
+            className="absolute bottom-5 left-1/2 flex h-16 w-16 -translate-x-1/2 items-center justify-center rounded-full border-4 border-white/80 bg-neutral-900/90 text-2xl text-white shadow-lg active:scale-95"
+          >
+            ■
+          </button>
+        )}
+        {phase === "live" && !fullscreen && (
+          <button
+            type="button"
+            onClick={toggleFullscreen}
+            aria-label="Full screen"
+            title="Fill the whole phone/tablet screen for recording, header and footer temporarily hidden"
+            className="absolute bottom-5 right-3 flex h-11 w-11 items-center justify-center rounded-md border border-white/50 bg-black/60 text-lg text-white shadow-lg"
+          >
+            ⛶
+          </button>
+        )}
+        {/* Delete & re-record / Submit sit just under the burned-in header
+            banner (top ~11% of the recorded frame), overlaid on the replay
+            itself, instead of a row below the video. */}
+        {phase === "review" && (
+          <div className="absolute inset-x-0 top-[13%] flex items-center justify-between gap-2 px-3">
+            <button
+              onClick={handleReRecord}
+              disabled={!canReRecord}
+              className="rounded-md border border-neutral-300 bg-white/90 px-3 py-1.5 text-xs font-semibold text-neutral-700 shadow hover:bg-white disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
+            >
+              Delete &amp; re-record ({attemptsLeft} left)
+            </button>
+            <button
+              onClick={() => {
+                setAgreed(false);
+                setAgreementOpen(true);
+              }}
+              className="rounded-md bg-red-700/90 px-4 py-1.5 text-xs font-semibold text-white shadow hover:bg-red-600 sm:text-sm"
+            >
+              Submit this recording
+            </button>
           </div>
         )}
       </div>
 
-      {phase === "review" && blobUrl && (
-        <div className="mx-auto max-w-md">
-          <video src={blobUrl} controls playsInline className="w-full rounded-lg border border-neutral-300" />
-        </div>
-      )}
-
-      {(phase === "idle" || phase === "review" || phase === "uploading") && (
+      {(phase === "idle" || phase === "uploading") && (
         <div
           className={
             fullscreen
@@ -534,26 +589,6 @@ export default function KataRecorder({
             >
               Enable camera
             </button>
-          )}
-          {phase === "review" && (
-            <>
-              <button
-                onClick={handleReRecord}
-                disabled={!canReRecord}
-                className="rounded-md border border-neutral-300 bg-white px-5 py-2.5 font-semibold text-neutral-700 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Delete &amp; re-record ({attemptsLeft} left)
-              </button>
-              <button
-                onClick={() => {
-                  setAgreed(false);
-                  setAgreementOpen(true);
-                }}
-                className="rounded-md bg-red-700 px-6 py-2.5 font-semibold text-white hover:bg-red-600"
-              >
-                Submit this recording
-              </button>
-            </>
           )}
           {phase === "uploading" && (
             <button disabled className="rounded-md bg-red-700 px-6 py-2.5 font-semibold text-white opacity-70">
