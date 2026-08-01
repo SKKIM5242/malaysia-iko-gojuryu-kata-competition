@@ -419,6 +419,13 @@ export async function applySubscriptionRenewalTerms(
   const validFromStr = validFrom.toISOString().slice(0, 10);
   const validUntilStr = validUntil.toISOString().slice(0, 10);
 
+  // sign_in_quota_auto MUST be turned off here. recompute_sign_in_quota()
+  // runs on practically every account-linking event, and it bails out
+  // immediately if this flag is off -- leaving it on meant a paid renewal's
+  // terms got silently overwritten back to the role's auto-computed
+  // quota the next time anything touched the profile. That is exactly what
+  // happened to a real referee account, which paid for this same $100
+  // renewal 4 times in one day because each purchase kept vanishing.
   await admin
     .from("profiles")
     .update({
@@ -426,6 +433,7 @@ export async function applySubscriptionRenewalTerms(
       sign_in_count: 0,
       sign_in_valid_from: validFromStr,
       sign_in_valid_until: validUntilStr,
+      sign_in_quota_auto: false,
     })
     .eq("user_id", renewal.user_id);
 
