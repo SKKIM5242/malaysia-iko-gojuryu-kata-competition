@@ -479,9 +479,17 @@ export default function AccessibilityToolbar() {
       synth.cancel();
       const selection = window.getSelection();
       const hasSelection = !!selection && selection.rangeCount > 0 && selection.toString().trim().length > 0;
+      // Grab the Range before clearing the selection -- a Range object stays
+      // live (independent of the Selection it came from) even after
+      // removeAllRanges(), so this doesn't lose what to read.
+      const selectedRange = hasSelection ? selection!.getRangeAt(0) : undefined;
+      // Clear the browser's own blue selection highlight now that we've
+      // captured it -- otherwise it sits on the page fighting for attention
+      // with the read-aloud word cursor while speaking.
+      selection?.removeAllRanges();
       const root = (document.querySelector("main") ?? document.body) as HTMLElement;
-      const { text, segments } = hasSelection
-        ? collectReadableSegments(root, selection!.getRangeAt(0))
+      const { text, segments } = selectedRange
+        ? collectReadableSegments(root, selectedRange)
         : collectReadableSegments(root);
       segmentsRef.current = segments;
       const chunks = chunkText(text);
@@ -495,11 +503,18 @@ export default function AccessibilityToolbar() {
       indexRef.current = 0;
       setIsSpeaking(true);
       setIsPaused(false);
+      // Small screens especially -- the panel would otherwise sit on top of
+      // the very page it's reading, blocking the moving highlight cursor as
+      // it scrolls into view. Same behavior on desktop/laptop too.
+      setOpen(false);
+      setLangMenuOpen(false);
       speakNext();
       startKeepAlive();
     } else if (isPaused) {
       synth.resume();
       setIsPaused(false);
+      setOpen(false);
+      setLangMenuOpen(false);
     } else {
       synth.pause();
       setIsPaused(true);
@@ -641,6 +656,14 @@ export default function AccessibilityToolbar() {
               <button
                 type="button"
                 onClick={handlePlayPause}
+                // Tapping/clicking a button elsewhere on the screen collapses
+                // whatever text is selected on the page before onClick even
+                // fires (mousedown/pointerdown happens first) -- this is what
+                // made "select text, then press play" fail on touch devices.
+                // preventDefault here keeps the selection alive until
+                // handlePlayPause reads it.
+                onPointerDown={(e) => e.preventDefault()}
+                onMouseDown={(e) => e.preventDefault()}
                 aria-label={isSpeaking && !isPaused ? "Pause reading" : "Play reading"}
                 title={isSpeaking && !isPaused ? "Pause reading" : "Play reading"}
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-red-700 text-white hover:bg-red-600"
