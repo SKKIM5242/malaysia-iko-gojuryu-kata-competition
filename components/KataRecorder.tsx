@@ -563,23 +563,41 @@ export default function KataRecorder({
             banner (top ~11% of the recorded frame), overlaid on the replay
             itself, instead of a row below the video. */}
         {phase === "review" && (
-          <div className="absolute inset-x-0 top-[13%] flex items-center justify-between gap-2 px-3">
-            <button
-              onClick={handleReRecord}
-              disabled={!canReRecord}
-              className="rounded-md border border-neutral-300 bg-white/90 px-3 py-1.5 text-xs font-semibold text-neutral-700 shadow hover:bg-white disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
-            >
-              Delete &amp; re-record ({attemptsLeft} left)
-            </button>
-            <button
-              onClick={() => {
-                setAgreed(false);
-                setAgreementOpen(true);
-              }}
-              className="rounded-md bg-red-700/90 px-4 py-1.5 text-xs font-semibold text-white shadow hover:bg-red-600 sm:text-sm"
-            >
-              Submit this recording
-            </button>
+          <div className="absolute inset-x-0 top-[13%] flex flex-col items-center gap-1.5 px-3">
+            {recordingStartedAt && (
+              <div className="rounded bg-black/60 px-2 py-0.5 text-[11px] text-white shadow">
+                Recording started {formatDateTime(recordingStartedAt.toISOString())}
+              </div>
+            )}
+            <div className="flex w-full items-center justify-between gap-2">
+              <button
+                onClick={handleReRecord}
+                disabled={!canReRecord}
+                className="rounded-md border border-neutral-300 bg-white/90 px-3 py-1.5 text-xs font-semibold text-neutral-700 shadow hover:bg-white disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
+              >
+                Delete &amp; re-record ({attemptsLeft} left)
+              </button>
+              <button
+                onClick={() => {
+                  setAgreed(false);
+                  setAgreementOpen(true);
+                }}
+                className="rounded-md bg-red-700/90 px-4 py-1.5 text-xs font-semibold text-white shadow hover:bg-red-600 sm:text-sm"
+              >
+                Submit this recording
+              </button>
+            </div>
+            {/* Buy more delete-and-re-record chances -- only reachable once
+                the free 3 are gone. This used to live in the instructional
+                text block above the recording area, which full screen mode
+                now hides for the whole live/recording/review flow, making
+                the button effectively unreachable right when it's actually
+                needed. */}
+            {attemptsLeft <= 0 && (
+              <div className="rounded-md bg-white/95 px-2 py-1.5 shadow">
+                <BuyExtraAttemptsButton hasPendingPurchase={hasPendingPurchase} />
+              </div>
+            )}
           </div>
         )}
       </div>
