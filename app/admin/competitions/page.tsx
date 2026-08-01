@@ -64,20 +64,42 @@ export default async function AdminCompetitions({
       categoryPaidCount.set(row.category_id, row.cnt);
     }
   }
-  // The most recent not-yet-undone merge per competition — drives whether
-  // the "Undo last merge" button next to "+ Add category" shows at all,
-  // and what its confirm/tooltip text says. Ordered newest-first so the
-  // first row seen per competition_id is the one Undo would act on.
-  const latestMergeByCompetition = new Map<string, { description: string | null }>();
+  // How many not-yet-undone merges/deletes are on each competition's undo
+  // stack — drives the "Undo last merge (N)" / "Undo delete (N)" button
+  // labels next to "+ Add category", visible to every admin/organizer/
+  // staff account (not just whoever clicked), since it's a straight count
+  // from these tables. Ordered newest-first so the first row seen per
+  // competition_id is both the one Undo would act on next AND, since every
+  // row for that competition gets counted as the loop continues, the
+  // running total of everything still on the stack.
+  const mergeStatsByCompetition = new Map<string, { count: number; description: string | null }>();
+  const deleteStatsByCompetition = new Map<string, { count: number; description: string | null }>();
   if (canManageCompetition) {
-    const { data: mergeLogRows } = await supabaseAdmin
-      .from("category_merge_log")
-      .select("competition_id, description, created_at")
-      .is("undone_at", null)
-      .order("created_at", { ascending: false });
+    const [{ data: mergeLogRows }, { data: deleteLogRows }] = await Promise.all([
+      supabaseAdmin
+        .from("category_merge_log")
+        .select("competition_id, description, created_at")
+        .is("undone_at", null)
+        .order("created_at", { ascending: false }),
+      supabaseAdmin
+        .from("category_delete_log")
+        .select("competition_id, category, created_at")
+        .is("undone_at", null)
+        .order("created_at", { ascending: false }),
+    ]);
     for (const row of (mergeLogRows as Array<{ competition_id: string; description: string | null }>) ?? []) {
-      if (!latestMergeByCompetition.has(row.competition_id)) {
-        latestMergeByCompetition.set(row.competition_id, { description: row.description });
+      const existing = mergeStatsByCompetition.get(row.competition_id);
+      if (existing) existing.count += 1;
+      else mergeStatsByCompetition.set(row.competition_id, { count: 1, description: row.description });
+    }
+    for (const row of (deleteLogRows as Array<{ competition_id: string; category: { name?: string } | null }>) ?? []) {
+      const existing = deleteStatsByCompetition.get(row.competition_id);
+      if (existing) existing.count += 1;
+      else {
+        deleteStatsByCompetition.set(row.competition_id, {
+          count: 1,
+          description: row.category?.name ? `Restore "${row.category.name}"` : null,
+        });
       }
     }
   }
@@ -338,21 +360,41 @@ export default async function AdminCompetitions({
                             actionName="undoMerge"
                             fields={{ competition_id: c.id, return_to: categoryReturnTo(c.id) }}
                             className={
-                              latestMergeByCompetition.has(c.id)
+                              (mergeStatsByCompetition.get(c.id)?.count ?? 0) > 0
                                 ? "rounded border border-orange-300 px-2 py-0.5 text-xs font-semibold text-orange-700 hover:bg-orange-50"
                                 : "rounded border border-neutral-200 px-2 py-0.5 text-xs font-semibold text-neutral-400 hover:bg-neutral-50"
                             }
                             title={
-                              latestMergeByCompetition.get(c.id)?.description ??
+                              mergeStatsByCompetition.get(c.id)?.description ??
                               "No merge has been done for this tier yet — nothing to undo."
                             }
                             confirmMessage={
-                              latestMergeByCompetition.has(c.id)
-                                ? `Undo the most recent merge for this tier?\n\n${latestMergeByCompetition.get(c.id)?.description ?? ""}\n\nThis restores the categories it combined and moves registrations back to where they were. Click again afterward to step back one merge further, if more than one was done.`
+                              (mergeStatsByCompetition.get(c.id)?.count ?? 0) > 0
+                                ? `Undo the most recent merge for this tier?\n\n${mergeStatsByCompetition.get(c.id)?.description ?? ""}\n\nThis restores the categories it combined and moves registrations back to where they were. Click again afterward to step back one merge further, if more than one was done.`
                                 : undefined
                             }
                           >
-                            ↺ Undo last merge
+                            ↺ Undo last merge ({mergeStatsByCompetition.get(c.id)?.count ?? 0})
+                          </CategoryActionButton>
+                          <CategoryActionButton
+                            actionName="undoDelete"
+                            fields={{ competition_id: c.id, return_to: categoryReturnTo(c.id) }}
+                            className={
+                              (deleteStatsByCompetition.get(c.id)?.count ?? 0) > 0
+                                ? "rounded border border-orange-300 px-2 py-0.5 text-xs font-semibold text-orange-700 hover:bg-orange-50"
+                                : "rounded border border-neutral-200 px-2 py-0.5 text-xs font-semibold text-neutral-400 hover:bg-neutral-50"
+                            }
+                            title={
+                              deleteStatsByCompetition.get(c.id)?.description ??
+                              "No category has been deleted for this tier yet — nothing to undo."
+                            }
+                            confirmMessage={
+                              (deleteStatsByCompetition.get(c.id)?.count ?? 0) > 0
+                                ? `Undo the most recent category delete for this tier?\n\n${deleteStatsByCompetition.get(c.id)?.description ?? ""}\n\nThis recreates the deleted category. Click again afterward to step back one delete further, if more than one was done.`
+                                : undefined
+                            }
+                          >
+                            ↺ Undo delete ({deleteStatsByCompetition.get(c.id)?.count ?? 0})
                           </CategoryActionButton>
                         </span>
                       )}

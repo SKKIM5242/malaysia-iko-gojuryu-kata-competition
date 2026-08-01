@@ -60,6 +60,29 @@ export interface UndoResult {
   description?: string;
 }
 
+/** How many not-yet-undone merges (or deletes) are currently sitting in
+ * one competition's undo stack -- drives the "Undo last merge (N)" /
+ * "Undo delete (N)" button labels, so admin/organizer/staff can see the
+ * stack depth instead of guessing. Shared across every staff account,
+ * since it's a straight count from the table, not per-browser state. */
+export async function countActiveMerges(supabase: SupabaseClient, competitionId: string): Promise<number> {
+  const { count } = await supabase
+    .from("category_merge_log")
+    .select("id", { count: "exact", head: true })
+    .eq("competition_id", competitionId)
+    .is("undone_at", null);
+  return count ?? 0;
+}
+
+export async function countActiveDeletes(supabase: SupabaseClient, competitionId: string): Promise<number> {
+  const { count } = await supabase
+    .from("category_delete_log")
+    .select("id", { count: "exact", head: true })
+    .eq("competition_id", competitionId)
+    .is("undone_at", null);
+  return count ?? 0;
+}
+
 /**
  * Reverses the most recent not-yet-undone merge for one competition:
  * recreates every deleted category from its snapshot (same id, so nothing
@@ -123,4 +146,52 @@ export async function undoLastCategoryMerge(
     .eq("id", entry.id);
 
   return { ok: true, description: entry.description ?? undefined };
+}
+
+/** Snapshots a category row into category_delete_log right before it's
+ * deleted -- call this immediately before the DELETE, using the row you
+ * just fetched, so the snapshot always matches what's about to happen.
+ * Deleting a category only ever succeeds while it has zero registrations
+ * (categories.id has no ON DELETE clause on registrations.category_id, so
+ * Postgres rejects the delete otherwise), so there's never anything to
+ * move back on undo -- just the one row to recreate. */
+export async function logCategoryDelete(
+  supabase: SupabaseClient,
+  params: { competitionId: string; category: Category; actorId: string | null },
+): Promise<void> {
+  await supabase.from("category_delete_log").insert({
+    competition_id: params.competitionId,
+    category: params.category,
+    created_by: params.actorId,
+  });
+}
+
+/** Reverses the most recent not-yet-undone category delete for one
+ * competition -- same stack-like repeat-to-go-further-back model as
+ * undoLastCategoryMerge above, kept as a separate table/stack since a
+ * plain delete and a merge restore differently. */
+export async function undoLastCategoryDelete(
+  supabase: SupabaseClient,
+  competitionId: string,
+): Promise<UndoResult> {
+  const { data: entry } = await supabase
+    .from("category_delete_log")
+    .select("*")
+    .eq("competition_id", competitionId)
+    .is("undone_at", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!entry) return { ok: false, error: "Nothing to undo for this tier." };
+
+  const category = entry.category as Category;
+  const { error: restoreErr } = await supabase.from("categories").insert(category);
+  if (restoreErr) return { ok: false, error: "Could not restore the deleted category." };
+
+  await supabase
+    .from("category_delete_log")
+    .update({ undone_at: new Date().toISOString() })
+    .eq("id", entry.id);
+
+  return { ok: true, description: `Restored "${category.name}".` };
 }

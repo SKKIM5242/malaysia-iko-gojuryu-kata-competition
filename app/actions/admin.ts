@@ -9,7 +9,10 @@ import { writeAudit } from "@/lib/audit";
 import { headers } from "next/headers";
 import { kataBaseOf, groupByKata, ageAt, resolveCategory } from "@/lib/division";
 import { KATA_FAMILIES, categoriesInFamily, adjacentKataOf, type KataFamily } from "@/lib/kata-families";
-import { logCategoryMerge, snapshotRegistrationCategories, undoLastCategoryMerge } from "@/lib/category-merge";
+import {
+  logCategoryMerge, snapshotRegistrationCategories, undoLastCategoryMerge,
+  logCategoryDelete, undoLastCategoryDelete,
+} from "@/lib/category-merge";
 import { getStripe, paymentsEnabled, REFEREE_DEPOSIT_USD, AUDIENCE_FEE_USD } from "@/lib/payments";
 import {
   notifyRefereeAssignment, notifyRefereeUnassigned, sendConfirmationEmail, notifyAnnouncementPublished,
@@ -494,8 +497,15 @@ export async function deleteCategory(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const returnTo = String(formData.get("return_to") ?? "") || "/admin/competitions";
   const { supabase, actorId } = await getActor();
+
+  const { data: source } = await supabase.from("categories").select("*").eq("id", id).maybeSingle();
+  if (!source) backTo(returnTo, { error: "Category not found." });
+
   const { error } = await supabase.from("categories").delete().eq("id", id);
   if (error) backTo(returnTo, { error: "Cannot delete — registrations reference this category." });
+
+  await logCategoryDelete(supabase, { competitionId: source!.competition_id, category: source as Category, actorId });
+
   await writeAudit(supabase, {
     table_name: "categories", record_id: id, action: "category_deleted", actor_id: actorId,
   });
@@ -1030,6 +1040,31 @@ export async function undoLastMerge(formData: FormData) {
   });
   revalidatePath("/");
   backTo(returnTo, { ok: result.description ? `Undone: ${result.description}` : "Merge undone." });
+}
+
+/**
+ * Reverses the most recent not-yet-undone plain category Delete for one
+ * competition tier — the "Undo delete" button next to "+ Add Category",
+ * alongside "Undo last merge" above. Repeated clicks step back one delete
+ * further each time; see lib/category-merge.ts for the actual restore
+ * logic.
+ */
+export async function undoLastDelete(formData: FormData) {
+  const competitionId = String(formData.get("competition_id") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/competitions";
+  const { supabase, actorId } = await getActor();
+  if (!competitionId) backTo(returnTo, { error: "Missing competition." });
+
+  const result = await undoLastCategoryDelete(supabase, competitionId);
+  if (!result.ok) backTo(returnTo, { error: result.error ?? "Nothing to undo." });
+
+  await writeAudit(supabase, {
+    table_name: "category_delete_log", record_id: null, action: "category_delete_undone",
+    new_value: { competition_id: competitionId, description: result.description ?? null },
+    actor_id: actorId,
+  });
+  revalidatePath("/");
+  backTo(returnTo, { ok: result.description ? `Undone: ${result.description}` : "Delete undone." });
 }
 
 /** Re-sequences sort_order for exactly the rows whose position actually
