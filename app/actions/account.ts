@@ -61,7 +61,11 @@ export async function claimAndStartRecording(formData: FormData) {
     }
   }
   revalidatePath("/account");
-  redirect("/account");
+  // Land back on the Record Your Kata section itself, not the page top --
+  // otherwise the only visible sign anything happened is the pending list
+  // shrinking by one row, and the participant has to scroll down manually
+  // to find the recorder that's now active for their newly-claimed kata.
+  redirect("/account#record-your-kata");
 }
 
 export interface DeleteVideoState {

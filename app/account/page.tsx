@@ -187,7 +187,7 @@ function PersonalRecordingSection({
   ctx: RecordingContext;
 }) {
   return (
-    <div className="mt-6">
+    <div id="record-your-kata" className="mt-6 scroll-mt-28">
       <h2 className="mb-3 text-lg font-bold">
         {ctx.existingVideo ? "Your Kata Recording" : "Record Your Kata"}
       </h2>
@@ -809,7 +809,9 @@ export default async function AccountPage({
           validUntil={profile.sign_in_valid_until}
           className="mb-2"
         />
-        <h1 className="text-2xl font-bold">{existingVideo ? "Your Kata Recording" : "Record Your Kata"}</h1>
+        <h1 id="record-your-kata" className="scroll-mt-28 text-2xl font-bold">
+          {existingVideo ? "Your Kata Recording" : "Record Your Kata"}
+        </h1>
         <SignInInfoTables canManage={false} />
         <p className="mt-1 mb-6 text-sm text-neutral-500">
           Signed in as {profile.full_name ?? user.email}.
