@@ -333,6 +333,17 @@ export async function saveCompetition(formData: FormData) {
       table_name: "competitions", record_id: id, action: "competition_updated",
       old_value: before, new_value: values, actor_id: actorId,
     });
+    // Editing the sign-in window here previously did nothing for anyone
+    // already tied to this tier -- their cached sign_in_valid_from/until
+    // only ever refreshed via a handful of unrelated actions (renewal,
+    // unlink, editing sign_in_role_defaults). Recompute everyone this tier
+    // actually affects so the new dates take effect immediately.
+    if (
+      before?.default_sign_in_valid_from !== values.default_sign_in_valid_from ||
+      before?.default_sign_in_valid_until !== values.default_sign_in_valid_until
+    ) {
+      await supabase.rpc("recompute_sign_in_quota_for_competition", { p_competition_id: id });
+    }
   } else {
     const { data, error } = await supabase
       .from("competitions").insert(values).select("id").single();
