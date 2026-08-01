@@ -8,7 +8,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { writeAudit } from "@/lib/audit";
 import { headers } from "next/headers";
 import { kataBaseOf, groupByKata, ageAt, resolveCategory } from "@/lib/division";
-import { KATA_FAMILIES, categoriesInFamily, type KataFamily } from "@/lib/kata-families";
+import { KATA_FAMILIES, categoriesInFamily, adjacentKataOf, type KataFamily } from "@/lib/kata-families";
+import { logCategoryMerge, snapshotRegistrationCategories, undoLastCategoryMerge } from "@/lib/category-merge";
 import { getStripe, paymentsEnabled, REFEREE_DEPOSIT_USD, AUDIENCE_FEE_USD } from "@/lib/payments";
 import {
   notifyRefereeAssignment, notifyRefereeUnassigned, sendConfirmationEmail, notifyAnnouncementPublished,
@@ -530,18 +531,18 @@ export async function mergeCategoryToMix(formData: FormData) {
 
   const { data: siblingsRaw } = await supabase
     .from("categories")
-    .select("id, name, gender")
+    .select("*")
     .eq("competition_id", source!.competition_id)
     .eq("belt_group", source!.belt_group)
     .eq("age_min", source!.age_min)
     .eq("age_max", source!.age_max)
     .in("gender", ["male", "female"]);
-  const mergeIds = (siblingsRaw ?? [])
-    .filter((s) => kataBaseOf(s.name) === kataBase)
-    .map((s) => s.id);
-  if (!mergeIds.includes(categoryId)) mergeIds.push(categoryId);
+  const siblings = ((siblingsRaw ?? []) as Category[]).filter((s) => kataBaseOf(s.name) === kataBase);
+  const mergeCats = siblings.some((s) => s.id === categoryId) ? siblings : [...siblings, source as Category];
+  const mergeIds = mergeCats.map((c) => c.id);
 
   let mixCategoryId: string;
+  let targetWasNew: boolean;
   const { data: existingMix } = await supabase
     .from("categories")
     .select("id")
@@ -550,6 +551,7 @@ export async function mergeCategoryToMix(formData: FormData) {
     .maybeSingle();
   if (existingMix) {
     mixCategoryId = existingMix.id;
+    targetWasNew = false;
   } else {
     const { data: created, error: createErr } = await supabase
       .from("categories")
@@ -567,11 +569,14 @@ export async function mergeCategoryToMix(formData: FormData) {
       .single();
     if (createErr || !created) backTo(returnTo, { error: "Could not create the Mix category." });
     mixCategoryId = created!.id;
+    targetWasNew = true;
     await writeAudit(supabase, {
       table_name: "categories", record_id: mixCategoryId, action: "category_created",
       new_value: { name: mixName, gender: "mix" }, actor_id: actorId,
     });
   }
+
+  const movedRegistrations = await snapshotRegistrationCategories(supabase, mergeIds);
 
   const { error: moveErr } = await supabase
     .from("registrations")
@@ -589,6 +594,17 @@ export async function mergeCategoryToMix(formData: FormData) {
     });
   }
 
+  await logCategoryMerge(supabase, {
+    competitionId: source!.competition_id,
+    mergeType: "to_mix",
+    targetCategoryId: mixCategoryId,
+    targetWasNew,
+    sourceCategories: mergeCats,
+    movedRegistrations,
+    description: `Merged into “${mixName}”.`,
+    actorId,
+  });
+
   await writeAudit(supabase, {
     table_name: "registrations", record_id: null, action: "registrations_merged_to_mix",
     new_value: { from_category_ids: mergeIds, to_category_id: mixCategoryId, deleted_source_categories: true }, actor_id: actorId,
@@ -601,10 +617,13 @@ export async function mergeCategoryToMix(formData: FormData) {
  * Merges a category with its ADJACENT age group in the same kata event,
  * belt division, and gender — the "merge before/after age group" button,
  * used when an age group has too few submissions (the organizer's policy:
- * events under 70 recordings get merged). The surviving category's age
- * range expands to cover both (its name's "Age lo–hi" part is rewritten),
- * the neighbor's registrations move over, and the emptied neighbor is
- * deleted. Repeatable, so 2 or 3 age groups can be combined.
+ * events under 70 recordings get merged). Builds a fresh widened category
+ * (its name's "Age lo–hi" part rewritten to cover both), moves both
+ * sides' registrations onto it, and deletes both original age brackets —
+ * always creating rather than mutating one of the two in place, so this
+ * follows the same create-or-reuse/move/delete shape as every other merge
+ * action here and undoes the same way. Repeatable, so 2 or 3 age groups
+ * can be combined by clicking again on the newly-merged category.
  */
 export async function mergeCategoryAgeGroup(formData: FormData) {
   const categoryId = String(formData.get("category_id") ?? "");
@@ -641,22 +660,48 @@ export async function mergeCategoryAgeGroup(formData: FormData) {
   const newMax = Math.max(source!.age_max!, neighbor!.age_max!);
   // Rewrite only the "Age lo–hi" part of the hierarchical name.
   const newName = source!.name.replace(/Age \d+–\d+/, `Age ${newMin}–${newMax}`);
+  const sourceIds = [categoryId, neighbor!.id];
+
+  const movedRegistrations = await snapshotRegistrationCategories(supabase, sourceIds);
+
+  const { data: created, error: createErr } = await supabase
+    .from("categories")
+    .insert({
+      competition_id: source!.competition_id,
+      name: newName,
+      age_min: newMin,
+      age_max: newMax,
+      belt_group: source!.belt_group,
+      gender: source!.gender,
+      max_participants: null,
+      sort_order: Math.min(source!.sort_order, neighbor!.sort_order),
+    })
+    .select("id")
+    .single();
+  if (createErr || !created) backTo(returnTo, { error: "Could not create the merged age group." });
+  const targetId = created!.id;
 
   const { error: moveErr } = await supabase
     .from("registrations")
-    .update({ category_id: categoryId })
-    .eq("category_id", neighbor!.id);
-  if (moveErr) backTo(returnTo, { error: "Could not move the neighbor age group's registrations." });
+    .update({ category_id: targetId })
+    .in("category_id", sourceIds);
+  if (moveErr) backTo(returnTo, { error: "Could not move registrations into the merged age group." });
 
-  const { error: renameErr } = await supabase
-    .from("categories")
-    .update({ age_min: newMin, age_max: newMax, name: newName })
-    .eq("id", categoryId);
-  if (renameErr) backTo(returnTo, { error: "Moved registrations, but could not widen the age range." });
+  await supabase.from("categories").delete().in("id", sourceIds);
 
-  await supabase.from("categories").delete().eq("id", neighbor!.id);
+  await logCategoryMerge(supabase, {
+    competitionId: source!.competition_id,
+    mergeType: "age_group",
+    targetCategoryId: targetId,
+    targetWasNew: true,
+    sourceCategories: [source as Category, neighbor as Category],
+    movedRegistrations,
+    description: `Merged “${neighbor!.name}” into “${newName}”.`,
+    actorId,
+  });
+
   await writeAudit(supabase, {
-    table_name: "categories", record_id: categoryId, action: "age_groups_merged",
+    table_name: "categories", record_id: targetId, action: "age_groups_merged",
     new_value: { absorbed_category: neighbor!.name, into: newName, direction }, actor_id: actorId,
   });
   revalidatePath("/");
@@ -704,8 +749,10 @@ export async function mergeKataFamily(formData: FormData) {
   }
 
   let targetId: string;
+  let targetWasNew: boolean;
   if (already) {
     targetId = already.id;
+    targetWasNew = false;
   } else {
     const { data: created, error: createErr } = await supabase
       .from("categories")
@@ -723,10 +770,12 @@ export async function mergeKataFamily(formData: FormData) {
       .single();
     if (createErr || !created) backTo(returnTo, { error: "Could not create the combined category." });
     targetId = created!.id;
+    targetWasNew = true;
   }
 
   const sourceIds = sourceCats.filter((c) => c.id !== targetId).map((c) => c.id);
   if (sourceIds.length > 0) {
+    const movedRegistrations = await snapshotRegistrationCategories(supabase, sourceIds);
     const { error: moveErr } = await supabase
       .from("registrations")
       .update({ category_id: targetId })
@@ -734,6 +783,17 @@ export async function mergeKataFamily(formData: FormData) {
     if (moveErr) backTo(returnTo, { error: "Could not move registrations into the combined category." });
 
     await supabase.from("categories").delete().in("id", sourceIds);
+
+    await logCategoryMerge(supabase, {
+      competitionId,
+      mergeType: "family",
+      targetCategoryId: targetId,
+      targetWasNew,
+      sourceCategories: sourceCats.filter((c) => c.id !== targetId),
+      movedRegistrations,
+      description: `${family} Kata merged — ${sourceIds.length} categor${sourceIds.length === 1 ? "y" : "ies"} consolidated.`,
+      actorId,
+    });
   }
 
   await writeAudit(supabase, {
@@ -783,8 +843,10 @@ export async function mergeKataBeltGroup(formData: FormData) {
   }
 
   let targetId: string;
+  let targetWasNew: boolean;
   if (already) {
     targetId = already.id;
+    targetWasNew = false;
   } else {
     const { data: created, error: createErr } = await supabase
       .from("categories")
@@ -802,10 +864,12 @@ export async function mergeKataBeltGroup(formData: FormData) {
       .single();
     if (createErr || !created) backTo(returnTo, { error: "Could not create the combined category." });
     targetId = created!.id;
+    targetWasNew = true;
   }
 
   const sourceIds = sourceCats.filter((c) => c.id !== targetId).map((c) => c.id);
   if (sourceIds.length > 0) {
+    const movedRegistrations = await snapshotRegistrationCategories(supabase, sourceIds);
     const { error: moveErr } = await supabase
       .from("registrations")
       .update({ category_id: targetId })
@@ -813,6 +877,17 @@ export async function mergeKataBeltGroup(formData: FormData) {
     if (moveErr) backTo(returnTo, { error: "Could not move registrations into the combined category." });
 
     await supabase.from("categories").delete().in("id", sourceIds);
+
+    await logCategoryMerge(supabase, {
+      competitionId,
+      mergeType: "belt_group",
+      targetCategoryId: targetId,
+      targetWasNew,
+      sourceCategories: sourceCats.filter((c) => c.id !== targetId),
+      movedRegistrations,
+      description: `${beltLabel} merged for “${kataBase}” — ${sourceIds.length} categor${sourceIds.length === 1 ? "y" : "ies"} consolidated.`,
+      actorId,
+    });
   }
 
   await writeAudit(supabase, {
@@ -826,6 +901,135 @@ export async function mergeKataBeltGroup(formData: FormData) {
       ? `${beltLabel} merged for “${kataBase}” — ${sourceIds.length} categor${sourceIds.length === 1 ? "y" : "ies"} consolidated into one.`
       : `${beltLabel} is already merged into one category for this kata.`,
   });
+}
+
+/**
+ * Merges one entire kata event's categories (every belt/age/gender
+ * sub-category) with the kata immediately ABOVE or BELOW it in the
+ * organizer's canonical 1-24 order — the "merge with kata above" / "merge
+ * with kata below" buttons. Only ever pairs kata within the same family
+ * (see adjacentKataOf in lib/kata-families.ts); at a family boundary there
+ * is no neighbor to offer, so the action simply reports nothing to merge.
+ * Same create-or-reuse/move/delete pattern as every other merge action in
+ * this file, logged for undo via category_merge_log.
+ */
+export async function mergeAdjacentKata(formData: FormData) {
+  const competitionId = String(formData.get("competition_id") ?? "");
+  const kataBase = String(formData.get("kata_base") ?? "");
+  const direction = formData.get("direction") === "above" ? "above" : "below";
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/competitions";
+  const { supabase, actorId } = await getActor();
+
+  if (!competitionId || !kataBase) backTo(returnTo, { error: "Missing competition or kata." });
+
+  const neighborBase = adjacentKataOf(kataBase, direction);
+  if (!neighborBase) {
+    backTo(returnTo, {
+      error: `No ${direction === "above" ? "earlier" : "later"} kata left to merge with in this family.`,
+    });
+  }
+
+  const { data: allCats } = await supabase
+    .from("categories")
+    .select("*")
+    .eq("competition_id", competitionId);
+  const cats = ((allCats as Category[]) ?? []);
+  const sourceCats = cats.filter((c) => {
+    const base = kataBaseOf(c.name);
+    return base === kataBase || base === neighborBase;
+  });
+  if (sourceCats.length === 0) backTo(returnTo, { error: "No categories found for these kata." });
+
+  const mergedName = `${kataBase} & ${neighborBase} — Combined (All Belts, Ages & Genders)`;
+  const already = sourceCats.find((c) => c.name === mergedName);
+  if (already && sourceCats.every((c) => c.id === already.id)) {
+    backTo(returnTo, { ok: "These kata are already merged into one category." });
+  }
+
+  let targetId: string;
+  let targetWasNew: boolean;
+  if (already) {
+    targetId = already.id;
+    targetWasNew = false;
+  } else {
+    const { data: created, error: createErr } = await supabase
+      .from("categories")
+      .insert({
+        competition_id: competitionId,
+        name: mergedName,
+        belt_group: "mix",
+        gender: "mix",
+        age_min: 4,
+        age_max: 99,
+        max_participants: null,
+        sort_order: Math.min(...sourceCats.map((c) => c.sort_order)),
+      })
+      .select("id")
+      .single();
+    if (createErr || !created) backTo(returnTo, { error: "Could not create the combined category." });
+    targetId = created!.id;
+    targetWasNew = true;
+  }
+
+  const sourceIds = sourceCats.filter((c) => c.id !== targetId).map((c) => c.id);
+  if (sourceIds.length > 0) {
+    const movedRegistrations = await snapshotRegistrationCategories(supabase, sourceIds);
+    const { error: moveErr } = await supabase
+      .from("registrations")
+      .update({ category_id: targetId })
+      .in("category_id", sourceIds);
+    if (moveErr) backTo(returnTo, { error: "Could not move registrations into the combined category." });
+
+    await supabase.from("categories").delete().in("id", sourceIds);
+
+    await logCategoryMerge(supabase, {
+      competitionId,
+      mergeType: "adjacent_kata",
+      targetCategoryId: targetId,
+      targetWasNew,
+      sourceCategories: sourceCats.filter((c) => c.id !== targetId),
+      movedRegistrations,
+      description: `Merged “${kataBase}” with “${neighborBase}” — ${sourceIds.length} categor${sourceIds.length === 1 ? "y" : "ies"} consolidated.`,
+      actorId,
+    });
+  }
+
+  await writeAudit(supabase, {
+    table_name: "categories", record_id: targetId, action: "adjacent_kata_merged",
+    new_value: { kataBase, neighborBase, competition_id: competitionId, categories_consolidated: sourceIds.length },
+    actor_id: actorId,
+  });
+  revalidatePath("/");
+  backTo(returnTo, {
+    ok: sourceIds.length > 0
+      ? `Merged “${kataBase}” with “${neighborBase}” — ${sourceIds.length} categor${sourceIds.length === 1 ? "y" : "ies"} consolidated into one.`
+      : "These kata are already merged into one category.",
+  });
+}
+
+/**
+ * Reverses the most recent not-yet-undone merge (Merge -> Mix, Merge age,
+ * Merge family, Merge belt group, or Merge with kata above/below) for one
+ * competition tier — the "Undo" button next to "+ Add Category". Repeated
+ * clicks step back one merge further each time; see
+ * lib/category-merge.ts for the actual restore logic.
+ */
+export async function undoLastMerge(formData: FormData) {
+  const competitionId = String(formData.get("competition_id") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/competitions";
+  const { supabase, actorId } = await getActor();
+  if (!competitionId) backTo(returnTo, { error: "Missing competition." });
+
+  const result = await undoLastCategoryMerge(supabase, competitionId);
+  if (!result.ok) backTo(returnTo, { error: result.error ?? "Nothing to undo." });
+
+  await writeAudit(supabase, {
+    table_name: "category_merge_log", record_id: null, action: "category_merge_undone",
+    new_value: { competition_id: competitionId, description: result.description ?? null },
+    actor_id: actorId,
+  });
+  revalidatePath("/");
+  backTo(returnTo, { ok: result.description ? `Undone: ${result.description}` : "Merge undone." });
 }
 
 /** Re-sequences sort_order for exactly the rows whose position actually

@@ -100,3 +100,22 @@ export function groupByFamily(
 export function categoriesInFamily(categories: Category[], family: KataFamily): Category[] {
   return categories.filter((c) => kataFamilyOf(kataBaseOf(c.name)) === family);
 }
+
+/** The kata event immediately above/below the given one in the canonical
+ * 1-24 order -- the pairing "merge with kata above/below" acts on. Returns
+ * null at either end of the list, and also null across a family boundary
+ * (e.g. Kata Tensho, #11 Intermediate, has no "below" partner here even
+ * though #12 Kata Sanseru exists) -- kept deliberately family-scoped so
+ * this merge can never blur the family taxonomy the other merges rely on.
+ * Also null for a name that isn't one of the 24 canonical kata (e.g. an
+ * already-merged/combined category), so the button naturally disappears
+ * once a kata has been merged away. */
+export function adjacentKataOf(kataBaseName: string, direction: "above" | "below"): string | null {
+  const rank = RANK_BY_KATA[kataBaseName.trim()];
+  if (rank == null) return null;
+  const neighborRank = direction === "above" ? rank - 1 : rank + 1;
+  const neighbor = CANONICAL_KATA_ORDER[neighborRank];
+  if (!neighbor) return null;
+  if (neighbor.family !== CANONICAL_KATA_ORDER[rank].family) return null;
+  return neighbor.name;
+}

@@ -19,8 +19,9 @@ import {
 } from "@/components/ui";
 import { Markdown } from "@/lib/markdown";
 import { kataBases } from "@/lib/division";
-import { groupByFamily } from "@/lib/kata-families";
+import { groupByFamily, adjacentKataOf } from "@/lib/kata-families";
 import KataGroupDragZone from "@/components/KataGroupDragZone";
+import CategoryActionButton from "@/components/CategoryActionButton";
 import { createClient } from "@/lib/supabase/server";
 import { winnersRevealDateFor } from "@/lib/winners";
 import type { Category } from "@/lib/types";
@@ -212,7 +213,10 @@ export default async function Home() {
                               {family} Kata
                             </h4>
                             <div className="space-y-2" data-drag-list={`home-kata-groups-${competition.id}-${family}`}>
-                              {kataGroups.map(([base, subCats]) => (
+                              {kataGroups.map(([base, subCats]) => {
+                                const neighborAbove = adjacentKataOf(base, "above");
+                                const neighborBelow = adjacentKataOf(base, "below");
+                                return (
                                 <details key={base} data-drag-item={base} className="rounded-lg border border-neutral-200 bg-white shadow-sm">
                                   <summary className="flex cursor-pointer items-center gap-2 px-4 py-2.5 text-sm font-semibold text-neutral-800 hover:bg-neutral-50">
                                     {canManageKata ? (
@@ -226,6 +230,32 @@ export default async function Home() {
                                       <span>
                                         <NoTranslate>{base}</NoTranslate>{" "}
                                         <span className="font-normal text-neutral-400">({subCats.length} sub-categories)</span>
+                                      </span>
+                                    )}
+                                    {canManageKata && (neighborAbove || neighborBelow) && (
+                                      <span className="ml-auto flex flex-wrap gap-1">
+                                        {neighborAbove && (
+                                          <CategoryActionButton
+                                            actionName="mergeAdjacentKata"
+                                            fields={{ competition_id: competition.id, kata_base: base, direction: "above", return_to: "/" }}
+                                            className="rounded border border-fuchsia-300 px-2 py-0.5 text-xs font-normal text-fuchsia-700 hover:bg-fuchsia-50"
+                                            title={`Combine every sub-category of "${base}" with every sub-category of "${neighborAbove}" (the kata immediately above it) into one`}
+                                            confirmMessage={`Merge ALL of "${base}" with ALL of "${neighborAbove}" (every belt, age, and gender in both) into ONE combined category?\n\nExisting registrations move over automatically — no resubmission needed. Undo this from the All Competitions page in the admin panel, next to "+ Add category", if this isn't what you meant.`}
+                                          >
+                                            ↑ Merge with kata above
+                                          </CategoryActionButton>
+                                        )}
+                                        {neighborBelow && (
+                                          <CategoryActionButton
+                                            actionName="mergeAdjacentKata"
+                                            fields={{ competition_id: competition.id, kata_base: base, direction: "below", return_to: "/" }}
+                                            className="rounded border border-fuchsia-300 px-2 py-0.5 text-xs font-normal text-fuchsia-700 hover:bg-fuchsia-50"
+                                            title={`Combine every sub-category of "${base}" with every sub-category of "${neighborBelow}" (the kata immediately below it) into one`}
+                                            confirmMessage={`Merge ALL of "${base}" with ALL of "${neighborBelow}" (every belt, age, and gender in both) into ONE combined category?\n\nExisting registrations move over automatically — no resubmission needed. Undo this from the All Competitions page in the admin panel, next to "+ Add category", if this isn't what you meant.`}
+                                          >
+                                            Merge with kata below ↓
+                                          </CategoryActionButton>
+                                        )}
                                       </span>
                                     )}
                                   </summary>
@@ -248,7 +278,8 @@ export default async function Home() {
                                     })}
                                   </ul>
                                 </details>
-                              ))}
+                                );
+                              })}
                             </div>
                           </div>
                         ))}

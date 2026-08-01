@@ -1,13 +1,18 @@
 "use client";
 
 import { useTransition } from "react";
-import { deleteCategory, mergeCategoryToMix, mergeCategoryAgeGroup, mergeKataFamily, mergeKataBeltGroup } from "@/app/actions/admin";
+import {
+  deleteCategory, mergeCategoryToMix, mergeCategoryAgeGroup, mergeKataFamily, mergeKataBeltGroup,
+  mergeAdjacentKata, undoLastMerge,
+} from "@/app/actions/admin";
 
 const ACTIONS = {
   mergeToMix: mergeCategoryToMix,
   mergeAgeGroup: mergeCategoryAgeGroup,
   mergeFamily: mergeKataFamily,
   mergeBeltGroup: mergeKataBeltGroup,
+  mergeAdjacentKata: mergeAdjacentKata,
+  undoMerge: undoLastMerge,
   delete: deleteCategory,
 } as const;
 

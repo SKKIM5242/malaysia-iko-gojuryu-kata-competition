@@ -11,7 +11,7 @@ import SubcategoryDragZone from "@/components/SubcategoryDragZone";
 import ScrollToAnchor from "@/components/ScrollToAnchor";
 import CategoryActionButton from "@/components/CategoryActionButton";
 import { kataBaseOf } from "@/lib/division";
-import { groupByFamily } from "@/lib/kata-families";
+import { groupByFamily, adjacentKataOf } from "@/lib/kata-families";
 import type { Category } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -62,6 +62,23 @@ export default async function AdminCompetitions({
     });
     for (const row of (counts as Array<{ category_id: string; cnt: number }>) ?? []) {
       categoryPaidCount.set(row.category_id, row.cnt);
+    }
+  }
+  // The most recent not-yet-undone merge per competition — drives whether
+  // the "Undo last merge" button next to "+ Add category" shows at all,
+  // and what its confirm/tooltip text says. Ordered newest-first so the
+  // first row seen per competition_id is the one Undo would act on.
+  const latestMergeByCompetition = new Map<string, { description: string | null }>();
+  if (canManageCompetition) {
+    const { data: mergeLogRows } = await supabaseAdmin
+      .from("category_merge_log")
+      .select("competition_id, description, created_at")
+      .is("undone_at", null)
+      .order("created_at", { ascending: false });
+    for (const row of (mergeLogRows as Array<{ competition_id: string; description: string | null }>) ?? []) {
+      if (!latestMergeByCompetition.has(row.competition_id)) {
+        latestMergeByCompetition.set(row.competition_id, { description: row.description });
+      }
     }
   }
   const editingCategory = params.editcat
@@ -309,13 +326,26 @@ export default async function AdminCompetitions({
                     <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
                       <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">Categories</p>
                       {canManageCompetition && (
-                        <Link
-                          href={`/admin/competitions?addcat=${c.id}`}
-                          scroll={false}
-                          className="rounded border border-neutral-300 px-2 py-0.5 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
-                        >
-                          + Add category
-                        </Link>
+                        <span className="flex flex-wrap items-center gap-2">
+                          <Link
+                            href={`/admin/competitions?addcat=${c.id}`}
+                            scroll={false}
+                            className="rounded border border-neutral-300 px-2 py-0.5 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
+                          >
+                            + Add category
+                          </Link>
+                          {latestMergeByCompetition.has(c.id) && (
+                            <CategoryActionButton
+                              actionName="undoMerge"
+                              fields={{ competition_id: c.id, return_to: categoryReturnTo(c.id) }}
+                              className="rounded border border-orange-300 px-2 py-0.5 text-xs font-semibold text-orange-700 hover:bg-orange-50"
+                              title={latestMergeByCompetition.get(c.id)?.description ?? "Undo the most recent merge for this tier"}
+                              confirmMessage={`Undo the most recent merge for this tier?\n\n${latestMergeByCompetition.get(c.id)?.description ?? ""}\n\nThis restores the categories it combined and moves registrations back to where they were. Click again afterward to step back one merge further, if more than one was done.`}
+                            >
+                              ↺ Undo last merge
+                            </CategoryActionButton>
+                          )}
+                        </span>
                       )}
                     </div>
                     {(categoriesByCompetition.get(c.id) ?? []).length === 0 ? (
@@ -350,6 +380,8 @@ export default async function AdminCompetitions({
                           const danCats = cats.filter((cat) => cat.belt_group === "dan");
                           const kyuMerged = kyuCats.length === 1 && kyuCats[0].name === `${base} — Color/Kyu Belt — Combined (All Ages & Genders)`;
                           const danMerged = danCats.length === 1 && danCats[0].name === `${base} — Black Belt & Dan Holders — Combined (All Ages & Genders)`;
+                          const neighborAbove = adjacentKataOf(base, "above");
+                          const neighborBelow = adjacentKataOf(base, "below");
                           return (
                           <details
                             key={base}
@@ -375,8 +407,30 @@ export default async function AdminCompetitions({
                                   <span className="font-normal text-neutral-400">({cats.length} sub-categories)</span>
                                 </span>
                               )}
-                              {canManageCompetition && (kyuCats.length > 1 || danCats.length > 1) && (
-                                <span className="ml-auto flex gap-1">
+                              {canManageCompetition && (neighborAbove || neighborBelow || kyuCats.length > 1 || danCats.length > 1) && (
+                                <span className="ml-auto flex flex-wrap gap-1">
+                                  {neighborAbove && (
+                                    <CategoryActionButton
+                                      actionName="mergeAdjacentKata"
+                                      fields={{ competition_id: c.id, kata_base: base, direction: "above", return_to: categoryReturnTo(c.id) }}
+                                      className="rounded border border-fuchsia-300 px-2 py-0.5 text-xs font-normal text-fuchsia-700 hover:bg-fuchsia-50"
+                                      title={`Combine every sub-category of "${base}" with every sub-category of "${neighborAbove}" (the kata immediately above it) into one`}
+                                      confirmMessage={`Merge ALL of "${base}" with ALL of "${neighborAbove}" (every belt, age, and gender in both) into ONE combined category?\n\nExisting registrations move over automatically — no resubmission needed. Undo is available next to "+ Add category" if this isn't what you meant.`}
+                                    >
+                                      ↑ Merge with kata above
+                                    </CategoryActionButton>
+                                  )}
+                                  {neighborBelow && (
+                                    <CategoryActionButton
+                                      actionName="mergeAdjacentKata"
+                                      fields={{ competition_id: c.id, kata_base: base, direction: "below", return_to: categoryReturnTo(c.id) }}
+                                      className="rounded border border-fuchsia-300 px-2 py-0.5 text-xs font-normal text-fuchsia-700 hover:bg-fuchsia-50"
+                                      title={`Combine every sub-category of "${base}" with every sub-category of "${neighborBelow}" (the kata immediately below it) into one`}
+                                      confirmMessage={`Merge ALL of "${base}" with ALL of "${neighborBelow}" (every belt, age, and gender in both) into ONE combined category?\n\nExisting registrations move over automatically — no resubmission needed. Undo is available next to "+ Add category" if this isn't what you meant.`}
+                                    >
+                                      Merge with kata below ↓
+                                    </CategoryActionButton>
+                                  )}
                                   {kyuCats.length > 1 && !kyuMerged && (
                                     <CategoryActionButton
                                       actionName="mergeBeltGroup"
