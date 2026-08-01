@@ -172,12 +172,13 @@ export default function KataRecorder({
     return () => document.removeEventListener("fullscreenchange", onFsChange);
   }, []);
 
-  // Full screen only makes sense while actually composing the shot or
-  // recording — once it moves to review there's more UI (re-record/submit/
-  // agreement) than a full-screen layout has room for, so drop back to the
-  // normal page automatically instead of requiring an extra tap.
+  // Full screen now covers the entire flow -- live, recording, AND review
+  // (the header/footer should stay gone through the replay + delete/submit
+  // step too, not just while composing the shot) -- so the only automatic
+  // exit left is once it's actually done and there's nothing left to keep
+  // the page maximized for.
   useEffect(() => {
-    if (fullscreen && phase !== "live" && phase !== "recording") {
+    if (fullscreen && phase === "done") {
       setFullscreen(false);
       if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
     }
@@ -192,20 +193,18 @@ export default function KataRecorder({
    * top where it works (also hides the browser's own address bar), never
    * required — its failure is silently ignored since the CSS overlay
    * already covers the requirement either way. */
-  function toggleFullscreen() {
-    setFullscreen((wasFullscreen) => {
-      const next = !wasFullscreen;
-      if (next) {
-        const el = containerRef.current as
-          | (HTMLDivElement & { webkitRequestFullscreen?: () => Promise<void> })
-          | null;
-        if (el?.requestFullscreen) void el.requestFullscreen().catch(() => {});
-        else if (el?.webkitRequestFullscreen) void el.webkitRequestFullscreen().catch(() => {});
-      } else if (document.fullscreenElement) {
-        void document.exitFullscreen().catch(() => {});
-      }
-      return next;
-    });
+  function enterFullscreen() {
+    setFullscreen(true);
+    const el = containerRef.current as
+      | (HTMLDivElement & { webkitRequestFullscreen?: () => Promise<void> })
+      | null;
+    if (el?.requestFullscreen) void el.requestFullscreen().catch(() => {});
+    else if (el?.webkitRequestFullscreen) void el.webkitRequestFullscreen().catch(() => {});
+  }
+
+  function exitFullscreen() {
+    setFullscreen(false);
+    if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
   }
 
   async function startCamera() {
@@ -222,6 +221,7 @@ export default function KataRecorder({
       }
       setPhase("live");
       requestAnimationFrame(renderLoop);
+      enterFullscreen();
     } catch {
       setError("Could not access your camera. Please allow camera & microphone permission and try again.");
     }
@@ -482,7 +482,7 @@ export default function KataRecorder({
                 <p className="text-sm font-bold">Kata Recording</p>
                 <button
                   type="button"
-                  onClick={toggleFullscreen}
+                  onClick={exitFullscreen}
                   className="rounded border border-white/30 px-2.5 py-1 text-xs font-semibold hover:bg-white/10"
                 >
                   ✕ Exit full screen
@@ -506,7 +506,13 @@ export default function KataRecorder({
             the background (still needed if the participant re-records)
             and would otherwise show through underneath. */}
         {(phase === "review" || phase === "uploading") && blobUrl && (
-          <video src={blobUrl} controls playsInline className="block h-full w-full object-contain" />
+          <video
+            src={blobUrl}
+            controls
+            playsInline
+            disablePictureInPicture
+            className="block h-full w-full object-contain"
+          />
         )}
         {phase === "idle" && (
           <div className="flex h-full items-center justify-center p-8 text-center text-neutral-300">
@@ -551,17 +557,6 @@ export default function KataRecorder({
             className="absolute bottom-5 left-1/2 flex h-16 w-16 -translate-x-1/2 items-center justify-center rounded-full border-4 border-white/80 bg-neutral-900/90 text-2xl text-white shadow-lg active:scale-95"
           >
             ■
-          </button>
-        )}
-        {phase === "live" && !fullscreen && (
-          <button
-            type="button"
-            onClick={toggleFullscreen}
-            aria-label="Full screen"
-            title="Fill the whole phone/tablet screen for recording, header and footer temporarily hidden"
-            className="absolute bottom-5 right-3 flex h-11 w-11 items-center justify-center rounded-md border border-white/50 bg-black/60 text-lg text-white shadow-lg"
-          >
-            ⛶
           </button>
         )}
         {/* Delete & re-record / Submit sit just under the burned-in header
