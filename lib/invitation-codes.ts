@@ -35,10 +35,44 @@ export function shortTierName(competitionName: string): string {
   return m ? `USD ${m[1]} Tier` : competitionName;
 }
 
-/** Everything except the running number. */
-export function codePrefix(role: string, feeUsd: number): string {
+/** Everything except the running number. Multiple tiers (a code covering a
+ * combination) join their tokens with "-", e.g. IKO-SCHOOL-TIER-USD10-USD100-2026-. */
+export function codePrefix(role: string, feesUsd: number[]): string {
   const roleToken = CODE_ROLE_TOKEN[role] ?? role.toUpperCase();
-  return `IKO-${roleToken}-TIER-${tierToken(feeUsd)}-2026-`;
+  const tierTokens = feesUsd.map(tierToken).join("-");
+  return `IKO-${roleToken}-TIER-${tierTokens}-2026-`;
+}
+
+export interface TierCombo {
+  /** Cheapest-first, matching how the label and code prefix order tiers. */
+  competitionIds: string[];
+  label: string;
+}
+
+/** Every contiguous range of tiers, sorted by fee ascending — for 3 tiers
+ * (10/100/200) this yields exactly the 6 combinations the organiser asked
+ * for: {10}, {10,100}, {10,100,200}, {100}, {100,200}, {200}. Deliberately
+ * excludes non-contiguous combinations like {10,200} skipping the middle
+ * tier, since a code is meant to cover a single continuous range of access,
+ * not an arbitrary pick-list. Scales automatically if a tier is added or
+ * removed. */
+export function tierCombinations(
+  competitions: Array<{ id: string; name: string; registration_fee_usd: number | null }>,
+): TierCombo[] {
+  const sorted = [...competitions].sort(
+    (a, b) => (a.registration_fee_usd ?? 0) - (b.registration_fee_usd ?? 0),
+  );
+  const combos: TierCombo[] = [];
+  for (let i = 0; i < sorted.length; i++) {
+    for (let j = i; j < sorted.length; j++) {
+      const slice = sorted.slice(i, j + 1);
+      combos.push({
+        competitionIds: slice.map((c) => c.id),
+        label: slice.map((c) => shortTierName(c.name)).join(" + "),
+      });
+    }
+  }
+  return combos;
 }
 
 const SEQUENCE_DIGITS = 5;

@@ -23,7 +23,7 @@ export default async function InvitationCodeList({
   role?: string;
   returnTo: string;
   codeExample: string;
-  competitions: Array<{ id: string; name: string }>;
+  competitions: Array<{ id: string; name: string; registration_fee_usd: number | null }>;
   editingId?: string;
 }) {
   const supabase = await createClient();
@@ -65,6 +65,7 @@ export default async function InvitationCodeList({
             valid_until: editing.valid_until,
             sign_in_limit: editing.sign_in_limit,
             competition_id: editing.competition_id,
+            competition_ids: editing.competition_ids,
           }}
           onCancelHref={returnTo}
         />
@@ -74,7 +75,7 @@ export default async function InvitationCodeList({
           action={bulkUploadInvitationCodes}
           templateHref="/invitation-codes-template.csv"
           entityLabel="invitation code"
-          note="competition_name must match an existing competition exactly; role must be one of the role keys in the template. Dates use DD/MM/YYYY format."
+          note="competition_name must match an existing competition exactly — join multiple tiers with + (e.g. &quot;USD 10 Tier + USD 100 Tier&quot;) for a code covering more than one; role must be one of the role keys in the template. Dates use DD/MM/YYYY format."
         />
       )}
       <h2 className="text-lg font-bold">{role ? "Codes For This Role" : "All Codes"}</h2>
@@ -124,7 +125,11 @@ export default async function InvitationCodeList({
             phone: c.phone ?? "",
             code: c.code,
             role: ROLE_LABELS[c.role] ?? c.role,
-            competition: competitionNameById.get(c.competition_id) ?? "",
+            competition: (c.competition_ids?.length ? c.competition_ids : [c.competition_id])
+              .filter(Boolean)
+              .map((id: string) => competitionNameById.get(id))
+              .filter(Boolean)
+              .join(" + "),
             valid_from: c.valid_from ? formatDate(c.valid_from) : "",
             valid_until: c.valid_until ? formatDate(c.valid_until) : "",
             sign_in_limit: c.sign_in_limit != null ? String(c.sign_in_limit) : "",

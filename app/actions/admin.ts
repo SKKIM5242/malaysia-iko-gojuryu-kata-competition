@@ -2254,7 +2254,8 @@ function requireInvitationCodeFields(formData: FormData, returnTo: string) {
   const validFrom = String(formData.get("valid_from") ?? "").trim();
   const validUntil = String(formData.get("valid_until") ?? "").trim();
   const signInLimitRaw = String(formData.get("sign_in_limit") ?? "").trim();
-  const competitionId = String(formData.get("competition_id") ?? "").trim();
+  const competitionIdsRaw = String(formData.get("competition_ids") ?? "").trim();
+  const competitionIds = competitionIdsRaw ? competitionIdsRaw.split(",").filter(Boolean) : [];
   if (!INVITATION_CODE_ROLES.includes(role)) backTo(returnTo, { error: "A valid role is required." });
   if (!code) backTo(returnTo, { error: "Code is required." });
   if (!maxUsesRaw || Number(maxUsesRaw) < 1) backTo(returnTo, { error: "Max uses is required." });
@@ -2262,14 +2263,18 @@ function requireInvitationCodeFields(formData: FormData, returnTo: string) {
   if (!validFrom) backTo(returnTo, { error: "Valid from is required." });
   if (!validUntil) backTo(returnTo, { error: "Valid until is required." });
   if (!signInLimitRaw || Number(signInLimitRaw) < 1) backTo(returnTo, { error: "Sign-in limit is required." });
-  if (!competitionId) backTo(returnTo, { error: "Competition is required." });
+  if (competitionIds.length === 0) backTo(returnTo, { error: "Competition tier is required." });
   return {
     role, code, note, email, phone,
     max_uses: Number(maxUsesRaw),
     valid_from: validFrom,
     valid_until: validUntil,
     sign_in_limit: Number(signInLimitRaw),
-    competition_id: competitionId,
+    // Cheapest tier stays the single-value primary (backward-compat display
+    // and profiles.sign_in_competition_id); competition_ids carries the
+    // full granted range — see lib/invitation-codes.ts's tierCombinations.
+    competition_id: competitionIds[0],
+    competition_ids: competitionIds,
   };
 }
 
@@ -2284,18 +2289,20 @@ function requireInvitationCodeFields(formData: FormData, returnTo: string) {
  * event handlers, not just form submissions. */
 export async function generateSequentialInvitationCode(
   role: string,
-  competitionId: string,
+  competitionIds: string[],
 ): Promise<{ code: string } | { error: string }> {
   if (!INVITATION_CODE_ROLES.includes(role)) return { error: "Pick a role first." };
-  if (!competitionId) return { error: "Pick a competition tier first." };
+  if (!competitionIds.length) return { error: "Pick a competition tier first." };
   const { supabase } = await getActor();
-  const { data: competition } = await supabase
+  const { data: competitions } = await supabase
     .from("competitions")
-    .select("registration_fee_usd")
-    .eq("id", competitionId)
-    .maybeSingle();
-  if (!competition) return { error: "Competition not found." };
-  const prefix = codePrefix(role, Number(competition.registration_fee_usd ?? 0));
+    .select("id, registration_fee_usd")
+    .in("id", competitionIds);
+  if (!competitions || competitions.length !== competitionIds.length) return { error: "Competition not found." };
+  const fees = competitions
+    .map((c) => Number(c.registration_fee_usd ?? 0))
+    .sort((a, b) => a - b);
+  const prefix = codePrefix(role, fees);
   const { data: existing } = await supabase
     .from("invitation_codes")
     .select("code")
@@ -2370,8 +2377,10 @@ export async function bulkUploadInvitationCodes(_prev: CsvUploadResult, formData
     : { data: null };
   const generated_by = myProfile?.full_name || myProfile?.email || null;
 
-  const { data: competitions } = await supabase.from("competitions").select("id, name");
-  const competitionIdByName = new Map((competitions ?? []).map((c) => [c.name.trim().toLowerCase(), c.id]));
+  const { data: competitions } = await supabase.from("competitions").select("id, name, registration_fee_usd");
+  const competitionByName = new Map(
+    (competitions ?? []).map((c) => [c.name.trim().toLowerCase(), { id: c.id, fee: Number(c.registration_fee_usd ?? 0) }]),
+  );
 
   const failures: Array<{ row: number; name: string; error: string }> = [];
   let succeeded = 0;
@@ -2390,7 +2399,12 @@ export async function bulkUploadInvitationCodes(_prev: CsvUploadResult, formData
     const validFrom = validFromRaw ? parseDDMMYYYY(validFromRaw) : null;
     const validUntil = validUntilRaw ? parseDDMMYYYY(validUntilRaw) : null;
     const signInLimit = Number(get(r, "sign_in_limit"));
-    const competitionId = competitionIdByName.get(get(r, "competition_name").trim().toLowerCase());
+    // A code can cover more than one tier — "USD 10 Tier + USD 100 Tier" —
+    // joined with "+" the same way the combination is displayed elsewhere.
+    const tierNames = get(r, "competition_name").split("+").map((s) => s.trim().toLowerCase()).filter(Boolean);
+    const matchedTiers = tierNames.map((n) => competitionByName.get(n)).filter((t): t is { id: string; fee: number } => !!t);
+    matchedTiers.sort((a, b) => a.fee - b.fee);
+    const competitionIds = matchedTiers.map((t) => t.id);
     if ((validFromRaw && !validFrom) || (validUntilRaw && !validUntil)) {
       failures.push({ row: rowNo, name: code, error: "Invalid valid_from/valid_until (use DD/MM/YYYY)" });
       continue;
@@ -2399,11 +2413,14 @@ export async function bulkUploadInvitationCodes(_prev: CsvUploadResult, formData
       failures.push({ row: rowNo, name: code, error: "email, max_uses, valid_from, valid_until, and sign_in_limit are all required" });
       continue;
     }
-    if (!competitionId) { failures.push({ row: rowNo, name: code, error: "competition_name does not match an existing competition" }); continue; }
+    if (matchedTiers.length === 0 || matchedTiers.length !== tierNames.length) {
+      failures.push({ row: rowNo, name: code, error: "competition_name does not match existing competition(s) — separate multiple tiers with +" });
+      continue;
+    }
 
     const record = {
       code, role, email, max_uses: maxUses, valid_from: validFrom, valid_until: validUntil,
-      sign_in_limit: signInLimit, competition_id: competitionId,
+      sign_in_limit: signInLimit, competition_id: competitionIds[0], competition_ids: competitionIds,
       note: get(r, "note") || null, generated_by,
     };
     const { data, error } = await supabase.from("invitation_codes").insert(record).select("id").single();
@@ -3346,7 +3363,7 @@ export async function generateRecordInvitationCode(formData: FormData) {
     .select("registration_fee_usd")
     .eq("id", competitionId)
     .maybeSingle();
-  const prefix = codePrefix(role, Number(picCompetition?.registration_fee_usd ?? 0));
+  const prefix = codePrefix(role, [Number(picCompetition?.registration_fee_usd ?? 0)]);
   const { data: existingCodes } = await supabase
     .from("invitation_codes")
     .select("code")

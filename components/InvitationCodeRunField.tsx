@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { generateSequentialInvitationCode } from "@/app/actions/admin";
 import { adminInput, adminLabel } from "@/components/admin-styles";
-import { shortTierName } from "@/lib/invitation-codes";
+import { tierCombinations } from "@/lib/invitation-codes";
 
 /** The `invitation_code` text field on an Add/Edit record form, with a "Run"
  * button beside it that fills in the next systematic code —
@@ -30,20 +30,22 @@ export default function InvitationCodeRunField({
 }: {
   id: string;
   role: string;
-  competitions: Array<{ id: string; name: string }>;
+  competitions: Array<{ id: string; name: string; registration_fee_usd: number | null }>;
   defaultValue?: string | null;
   label?: string;
   placeholder?: string;
 }) {
+  const combos = tierCombinations(competitions);
   const [code, setCode] = useState(defaultValue ?? "");
-  const [competitionId, setCompetitionId] = useState("");
+  const [comboValue, setComboValue] = useState("");
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function run() {
     setRunning(true);
     setError(null);
-    const result = await generateSequentialInvitationCode(role, competitionId);
+    const competitionIds = comboValue ? comboValue.split(",").filter(Boolean) : [];
+    const result = await generateSequentialInvitationCode(role, competitionIds);
     if ("code" in result) setCode(result.code);
     else setError(result.error);
     setRunning(false);
@@ -62,20 +64,20 @@ export default function InvitationCodeRunField({
           placeholder={placeholder}
         />
         <select
-          aria-label="Competition tier for the generated code"
-          value={competitionId}
-          onChange={(e) => setCompetitionId(e.target.value)}
+          aria-label="Competition tier(s) for the generated code"
+          value={comboValue}
+          onChange={(e) => setComboValue(e.target.value)}
           className={`${adminInput} w-auto`}
         >
-          <option value="">Tier for code…</option>
-          {competitions.map((c) => (
-            <option key={c.id} value={c.id}>{shortTierName(c.name)}</option>
+          <option value="">Tier(s) for code…</option>
+          {combos.map((c) => (
+            <option key={c.competitionIds.join(",")} value={c.competitionIds.join(",")}>{c.label}</option>
           ))}
         </select>
         <button
           type="button"
           onClick={run}
-          disabled={running || !competitionId}
+          disabled={running || !comboValue}
           className="rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {running ? "Running…" : "Run"}
@@ -83,9 +85,9 @@ export default function InvitationCodeRunField({
       </div>
       {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
       <p className="mt-1 text-xs text-neutral-400">
-        Pick a tier then click <strong>Run</strong> to fill in the next code for this role and tier —
-        the same running sequence as Accounts → Invitation codes. You can also type a code by hand.
-        Nothing is reserved until you save this form.
+        Pick tier(s) then click <strong>Run</strong> to fill in the next code for this role and
+        combination — the same running sequence as Accounts → Invitation codes. You can also type
+        a code by hand. Nothing is reserved until you save this form.
       </p>
     </div>
   );

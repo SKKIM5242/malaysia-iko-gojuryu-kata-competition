@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { createInvitationCode, updateInvitationCode, generateSequentialInvitationCode } from "@/app/actions/admin";
 import { Card, adminBtn, adminBtnSecondary, adminInput, adminLabel } from "@/components/admin-styles";
-import { shortTierName } from "@/lib/invitation-codes";
+import { tierCombinations } from "@/lib/invitation-codes";
 
 export const ROLE_LABELS: Record<string, string> = {
   school: "School / Dojo / Club",
@@ -30,6 +30,7 @@ export interface InvitationCodeRow {
   valid_until: string | null;
   sign_in_limit: number | null;
   competition_id: string | null;
+  competition_ids: string[] | null;
 }
 
 /** Full-featured invitation-code creator/editor, shared by every admin
@@ -65,12 +66,16 @@ export default function InvitationCodeForm({
   title?: string;
   idPrefix: string;
   codeExample: string;
-  competitions: Array<{ id: string; name: string }>;
+  competitions: Array<{ id: string; name: string; registration_fee_usd: number | null }>;
   editing?: InvitationCodeRow;
   onCancelHref?: string;
 }) {
   const [selectedRole, setSelectedRole] = useState(role ?? editing?.role ?? "referee");
-  const [competitionId, setCompetitionId] = useState(editing?.competition_id ?? "");
+  const combos = tierCombinations(competitions);
+  const editingCombo = editing?.competition_ids?.length
+    ? editing.competition_ids.join(",")
+    : editing?.competition_id ?? "";
+  const [comboValue, setComboValue] = useState(editingCombo);
   const [code, setCode] = useState(editing?.code ?? "");
   const [running, setRunning] = useState(false);
   const [runError, setRunError] = useState<string | null>(null);
@@ -78,7 +83,8 @@ export default function InvitationCodeForm({
   async function runGenerate() {
     setRunning(true);
     setRunError(null);
-    const result = await generateSequentialInvitationCode(selectedRole, competitionId);
+    const competitionIds = comboValue ? comboValue.split(",").filter(Boolean) : [];
+    const result = await generateSequentialInvitationCode(selectedRole, competitionIds);
     if ("code" in result) setCode(result.code);
     else setRunError(result.error);
     setRunning(false);
@@ -118,18 +124,18 @@ export default function InvitationCodeForm({
             </div>
           )}
           <div>
-            <label htmlFor={`${idPrefix}_competition_id`} className={adminLabel}>Competition Tier *</label>
+            <label htmlFor={`${idPrefix}_competition_id`} className={adminLabel}>Competition Tier(s) *</label>
             <select
               id={`${idPrefix}_competition_id`}
-              name="competition_id"
+              name="competition_ids"
               required
-              value={competitionId}
-              onChange={(e) => setCompetitionId(e.target.value)}
+              value={comboValue}
+              onChange={(e) => setComboValue(e.target.value)}
               className={adminInput}
             >
-              <option value="" disabled>Select competition tier</option>
-              {competitions.map((c) => (
-                <option key={c.id} value={c.id}>{shortTierName(c.name)}</option>
+              <option value="" disabled>Select competition tier(s)</option>
+              {combos.map((c) => (
+                <option key={c.competitionIds.join(",")} value={c.competitionIds.join(",")}>{c.label}</option>
               ))}
             </select>
           </div>
@@ -148,7 +154,7 @@ export default function InvitationCodeForm({
               <button
                 type="button"
                 onClick={runGenerate}
-                disabled={running || !competitionId}
+                disabled={running || !comboValue}
                 className={`${adminBtnSecondary} shrink-0 whitespace-nowrap disabled:opacity-50`}
               >
                 {running ? "Running…" : "Run"}
@@ -158,7 +164,7 @@ export default function InvitationCodeForm({
           {runError && <p className="mt-1 text-xs text-red-700">{runError}</p>}
           {!editing && !runError && (
             <p className="mt-1 text-xs text-neutral-400">
-              Pick Role and Competition Tier above, then click Run — the systematic code for that
+              Pick Role and Competition Tier(s) above, then click Run — the systematic code for that
               exact combination fills in here, ready to reuse if this form isn&apos;t submitted.
             </p>
           )}
@@ -260,8 +266,8 @@ export default function InvitationCodeForm({
         </div>
         <p className="text-xs text-neutral-400">
           Every field is required except Note and Phone No. The code activates instantly at public
-          sign-up — only for the Competition selected above — and copies Valid from/until and
-          Sign-in limit onto the resulting account as its own sign-in window/cap. Email binds the
+          sign-up — granting access across every tier selected above — and copies Valid from/until
+          and Sign-in limit onto the resulting account as its own sign-in window/cap. Email binds the
           code to one address; Max uses caps total redemptions. Phone No. is a contact reference
           only — it doesn&apos;t enable a Telegram DM by itself, since the Bot API can only message
           someone who has already started a chat with the bot.
