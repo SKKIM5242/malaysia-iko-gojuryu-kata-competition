@@ -95,11 +95,8 @@ async function getPendingRegistrations(
     }));
 }
 
-function watermarkText(eventDate: string | null | undefined): string {
-  const label = eventDate
-    ? new Date(eventDate + "T00:00:00").toLocaleDateString("en-US", { month: "short", year: "numeric" })
-    : "Sep 2026";
-  return `Malaysia Open - IKO Goju-ryu Karate-do - Kata Competition ${label}`;
+function watermarkText(): string {
+  return "Malaysia Open Virtual Karate-do Kata Competition 2026";
 }
 
 interface RecordingContext {
@@ -210,7 +207,7 @@ function PersonalRecordingSection({
             initialAttempts={profile.record_attempts}
             maxAttempts={ctx.maxAttempts}
             hasPendingPurchase={ctx.hasPendingPurchase}
-            watermark={watermarkText(ctx.eventDate)}
+            watermark={watermarkText()}
             recordingStart={ctx.eventDate}
             recordingEnd={ctx.registrationDeadline}
           />
@@ -858,7 +855,7 @@ export default async function AccountPage({
               initialAttempts={profile.record_attempts}
               maxAttempts={maxAttempts}
               hasPendingPurchase={hasPendingPurchase}
-              watermark={watermarkText(eventDate)}
+              watermark={watermarkText()}
               recordingStart={eventDate}
               recordingEnd={registrationDeadline}
             />

@@ -92,7 +92,7 @@ function drawFrame(
   ctx.fillStyle = "#ffffff";
   ctx.shadowColor = "rgba(0,0,0,0.55)";
   ctx.shadowBlur = 3;
-  ctx.font = `${Math.max(9, Math.round(w * 0.018))}px Arial, sans-serif`;
+  ctx.font = "8px Arial, sans-serif";
   ctx.fillText(watermark, w / 2, h - 10);
   ctx.restore();
 }
@@ -474,16 +474,21 @@ export default function KataRecorder({
             itself (absolute, top of the box) instead of taking their own
             row above it -- in full screen especially, every bit of height
             given to a separate row is height taken away from the actual
-            preview, which is the whole point of full screen. */}
+            preview, which is the whole point of full screen. No background
+            box behind the title bar -- just the text and button themselves,
+            with a drop-shadow for legibility over whatever's playing
+            underneath, so it doesn't read as its own separate strip sitting
+            in front of the recording header banner. */}
         {(fullscreen || error) && (
           <div className="absolute inset-x-0 top-0 z-20 flex flex-col">
             {fullscreen && (
-              <div className="flex items-center justify-between gap-2 bg-neutral-900/85 px-3 py-2 text-white backdrop-blur-sm">
+              <div className="flex items-center justify-between gap-2 px-3 py-2 text-white" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.85)" }}>
                 <p className="text-sm font-bold">Kata Recording</p>
                 <button
                   type="button"
                   onClick={exitFullscreen}
-                  className="rounded border border-white/30 px-2.5 py-1 text-xs font-semibold hover:bg-white/10"
+                  className="rounded border border-white/50 bg-black/30 px-2.5 py-1 text-xs font-semibold hover:bg-black/50"
+                  style={{ textShadow: "none" }}
                 >
                   ✕ Exit full screen
                 </button>
@@ -520,32 +525,26 @@ export default function KataRecorder({
           </div>
         )}
         {phase !== "idle" && phase !== "review" && phase !== "uploading" && (
-          <div className="absolute right-2 top-[13%] rounded bg-black/70 px-2 py-1 text-right text-[11px] font-semibold leading-tight text-white">
+          <div className="absolute right-2 top-12 rounded bg-black/70 px-1.5 py-0.5 text-right text-[10px] font-semibold leading-tight text-white">
             Deleted Recording: {attempts} / Available: {maxAttempts}
           </div>
         )}
         {phase === "recording" && (
-          <div className="absolute left-3 top-[13%] flex flex-col items-start gap-1">
-            <div className="flex items-center gap-2 rounded-full bg-black/70 px-3 py-1 text-sm font-semibold text-white">
-              <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-red-500" /> LIVE REC {mm}:{ss} / 05:00
-            </div>
-            {recordingStartedAt && (
-              <div className="rounded bg-black/60 px-2 py-0.5 text-[11px] text-white">
-                Recording started {formatDateTime(recordingStartedAt.toISOString())}
-              </div>
-            )}
+          <div className="absolute left-3 top-12 flex items-center gap-1.5 rounded-full bg-black/70 px-2.5 py-0.5 text-xs font-semibold text-white">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" /> LIVE REC {mm}:{ss} / 05:00
           </div>
         )}
-        {/* Start/Stop (round) + full-screen toggle (square, bottom-right)
-            live INSIDE the recording area itself instead of a separate row
-            below it -- that row used to eat into the height available for
-            the actual preview, most noticeable in full screen mode where
-            every pixel of vertical space matters. */}
+        {/* Start/Stop (round) lives INSIDE the recording area itself instead
+            of a separate row below it -- that row used to eat into the
+            height available for the actual preview, most noticeable in
+            full screen mode where every pixel of vertical space matters.
+            Sits a bit clear of the very bottom edge so it doesn't crowd
+            the burned-in watermark text there. */}
         {phase === "live" && (
           <button
             onClick={startRecording}
             aria-label="Start recording"
-            className="absolute bottom-5 left-1/2 flex h-16 w-16 -translate-x-1/2 items-center justify-center rounded-full border-4 border-white/80 bg-red-600/90 text-2xl text-white shadow-lg active:scale-95"
+            className="absolute bottom-10 left-1/2 flex h-16 w-16 -translate-x-1/2 items-center justify-center rounded-full border-4 border-white/80 bg-red-600/90 text-2xl text-white shadow-lg active:scale-95"
           >
             ●
           </button>
@@ -554,21 +553,31 @@ export default function KataRecorder({
           <button
             onClick={stopRecording}
             aria-label="Stop recording"
-            className="absolute bottom-5 left-1/2 flex h-16 w-16 -translate-x-1/2 items-center justify-center rounded-full border-4 border-white/80 bg-neutral-900/90 text-2xl text-white shadow-lg active:scale-95"
+            className="absolute bottom-10 left-1/2 flex h-16 w-16 -translate-x-1/2 items-center justify-center rounded-full border-4 border-white/80 bg-neutral-900/90 text-2xl text-white shadow-lg active:scale-95"
           >
             ■
           </button>
         )}
+        {/* Manual way back into full screen after tapping "Exit full
+            screen" -- without this there was no way back in short of
+            reloading the page. */}
+        {!fullscreen &&
+          (phase === "live" || phase === "recording" || phase === "review" || phase === "uploading") && (
+            <button
+              type="button"
+              onClick={enterFullscreen}
+              aria-label="Full screen"
+              title="Fill the whole phone/tablet screen for recording, header and footer temporarily hidden"
+              className="absolute bottom-3 right-3 flex h-11 w-11 items-center justify-center rounded-md border border-white/50 bg-black/60 text-lg text-white shadow-lg"
+            >
+              ⛶
+            </button>
+          )}
         {/* Delete & re-record / Submit sit just under the burned-in header
             banner (top ~11% of the recorded frame), overlaid on the replay
             itself, instead of a row below the video. */}
         {phase === "review" && (
           <div className="absolute inset-x-0 top-[13%] flex flex-col items-center gap-1.5 px-3">
-            {recordingStartedAt && (
-              <div className="rounded bg-black/60 px-2 py-0.5 text-[11px] text-white shadow">
-                Recording started {formatDateTime(recordingStartedAt.toISOString())}
-              </div>
-            )}
             <div className="flex w-full items-center justify-between gap-2">
               <button
                 onClick={handleReRecord}
@@ -598,6 +607,18 @@ export default function KataRecorder({
                 <BuyExtraAttemptsButton hasPendingPurchase={hasPendingPurchase} />
               </div>
             )}
+          </div>
+        )}
+        {/* Only shown once there's an actual submitted/reviewable take --
+            bottom-center, plain white text (no background box) so it reads
+            as part of the recording itself, right above the burned-in
+            watermark rather than competing with the video controls bar. */}
+        {phase === "review" && recordingStartedAt && (
+          <div
+            className="pointer-events-none absolute inset-x-0 bottom-12 text-center text-xs font-semibold text-white"
+            style={{ textShadow: "0 1px 3px rgba(0,0,0,0.85)" }}
+          >
+            Recording dated {formatDateTime(recordingStartedAt.toISOString())}
           </div>
         )}
       </div>
