@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import type { PaymentStatus } from "@/lib/types";
 import RoleSwitcher from "@/components/RoleSwitcher";
+import FooterHeightSync from "@/components/FooterHeightSync";
 
 export function StatusBadge({ status }: { status: PaymentStatus }) {
   const styles: Record<PaymentStatus, string> = {
@@ -119,12 +120,13 @@ export function SiteHeader() {
 
 export function SiteFooter() {
   return (
-    <>
-      {/* Bottom Menu — reserves space in normal flow (spacer) then pins the
-          whole footer to the bottom of the viewport, so it stays visible
-          while scrolling a long page, mirroring the sticky SiteHeader at
-          the top. */}
-      <div aria-hidden className="h-28 sm:h-24 [@media(max-height:500px)_and_(orientation:landscape)]:h-20" />
+    // Bottom Menu — FooterHeightSync reserves exactly as much space in
+    // normal flow as the footer actually renders (measured, not guessed),
+    // then the footer pins itself to the bottom of the viewport so it
+    // stays visible while scrolling a long page, mirroring the sticky
+    // SiteHeader at the top. See FooterHeightSync for why this must be
+    // measured rather than a fixed height class.
+    <FooterHeightSync fallbackClassName="h-28 sm:h-24 [@media(max-height:500px)_and_(orientation:landscape)]:h-20">
       <div data-mobile-footer className="fixed inset-x-0 bottom-0 z-40 border-t border-neutral-800 bg-neutral-950 text-white">
         <div className="mx-auto max-w-6xl px-4 py-2 text-center text-xs sm:text-sm [@media(max-height:500px)_and_(orientation:landscape)]:px-3 [@media(max-height:500px)_and_(orientation:landscape)]:py-1">
           <p className="font-bold [@media(max-height:500px)_and_(orientation:landscape)]:text-[10px]">
@@ -152,7 +154,7 @@ export function SiteFooter() {
           </Link>
         </div>
       </div>
-    </>
+    </FooterHeightSync>
   );
 }
 

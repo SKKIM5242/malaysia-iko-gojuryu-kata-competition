@@ -105,7 +105,9 @@ export default function KataRecorder({
   const [agreementOpen, setAgreementOpen] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const [recordingStartedAt, setRecordingStartedAt] = useState<Date | null>(null);
+  const [fullscreen, setFullscreen] = useState(false);
 
+  const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -139,6 +141,53 @@ export default function KataRecorder({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Keeps our own state in sync if the browser's own fullscreen exits some
+  // other way than our own button — the OS back gesture/button on mobile,
+  // or Escape on desktop.
+  useEffect(() => {
+    function onFsChange() {
+      if (!document.fullscreenElement) setFullscreen(false);
+    }
+    document.addEventListener("fullscreenchange", onFsChange);
+    return () => document.removeEventListener("fullscreenchange", onFsChange);
+  }, []);
+
+  // Full screen only makes sense while actually composing the shot or
+  // recording — once it moves to review there's more UI (re-record/submit/
+  // agreement) than a full-screen layout has room for, so drop back to the
+  // normal page automatically instead of requiring an extra tap.
+  useEffect(() => {
+    if (fullscreen && phase !== "live" && phase !== "recording") {
+      setFullscreen(false);
+      if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
+
+  /** The fixed inset-0 CSS overlay is what actually guarantees the header/
+   * footer disappear and the recorder fills the whole screen, on every
+   * device regardless of Fullscreen API support (mobile Safari's support
+   * for arbitrary elements — as opposed to just <video> — is still
+   * inconsistent). Requesting real Fullscreen too is a bonus layered on
+   * top where it works (also hides the browser's own address bar), never
+   * required — its failure is silently ignored since the CSS overlay
+   * already covers the requirement either way. */
+  function toggleFullscreen() {
+    setFullscreen((wasFullscreen) => {
+      const next = !wasFullscreen;
+      if (next) {
+        const el = containerRef.current as
+          | (HTMLDivElement & { webkitRequestFullscreen?: () => Promise<void> })
+          | null;
+        if (el?.requestFullscreen) void el.requestFullscreen().catch(() => {});
+        else if (el?.webkitRequestFullscreen) void el.webkitRequestFullscreen().catch(() => {});
+      } else if (document.fullscreenElement) {
+        void document.exitFullscreen().catch(() => {});
+      }
+      return next;
+    });
+  }
 
   async function startCamera() {
     setError(null);
@@ -290,11 +339,29 @@ export default function KataRecorder({
   if (notYetOpen || windowClosed) return null;
 
   return (
-    <div className="space-y-4">
+    <div
+      ref={containerRef}
+      className={fullscreen ? "fixed inset-0 z-[300] flex h-[100dvh] flex-col bg-black" : "space-y-4"}
+    >
       {error && (
         <div className="rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>
       )}
 
+      {fullscreen && (
+        <div className="flex shrink-0 items-center justify-between gap-2 bg-neutral-900 px-3 py-2 text-white">
+          <p className="text-sm font-bold">Kata Recording</p>
+          <button
+            type="button"
+            onClick={toggleFullscreen}
+            className="rounded border border-white/30 px-2.5 py-1 text-xs font-semibold hover:bg-white/10"
+          >
+            ✕ Exit full screen
+          </button>
+        </div>
+      )}
+
+      {!fullscreen && (
+      <>
       <div className="space-y-2 rounded-md border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
         <p>
           Please start your recording as soon as possible — don&apos;t wait until the last minute
@@ -372,10 +439,21 @@ export default function KataRecorder({
         </p>
         <p>All the best to you — may your recording be a successful one. Thank you for participating.</p>
       </div>
+      </>
+      )}
 
-      <div className="relative mx-auto max-w-md overflow-hidden rounded-lg border border-neutral-300 bg-black">
+      <div
+        className={
+          fullscreen
+            ? "relative min-h-0 flex-1 overflow-hidden bg-black"
+            : "relative mx-auto max-w-md overflow-hidden rounded-lg border border-neutral-300 bg-black"
+        }
+      >
         <video ref={videoRef} playsInline muted className="hidden" />
-        <canvas ref={canvasRef} className={phase === "idle" ? "hidden" : "block w-full"} />
+        <canvas
+          ref={canvasRef}
+          className={phase === "idle" ? "hidden" : fullscreen ? "block h-full w-full object-contain" : "block w-full"}
+        />
         {phase === "idle" && (
           <div className="flex aspect-[3/4] items-center justify-center p-8 text-center text-neutral-300">
             Camera preview appears here once started.
@@ -404,7 +482,13 @@ export default function KataRecorder({
         </div>
       )}
 
-      <div className="flex flex-wrap justify-center gap-3">
+      <div
+        className={
+          fullscreen
+            ? "flex shrink-0 items-center justify-center gap-3 bg-black px-4 py-4"
+            : "flex flex-wrap justify-center gap-3"
+        }
+      >
         {phase === "idle" && (
           <button
             onClick={startCamera}
@@ -414,17 +498,37 @@ export default function KataRecorder({
           </button>
         )}
         {phase === "live" && (
-          <button
-            onClick={startRecording}
-            className="w-full max-w-md rounded-lg bg-red-700 px-6 py-4 text-lg font-bold text-white hover:bg-red-600 sm:w-auto"
-          >
-            ● Start
-          </button>
+          <>
+            <button
+              onClick={startRecording}
+              className={
+                fullscreen
+                  ? "flex-1 rounded-lg bg-red-700 px-6 py-4 text-lg font-bold text-white hover:bg-red-600"
+                  : "w-full max-w-md rounded-lg bg-red-700 px-6 py-4 text-lg font-bold text-white hover:bg-red-600 sm:w-auto"
+              }
+            >
+              ● Start
+            </button>
+            {!fullscreen && (
+              <button
+                type="button"
+                onClick={toggleFullscreen}
+                title="Fill the whole phone/tablet screen for recording, header and footer temporarily hidden"
+                className="rounded-lg border border-neutral-300 bg-white px-4 py-4 text-sm font-semibold text-neutral-700 hover:bg-neutral-50"
+              >
+                ⛶ Full screen
+              </button>
+            )}
+          </>
         )}
         {phase === "recording" && (
           <button
             onClick={stopRecording}
-            className="w-full max-w-md rounded-lg bg-neutral-900 px-6 py-4 text-lg font-bold text-white hover:bg-neutral-700 sm:w-auto"
+            className={
+              fullscreen
+                ? "flex-1 rounded-lg bg-neutral-900 px-6 py-4 text-lg font-bold text-white hover:bg-neutral-700"
+                : "w-full max-w-md rounded-lg bg-neutral-900 px-6 py-4 text-lg font-bold text-white hover:bg-neutral-700 sm:w-auto"
+            }
           >
             ■ Stop
           </button>
