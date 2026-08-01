@@ -5019,6 +5019,33 @@ export async function linkRegistrationToAccount(formData: FormData) {
   backTo(returnTo, { ok: "Linked — the participant can now sign in and record their kata." });
 }
 
+/** Frees up an account that's linked to a registration, so it can be
+ * re-linked to a different one — the fix for "already has a different
+ * registration linked" when Link to account is clicked. Symmetric with
+ * linkRegistrationToAccount: same permission tier, delegates to
+ * admin_unlink_registration() so the account-matching logic lives in one
+ * place. The account itself isn't touched otherwise (still approved, role
+ * unchanged) — only its registration_id/participant_id are cleared, and
+ * its sign-in quota is recomputed so it reflects the account no longer
+ * being tied to that competition. */
+export async function unlinkRegistrationFromAccount(formData: FormData) {
+  const registrationId = String(formData.get("registration_id") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "/admin/records");
+  const { supabase, actorId } = await getActor();
+  const actorRole = await getActorRole(supabase, actorId);
+  if (!["admin", "organizer", "staff", "customer_support", "referee"].includes(actorRole ?? "")) {
+    backTo(returnTo, { error: "Only Admin, Organizer, Participant Support, or Referee/Judge accounts can unlink a registration." });
+  }
+  const { data, error } = await supabase.rpc("admin_unlink_registration", { p_registration_id: registrationId });
+  if (error || data !== "OK") {
+    backTo(returnTo, { error: String(data ?? "Could not unlink that registration — please try again.") });
+  }
+  await writeAudit(supabase, {
+    table_name: "profiles", record_id: registrationId, action: "registration_unlinked_by_staff", actor_id: actorId,
+  });
+  backTo(returnTo, { ok: "Unlinked — that account is now free to be linked to a different registration." });
+}
+
 /** Manually resends a registration's confirmation email — for when the
  * automatic one never arrived (e.g. an email-provider misconfiguration) and
  * the organizer wants to get the participant their reference ID without

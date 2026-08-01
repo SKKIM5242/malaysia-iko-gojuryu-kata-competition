@@ -8,7 +8,7 @@ import AdminVideoUploadForm from "@/components/AdminVideoUploadForm";
 import ColumnFilterDropdown from "@/components/ColumnFilterDropdown";
 import DualScrollBox from "@/components/DualScrollBox";
 import { useGridControls, isClosed, CLOSED_SIZE } from "@/lib/useGridControls";
-import { updateRegistrationSlotStatus, linkRegistrationToAccount, resendRegistrationConfirmation } from "@/app/actions/admin";
+import { updateRegistrationSlotStatus, linkRegistrationToAccount, unlinkRegistrationFromAccount, resendRegistrationConfirmation } from "@/app/actions/admin";
 
 export type SlotStatus = "active" | "unslotted" | "forfeited" | "given_up";
 
@@ -291,8 +291,28 @@ function extraCell(
 function AccountLinkCell({ row, canLinkAccount }: { row: ParticipantRecordRow; canLinkAccount: boolean }) {
   if (row.linkedAccountEmail) {
     return (
-      <span className="text-xs text-green-700" title={`Linked to ${row.linkedAccountEmail}`}>
-        ✅ {row.linkedAccountEmail}
+      <span className="flex flex-wrap items-center gap-1">
+        <span className="text-xs text-green-700" title={`Linked to ${row.linkedAccountEmail}`}>
+          ✅ {row.linkedAccountEmail}
+        </span>
+        {canLinkAccount && (
+          <form action={unlinkRegistrationFromAccount}>
+            <input type="hidden" name="registration_id" value={row.registrationId} />
+            <input type="hidden" name="return_to" value="/admin/records" />
+            <button
+              type="submit"
+              title={`Unlink ${row.linkedAccountEmail} from this registration — frees that account up to be linked to a different registration instead`}
+              onClick={(e) => {
+                if (!window.confirm(`Unlink ${row.linkedAccountEmail} from this registration?\n\nThey won't be able to sign in and see this recording until it's re-linked.`)) {
+                  e.preventDefault();
+                }
+              }}
+              className="rounded border border-red-200 px-1.5 py-0.5 text-[10px] font-semibold text-red-600 hover:bg-red-50"
+            >
+              Unlink
+            </button>
+          </form>
+        )}
       </span>
     );
   }
