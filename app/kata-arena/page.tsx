@@ -310,7 +310,7 @@ export default async function KataArenaPage({
     return (
       <>
         <SiteHeader />
-        <SubscriptionBlocked title="Kata Arena" reason={quota.reason!} signOutForm={signOutButtonForm} />
+        <SubscriptionBlocked title="Kata Arena" reason={quota.reason!} canRenew={quota.canRenew} signOutForm={signOutButtonForm} />
         <SiteFooter />
       </>
     );

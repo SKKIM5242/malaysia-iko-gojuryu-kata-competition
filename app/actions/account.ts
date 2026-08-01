@@ -8,6 +8,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { writeAudit } from "@/lib/audit";
 import { getStripe, paymentsEnabled } from "@/lib/payments";
 import { notifyParticipantScored } from "@/lib/notify";
+import { isWithinSignInQuota } from "@/lib/sign-in-quota";
 
 export interface AccountActionState {
   ok: boolean;
@@ -229,9 +230,23 @@ export async function requestNewSubscription(
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("sign_in_competition_id, registration_id, school_id, sensei_id")
+    .select(
+      "sign_in_competition_id, registration_id, school_id, sensei_id, role, sign_in_limit, sign_in_count, sign_in_valid_from, sign_in_valid_until",
+    )
     .eq("user_id", user.id)
     .maybeSingle();
+
+  // Belt-and-suspenders alongside SubscriptionBlocked hiding its own
+  // button: reject a renewal outright if this account isn't actually in a
+  // state a payment would fix (e.g. its sign-in window just hasn't opened
+  // yet) — this is the real Stripe-charging entry point, so it shouldn't
+  // trust the UI alone to keep someone from paying for nothing.
+  if (profile) {
+    const quotaCheck = isWithinSignInQuota(profile);
+    if (!quotaCheck.ok && quotaCheck.canRenew === false) {
+      return { ok: false, error: "Your account doesn't need a renewal right now." };
+    }
+  }
 
   // Resolve which competition tier this account belongs to — usually
   // already tracked on the profile, but fall back to whatever record it's

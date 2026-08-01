@@ -348,7 +348,7 @@ export default async function AccountPage({
     return (
       <>
         <SiteHeader />
-        <SubscriptionBlocked title="My account" reason={quota.reason!} signOutForm={SignOutButton} />
+        <SubscriptionBlocked title="My account" reason={quota.reason!} canRenew={quota.canRenew} signOutForm={SignOutButton} />
         <SiteFooter />
       </>
     );

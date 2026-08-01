@@ -15,10 +15,16 @@ const initial: AccountActionState = { ok: false };
 export default function SubscriptionBlocked({
   title,
   reason,
+  canRenew = true,
   signOutForm,
 }: {
   title: string;
   reason: string;
+  /** False when there's nothing a payment would fix right now — e.g. the
+   * sign-in window just hasn't opened yet. Hides the paid "Request New
+   * Subscription" button (a real Stripe charge) so nobody pays for
+   * something that was never going to unblock them. */
+  canRenew?: boolean;
   signOutForm: React.ReactNode;
 }) {
   const router = useRouter();
@@ -38,27 +44,31 @@ export default function SubscriptionBlocked({
       <h1 className="text-2xl font-bold">{title}</h1>
       <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-6">
         <p className="font-semibold text-amber-900">{reason}</p>
-        <p className="mt-1 text-sm text-amber-800">
-          A new subscription is priced off your current tier — USD 10 tier renews at USD 100 (10x);
-          USD 100 and USD 200 tiers renew at the same price. Once paid, it&apos;s valid for 3 months
-          from today with 30 sign-ins available — whichever runs out first ends it, at which point
-          you&apos;ll need to renew again or you may choose to sign in as audience instead.
-        </p>
-        {requested || (state.ok && !state.checkoutUrl) ? (
-          <p className="mt-3 text-sm font-semibold text-green-700">
-            Request submitted — the organizer will confirm your payment and renew your access shortly.
-          </p>
-        ) : (
-          <form action={formAction} className="mt-3">
-            {state.error && <p className="mb-2 text-xs font-semibold text-red-600">{state.error}</p>}
-            <button
-              type="submit"
-              disabled={pending}
-              className="rounded-md bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-60"
-            >
-              {pending ? "Redirecting to payment…" : "Request New Subscription"}
-            </button>
-          </form>
+        {canRenew && (
+          <>
+            <p className="mt-1 text-sm text-amber-800">
+              A new subscription is priced off your current tier — USD 10 tier renews at USD 100 (10x);
+              USD 100 and USD 200 tiers renew at the same price. Once paid, it&apos;s valid for 3 months
+              from today with 30 sign-ins available — whichever runs out first ends it, at which point
+              you&apos;ll need to renew again or you may choose to sign in as audience instead.
+            </p>
+            {requested || (state.ok && !state.checkoutUrl) ? (
+              <p className="mt-3 text-sm font-semibold text-green-700">
+                Request submitted — the organizer will confirm your payment and renew your access shortly.
+              </p>
+            ) : (
+              <form action={formAction} className="mt-3">
+                {state.error && <p className="mb-2 text-xs font-semibold text-red-600">{state.error}</p>}
+                <button
+                  type="submit"
+                  disabled={pending}
+                  className="rounded-md bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-60"
+                >
+                  {pending ? "Redirecting to payment…" : "Request New Subscription"}
+                </button>
+              </form>
+            )}
+          </>
         )}
       </div>
       <div className="mt-4">{signOutForm}</div>
