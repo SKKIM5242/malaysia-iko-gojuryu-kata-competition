@@ -465,13 +465,50 @@ export default function KataRecorder({
           </div>
         )}
         {phase === "recording" && (
-          <div className="absolute left-3 top-[13%] flex items-center gap-2 rounded-full bg-black/70 px-3 py-1 text-sm font-semibold text-white">
-            <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-red-500" /> LIVE REC {mm}:{ss} / 05:00
+          <div className="absolute left-3 top-[13%] flex flex-col items-start gap-1">
+            <div className="flex items-center gap-2 rounded-full bg-black/70 px-3 py-1 text-sm font-semibold text-white">
+              <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-red-500" /> LIVE REC {mm}:{ss} / 05:00
+            </div>
+            {recordingStartedAt && (
+              <div className="rounded bg-black/60 px-2 py-0.5 text-[11px] text-white">
+                Recording started {formatDateTime(recordingStartedAt.toISOString())}
+              </div>
+            )}
           </div>
         )}
-        {phase === "recording" && recordingStartedAt && (
-          <div className="absolute bottom-2 left-3 text-[12px] text-white" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.85)" }}>
-            Recording started {formatDateTime(recordingStartedAt.toISOString())}
+        {/* Start/Stop + full-screen toggle live INSIDE the recording area
+            itself (translucent, over the camera feed) instead of a
+            separate row below it -- that row used to eat into the height
+            available for the actual preview, most noticeable in full
+            screen mode where every pixel of vertical space matters. */}
+        {(phase === "live" || phase === "recording") && (
+          <div className="absolute inset-x-0 bottom-3 flex items-center justify-center gap-3 px-4">
+            {phase === "live" && (
+              <button
+                onClick={startRecording}
+                className="flex-1 max-w-xs rounded-lg bg-red-700/85 px-6 py-3 text-lg font-bold text-white shadow-lg backdrop-blur-sm hover:bg-red-600/90"
+              >
+                ● Start
+              </button>
+            )}
+            {phase === "recording" && (
+              <button
+                onClick={stopRecording}
+                className="flex-1 max-w-xs rounded-lg bg-neutral-900/85 px-6 py-3 text-lg font-bold text-white shadow-lg backdrop-blur-sm hover:bg-neutral-700/90"
+              >
+                ■ Stop
+              </button>
+            )}
+            {phase === "live" && !fullscreen && (
+              <button
+                type="button"
+                onClick={toggleFullscreen}
+                title="Fill the whole phone/tablet screen for recording, header and footer temporarily hidden"
+                className="shrink-0 rounded-lg border border-white/40 bg-black/50 px-4 py-3 text-sm font-semibold text-white shadow-lg backdrop-blur-sm hover:bg-black/60"
+              >
+                ⛶ Full screen
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -482,83 +519,49 @@ export default function KataRecorder({
         </div>
       )}
 
-      <div
-        className={
-          fullscreen
-            ? "flex shrink-0 items-center justify-center gap-3 bg-black px-4 py-4"
-            : "flex flex-wrap justify-center gap-3"
-        }
-      >
-        {phase === "idle" && (
-          <button
-            onClick={startCamera}
-            className="w-full max-w-md rounded-lg bg-red-700 px-6 py-4 text-lg font-bold text-white hover:bg-red-600 sm:w-auto"
-          >
-            Enable camera
-          </button>
-        )}
-        {phase === "live" && (
-          <>
+      {(phase === "idle" || phase === "review" || phase === "uploading") && (
+        <div
+          className={
+            fullscreen
+              ? "flex shrink-0 items-center justify-center gap-3 bg-black px-4 py-4"
+              : "flex flex-wrap justify-center gap-3"
+          }
+        >
+          {phase === "idle" && (
             <button
-              onClick={startRecording}
-              className={
-                fullscreen
-                  ? "flex-1 rounded-lg bg-red-700 px-6 py-4 text-lg font-bold text-white hover:bg-red-600"
-                  : "w-full max-w-md rounded-lg bg-red-700 px-6 py-4 text-lg font-bold text-white hover:bg-red-600 sm:w-auto"
-              }
+              onClick={startCamera}
+              className="w-full max-w-md rounded-lg bg-red-700 px-6 py-4 text-lg font-bold text-white hover:bg-red-600 sm:w-auto"
             >
-              ● Start
+              Enable camera
             </button>
-            {!fullscreen && (
+          )}
+          {phase === "review" && (
+            <>
               <button
-                type="button"
-                onClick={toggleFullscreen}
-                title="Fill the whole phone/tablet screen for recording, header and footer temporarily hidden"
-                className="rounded-lg border border-neutral-300 bg-white px-4 py-4 text-sm font-semibold text-neutral-700 hover:bg-neutral-50"
+                onClick={handleReRecord}
+                disabled={!canReRecord}
+                className="rounded-md border border-neutral-300 bg-white px-5 py-2.5 font-semibold text-neutral-700 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                ⛶ Full screen
+                Delete &amp; re-record ({attemptsLeft} left)
               </button>
-            )}
-          </>
-        )}
-        {phase === "recording" && (
-          <button
-            onClick={stopRecording}
-            className={
-              fullscreen
-                ? "flex-1 rounded-lg bg-neutral-900 px-6 py-4 text-lg font-bold text-white hover:bg-neutral-700"
-                : "w-full max-w-md rounded-lg bg-neutral-900 px-6 py-4 text-lg font-bold text-white hover:bg-neutral-700 sm:w-auto"
-            }
-          >
-            ■ Stop
-          </button>
-        )}
-        {phase === "review" && (
-          <>
-            <button
-              onClick={handleReRecord}
-              disabled={!canReRecord}
-              className="rounded-md border border-neutral-300 bg-white px-5 py-2.5 font-semibold text-neutral-700 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Delete &amp; re-record ({attemptsLeft} left)
+              <button
+                onClick={() => {
+                  setAgreed(false);
+                  setAgreementOpen(true);
+                }}
+                className="rounded-md bg-red-700 px-6 py-2.5 font-semibold text-white hover:bg-red-600"
+              >
+                Submit this recording
+              </button>
+            </>
+          )}
+          {phase === "uploading" && (
+            <button disabled className="rounded-md bg-red-700 px-6 py-2.5 font-semibold text-white opacity-70">
+              Submitting…
             </button>
-            <button
-              onClick={() => {
-                setAgreed(false);
-                setAgreementOpen(true);
-              }}
-              className="rounded-md bg-red-700 px-6 py-2.5 font-semibold text-white hover:bg-red-600"
-            >
-              Submit this recording
-            </button>
-          </>
-        )}
-        {phase === "uploading" && (
-          <button disabled className="rounded-md bg-red-700 px-6 py-2.5 font-semibold text-white opacity-70">
-            Submitting…
-          </button>
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
       {agreementOpen && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/60 p-4">
