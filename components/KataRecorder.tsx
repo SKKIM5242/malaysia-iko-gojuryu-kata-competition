@@ -53,7 +53,9 @@ function drawFrame(
 ) {
   ctx.drawImage(video, 0, 0, w, h);
 
-  const topH = Math.round(h * 0.11);
+  // A bit taller than before to give the now-bigger/bolder title room to
+  // breathe without crowding the subtitle underneath it.
+  const topH = Math.round(h * 0.13);
 
   // Top banner — colorful gradient declaration
   const grad = ctx.createLinearGradient(0, 0, w, 0);
@@ -69,19 +71,21 @@ function drawFrame(
   ctx.fillStyle = "#ffffff";
   ctx.shadowColor = "rgba(0,0,0,0.6)";
   ctx.shadowBlur = 4;
-  // Longer than the old "MALAYSIA OPEN — ONLINE KATA COMPETITION" -- shrink
-  // the font (down to a 10px floor) until it actually measures within the
-  // frame width, instead of a fixed ratio that could still overflow to a
-  // second line on a narrower recording resolution.
+  // Shrinks (with no real floor -- 4px is just a sanity minimum, not a size
+  // the loop is allowed to stop shrinking above) until it actually measures
+  // within the frame width. A hard floor like the old "10px minimum" doesn't
+  // guarantee a fit -- on a narrow enough negotiated resolution, even the
+  // floor size can still overflow past the frame edge, which is exactly
+  // what full-width cut-off text on real devices turned out to be.
   const bannerTitle = "MALAYSIA OPEN VIRTUAL KARATE-DO KATA COMPETITION";
-  let titleFontPx = Math.max(12, Math.round(topH * 0.32));
-  ctx.font = `bold ${titleFontPx}px Georgia, serif`;
+  let titleFontPx = Math.max(14, Math.round(topH * 0.4));
+  ctx.font = `900 ${titleFontPx}px Georgia, serif`;
   const maxTitleWidth = w * 0.94;
-  while (titleFontPx > 10 && ctx.measureText(bannerTitle).width > maxTitleWidth) {
+  while (titleFontPx > 4 && ctx.measureText(bannerTitle).width > maxTitleWidth) {
     titleFontPx -= 1;
-    ctx.font = `bold ${titleFontPx}px Georgia, serif`;
+    ctx.font = `900 ${titleFontPx}px Georgia, serif`;
   }
-  ctx.fillText(bannerTitle, w / 2, topH * 0.48);
+  ctx.fillText(bannerTitle, w / 2, topH * 0.4);
   // Same shrink-to-fit treatment as the title above, but its STARTING size
   // is also capped at a fraction of whatever the title actually ended up
   // at (not just its own independent proportional guess + floor) -- on a
@@ -92,9 +96,9 @@ function drawFrame(
   // keeps "title clearly bigger than subtitle" true no matter how much
   // either one had to shrink.
   const subtitle = "Organized by IKO GOJU-RYU KARATE-DO MALAYSIA SDN BHD";
-  let subtitleFontPx = Math.min(Math.max(9, Math.round(topH * 0.2)), Math.round(titleFontPx * 0.65));
+  let subtitleFontPx = Math.min(Math.max(8, Math.round(topH * 0.16)), Math.round(titleFontPx * 0.55));
   ctx.font = `${subtitleFontPx}px Arial, sans-serif`;
-  while (subtitleFontPx > 6 && ctx.measureText(subtitle).width > maxTitleWidth) {
+  while (subtitleFontPx > 3 && ctx.measureText(subtitle).width > maxTitleWidth) {
     subtitleFontPx -= 1;
     ctx.font = `${subtitleFontPx}px Arial, sans-serif`;
   }
@@ -630,7 +634,7 @@ export default function KataRecorder({
             how tall the title grows. A background bar behind the title
             (rather than just a drop-shadow) keeps it legible now that it
             can span multiple lines over whatever's playing underneath. */}
-        <div className="absolute inset-x-0 top-[11%] z-20 flex flex-col">
+        <div className="absolute inset-x-0 top-[13%] z-20 flex flex-col">
           {fullscreen && (
             <div className="flex items-start justify-between gap-2 bg-black/45 px-3 py-2 text-white" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.85)" }}>
               <p className="min-w-0 flex-1 break-words text-sm font-bold">
@@ -722,8 +726,14 @@ export default function KataRecorder({
           />
         )}
         {phase === "idle" && (
-          <div className="flex h-full items-center justify-center p-8 text-center text-neutral-300">
-            Camera preview appears here once camera is enable — click below button.
+          <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center text-neutral-300">
+            <p>Camera preview appears here once camera is enable — click below button.</p>
+            <button
+              onClick={startCamera}
+              className="w-full max-w-md rounded-lg bg-white px-6 py-4 text-lg font-bold text-neutral-900 shadow-lg hover:bg-neutral-100 sm:w-auto"
+            >
+              Enable camera
+            </button>
           </div>
         )}
         {/* Start/Stop (round) lives INSIDE the recording area itself instead
@@ -779,7 +789,13 @@ export default function KataRecorder({
         )}
       </div>
 
-      {(phase === "idle" || phase === "uploading") && (
+      {/* "Enable camera" now lives inside the preview box itself (right
+          under the placeholder text) instead of a separate row below it --
+          this row is only for "Submitting…" now. Keeping it inside the box
+          means it's always reachable regardless of box shape, including a
+          short landscape box where a separate row below could get cramped
+          or pushed off-screen. */}
+      {phase === "uploading" && (
         <div
           className={
             fullscreen
@@ -787,22 +803,11 @@ export default function KataRecorder({
               : "flex flex-wrap justify-center gap-3"
           }
         >
-          {phase === "idle" && (
-            <button
-              onClick={startCamera}
-              className="w-full max-w-md rounded-lg bg-red-700 px-6 py-4 text-lg font-bold text-white hover:bg-red-600 sm:w-auto"
-            >
-              Enable camera
-            </button>
-          )}
-          {phase === "uploading" && (
-            <button disabled className="rounded-md bg-red-700 px-6 py-2.5 font-semibold text-white opacity-70">
-              Submitting…
-            </button>
-          )}
+          <button disabled className="rounded-md bg-red-700 px-6 py-2.5 font-semibold text-white opacity-70">
+            Submitting…
+          </button>
         </div>
       )}
-
       {agreementOpen && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/60 p-4">
           <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
