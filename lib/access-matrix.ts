@@ -61,8 +61,8 @@ export const ACCESS_MATRIX: AccessRow[] = [
   },
   {
     resource: "Categories (incl. Merge to Mix)",
-    admin: "Full", organizer: "Full", customerSupport: "View only", referee: "View only",
-    note: "The merge/add/edit/delete UI is hidden from Participant Support and Referee on both /admin/competitions (canManageCompetition) and /kata-categories (canManageKata) — admin/organizer/staff only. But saveCategory/deleteCategory/mergeCategoryToMix/mergeAdjacentKata themselves still carry no server-side role guard, so this is enforced only by hiding the buttons, not by the actions rejecting the request — worth closing with a real guard.",
+    admin: "Full", organizer: "Full", customerSupport: "Blocked", referee: "Blocked",
+    note: "saveCategory/deleteCategory/mergeCategoryToMix/mergeCategoryAgeGroup/mergeKataFamily/mergeKataBeltGroup/mergeAdjacentKata/undoLastMerge/undoLastDelete/reorderCategoryGroups/reorderSubcategories all require requireCompetitionManager (admin/organizer/staff only) — this now matches the UI, which already hid these controls from Participant Support and Referee on both /admin/competitions and /kata-categories.",
   },
   {
     resource: "Announcements",
@@ -102,13 +102,13 @@ export const ACCESS_MATRIX: AccessRow[] = [
   },
   {
     resource: "Accounts page (approvals, invitation codes)",
-    admin: "Full", organizer: "Blocked (route)", customerSupport: "Blocked (route)", referee: "Blocked (route)",
-    note: "/admin/accounts stays restricted to Admin at the route level — the only page excluded from the otherwise-shared full nav.",
+    admin: "Full", organizer: "Full", customerSupport: "Blocked (route)", referee: "Blocked (route)",
+    note: "/admin/accounts is restricted to Admin and Organizer/Staff at the route level — Participant Support and Referee/Judge are the two roles excluded from the otherwise-shared full nav. approve_profile() and every invitation-code write already run through is_admin(), which has always treated organizer/staff as admin-tier, so Organizer's access here is genuinely full, not just past the door.",
   },
   {
     resource: "Email Verifications page",
-    admin: "Full", organizer: "Blocked (route)", customerSupport: "Blocked (route)", referee: "Blocked (route)",
-    note: "/admin/email-verifications is Admin-only at the route level, same as Accounts — it can manually mark an account verified, bypassing the sign-in gate.",
+    admin: "Full", organizer: "Full", customerSupport: "Blocked (route)", referee: "Blocked (route)",
+    note: "/admin/email-verifications is Admin/Organizer-only at the route level, same as Accounts — it can manually mark an account verified, bypassing the sign-in gate. markEmailVerified/resendVerificationEmail already gate on requireAdminTier() (admin/organizer/staff), so no action-level change was needed once the route let Organizer through.",
   },
   {
     resource: "CSV bulk upload — Schools / Senseis / Referees / Audience / Participants / Announcements / Invitation Codes / Content reference tables",

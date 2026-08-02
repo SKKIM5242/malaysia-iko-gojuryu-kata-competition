@@ -61,11 +61,13 @@ export async function updateSession(request: NextRequest) {
     // organizer's explicit instruction, every approved staff-tier role
     // (admin, organizer/staff, customer_support, referee) gets full access
     // to every /admin listing page, including bank/IC details on Schools,
-    // Senseis, Organizers, and Support — only /admin/accounts (staff
-    // account approvals + invitation codes) stays restricted to the Super
-    // Admin. Write actions for sensitive operations (e.g. assigning
-    // referees, approving registrations) are narrowed further at the
-    // page/action level — see app/actions/admin.ts.
+    // Senseis, Organizers, and Support. /admin/accounts (staff account
+    // approvals + invitation codes) and /admin/email-verifications stay
+    // restricted to Admin and Organizer/Staff — Participant Support and
+    // Referee/Judge are the only two roles turned away from those two.
+    // Write actions for sensitive operations (e.g. assigning referees,
+    // approving registrations) are narrowed further at the page/action
+    // level — see app/actions/admin.ts.
     if (request.nextUrl.pathname.startsWith("/admin")) {
       if (!user) {
         return redirectTo("/login");
@@ -78,9 +80,9 @@ export async function updateSession(request: NextRequest) {
       const role = profile?.approved ? profile.role : null;
       const path = request.nextUrl.pathname;
 
-      if (role === "admin") {
+      if (role === "admin" || role === "organizer" || role === "staff") {
         // full access
-      } else if (role === "organizer" || role === "staff" || role === "customer_support" || role === "referee") {
+      } else if (role === "customer_support" || role === "referee") {
         if (path.startsWith("/admin/accounts") || path.startsWith("/admin/email-verifications")) {
           return redirectTo("/admin");
         }
