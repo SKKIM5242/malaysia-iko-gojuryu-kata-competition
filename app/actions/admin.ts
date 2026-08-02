@@ -4804,6 +4804,94 @@ export async function uploadWinnerReceipt(formData: FormData) {
   backTo(returnTo, { ok: "Receipt uploaded." });
 }
 
+// ── Other Payout (free-form, organizer-entered) ─────────────────────────────
+
+/** Creates or edits one manually-entered payout row — unlike commission/
+ * winner payouts (computed live, only ever tracked by status), every field
+ * here is real stored data the organizer typed in, so both create and edit
+ * go through this one action. */
+export async function saveOtherPayout(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const returnTo = "/admin/commissions";
+  const competitionId = String(formData.get("competition_id") ?? "");
+  const description = String(formData.get("description") ?? "").trim();
+  const amountRaw = String(formData.get("amount_usd") ?? "").trim();
+  if (!competitionId || !description || !amountRaw || Number.isNaN(Number(amountRaw)) || Number(amountRaw) < 0) {
+    backTo(returnTo, { error: "Tier, description, and a valid amount are all required." });
+  }
+  const { supabase, actorId } = await getActor();
+  await requireCompetitionManager(supabase, actorId, returnTo);
+  const values = { competition_id: competitionId, description, amount_usd: Number(amountRaw), updated_at: new Date().toISOString() };
+  if (id) {
+    const { error } = await supabase.from("other_payouts").update(values).eq("id", id);
+    if (error) backTo(returnTo, { error: `Could not save: ${error.message}` });
+    await writeAudit(supabase, {
+      table_name: "other_payouts", record_id: id, action: "other_payout_updated", new_value: values, actor_id: actorId,
+    });
+  } else {
+    const { data, error } = await supabase
+      .from("other_payouts")
+      .insert({ ...values, created_by: actorId })
+      .select("id")
+      .single();
+    if (error) backTo(returnTo, { error: `Could not create: ${error.message}` });
+    await writeAudit(supabase, {
+      table_name: "other_payouts", record_id: data!.id, action: "other_payout_created", new_value: values, actor_id: actorId,
+    });
+  }
+  backTo(returnTo, { ok: "Other payout saved." });
+}
+
+export async function deleteOtherPayout(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const returnTo = "/admin/commissions";
+  if (!id) backTo(returnTo, { error: "Invalid request." });
+  const { supabase, actorId } = await getActor();
+  await requireCompetitionManager(supabase, actorId, returnTo);
+  const { error } = await supabase.from("other_payouts").delete().eq("id", id);
+  if (error) backTo(returnTo, { error: `Could not delete: ${error.message}` });
+  await writeAudit(supabase, {
+    table_name: "other_payouts", record_id: id, action: "other_payout_deleted", actor_id: actorId,
+  });
+  backTo(returnTo, { ok: "Other payout deleted." });
+}
+
+export async function setOtherPayoutStatus(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const status = String(formData.get("status") ?? "");
+  const returnTo = "/admin/commissions";
+  if (!id || !["unpaid", "paid"].includes(status)) {
+    backTo(returnTo, { error: "Invalid request." });
+  }
+  const { supabase, actorId } = await getActor();
+  await requireCompetitionManager(supabase, actorId, returnTo);
+  const { error } = await supabase
+    .from("other_payouts")
+    .update({ status, paid_at: status === "paid" ? new Date().toISOString() : null, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) backTo(returnTo, { error: `Could not update payout status: ${error.message}` });
+  await writeAudit(supabase, {
+    table_name: "other_payouts", record_id: id, action: "other_payout_status_changed", new_value: { status }, actor_id: actorId,
+  });
+  backTo(returnTo, { ok: "Payout status updated." });
+}
+
+export async function uploadOtherPayoutReceipt(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const returnTo = "/admin/commissions";
+  if (!id) backTo(returnTo, { error: "Invalid request." });
+  const { supabase, actorId } = await getActor();
+  await requireCompetitionManager(supabase, actorId, returnTo);
+  const receiptPath = await uploadReceiptIfPresent(supabase, formData, "other-payout", returnTo);
+  if (!receiptPath) backTo(returnTo, { error: "Choose a receipt file first." });
+  const { error } = await supabase.from("other_payouts").update({ receipt_path: receiptPath, updated_at: new Date().toISOString() }).eq("id", id);
+  if (error) backTo(returnTo, { error: `Could not save the receipt: ${error.message}` });
+  await writeAudit(supabase, {
+    table_name: "other_payouts", record_id: id, action: "other_payout_receipt_uploaded", new_value: { receipt_path: receiptPath }, actor_id: actorId,
+  });
+  backTo(returnTo, { ok: "Receipt uploaded." });
+}
+
 // ── Participant Support shift log ────────────────────────────────────────────
 
 /** Manual clock-in — deliberately not tied to page-session timestamps,

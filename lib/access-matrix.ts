@@ -121,9 +121,9 @@ export const ACCESS_MATRIX: AccessRow[] = [
     note: "/admin/email-verifications is Admin/Organizer-only at the route level, same as Accounts — it can manually mark an account verified, bypassing the sign-in gate. markEmailVerified/resendVerificationEmail already gate on requireAdminTier() (admin/organizer/staff), so no action-level change was needed once the route let Organizer through.",
   },
   {
-    resource: "Commissions & Winner Rewards page (incl. payout receipt upload)",
+    resource: "Commissions, Winner Rewards, Other Payouts & Profit/Loss page",
     admin: "Full", organizer: "Full", customerSupport: "Blocked (route)", referee: "Blocked (route)",
-    note: "/admin/commissions is now Admin/Organizer/Staff-only at the route level, same pattern as Classes. setCommissionPayoutStatus/setWinnerPayoutStatus/uploadCommissionReceipt/uploadWinnerReceipt all require requireCompetitionManager — previously the payout-status actions had no guard at all, so any staff-tier role could mark a payout paid despite the page never being explicitly restricted.",
+    note: "/admin/commissions is Admin/Organizer/Staff-only at the route level, same pattern as Classes. setCommissionPayoutStatus/setWinnerPayoutStatus/uploadCommissionReceipt/uploadWinnerReceipt/saveOtherPayout/deleteOtherPayout/setOtherPayoutStatus/uploadOtherPayoutReceipt all require requireCompetitionManager. Other Payouts is a manually-entered ledger (vendor payments, refunds, bonuses, etc.) with its own Add/Edit/Delete, same Paid/Unpaid + receipt pattern as Commissions/Rewards. Profit/Loss is a per-tier report (participant fee revenue minus every Paid commission/reward/other-payout for that tier) generated on demand — nothing here is stored, all computed live.",
   },
   {
     resource: "Content page (announcements, competition tiers, access matrix, and every other reference table)",

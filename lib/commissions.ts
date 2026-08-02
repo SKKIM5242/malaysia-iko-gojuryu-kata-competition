@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { COMMISSION_ENTRY_THRESHOLD } from "@/lib/tier-entries";
 
-const COMMISSION_RATE = 0.1;
+export const COMMISSION_RATE = 0.1;
 /** Schools/Senseis qualify PER COMPETITION TIER: more than this many paid
  * ENTRIES (kata events) by their students within a single tier earns 10% of
  * that tier's fees. A tier with 10 or fewer entries earns nothing, even if
@@ -33,8 +33,8 @@ export interface CommissionRow {
   /** Fees from qualifying tiers only — the base the 10% is taken from. */
   qualifyingFeesUsd: number;
   commissionUsd: number;
-  /** Per-tier breakdown, tiers with no entries omitted. Empty for referees,
-   * whose commission is not tier-scoped. */
+  /** Per-tier breakdown, tiers with no entries omitted. Referees have no
+   * qualifying threshold, so every tier they judged in shows qualifies=true. */
   tiers: CommissionTierSplit[];
   bankName: string | null;
   bankAccountNo: string | null;
@@ -82,9 +82,11 @@ export async function computeCommissions(): Promise<CommissionRow[]> {
   // Only paid registrations count -- there's no commission on money the
   // organizer hasn't actually collected yet.
   const feeByRegistration = new Map<string, number>();
+  const competitionIdByRegistration = new Map<string, string>();
   for (const r of registrations ?? []) {
     if (r.payment_status !== "paid") continue;
     feeByRegistration.set(r.id as string, feeByCompetition.get(r.competition_id as string) ?? 0);
+    competitionIdByRegistration.set(r.id as string, r.competition_id as string);
   }
   // Paid entries grouped by participant AND tier — the commission rule is
   // "more than 10 events per competition Tier", so a flat per-participant
@@ -211,6 +213,23 @@ export async function computeCommissions(): Promise<CommissionRow[]> {
     const uid = (r.user_id as string | null) ?? userIdByEmail.get(String(r.email ?? "").toLowerCase());
     const judgedRegIds = uid ? judgedRegistrationsByUser.get(uid) ?? new Set<string>() : new Set<string>();
     const totalFees = [...judgedRegIds].reduce((sum, regId) => sum + (feeByRegistration.get(regId) ?? 0), 0);
+    // Referees have no qualifying threshold -- every tier they judged in pays,
+    // so this rollup is just for the per-tier breakdown Section 4 needs.
+    const perTier = new Map<string, { entries: number; fees: number }>();
+    for (const regId of judgedRegIds) {
+      const cid = competitionIdByRegistration.get(regId);
+      if (!cid) continue;
+      const cur = perTier.get(cid) ?? { entries: 0, fees: 0 };
+      cur.entries += 1;
+      cur.fees += feeByRegistration.get(regId) ?? 0;
+      perTier.set(cid, cur);
+    }
+    const tiers: CommissionTierSplit[] = [];
+    for (const cid of competitionOrder) {
+      const v = perTier.get(cid);
+      if (!v || v.entries === 0) continue;
+      tiers.push({ competitionId: cid, entryCount: v.entries, feesUsd: v.fees, qualifies: true });
+    }
     rows.push({
       recipientType: "referee", recipientId: r.id as string, name: r.full_name as string,
       // A referee's unit is the judged entry, not the student — one entry per
@@ -218,7 +237,7 @@ export async function computeCommissions(): Promise<CommissionRow[]> {
       participantCount: judgedRegIds.size, entryCount: judgedRegIds.size,
       totalFeesUsd: totalFees, qualifyingFeesUsd: totalFees,
       commissionUsd: totalFees * COMMISSION_RATE,
-      tiers: [],
+      tiers,
       bankName: r.bank_name as string | null, bankAccountNo: r.bank_account_no as string | null,
       bankAccountName: r.bank_account_name as string | null,
       payoutStatus: statusFor("referee", r.id as string),
