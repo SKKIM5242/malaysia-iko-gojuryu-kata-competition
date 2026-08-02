@@ -92,23 +92,21 @@ function drawFrame(
   // before needing to shrink to fit) and make the banner just tall enough
   // to hold it -- a fixed height-proportional slice left a lot of empty
   // colored background around comparatively small type on a tall portrait
-  // recording. Fitting the WHOLE title on one line meant its size was
-  // capped by the full ~50-character string's width regardless of how
-  // large the starting guess was -- splitting it across two lines lets
-  // each line run close to double the size before hitting that same
-  // width limit, which is what actually makes the banner (and its text)
-  // bigger, not just a bigger initial guess that the fit-loop shrinks
-  // right back down anyway. Landscape is unchanged (one line still fits
-  // comfortably there, and it was never reported as a problem).
+  // recording. The fit-loop's floor is set by whichever LINE is longest,
+  // not by the starting font guess -- fewer, shorter lines raise that
+  // ceiling: one line was capped by all ~50 characters, two lines by a
+  // 27-character line, these four by a 14-character line at most --
+  // letting the font actually grow further before hitting the same width
+  // limit each time, which is what makes the banner (and its text)
+  // meaningfully bigger, not just a bigger initial guess that the
+  // fit-loop shrinks right back down anyway. Landscape is unchanged (one
+  // line still fits comfortably there, and it was never reported as a
+  // problem).
   if (h > w) {
-    const titleLine1 = "MALAYSIA OPEN VIRTUAL";
-    const titleLine2 = "KARATE-DO KATA COMPETITION";
+    const titleLines = ["MALAYSIA OPEN", "VIRTUAL", "KARATE-DO KATA", "COMPETITION"];
     let titleFontPx = Math.round(w * 0.15);
     ctx.font = `900 ${titleFontPx}px Georgia, serif`;
-    while (
-      titleFontPx > 4 &&
-      (ctx.measureText(titleLine1).width > maxTitleWidth || ctx.measureText(titleLine2).width > maxTitleWidth)
-    ) {
+    while (titleFontPx > 4 && titleLines.some((line) => ctx.measureText(line).width > maxTitleWidth)) {
       titleFontPx -= 1;
       ctx.font = `900 ${titleFontPx}px Georgia, serif`;
     }
@@ -122,9 +120,9 @@ function drawFrame(
     const lineGap = Math.round(titleFontPx * 0.14);
     const subtitleGap = Math.round(titleFontPx * 0.22);
     const padBottom = Math.round(subtitleFontPx * 0.4);
-    const line1Y = padTop + titleFontPx * 0.8;
-    const line2Y = line1Y + titleFontPx * 0.85 + lineGap;
-    const subtitleY = line2Y + titleFontPx * 0.3 + subtitleGap + subtitleFontPx * 0.8;
+    const titleLineHeight = titleFontPx * 0.85 + lineGap;
+    const titleLineYs = titleLines.map((_, i) => padTop + titleFontPx * 0.8 + i * titleLineHeight);
+    const subtitleY = titleLineYs[titleLineYs.length - 1] + titleFontPx * 0.3 + subtitleGap + subtitleFontPx * 0.8;
     const topH = Math.round(subtitleY + subtitleFontPx * 0.35 + padBottom);
 
     drawBannerRect(ctx, w, topH);
@@ -133,8 +131,7 @@ function drawFrame(
     ctx.shadowColor = "rgba(0,0,0,0.6)";
     ctx.shadowBlur = 4;
     ctx.font = `900 ${titleFontPx}px Georgia, serif`;
-    ctx.fillText(titleLine1, w / 2, line1Y);
-    ctx.fillText(titleLine2, w / 2, line2Y);
+    titleLines.forEach((line, i) => ctx.fillText(line, w / 2, titleLineYs[i]));
     ctx.font = `${subtitleFontPx}px Arial, sans-serif`;
     ctx.fillText(subtitle, w / 2, subtitleY);
     ctx.shadowBlur = 0;
@@ -727,30 +724,36 @@ export default function KataRecorder({
               <p className="min-w-0 flex-1 break-words text-sm font-bold">
                 Kata Recording{categoryName ? ` — ${categoryName}` : ""}
               </p>
-              <button
-                type="button"
-                onClick={exitFullscreen}
-                className="shrink-0 rounded border border-white/50 bg-black/30 px-2.5 py-1 text-xs font-semibold hover:bg-black/50"
-                style={{ textShadow: "none" }}
-              >
-                ✕ Exit full screen
-              </button>
+              {/* Deleted Recording sits right under Exit full screen, in the
+                  SAME row as the title, instead of its own row below --
+                  plain text with just the row's own drop-shadow (no
+                  background box), matching the "Recording dated…" and
+                  watermark text style elsewhere instead of reading as a
+                  separate dark chip. */}
+              <div className="flex shrink-0 flex-col items-end gap-1">
+                <button
+                  type="button"
+                  onClick={exitFullscreen}
+                  className="rounded border border-white/50 bg-black/30 px-2.5 py-1 text-xs font-semibold hover:bg-black/50"
+                  style={{ textShadow: "none" }}
+                >
+                  ✕ Exit full screen
+                </button>
+                {(phase === "live" || phase === "recording") && (
+                  <span className="text-[10px] font-semibold leading-tight">
+                    Deleted Recording: {attempts} / Available: {maxAttempts}
+                  </span>
+                )}
+              </div>
             </div>
           )}
           {error && (
             <div className="bg-red-50/95 px-4 py-2 text-sm text-red-800 backdrop-blur-sm">{error}</div>
           )}
-          {(phase === "live" || phase === "recording") && (
-            <div className="flex flex-wrap items-center justify-between gap-1 px-2 pt-1">
-              {phase === "recording" ? (
-                <div className="flex items-center gap-1.5 rounded-full bg-black/70 px-2.5 py-0.5 text-xs font-semibold text-white">
-                  <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" /> LIVE REC {mm}:{ss} / 05:00
-                </div>
-              ) : (
-                <span />
-              )}
-              <div className="rounded bg-black/70 px-1.5 py-0.5 text-right text-[10px] font-semibold leading-tight text-white">
-                Deleted Recording: {attempts} / Available: {maxAttempts}
+          {phase === "recording" && (
+            <div className="px-2 pt-1">
+              <div className="inline-flex items-center gap-1.5 rounded-full bg-black/70 px-2.5 py-0.5 text-xs font-semibold text-white">
+                <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" /> LIVE REC {mm}:{ss} / 05:00
               </div>
             </div>
           )}
