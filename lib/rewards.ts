@@ -13,24 +13,13 @@ export interface WinnerRewardRow {
   bankName: string | null;
   bankAccountNo: string | null;
   bankAccountName: string | null;
-  /** Prize amount for this rank, parsed from the tier's own published
-   * announcement text (e.g. "Gold - 1st Prize - USD 2,000 & Certificate").
-   * Null when no announcement for the tier states a matching prize line --
-   * shown as "not announced" rather than silently treated as $0. */
-  rewardAmountUsd: number | null;
+  /** Prize amount for this rank, from that tier's own row in `tier_prizes`
+   * (see lib/tier-prizes.ts) -- a real organizer-controlled setting, not
+   * parsed from announcement text. Defaults to 0 until the organizer sets
+   * it for that tier. */
+  rewardAmountUsd: number;
   payoutStatus: "unpaid" | "paid";
   receiptPath: string | null;
-}
-
-const PRIZE_LINE_PATTERN: Record<1 | 2 | 3, RegExp> = {
-  1: /1st\s*Prize\s*-?\s*USD\s*([\d,]+(?:\.\d+)?)/i,
-  2: /2nd\s*Prize\s*-?\s*USD\s*([\d,]+(?:\.\d+)?)/i,
-  3: /3rd\s*Prize\s*-?\s*USD\s*([\d,]+(?:\.\d+)?)/i,
-};
-
-function parsePrizeAmount(body: string, rank: 1 | 2 | 3): number | null {
-  const match = body.match(PRIZE_LINE_PATTERN[rank]);
-  return match ? Number(match[1].replace(/,/g, "")) : null;
 }
 
 interface Entry {
@@ -52,7 +41,7 @@ export async function computeWinnerRewards(): Promise<WinnerRewardRow[]> {
 
   const { data: competitions } = await supabase
     .from("competitions")
-    .select("id, name, registration_deadline, winners_announce_date, registration_fee_usd");
+    .select("id, name, registration_deadline, winners_announce_date");
   const revealed = (competitions ?? []).filter((c) => {
     if (!c.registration_deadline) return false;
     const revealDate =
@@ -62,14 +51,10 @@ export async function computeWinnerRewards(): Promise<WinnerRewardRow[]> {
   });
   if (revealed.length === 0) return [];
 
-  const [{ data: categories }, { data: payouts }, { data: announcements }] = await Promise.all([
+  const [{ data: categories }, { data: payouts }, { data: prizes }] = await Promise.all([
     supabase.from("categories").select("id, name"),
     supabase.from("winner_payouts").select("registration_id, status, receipt_path"),
-    supabase
-      .from("announcements")
-      .select("competition_id, title, body, published, created_at")
-      .eq("published", true)
-      .order("created_at", { ascending: true }),
+    supabase.from("tier_prizes").select("competition_id, first_place_usd, second_place_usd, third_place_usd"),
   ]);
   const categoryNameById = new Map((categories ?? []).map((c) => [c.id as string, c.name as string]));
   const payoutStatus = new Map(
@@ -78,34 +63,12 @@ export async function computeWinnerRewards(): Promise<WinnerRewardRow[]> {
   const receiptPathByReg = new Map(
     (payouts ?? []).map((p) => [p.registration_id as string, p.receipt_path as string | null]),
   );
-
-  // Prize amounts are announced per tier as free text (e.g. "Gold - 1st
-  // Prize - USD 2,000 & Certificate") rather than stored as a number
-  // anywhere -- pick each tier's most recently published announcement
-  // (`.order("created_at", { ascending: true })` above means the last write
-  // wins the map) and parse its prize lines. A handful of legacy
-  // announcement rows predate the competition_id FK, so those fall back to
-  // matching "USD<fee>" in the title against the tier's own fee.
-  const bodyByCompetitionId = new Map<string, string>();
-  const bodyByFeeFallback = new Map<number, string>();
-  for (const a of announcements ?? []) {
-    const body = a.body as string;
-    if (a.competition_id) {
-      bodyByCompetitionId.set(a.competition_id as string, body);
-    } else {
-      const feeMatch = (a.title as string).match(/USD\s*(\d+)/i);
-      if (feeMatch) bodyByFeeFallback.set(Number(feeMatch[1]), body);
-    }
-  }
-  const prizeAmountsByCompetition = new Map<string, { 1: number | null; 2: number | null; 3: number | null }>();
-  for (const comp of revealed) {
-    const body = bodyByCompetitionId.get(comp.id as string) ?? bodyByFeeFallback.get(Number(comp.registration_fee_usd ?? -1));
-    prizeAmountsByCompetition.set(comp.id as string, {
-      1: body ? parsePrizeAmount(body, 1) : null,
-      2: body ? parsePrizeAmount(body, 2) : null,
-      3: body ? parsePrizeAmount(body, 3) : null,
-    });
-  }
+  const prizesByCompetition = new Map(
+    (prizes ?? []).map((p) => [
+      p.competition_id as string,
+      { 1: Number(p.first_place_usd ?? 0), 2: Number(p.second_place_usd ?? 0), 3: Number(p.third_place_usd ?? 0) },
+    ]),
+  );
 
   const entriesWithMeta: Array<{
     entry: Entry; competitionId: string; competitionName: string; categoryName: string; rank: number;
@@ -137,7 +100,7 @@ export async function computeWinnerRewards(): Promise<WinnerRewardRow[]> {
 
   const rows: WinnerRewardRow[] = entriesWithMeta.map(({ entry, competitionId, competitionName, categoryName, rank }) => {
     const bank = bankByParticipant.get(entry.participantId);
-    const prizes = prizeAmountsByCompetition.get(competitionId);
+    const prizes = prizesByCompetition.get(competitionId);
     return {
       registrationId: entry.regId,
       competitionId,
@@ -146,7 +109,7 @@ export async function computeWinnerRewards(): Promise<WinnerRewardRow[]> {
       rank,
       participantName: entry.name,
       finalScore: entry.score,
-      rewardAmountUsd: rank === 1 || rank === 2 || rank === 3 ? prizes?.[rank] ?? null : null,
+      rewardAmountUsd: rank === 1 || rank === 2 || rank === 3 ? prizes?.[rank] ?? 0 : 0,
       bankName: (bank?.bank_name as string | undefined) ?? null,
       bankAccountNo: (bank?.bank_account_no as string | undefined) ?? null,
       bankAccountName: (bank?.bank_account_name as string | undefined) ?? null,

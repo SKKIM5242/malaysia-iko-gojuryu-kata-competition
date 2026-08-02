@@ -4892,6 +4892,37 @@ export async function uploadOtherPayoutReceipt(formData: FormData) {
   backTo(returnTo, { ok: "Receipt uploaded." });
 }
 
+/** Top-3 prize amounts per tier -- a real organizer-controlled setting (see
+ * migration 0103_tier_prizes.sql), not parsed from announcement text, since
+ * this feeds the Profit/Loss report and a reworded announcement shouldn't
+ * silently change what that report computes. */
+export async function saveTierPrizes(formData: FormData) {
+  const competitionId = String(formData.get("competition_id") ?? "");
+  const returnTo = "/admin/commissions";
+  if (!competitionId) backTo(returnTo, { error: "Invalid request." });
+  const firstRaw = String(formData.get("first_place_usd") ?? "").trim();
+  const secondRaw = String(formData.get("second_place_usd") ?? "").trim();
+  const thirdRaw = String(formData.get("third_place_usd") ?? "").trim();
+  const first = Number(firstRaw);
+  const second = Number(secondRaw);
+  const third = Number(thirdRaw);
+  if ([first, second, third].some((n) => Number.isNaN(n) || n < 0)) {
+    backTo(returnTo, { error: "Prize amounts must be valid non-negative numbers." });
+  }
+  const { supabase, actorId } = await getActor();
+  await requireCompetitionManager(supabase, actorId, returnTo);
+  const values = {
+    competition_id: competitionId, first_place_usd: first, second_place_usd: second, third_place_usd: third,
+    updated_at: new Date().toISOString(),
+  };
+  const { error } = await supabase.from("tier_prizes").upsert(values, { onConflict: "competition_id" });
+  if (error) backTo(returnTo, { error: `Could not save: ${error.message}` });
+  await writeAudit(supabase, {
+    table_name: "tier_prizes", record_id: competitionId, action: "tier_prizes_saved", new_value: values, actor_id: actorId,
+  });
+  backTo(returnTo, { ok: "Prize amounts saved." });
+}
+
 // ── Commissions/Rewards/Other Payouts CSV bulk upload ───────────────────────
 // All three re-use the exact CSV shape each table's own "Download CSV"
 // button already produces -- download, edit the status (and for Other

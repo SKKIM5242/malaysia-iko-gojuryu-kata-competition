@@ -3,10 +3,11 @@ import { schemaReady } from "@/lib/data";
 import { computeCommissions, type CommissionRow } from "@/lib/commissions";
 import { computeWinnerRewards, type WinnerRewardRow } from "@/lib/rewards";
 import { getOtherPayouts, type OtherPayoutRow } from "@/lib/other-payouts";
+import { getTierPrizes, type TierPrizeRow } from "@/lib/tier-prizes";
 import { computeProfitLossByTier } from "@/lib/profit-loss";
 import {
   setCommissionPayoutStatus, setWinnerPayoutStatus, uploadCommissionReceipt, uploadWinnerReceipt,
-  saveOtherPayout, deleteOtherPayout, setOtherPayoutStatus, uploadOtherPayoutReceipt,
+  saveOtherPayout, deleteOtherPayout, setOtherPayoutStatus, uploadOtherPayoutReceipt, saveTierPrizes,
   bulkUploadCommissionPayouts, bulkUploadWinnerPayouts, bulkUploadOtherPayouts,
 } from "@/app/actions/admin";
 import { AdminShell } from "@/components/admin";
@@ -214,6 +215,7 @@ export default async function AdminCommissions({
   const payable = rows.filter((r) => r.commissionUsd > 0);
   const rewardRows = await computeWinnerRewards();
   const otherPayouts = await getOtherPayouts();
+  const tierPrizes = await getTierPrizes();
   const allCompetitions = await getAllCompetitions();
   const tierNameById = new Map(allCompetitions.map((c) => [c.id, c.name]));
   const profitLossRows = await computeProfitLossByTier(rows, rewardRows, otherPayouts);
@@ -343,14 +345,71 @@ export default async function AdminCommissions({
       </p>
 
       <h2 id="rewards" className="mt-10 mb-2 scroll-mt-4 text-lg font-bold text-neutral-900">Rewards — Top 3 Winners Payout</h2>
+
+      <h3 className="mb-1 text-sm font-bold text-neutral-800">Prize Amounts by Tier</h3>
+      <p className="mb-3 max-w-3xl text-xs text-neutral-500">
+        Set once per tier — this is what feeds each winner&apos;s Reward amount below and the
+        Profit/Loss report, independent of whatever wording is in that tier&apos;s public
+        announcement. Defaults to $0 until you set it.
+      </p>
+      {tierPrizes.map((t) => (
+        <form key={t.competitionId} id={`prize-${t.competitionId}`} action={saveTierPrizes}>
+          <input type="hidden" name="competition_id" value={t.competitionId} />
+        </form>
+      ))}
+      <div className="mb-8 overflow-x-auto rounded-md border border-neutral-200">
+        <table className="w-full text-left text-xs">
+          <thead className="border-b border-neutral-200 bg-neutral-50 uppercase tracking-wide text-neutral-500">
+            <tr>
+              <th className="px-3 py-2">Tier</th>
+              <th className="px-3 py-2">🥇 1st (USD)</th>
+              <th className="px-3 py-2">🥈 2nd (USD)</th>
+              <th className="px-3 py-2">🥉 3rd (USD)</th>
+              <th className="px-3 py-2">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-neutral-100">
+            {tierPrizes.map((t: TierPrizeRow) => (
+              <tr key={t.competitionId}>
+                <td className="px-3 py-2 font-semibold">{shortTierName(t.competitionName)}</td>
+                <td className="px-3 py-2">
+                  <input
+                    form={`prize-${t.competitionId}`} name="first_place_usd" type="number" step="0.01" min="0"
+                    defaultValue={t.firstPlaceUsd} className={cellInput}
+                  />
+                </td>
+                <td className="px-3 py-2">
+                  <input
+                    form={`prize-${t.competitionId}`} name="second_place_usd" type="number" step="0.01" min="0"
+                    defaultValue={t.secondPlaceUsd} className={cellInput}
+                  />
+                </td>
+                <td className="px-3 py-2">
+                  <input
+                    form={`prize-${t.competitionId}`} name="third_place_usd" type="number" step="0.01" min="0"
+                    defaultValue={t.thirdPlaceUsd} className={cellInput}
+                  />
+                </td>
+                <td className="px-3 py-2">
+                  <button
+                    form={`prize-${t.competitionId}`} type="submit"
+                    className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
+                  >
+                    Save
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
       <p className="mb-6 max-w-3xl text-sm text-neutral-500">
         Top 3 per category, for every competition whose Winners have already been announced —
         computed live from the same scores shown on the public{" "}
         <a href="/winners" className="font-semibold underline underline-offset-2">Winners</a> page.
         Winnings are transferred to each participant&apos;s account after 1 month of the winner
-        announcement. Reward amount is parsed from that tier&apos;s own published announcement
-        (its &quot;Gold/Silver/Bronze — 1st/2nd/3rd Prize&quot; lines) — shows &quot;not
-        announced&quot; if the tier&apos;s announcement doesn&apos;t state one.
+        announcement. Reward amount comes from the Prize Amounts table above.
         &quot;Paid&quot; below is your own record of who you&apos;ve actually paid out
         via bank transfer — use the bank details shown to do that transfer yourself.
       </p>
@@ -394,8 +453,8 @@ export default async function AdminCommissions({
             rank: `${MEDALS[r.rank - 1] ?? ""} ${r.rank}`,
             name: r.participantName,
             score: r.finalScore.toFixed(1),
-            reward_amount: r.rewardAmountUsd != null ? `$${r.rewardAmountUsd.toFixed(2)}` : "— not announced",
-            reward_amount_csv: r.rewardAmountUsd != null ? r.rewardAmountUsd.toFixed(2) : "",
+            reward_amount: `$${r.rewardAmountUsd.toFixed(2)}`,
+            reward_amount_csv: r.rewardAmountUsd.toFixed(2),
             bank: [r.bankName, r.bankAccountNo, r.bankAccountName].filter(Boolean).join(" · ") || "—",
             bank_name: r.bankName ?? "",
             bank_account_no: r.bankAccountNo ?? "",

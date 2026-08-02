@@ -65,7 +65,7 @@ export async function computeProfitLossByTier(
 
   const winnerPaidByTier = new Map<string, number>();
   for (const row of rewardRows) {
-    if (row.payoutStatus !== "paid" || row.rewardAmountUsd == null) continue;
+    if (row.payoutStatus !== "paid") continue;
     winnerPaidByTier.set(row.competitionId, (winnerPaidByTier.get(row.competitionId) ?? 0) + row.rewardAmountUsd);
   }
 
