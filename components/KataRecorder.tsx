@@ -82,8 +82,17 @@ function drawFrame(
     ctx.font = `bold ${titleFontPx}px Georgia, serif`;
   }
   ctx.fillText(bannerTitle, w / 2, topH * 0.48);
-  ctx.font = `${Math.max(9, Math.round(topH * 0.2))}px Arial, sans-serif`;
-  ctx.fillText("Organized by IKO GOJU-RYU KARATE-DO MALAYSIA SDN BHD", w / 2, topH * 0.82);
+  // Same shrink-to-fit treatment as the title above -- this line had a
+  // fixed size only, so at some negotiated resolutions it could overflow
+  // past the frame edge instead of shrinking to match.
+  const subtitle = "Organized by IKO GOJU-RYU KARATE-DO MALAYSIA SDN BHD";
+  let subtitleFontPx = Math.max(9, Math.round(topH * 0.2));
+  ctx.font = `${subtitleFontPx}px Arial, sans-serif`;
+  while (subtitleFontPx > 7 && ctx.measureText(subtitle).width > maxTitleWidth) {
+    subtitleFontPx -= 1;
+    ctx.font = `${subtitleFontPx}px Arial, sans-serif`;
+  }
+  ctx.fillText(subtitle, w / 2, topH * 0.82);
   ctx.shadowBlur = 0;
 
   // Light watermark, bottom center of frame -- font size and bottom margin
@@ -190,9 +199,14 @@ export default function KataRecorder({
   // height from that, so a tall aspect-ratio box would just overflow past
   // any max-height instead of shrinking back down. Computing explicit pixel
   // width/height here sidesteps that entirely.
-  const [viewport, setViewport] = useState<{ w: number; h: number }>(() =>
-    typeof window === "undefined" ? { w: 400, h: 800 } : { w: window.innerWidth, h: window.innerHeight },
-  );
+  //
+  // Always starts at this SAME placeholder value on both server and client
+  // -- reading the real window size here directly (guarded by `typeof
+  // window`) made the server-rendered box a different size than what the
+  // client immediately computed during hydration (window already exists by
+  // then), which React flags as a hydration mismatch. The mount effect
+  // below corrects it to the real size right after hydration instead.
+  const [viewport, setViewport] = useState<{ w: number; h: number }>({ w: 400, h: 800 });
 
   const attemptsLeft = Math.max(0, maxAttempts - attempts);
   const canReRecord = attemptsLeft > 0;
@@ -223,11 +237,26 @@ export default function KataRecorder({
     function onResize() {
       setViewport({ w: window.innerWidth, h: window.innerHeight });
     }
+    // Correct the placeholder to the real size right after mount -- safe to
+    // read window here (this only runs client-side, after hydration).
+    onResize();
+    // iOS Safari fires "orientationchange" before window.innerWidth/
+    // innerHeight have actually updated to the new orientation -- reading
+    // them immediately in the handler captures the OLD (pre-rotation)
+    // values, which is exactly what left the box computing itself from a
+    // stale, mismatched viewport size right after rotating back from
+    // landscape to portrait. Re-reading a couple times shortly after
+    // catches up once the browser settles, on every engine's own timing.
+    function onOrientationChange() {
+      onResize();
+      setTimeout(onResize, 60);
+      setTimeout(onResize, 300);
+    }
     window.addEventListener("resize", onResize);
-    window.addEventListener("orientationchange", onResize);
+    window.addEventListener("orientationchange", onOrientationChange);
     return () => {
       window.removeEventListener("resize", onResize);
-      window.removeEventListener("orientationchange", onResize);
+      window.removeEventListener("orientationchange", onOrientationChange);
     };
   }, []);
 
@@ -301,14 +330,19 @@ export default function KataRecorder({
   function renderLoop() {
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    if (!video || !canvas || video.videoWidth === 0) {
+    // Guard on BOTH dimensions, not just width -- a rotation on a real
+    // device can briefly report one of the two as 0 while the stream
+    // reflows, and a ratio computed from a 0 height is Infinity, which
+    // then collapses the preview box's computed height to 0 (width /
+    // Infinity) and makes the whole recording screen appear to vanish.
+    if (!video || !canvas || video.videoWidth === 0 || video.videoHeight === 0) {
       rafRef.current = requestAnimationFrame(renderLoop);
       return;
     }
     if (canvas.width !== video.videoWidth) canvas.width = video.videoWidth;
     if (canvas.height !== video.videoHeight) canvas.height = video.videoHeight;
     const ratio = video.videoWidth / video.videoHeight;
-    if (Math.abs(videoAspectRef.current - ratio) > 0.01) {
+    if (Number.isFinite(ratio) && ratio > 0 && Math.abs(videoAspectRef.current - ratio) > 0.01) {
       videoAspectRef.current = ratio;
       setVideoAspect(ratio);
     }
@@ -440,7 +474,11 @@ export default function KataRecorder({
   // so it hugs the video instead of leaving it stranded inside a
   // mis-shaped box. Falls back to a portrait guess before the camera has
   // reported its real dimensions (idle placeholder / not started yet).
-  const previewRatio = videoAspect ?? 9 / 16;
+  // Defensive fallback: even though renderLoop now guards against feeding
+  // a degenerate value into videoAspect, a bad value here would divide the
+  // box's height by zero/Infinity and make the whole recording screen
+  // silently vanish, so re-check it right at the point of use too.
+  const previewRatio = videoAspect && Number.isFinite(videoAspect) && videoAspect > 0 ? videoAspect : 9 / 16;
   const previewMaxHeightPx = viewport.h * 0.85;
   const previewMaxWidthCapPx = previewRatio > 1 ? 896 : 448;
   const previewAvailableWidthPx = Math.max(200, viewport.w - 32);
@@ -564,37 +602,87 @@ export default function KataRecorder({
         }
         style={fullscreen ? undefined : { width: previewBoxWidthPx, height: previewBoxHeightPx }}
       >
-        {/* Title bar and error banner float directly on the recording area
-            itself (absolute, top of the box) instead of taking their own
-            row above it -- in full screen especially, every bit of height
-            given to a separate row is height taken away from the actual
-            preview, which is the whole point of full screen. No background
-            box behind the title bar -- just the text and button themselves,
-            with a drop-shadow for legibility over whatever's playing
-            underneath, so it doesn't read as its own separate strip sitting
-            in front of the recording header banner. */}
-        {(fullscreen || error) && (
-          <div className="absolute inset-x-0 top-0 z-20 flex flex-col">
-            {fullscreen && (
-              <div className="flex items-start justify-between gap-2 px-3 py-2 text-white" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.85)" }}>
-                <p className="min-w-0 flex-1 break-words text-sm font-bold">
-                  Kata Recording{categoryName ? ` — ${categoryName}` : ""}
-                </p>
+        {/* Title bar, error banner, the live/recording badges, and the
+            review controls all stack in ONE column starting right below the
+            burned-in header banner (its top ~11%) -- previously each piece
+            was independently absolute-positioned at its own guessed offset
+            (top-0, top-12, top-[13%]), which only worked as long as the
+            title stayed on one line. Once a long category name wraps to 2-3
+            lines, a fixed offset below it starts overlapping whatever comes
+            next; stacking in flex-col instead means every piece pushes the
+            next one down automatically, so nothing can overlap no matter
+            how tall the title grows. A background bar behind the title
+            (rather than just a drop-shadow) keeps it legible now that it
+            can span multiple lines over whatever's playing underneath. */}
+        <div className="absolute inset-x-0 top-[11%] z-20 flex flex-col">
+          {fullscreen && (
+            <div className="flex items-start justify-between gap-2 bg-black/45 px-3 py-2 text-white" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.85)" }}>
+              <p className="min-w-0 flex-1 break-words text-sm font-bold">
+                Kata Recording{categoryName ? ` — ${categoryName}` : ""}
+              </p>
+              <button
+                type="button"
+                onClick={exitFullscreen}
+                className="shrink-0 rounded border border-white/50 bg-black/30 px-2.5 py-1 text-xs font-semibold hover:bg-black/50"
+                style={{ textShadow: "none" }}
+              >
+                ✕ Exit full screen
+              </button>
+            </div>
+          )}
+          {error && (
+            <div className="bg-red-50/95 px-4 py-2 text-sm text-red-800 backdrop-blur-sm">{error}</div>
+          )}
+          {(phase === "live" || phase === "recording") && (
+            <div className="flex items-center justify-between gap-2 px-2 pt-1">
+              {phase === "recording" ? (
+                <div className="flex items-center gap-1.5 rounded-full bg-black/70 px-2.5 py-0.5 text-xs font-semibold text-white">
+                  <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" /> LIVE REC {mm}:{ss} / 05:00
+                </div>
+              ) : (
+                <span />
+              )}
+              <div className="rounded bg-black/70 px-1.5 py-0.5 text-right text-[10px] font-semibold leading-tight text-white">
+                Deleted Recording: {attempts} / Available: {maxAttempts}
+              </div>
+            </div>
+          )}
+          {/* Delete & re-record / Submit sit just under the title, overlaid
+              on the replay itself, instead of a row below the video. */}
+          {phase === "review" && (
+            <div className="flex flex-col items-center gap-1.5 px-3 pt-2">
+              <div className="flex w-full items-center justify-between gap-2">
                 <button
-                  type="button"
-                  onClick={exitFullscreen}
-                  className="shrink-0 rounded border border-white/50 bg-black/30 px-2.5 py-1 text-xs font-semibold hover:bg-black/50"
-                  style={{ textShadow: "none" }}
+                  onClick={handleReRecord}
+                  disabled={!canReRecord}
+                  className="rounded-md border border-neutral-300 bg-white/90 px-3 py-1.5 text-xs font-semibold text-neutral-700 shadow hover:bg-white disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
                 >
-                  ✕ Exit full screen
+                  Delete &amp; re-record ({attemptsLeft} left)
+                </button>
+                <button
+                  onClick={() => {
+                    setAgreed(false);
+                    setAgreementOpen(true);
+                  }}
+                  className="rounded-md bg-red-700/90 px-4 py-1.5 text-xs font-semibold text-white shadow hover:bg-red-600 sm:text-sm"
+                >
+                  Submit this recording
                 </button>
               </div>
-            )}
-            {error && (
-              <div className="bg-red-50/95 px-4 py-2 text-sm text-red-800 backdrop-blur-sm">{error}</div>
-            )}
-          </div>
-        )}
+              {/* Buy more delete-and-re-record chances -- only reachable once
+                  the free 3 are gone. This used to live in the instructional
+                  text block above the recording area, which full screen mode
+                  now hides for the whole live/recording/review flow, making
+                  the button effectively unreachable right when it's actually
+                  needed. */}
+              {attemptsLeft <= 0 && (
+                <div className="rounded-md bg-white/95 px-2 py-1.5 shadow">
+                  <BuyExtraAttemptsButton hasPendingPurchase={hasPendingPurchase} />
+                </div>
+              )}
+            </div>
+          )}
+        </div>
         <video ref={videoRef} playsInline muted className="hidden" />
         <canvas
           ref={canvasRef}
@@ -611,6 +699,7 @@ export default function KataRecorder({
             src={blobUrl}
             controls
             playsInline
+            preload="auto"
             disablePictureInPicture
             className="block h-full w-full object-contain"
           />
@@ -618,16 +707,6 @@ export default function KataRecorder({
         {phase === "idle" && (
           <div className="flex h-full items-center justify-center p-8 text-center text-neutral-300">
             Camera preview appears here once started.
-          </div>
-        )}
-        {phase !== "idle" && phase !== "review" && phase !== "uploading" && (
-          <div className="absolute right-2 top-12 rounded bg-black/70 px-1.5 py-0.5 text-right text-[10px] font-semibold leading-tight text-white">
-            Deleted Recording: {attempts} / Available: {maxAttempts}
-          </div>
-        )}
-        {phase === "recording" && (
-          <div className="absolute left-3 top-12 flex items-center gap-1.5 rounded-full bg-black/70 px-2.5 py-0.5 text-xs font-semibold text-white">
-            <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" /> LIVE REC {mm}:{ss} / 05:00
           </div>
         )}
         {/* Start/Stop (round) lives INSIDE the recording area itself instead
@@ -669,42 +748,6 @@ export default function KataRecorder({
               ⛶
             </button>
           )}
-        {/* Delete & re-record / Submit sit just under the burned-in header
-            banner (top ~11% of the recorded frame), overlaid on the replay
-            itself, instead of a row below the video. */}
-        {phase === "review" && (
-          <div className="absolute inset-x-0 top-[13%] flex flex-col items-center gap-1.5 px-3">
-            <div className="flex w-full items-center justify-between gap-2">
-              <button
-                onClick={handleReRecord}
-                disabled={!canReRecord}
-                className="rounded-md border border-neutral-300 bg-white/90 px-3 py-1.5 text-xs font-semibold text-neutral-700 shadow hover:bg-white disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
-              >
-                Delete &amp; re-record ({attemptsLeft} left)
-              </button>
-              <button
-                onClick={() => {
-                  setAgreed(false);
-                  setAgreementOpen(true);
-                }}
-                className="rounded-md bg-red-700/90 px-4 py-1.5 text-xs font-semibold text-white shadow hover:bg-red-600 sm:text-sm"
-              >
-                Submit this recording
-              </button>
-            </div>
-            {/* Buy more delete-and-re-record chances -- only reachable once
-                the free 3 are gone. This used to live in the instructional
-                text block above the recording area, which full screen mode
-                now hides for the whole live/recording/review flow, making
-                the button effectively unreachable right when it's actually
-                needed. */}
-            {attemptsLeft <= 0 && (
-              <div className="rounded-md bg-white/95 px-2 py-1.5 shadow">
-                <BuyExtraAttemptsButton hasPendingPurchase={hasPendingPurchase} />
-              </div>
-            )}
-          </div>
-        )}
         {/* Only shown once there's an actual submitted/reviewable take --
             bottom-center, plain white text (no background box) so it reads
             as part of the recording itself, right above the burned-in
