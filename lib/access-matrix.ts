@@ -121,6 +121,11 @@ export const ACCESS_MATRIX: AccessRow[] = [
     note: "/admin/email-verifications is Admin/Organizer-only at the route level, same as Accounts — it can manually mark an account verified, bypassing the sign-in gate. markEmailVerified/resendVerificationEmail already gate on requireAdminTier() (admin/organizer/staff), so no action-level change was needed once the route let Organizer through.",
   },
   {
+    resource: "Commissions & Winner Rewards page (incl. payout receipt upload)",
+    admin: "Full", organizer: "Full", customerSupport: "Blocked (route)", referee: "Blocked (route)",
+    note: "/admin/commissions is now Admin/Organizer/Staff-only at the route level, same pattern as Classes. setCommissionPayoutStatus/setWinnerPayoutStatus/uploadCommissionReceipt/uploadWinnerReceipt all require requireCompetitionManager — previously the payout-status actions had no guard at all, so any staff-tier role could mark a payout paid despite the page never being explicitly restricted.",
+  },
+  {
     resource: "Content page (announcements, competition tiers, access matrix, and every other reference table)",
     admin: "Full", organizer: "Full", customerSupport: "View only", referee: "View only",
     note: "canManage (admin/organizer/staff) gates every create/edit/delete control and CSV uploader across all six sections; canView additionally admits Participant Support and Referee/Judge, who see every table's live data with inputs disabled and no Save/Delete/+Add row/upload controls rendered at all.",
