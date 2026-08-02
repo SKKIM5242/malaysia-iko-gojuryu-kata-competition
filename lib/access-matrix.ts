@@ -61,13 +61,13 @@ export const ACCESS_MATRIX: AccessRow[] = [
   },
   {
     resource: "Categories (incl. Merge to Mix)",
-    admin: "Full", organizer: "Full", customerSupport: "Full", referee: "Full",
-    note: "saveCategory/deleteCategory/mergeCategoryToMix carry no role guard — category-level access is intentionally open to all four.",
+    admin: "Full", organizer: "Full", customerSupport: "View only", referee: "View only",
+    note: "The merge/add/edit/delete UI is hidden from Participant Support and Referee on both /admin/competitions (canManageCompetition) and /kata-categories (canManageKata) — admin/organizer/staff only. But saveCategory/deleteCategory/mergeCategoryToMix/mergeAdjacentKata themselves still carry no server-side role guard, so this is enforced only by hiding the buttons, not by the actions rejecting the request — worth closing with a real guard.",
   },
   {
     resource: "Announcements",
-    admin: "Full", organizer: "Full", customerSupport: "Full", referee: "Full",
-    note: "No role guard on save/publish/delete/reorder.",
+    admin: "Full", organizer: "Full", customerSupport: "Blocked", referee: "Blocked",
+    note: "saveAnnouncement/toggleAnnouncement/moveAnnouncement/deleteAnnouncement all require requireContentManager (admin/organizer/staff only). The New/Edit/Delete/Publish/Reorder controls render for Participant Support and Referee anyway, so they see the form and buttons but every submission comes back \"Only Admin / Organizer can manage announcements.\" — the UI should hide these for them instead of letting the action reject.",
   },
   {
     resource: "Judging Arena (assign referees, set judges-required)",
@@ -111,9 +111,9 @@ export const ACCESS_MATRIX: AccessRow[] = [
     note: "/admin/email-verifications is Admin-only at the route level, same as Accounts — it can manually mark an account verified, bypassing the sign-in gate.",
   },
   {
-    resource: "CSV bulk upload — Schools / Senseis / Referees / Audience",
-    admin: "Full", organizer: "Full", customerSupport: "Full", referee: "Full",
-    note: "Mirrors the single-record actions above (no extra guard).",
+    resource: "CSV bulk upload — Schools / Senseis / Referees / Audience / Participants / Announcements / Invitation Codes / Content reference tables",
+    admin: "Full", organizer: "Full", customerSupport: "Blocked", referee: "Blocked",
+    note: "Every one of these bulk-upload actions calls the shared bulkUploadRoleError guard, which restricts to admin/organizer only — Participant Support and Referee are rejected. This is narrower than the single-record Add/Edit/Delete forms next to each uploader (see their own rows above), which stay open to all four.",
   },
   {
     resource: "CSV bulk upload — Organizer / Support accounts",
