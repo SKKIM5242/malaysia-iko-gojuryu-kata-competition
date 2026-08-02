@@ -86,14 +86,18 @@ function drawFrame(
   ctx.fillText("Organized by IKO GOJU-RYU KARATE-DO MALAYSIA SDN BHD", w / 2, topH * 0.82);
   ctx.shadowBlur = 0;
 
-  // Light watermark, bottom of frame
+  // Light watermark, bottom center of frame -- font size and bottom margin
+  // both scale with the actual recorded resolution (was a fixed "8px"/10px,
+  // which reads fine on a small preview thumbnail but is practically
+  // invisible once phones and tablets started negotiating much taller/wider
+  // real camera resolutions than that was ever sized for).
   ctx.save();
   ctx.globalAlpha = 0.38;
   ctx.fillStyle = "#ffffff";
   ctx.shadowColor = "rgba(0,0,0,0.55)";
   ctx.shadowBlur = 3;
-  ctx.font = "8px Arial, sans-serif";
-  ctx.fillText(watermark, w / 2, h - 10);
+  ctx.font = `${Math.max(11, Math.round(h * 0.022))}px Arial, sans-serif`;
+  ctx.fillText(watermark, w / 2, h - Math.max(14, Math.round(h * 0.025)));
   ctx.restore();
 }
 
@@ -110,13 +114,21 @@ function daysBetween(from: Date, to: Date): number {
  * left/right on a wide desktop or landscape-tablet window. Real camera
  * hardware only offers a handful of discrete resolutions, so this can't
  * guarantee an exact edge-to-edge fill, but matching portrait/landscape
- * gets far closer on every device than a fixed square ever could. */
+ * gets far closer on every device than a fixed square ever could.
+ *
+ * The width/height requested here are in the CAMERA SENSOR's own frame,
+ * not the screen's -- on a phone in portrait, the sensor itself is mounted
+ * landscape (rotated 90° by the OS to produce the portrait preview you see),
+ * so asking for a tall/narrow ideal while the screen is in portrait actually
+ * fights the sensor's native orientation on real devices. Confirmed on
+ * device: request the SENSOR-shaped shape opposite the screen's own
+ * orientation. */
 function idealVideoDimensions(): { width: number; height: number } {
   if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
-    return { width: 720, height: 1280 };
+    return { width: 1280, height: 720 };
   }
   const landscape = window.matchMedia("(orientation: landscape)").matches;
-  return landscape ? { width: 1280, height: 720 } : { width: 720, height: 1280 };
+  return landscape ? { width: 720, height: 1280 } : { width: 1280, height: 720 };
 }
 
 export default function KataRecorder({
@@ -564,14 +576,14 @@ export default function KataRecorder({
         {(fullscreen || error) && (
           <div className="absolute inset-x-0 top-0 z-20 flex flex-col">
             {fullscreen && (
-              <div className="flex items-center justify-between gap-2 px-3 py-2 text-white" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.85)" }}>
-                <p className="truncate text-sm font-bold">
+              <div className="flex items-start justify-between gap-2 px-3 py-2 text-white" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.85)" }}>
+                <p className="min-w-0 flex-1 break-words text-sm font-bold">
                   Kata Recording{categoryName ? ` — ${categoryName}` : ""}
                 </p>
                 <button
                   type="button"
                   onClick={exitFullscreen}
-                  className="rounded border border-white/50 bg-black/30 px-2.5 py-1 text-xs font-semibold hover:bg-black/50"
+                  className="shrink-0 rounded border border-white/50 bg-black/30 px-2.5 py-1 text-xs font-semibold hover:bg-black/50"
                   style={{ textShadow: "none" }}
                 >
                   ✕ Exit full screen
