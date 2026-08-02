@@ -90,8 +90,9 @@ async function blockCustomerSupport(
   }
 }
 
-/** Only Admin/Organizer (and legacy "staff") may create or edit competitions
- * — Referee and Participant Support get category-level access but not this. */
+/** Only Admin/Organizer (and legacy "staff") may create or edit competitions,
+ * or add/edit/delete/merge/reorder their kata categories — Referee and
+ * Participant Support can view but not change either. */
 async function requireCompetitionManager(
   supabase: Awaited<ReturnType<typeof createClient>>,
   actorId: string | null,
@@ -485,6 +486,7 @@ export async function saveCategory(formData: FormData) {
     backTo(returnTo, { error: "Max participants must be a number." });
   }
   const { supabase, actorId } = await getActor();
+  await requireCompetitionManager(supabase, actorId, returnTo);
   if (id) {
     const { error } = await supabase.from("categories").update(values).eq("id", id);
     if (error) backTo(returnTo, { error: "Could not update category." });
@@ -508,6 +510,7 @@ export async function deleteCategory(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const returnTo = String(formData.get("return_to") ?? "") || "/admin/competitions";
   const { supabase, actorId } = await getActor();
+  await requireCompetitionManager(supabase, actorId, returnTo);
 
   const { data: source } = await supabase.from("categories").select("*").eq("id", id).maybeSingle();
   if (!source) backTo(returnTo, { error: "Category not found." });
@@ -537,6 +540,7 @@ export async function mergeCategoryToMix(formData: FormData) {
   const categoryId = String(formData.get("category_id") ?? "");
   const returnTo = String(formData.get("return_to") ?? "") || "/admin/competitions";
   const { supabase, actorId } = await getActor();
+  await requireCompetitionManager(supabase, actorId, returnTo);
 
   const { data: source } = await supabase
     .from("categories")
@@ -651,6 +655,7 @@ export async function mergeCategoryAgeGroup(formData: FormData) {
   const direction = formData.get("direction") === "before" ? "before" : "after";
   const returnTo = String(formData.get("return_to") ?? "") || "/admin/competitions";
   const { supabase, actorId } = await getActor();
+  await requireCompetitionManager(supabase, actorId, returnTo);
 
   const { data: source } = await supabase
     .from("categories").select("*").eq("id", categoryId).maybeSingle();
@@ -752,6 +757,7 @@ export async function mergeKataFamily(formData: FormData) {
   const family = String(formData.get("family") ?? "") as KataFamily;
   const returnTo = String(formData.get("return_to") ?? "") || "/admin/competitions";
   const { supabase, actorId } = await getActor();
+  await requireCompetitionManager(supabase, actorId, returnTo);
 
   if (!KATA_FAMILIES.includes(family)) backTo(returnTo, { error: "Unknown kata family." });
   if (!competitionId) backTo(returnTo, { error: "Missing competition." });
@@ -844,6 +850,7 @@ export async function mergeKataBeltGroup(formData: FormData) {
   const beltGroupValue = formData.get("belt_group") === "dan" ? "dan" : "kyu";
   const returnTo = String(formData.get("return_to") ?? "") || "/admin/competitions";
   const { supabase, actorId } = await getActor();
+  await requireCompetitionManager(supabase, actorId, returnTo);
 
   if (!competitionId || !kataBase) backTo(returnTo, { error: "Missing competition or kata." });
 
@@ -940,6 +947,7 @@ export async function mergeAdjacentKata(formData: FormData) {
   const direction = formData.get("direction") === "above" ? "above" : "below";
   const returnTo = String(formData.get("return_to") ?? "") || "/admin/competitions";
   const { supabase, actorId } = await getActor();
+  await requireCompetitionManager(supabase, actorId, returnTo);
 
   if (!competitionId || !kataBase) backTo(returnTo, { error: "Missing competition or kata." });
 
@@ -1039,6 +1047,7 @@ export async function undoLastMerge(formData: FormData) {
   const competitionId = String(formData.get("competition_id") ?? "");
   const returnTo = String(formData.get("return_to") ?? "") || "/admin/competitions";
   const { supabase, actorId } = await getActor();
+  await requireCompetitionManager(supabase, actorId, returnTo);
   if (!competitionId) backTo(returnTo, { error: "Missing competition." });
 
   const result = await undoLastCategoryMerge(supabase, competitionId);
@@ -1064,6 +1073,7 @@ export async function undoLastDelete(formData: FormData) {
   const competitionId = String(formData.get("competition_id") ?? "");
   const returnTo = String(formData.get("return_to") ?? "") || "/admin/competitions";
   const { supabase, actorId } = await getActor();
+  await requireCompetitionManager(supabase, actorId, returnTo);
   if (!competitionId) backTo(returnTo, { error: "Missing competition." });
 
   const result = await undoLastCategoryDelete(supabase, competitionId);
@@ -1107,7 +1117,8 @@ export async function reorderCategoryGroups(formData: FormData) {
   if (!sourceBase || !targetBase || sourceBase === targetBase) {
     backTo(returnTo, { error: "Could not reorder — try again." });
   }
-  const { supabase } = await getActor();
+  const { supabase, actorId } = await getActor();
+  await requireCompetitionManager(supabase, actorId, returnTo);
 
   const { data: all } = await supabase
     .from("categories")
@@ -1146,7 +1157,8 @@ export async function reorderSubcategories(formData: FormData) {
   if (!sourceId || !targetId || sourceId === targetId) {
     backTo(returnTo, { error: "Could not reorder — try again." });
   }
-  const { supabase } = await getActor();
+  const { supabase, actorId } = await getActor();
+  await requireCompetitionManager(supabase, actorId, returnTo);
 
   const { data: source } = await supabase
     .from("categories").select("competition_id, name").eq("id", sourceId).maybeSingle();
