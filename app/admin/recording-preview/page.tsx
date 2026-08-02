@@ -7,9 +7,9 @@ import KataRecorder from "@/components/KataRecorder";
 export const dynamic = "force-dynamic";
 
 /** Sample dates only — this page never touches a real competition or
- * registration, it exists purely so Admin/Organizer can test the recording
- * UI end-to-end (camera, timer, delete-and-re-record) and Support can see
- * how it looks and works without being able to use it. */
+ * registration, it exists purely so Admin/Organizer/Referee can test the
+ * recording UI end-to-end (camera, timer, delete-and-re-record) and Support
+ * can see how it looks and works without being able to use it. */
 function sampleDates() {
   const start = new Date();
   const end = new Date(start.getTime() + 30 * 24 * 60 * 60 * 1000);
@@ -35,7 +35,7 @@ export default async function AdminRecordingPreview() {
     ? await supabase.from("profiles").select("role").eq("user_id", user.id).maybeSingle()
     : { data: null };
   const role = myProfile?.role ?? null;
-  const canTest = ["admin", "organizer", "staff"].includes(role ?? "");
+  const canTest = ["admin", "organizer", "staff", "referee"].includes(role ?? "");
   const canView = canTest || role === "customer_support";
   const { start, end } = sampleDates();
 
@@ -50,10 +50,10 @@ export default async function AdminRecordingPreview() {
           }`}>
             {canTest ? (
               <>
-                <strong>Admin / Organizer — full test access.</strong> This is the exact recording
-                window a participant sees, using sample dates. You can test the camera, timer, and
-                delete-and-re-record flow. Final submission will show an expected error since your
-                staff account has no paid registration to attach it to.
+                <strong>Admin / Organizer / Referee — full test access.</strong> This is the exact
+                recording window a participant sees, using sample dates. You can test the camera,
+                timer, and delete-and-re-record flow. Final submission will show an expected error
+                since your staff account has no paid registration to attach it to.
               </>
             ) : (
               <>

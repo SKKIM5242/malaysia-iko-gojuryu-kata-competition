@@ -24,7 +24,7 @@ export default async function AdminMobilePreview() {
     ? await supabase.from("profiles").select("role").eq("user_id", user.id).maybeSingle()
     : { data: null };
   const role = myProfile?.role ?? null;
-  const canView = ["admin", "organizer", "staff", "customer_support"].includes(role ?? "");
+  const canView = ["admin", "organizer", "staff", "customer_support", "referee"].includes(role ?? "");
 
   return (
     <AdminShell title="Mobile Preview — Portrait & Landscape" active="/admin/mobile-preview">
@@ -35,8 +35,8 @@ export default async function AdminMobilePreview() {
           <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             <strong>View access only.</strong> These frames load the real, live site at exact phone
             dimensions so you can check how any page looks and behaves on mobile — Portrait and
-            Landscape, side by side — without needing an actual phone. Admin, Organizer, and
-            Participant Support can all view this page.
+            Landscape, side by side — without needing an actual phone. Admin, Organizer,
+            Participant Support, and Referee/Judge can all view this page.
           </div>
           <MobilePreviewFrames />
         </div>
