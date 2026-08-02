@@ -41,6 +41,35 @@ function extensionForMimeType(mimeType: string): string {
   return mimeType.startsWith("video/mp4") ? "mp4" : "webm";
 }
 
+/** Light watermark, bottom center of frame -- font size and bottom margin
+ * both scale with the actual recorded resolution (was a fixed "8px"/10px,
+ * which reads fine on a small preview thumbnail but is practically
+ * invisible once phones and tablets started negotiating much taller/wider
+ * real camera resolutions than that was ever sized for). Shared by both
+ * the portrait and landscape banner layouts below. */
+function drawWatermark(ctx: CanvasRenderingContext2D, w: number, h: number, watermark: string) {
+  ctx.save();
+  ctx.globalAlpha = 0.38;
+  ctx.fillStyle = "#ffffff";
+  ctx.shadowColor = "rgba(0,0,0,0.55)";
+  ctx.shadowBlur = 3;
+  ctx.font = `${Math.max(11, Math.round(h * 0.022))}px Arial, sans-serif`;
+  ctx.textAlign = "center";
+  ctx.fillText(watermark, w / 2, h - Math.max(14, Math.round(h * 0.025)));
+  ctx.restore();
+}
+
+function drawBannerRect(ctx: CanvasRenderingContext2D, w: number, topH: number) {
+  const grad = ctx.createLinearGradient(0, 0, w, 0);
+  grad.addColorStop(0, "#b91c1c");
+  grad.addColorStop(0.5, "#7c2d92");
+  grad.addColorStop(1, "#1d4ed8");
+  ctx.globalAlpha = 0.88;
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w, topH);
+  ctx.globalAlpha = 1;
+}
+
 /** Draws the branded competition frame: colorful title banner, live camera
  * feed, and a light watermark — all burned into the recorded pixels via
  * canvas.captureStream(), never the raw camera feed. Returns the banner's
@@ -57,78 +86,88 @@ function drawFrame(
   ctx.drawImage(video, 0, 0, w, h);
 
   const maxTitleWidth = w * 0.94;
-  const bannerTitle = "MALAYSIA OPEN VIRTUAL KARATE-DO KATA COMPETITION";
   const subtitle = "Organized by IKO GOJU-RYU KARATE-DO MALAYSIA SDN BHD";
 
-  let topH: number;
-  let titleFontPx: number;
-  let subtitleFontPx: number;
-  let titleY: number;
-  let subtitleY: number;
-
-  // Portrait only: size the two lines from the frame's WIDTH (how much text
-  // actually fits, at a size worth reading) and then make the banner just
-  // tall enough to hold them -- previously topH was a fixed slice of the
-  // frame's HEIGHT, which on a tall portrait recording left a lot of empty
-  // colored background around comparatively small type, and pushed the DOM
-  // title bar below it down further than the (short) text actually needed.
-  // Landscape keeps the original height-proportional sizing since it was
-  // never reported as a problem there.
+  // Portrait only: size from the frame's WIDTH (how large the text can get
+  // before needing to shrink to fit) and make the banner just tall enough
+  // to hold it -- a fixed height-proportional slice left a lot of empty
+  // colored background around comparatively small type on a tall portrait
+  // recording. Fitting the WHOLE title on one line meant its size was
+  // capped by the full ~50-character string's width regardless of how
+  // large the starting guess was -- splitting it across two lines lets
+  // each line run close to double the size before hitting that same
+  // width limit, which is what actually makes the banner (and its text)
+  // bigger, not just a bigger initial guess that the fit-loop shrinks
+  // right back down anyway. Landscape is unchanged (one line still fits
+  // comfortably there, and it was never reported as a problem).
   if (h > w) {
-    titleFontPx = Math.round(w * 0.072);
+    const titleLine1 = "MALAYSIA OPEN VIRTUAL";
+    const titleLine2 = "KARATE-DO KATA COMPETITION";
+    let titleFontPx = Math.round(w * 0.15);
     ctx.font = `900 ${titleFontPx}px Georgia, serif`;
-    while (titleFontPx > 4 && ctx.measureText(bannerTitle).width > maxTitleWidth) {
+    while (
+      titleFontPx > 4 &&
+      (ctx.measureText(titleLine1).width > maxTitleWidth || ctx.measureText(titleLine2).width > maxTitleWidth)
+    ) {
       titleFontPx -= 1;
       ctx.font = `900 ${titleFontPx}px Georgia, serif`;
     }
-    subtitleFontPx = Math.round(titleFontPx * 0.5);
+    let subtitleFontPx = Math.round(titleFontPx * 0.4);
     ctx.font = `${subtitleFontPx}px Arial, sans-serif`;
     while (subtitleFontPx > 3 && ctx.measureText(subtitle).width > maxTitleWidth) {
       subtitleFontPx -= 1;
       ctx.font = `${subtitleFontPx}px Arial, sans-serif`;
     }
-    const padTop = Math.round(titleFontPx * 0.3);
-    const gap = Math.round(titleFontPx * 0.22);
+    const padTop = Math.round(titleFontPx * 0.32);
+    const lineGap = Math.round(titleFontPx * 0.14);
+    const subtitleGap = Math.round(titleFontPx * 0.22);
     const padBottom = Math.round(subtitleFontPx * 0.4);
-    titleY = padTop + titleFontPx * 0.8;
-    subtitleY = titleY + titleFontPx * 0.3 + gap + subtitleFontPx * 0.8;
-    topH = Math.round(subtitleY + subtitleFontPx * 0.35 + padBottom);
-  } else {
-    // A bit taller than before to give the now-bigger/bolder title room to
-    // breathe without crowding the subtitle underneath it.
-    topH = Math.round(h * 0.13);
-    titleFontPx = Math.max(14, Math.round(topH * 0.4));
+    const line1Y = padTop + titleFontPx * 0.8;
+    const line2Y = line1Y + titleFontPx * 0.85 + lineGap;
+    const subtitleY = line2Y + titleFontPx * 0.3 + subtitleGap + subtitleFontPx * 0.8;
+    const topH = Math.round(subtitleY + subtitleFontPx * 0.35 + padBottom);
+
+    drawBannerRect(ctx, w, topH);
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#ffffff";
+    ctx.shadowColor = "rgba(0,0,0,0.6)";
+    ctx.shadowBlur = 4;
     ctx.font = `900 ${titleFontPx}px Georgia, serif`;
-    while (titleFontPx > 4 && ctx.measureText(bannerTitle).width > maxTitleWidth) {
-      titleFontPx -= 1;
-      ctx.font = `900 ${titleFontPx}px Georgia, serif`;
-    }
-    // Capped at a fraction of whatever the title actually ended up at (not
-    // just its own independent proportional guess + floor) -- on a
-    // narrow-but-tall recording, the (longer) title needs much more
-    // shrinking than the (shorter) subtitle, and two independent floors
-    // could let the subtitle end up the same size as, or bigger than, the
-    // title it's supposed to sit under.
-    subtitleFontPx = Math.min(Math.max(8, Math.round(topH * 0.16)), Math.round(titleFontPx * 0.55));
+    ctx.fillText(titleLine1, w / 2, line1Y);
+    ctx.fillText(titleLine2, w / 2, line2Y);
     ctx.font = `${subtitleFontPx}px Arial, sans-serif`;
-    while (subtitleFontPx > 3 && ctx.measureText(subtitle).width > maxTitleWidth) {
-      subtitleFontPx -= 1;
-      ctx.font = `${subtitleFontPx}px Arial, sans-serif`;
-    }
-    titleY = topH * 0.4;
-    subtitleY = topH * 0.82;
+    ctx.fillText(subtitle, w / 2, subtitleY);
+    ctx.shadowBlur = 0;
+
+    drawWatermark(ctx, w, h, watermark);
+    return topH / h;
   }
 
-  // Top banner — colorful gradient declaration
-  const grad = ctx.createLinearGradient(0, 0, w, 0);
-  grad.addColorStop(0, "#b91c1c");
-  grad.addColorStop(0.5, "#7c2d92");
-  grad.addColorStop(1, "#1d4ed8");
-  ctx.globalAlpha = 0.88;
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, w, topH);
-  ctx.globalAlpha = 1;
+  // Landscape: unchanged single-line layout, sized from the frame's height.
+  const bannerTitle = "MALAYSIA OPEN VIRTUAL KARATE-DO KATA COMPETITION";
+  const topH = Math.round(h * 0.13);
+  let titleFontPx = Math.max(14, Math.round(topH * 0.4));
+  ctx.font = `900 ${titleFontPx}px Georgia, serif`;
+  while (titleFontPx > 4 && ctx.measureText(bannerTitle).width > maxTitleWidth) {
+    titleFontPx -= 1;
+    ctx.font = `900 ${titleFontPx}px Georgia, serif`;
+  }
+  // Capped at a fraction of whatever the title actually ended up at (not
+  // just its own independent proportional guess + floor) -- on a
+  // narrow-but-tall recording, the (longer) title needs much more
+  // shrinking than the (shorter) subtitle, and two independent floors
+  // could let the subtitle end up the same size as, or bigger than, the
+  // title it's supposed to sit under.
+  let subtitleFontPx = Math.min(Math.max(8, Math.round(topH * 0.16)), Math.round(titleFontPx * 0.55));
+  ctx.font = `${subtitleFontPx}px Arial, sans-serif`;
+  while (subtitleFontPx > 3 && ctx.measureText(subtitle).width > maxTitleWidth) {
+    subtitleFontPx -= 1;
+    ctx.font = `${subtitleFontPx}px Arial, sans-serif`;
+  }
+  const titleY = topH * 0.4;
+  const subtitleY = topH * 0.82;
 
+  drawBannerRect(ctx, w, topH);
   ctx.textAlign = "center";
   ctx.fillStyle = "#ffffff";
   ctx.shadowColor = "rgba(0,0,0,0.6)";
@@ -139,20 +178,7 @@ function drawFrame(
   ctx.fillText(subtitle, w / 2, subtitleY);
   ctx.shadowBlur = 0;
 
-  // Light watermark, bottom center of frame -- font size and bottom margin
-  // both scale with the actual recorded resolution (was a fixed "8px"/10px,
-  // which reads fine on a small preview thumbnail but is practically
-  // invisible once phones and tablets started negotiating much taller/wider
-  // real camera resolutions than that was ever sized for).
-  ctx.save();
-  ctx.globalAlpha = 0.38;
-  ctx.fillStyle = "#ffffff";
-  ctx.shadowColor = "rgba(0,0,0,0.55)";
-  ctx.shadowBlur = 3;
-  ctx.font = `${Math.max(11, Math.round(h * 0.022))}px Arial, sans-serif`;
-  ctx.fillText(watermark, w / 2, h - Math.max(14, Math.round(h * 0.025)));
-  ctx.restore();
-
+  drawWatermark(ctx, w, h, watermark);
   return topH / h;
 }
 
@@ -168,8 +194,12 @@ function daysBetween(from: Date, to: Date): number {
  * letterboxed bars on every device: top/bottom on a tall phone screen,
  * left/right on a wide desktop or landscape-tablet window. Real camera
  * hardware only offers a handful of discrete resolutions, so this can't
- * guarantee an exact edge-to-edge fill, but matching portrait/landscape
- * gets far closer on every device than a fixed square ever could.
+ * guarantee an exact edge-to-edge fill, but matching the device's actual
+ * proportions (not just a generic 16:9 guess) gets it as close as the
+ * hardware allows -- a modern phone screen is routinely taller/narrower
+ * than any standard camera ratio, so some residual letterboxing in
+ * fullscreen is a real hardware ceiling, not something this can fully
+ * eliminate.
  *
  * The width/height requested here are in the CAMERA SENSOR's own frame,
  * not the screen's -- on a phone in portrait, the sensor itself is mounted
@@ -177,13 +207,18 @@ function daysBetween(from: Date, to: Date): number {
  * so asking for a tall/narrow ideal while the screen is in portrait actually
  * fights the sensor's native orientation on real devices. Confirmed on
  * device: request the SENSOR-shaped shape opposite the screen's own
- * orientation. */
+ * orientation, scaled to this device's own measured proportions rather
+ * than a fixed preset. */
 function idealVideoDimensions(): { width: number; height: number } {
   if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
     return { width: 1280, height: 720 };
   }
   const landscape = window.matchMedia("(orientation: landscape)").matches;
-  return landscape ? { width: 720, height: 1280 } : { width: 1280, height: 720 };
+  const screenLong = Math.max(window.innerWidth, window.innerHeight, 480);
+  const screenShort = Math.max(Math.min(window.innerWidth, window.innerHeight), 240);
+  const longEdge = 1280;
+  const shortEdge = Math.max(400, Math.round(longEdge * (screenShort / screenLong)));
+  return landscape ? { width: shortEdge, height: longEdge } : { width: longEdge, height: shortEdge };
 }
 
 export default function KataRecorder({
