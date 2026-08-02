@@ -101,6 +101,24 @@ function daysBetween(from: Date, to: Date): number {
   return Math.ceil((to.getTime() - from.getTime()) / (24 * 60 * 60 * 1000));
 }
 
+/** Requests a camera resolution shaped like the screen it'll actually be
+ * displayed on. This used to always ask for a near-square 1280x1280 frame
+ * regardless of device — since the video renders with object-contain
+ * (preserves its own aspect ratio, never crops, so the whole kata always
+ * stays in frame), a mismatched request is exactly what left large black
+ * letterboxed bars on every device: top/bottom on a tall phone screen,
+ * left/right on a wide desktop or landscape-tablet window. Real camera
+ * hardware only offers a handful of discrete resolutions, so this can't
+ * guarantee an exact edge-to-edge fill, but matching portrait/landscape
+ * gets far closer on every device than a fixed square ever could. */
+function idealVideoDimensions(): { width: number; height: number } {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+    return { width: 720, height: 1280 };
+  }
+  const landscape = window.matchMedia("(orientation: landscape)").matches;
+  return landscape ? { width: 1280, height: 720 } : { width: 720, height: 1280 };
+}
+
 export default function KataRecorder({
   initialAttempts,
   maxAttempts,
@@ -216,8 +234,9 @@ export default function KataRecorder({
   async function startCamera() {
     setError(null);
     try {
+      const { width, height } = idealVideoDimensions();
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 1280 } },
+        video: { facingMode: "environment", width: { ideal: width }, height: { ideal: height } },
         audio: true,
       });
       streamRef.current = stream;
@@ -476,7 +495,7 @@ export default function KataRecorder({
         className={
           fullscreen
             ? "relative h-[100dvh] w-full overflow-hidden bg-black"
-            : "relative mx-auto min-h-[70dvh] max-w-md overflow-hidden rounded-lg border border-neutral-300 bg-black [@media(orientation:landscape)]:max-w-4xl"
+            : "relative mx-auto min-h-[85dvh] max-w-md overflow-hidden rounded-lg border border-neutral-300 bg-black [@media(orientation:landscape)]:max-w-4xl"
         }
       >
         {/* Title bar and error banner float directly on the recording area
