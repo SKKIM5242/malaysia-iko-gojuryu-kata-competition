@@ -133,6 +133,28 @@ async function blockReferee(
   }
 }
 
+/** Schools/Senseis/Referees/Audience/Participants: the Add/Edit (and, for
+ * everything except Participants, Delete) forms next to each list are shown
+ * to every staff-tier role, including Participant Support and Referee/Judge
+ * — not just Admin/Organizer/Staff — per the existing UI (those forms are
+ * never hidden from them) and blockCustomerSupport's own doc comment above
+ * ("Participant Support has edit access to registrations/participants").
+ * The underlying save/delete actions had no server-side check at all,
+ * meaning a Participant/Audience/School/Sensei self-service login could
+ * have called them directly too — this closes that off while keeping the
+ * intended Support/Referee access working, not narrowing it further to
+ * requireCompetitionManager (which would break existing behavior). */
+async function requireCommunityManager(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  actorId: string | null,
+  returnTo: string,
+) {
+  const role = await getActorRole(supabase, actorId);
+  if (!["admin", "organizer", "staff", "customer_support", "referee"].includes(role ?? "")) {
+    backTo(returnTo, { error: "You don't have permission to do that." });
+  }
+}
+
 /** Judging Arena mutations (assign/unassign referees, set judges-required,
  * auto-assign) are Super Admin only — Organizer, Participant Support, and
  * Referee can view the arena but not configure it. */
@@ -1490,6 +1512,7 @@ export async function saveSchool(formData: FormData) {
   }
   const record = { ...values, gender: values.contact_title === "Mr." ? "male" : "female" };
   const { supabase, actorId } = await getActor();
+  await requireCommunityManager(supabase, actorId, returnTo);
   if (!id) {
     const { data: dup } = await supabase
       .from("schools").select("id").ilike("name", values.name).limit(1);
@@ -1530,6 +1553,7 @@ export async function deleteSchool(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const returnTo = "/admin/schools";
   const { supabase, actorId } = await getActor();
+  await requireCommunityManager(supabase, actorId, returnTo);
   const { error } = await supabase.from("schools").delete().eq("id", id);
   if (error) backTo(returnTo, { error: "Cannot delete — senseis or participants reference this school." });
   await writeAudit(supabase, {
@@ -1584,6 +1608,7 @@ export async function saveSensei(formData: FormData) {
     backTo(returnTo, { error: "Personal bank details (bank name, account number, and account holder name) are required." });
   }
   const { supabase, actorId } = await getActor();
+  await requireCommunityManager(supabase, actorId, returnTo);
 
   const certificatePath = await uploadCertificateIfPresent(supabase, formData, "sensei", returnTo);
   if (!id && !certificatePath) {
@@ -1637,6 +1662,7 @@ export async function deleteSensei(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const returnTo = "/admin/senseis";
   const { supabase, actorId } = await getActor();
+  await requireCommunityManager(supabase, actorId, returnTo);
   const { error } = await supabase.from("senseis").delete().eq("id", id);
   if (error) backTo(returnTo, { error: "Cannot delete — participants reference this sensei." });
   await writeAudit(supabase, {
@@ -1787,6 +1813,11 @@ export async function updateCommunityStatus(formData: FormData) {
     backTo(returnTo, { error: "Invalid update." });
   }
   const { supabase, actorId } = await getActor();
+  // Financially/approval-sensitive (marks a fee paid/waived, or approves a
+  // referee/staff application) -- kept admin/organizer/staff only, same as
+  // commission and winner payout status, rather than opened to Support/
+  // Referee the way the plain Save/Delete forms on these same pages are.
+  await requireCompetitionManager(supabase, actorId, returnTo);
   const { error } = await supabase.from(table).update({ [field]: value }).eq("id", id);
   if (error) backTo(returnTo, { error: "Update failed — please try again." });
   await writeAudit(supabase, {
@@ -1820,6 +1851,7 @@ export async function saveAudienceMember(formData: FormData) {
     backTo(returnTo, { error: "Name, email, and mobile phone are required." });
   }
   const { supabase, actorId } = await getActor();
+  await requireCommunityManager(supabase, actorId, returnTo);
 
   if (id) {
     const { error } = await supabase
@@ -1872,6 +1904,7 @@ export async function deleteAudienceMember(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const returnTo = "/admin/audience";
   const { supabase, actorId } = await getActor();
+  await requireCommunityManager(supabase, actorId, returnTo);
   const { error } = await supabase.from("audiences").delete().eq("id", id);
   if (error) backTo(returnTo, { error: "Could not delete — please try again." });
   await writeAudit(supabase, {
@@ -1925,6 +1958,7 @@ export async function saveReferee(formData: FormData) {
     backTo(returnTo, { error: "Bank details are required." });
   }
   const { supabase, actorId } = await getActor();
+  await requireCommunityManager(supabase, actorId, returnTo);
 
   const certificatePath = await uploadCertificateIfPresent(supabase, formData, "referee", returnTo);
   if (!id && !certificatePath) {
@@ -1970,6 +2004,7 @@ export async function deleteReferee(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const returnTo = "/admin/referees";
   const { supabase, actorId } = await getActor();
+  await requireCommunityManager(supabase, actorId, returnTo);
   const { error } = await supabase.from("referees").delete().eq("id", id);
   if (error) backTo(returnTo, { error: "Could not delete referee." });
   await writeAudit(supabase, {
@@ -2025,6 +2060,7 @@ export async function saveParticipant(formData: FormData) {
     backTo(returnTo, { error: "Reward payout bank details are required." });
   }
   const { supabase, actorId } = await getActor();
+  await requireCommunityManager(supabase, actorId, returnTo);
 
   const certificatePath = await uploadCertificateIfPresent(supabase, formData, "participant", returnTo);
 
@@ -2222,8 +2258,11 @@ export async function deleteParticipant(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const returnTo = "/admin/participants";
   const { supabase, actorId } = await getActor();
-  await blockCustomerSupport(supabase, actorId, returnTo);
-  await blockReferee(supabase, actorId, returnTo);
+  // Deliberately an allow-list (admin/organizer/staff), not the deny-list
+  // this used to be (blockCustomerSupport + blockReferee) -- a deny-list
+  // silently admits any future/unlisted role too, whereas canDelete on the
+  // Participants page itself is already "everyone except Support/Referee".
+  await requireCompetitionManager(supabase, actorId, returnTo);
   const { error } = await supabase.from("participants").delete().eq("id", id);
   if (error) backTo(returnTo, { error: "Cannot delete — registrations reference this participant. Delete those first." });
   await writeAudit(supabase, {
@@ -2240,6 +2279,11 @@ export async function setProfileApproval(formData: FormData) {
   const approve = formData.get("approve") === "true";
   const returnTo = "/admin/accounts";
   const { supabase, actorId } = await getActor();
+  // Defense-in-depth: approve_profile() is SECURITY DEFINER and already
+  // asserts is_admin() itself, so an unauthorized call would fail at the DB
+  // layer regardless -- this just gives a clearer error and matches every
+  // other action's own explicit guard, rather than relying solely on the RPC.
+  await requireCompetitionManager(supabase, actorId, returnTo);
   const { error } = await supabase.rpc("approve_profile", { p_user: userId, p_approve: approve });
   if (error) backTo(returnTo, { error: "Could not update approval." });
   await writeAudit(supabase, {
@@ -2305,7 +2349,14 @@ export async function generateSequentialInvitationCode(
 ): Promise<{ code: string } | { error: string }> {
   if (!INVITATION_CODE_ROLES.includes(role)) return { error: "Pick a role first." };
   if (!competitionIds.length) return { error: "Pick a competition tier first." };
-  const { supabase } = await getActor();
+  const { supabase, actorId } = await getActor();
+  // This returns a value rather than redirecting, so it can't use the
+  // backTo-based requireCompetitionManager helper -- same allow-list,
+  // returned as an error value instead.
+  const actorRole = await getActorRole(supabase, actorId);
+  if (!["admin", "organizer", "staff"].includes(actorRole ?? "")) {
+    return { error: "Only Admin / Organizer can generate invitation codes." };
+  }
   const { data: competitions } = await supabase
     .from("competitions")
     .select("id, registration_fee_usd")
@@ -2327,6 +2378,7 @@ export async function createInvitationCode(formData: FormData) {
   const returnTo = String(formData.get("return_to") ?? "/admin/accounts");
   const fields = requireInvitationCodeFields(formData, returnTo);
   const { supabase, actorId } = await getActor();
+  await requireCompetitionManager(supabase, actorId, returnTo);
   // Who generated it is read from the signer's own session, never typed in —
   // falls back to their account email when they haven't set a display name.
   const { data: myProfile } = actorId
@@ -2355,6 +2407,7 @@ export async function updateInvitationCode(formData: FormData) {
   if (!id) backTo(returnTo, { error: "Invalid request." });
   const fields = requireInvitationCodeFields(formData, returnTo);
   const { supabase, actorId } = await getActor();
+  await requireCompetitionManager(supabase, actorId, returnTo);
   const { data: before } = await supabase.from("invitation_codes").select("*").eq("id", id).maybeSingle();
   const { error } = await supabase.from("invitation_codes").update(fields).eq("id", id);
   if (error) backTo(returnTo, { error: `Could not update code: ${error.message}` });
@@ -2454,6 +2507,7 @@ export async function deleteInvitationCode(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const returnTo = String(formData.get("return_to") ?? "/admin/accounts");
   const { supabase, actorId } = await getActor();
+  await requireCompetitionManager(supabase, actorId, returnTo);
   const { error } = await supabase.from("invitation_codes").delete().eq("id", id);
   if (error) backTo(returnTo, { error: "Could not delete code." });
   await writeAudit(supabase, {
@@ -3357,6 +3411,7 @@ export async function generateRecordInvitationCode(formData: FormData) {
   }
 
   const { supabase, actorId } = await getActor();
+  await requireCompetitionManager(supabase, actorId, returnTo);
 
   const draft = draftRecordFields(role, formData);
   if (draft) await supabase.from(table).update(draft).eq("id", id);
@@ -3423,6 +3478,7 @@ export async function toggleInvitationCode(formData: FormData) {
   const active = formData.get("active") === "true";
   const returnTo = String(formData.get("return_to") ?? "/admin/accounts");
   const { supabase, actorId } = await getActor();
+  await requireCompetitionManager(supabase, actorId, returnTo);
   const { error } = await supabase.from("invitation_codes").update({ active }).eq("id", id);
   if (error) backTo(returnTo, { error: "Could not update code." });
   await writeAudit(supabase, {
