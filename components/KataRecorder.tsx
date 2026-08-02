@@ -159,6 +159,28 @@ export default function KataRecorder({
   const rafRef = useRef<number | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const recordedBlobRef = useRef<Blob | null>(null);
+  // Real cameras rarely honor the `ideal` width/height sent to getUserMedia
+  // exactly -- a desktop webcam in particular is a landscape-only sensor and
+  // will hand back a landscape stream even when asked for a portrait one.
+  // Sizing the preview box from a static "assume portrait unless the window
+  // itself looks landscape" guess (the old min-h-[85dvh]/max-w-md/
+  // landscape:max-w-4xl classes) is exactly what left the box shaped nothing
+  // like whatever the camera actually delivered -- object-contain then
+  // faithfully shrinks that real video to fit the mis-shaped box, wasting
+  // most of it as plain black. Tracking the box's shape from the stream's
+  // OWN dimensions instead removes that mismatch regardless of device or
+  // orientation.
+  const [videoAspect, setVideoAspect] = useState<number | null>(null);
+  const videoAspectRef = useRef(0);
+  // CSS `aspect-ratio` on a plain block element doesn't shrink-to-fit the
+  // way it does on a replaced element (img/video) -- a statically-positioned
+  // div with width:auto fills its container's full width first, THEN derives
+  // height from that, so a tall aspect-ratio box would just overflow past
+  // any max-height instead of shrinking back down. Computing explicit pixel
+  // width/height here sidesteps that entirely.
+  const [viewport, setViewport] = useState<{ w: number; h: number }>(() =>
+    typeof window === "undefined" ? { w: 400, h: 800 } : { w: window.innerWidth, h: window.innerHeight },
+  );
 
   const attemptsLeft = Math.max(0, maxAttempts - attempts);
   const canReRecord = attemptsLeft > 0;
@@ -183,6 +205,18 @@ export default function KataRecorder({
       if (blobUrl) URL.revokeObjectURL(blobUrl);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    function onResize() {
+      setViewport({ w: window.innerWidth, h: window.innerHeight });
+    }
+    window.addEventListener("resize", onResize);
+    window.addEventListener("orientationchange", onResize);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("orientationchange", onResize);
+    };
   }, []);
 
   // Keeps our own state in sync if the browser's own fullscreen exits some
@@ -261,6 +295,11 @@ export default function KataRecorder({
     }
     if (canvas.width !== video.videoWidth) canvas.width = video.videoWidth;
     if (canvas.height !== video.videoHeight) canvas.height = video.videoHeight;
+    const ratio = video.videoWidth / video.videoHeight;
+    if (Math.abs(videoAspectRef.current - ratio) > 0.01) {
+      videoAspectRef.current = ratio;
+      setVideoAspect(ratio);
+    }
     const ctx = canvas.getContext("2d");
     if (ctx) drawFrame(ctx, video, canvas.width, canvas.height, watermark);
     rafRef.current = requestAnimationFrame(renderLoop);
@@ -382,6 +421,20 @@ export default function KataRecorder({
   const mm = String(Math.floor(seconds / 60)).padStart(2, "0");
   const ss = String(seconds % 60).padStart(2, "0");
 
+  // Fit the box within an 85dvh-tall, viewport-width-minus-margins budget
+  // while preserving the real video's aspect ratio -- whichever dimension
+  // (the height budget or the width budget) is more restrictive wins,
+  // exactly like object-contain's own math, but applied to the CONTAINER
+  // so it hugs the video instead of leaving it stranded inside a
+  // mis-shaped box. Falls back to a portrait guess before the camera has
+  // reported its real dimensions (idle placeholder / not started yet).
+  const previewRatio = videoAspect ?? 9 / 16;
+  const previewMaxHeightPx = viewport.h * 0.85;
+  const previewMaxWidthCapPx = previewRatio > 1 ? 896 : 448;
+  const previewAvailableWidthPx = Math.max(200, viewport.w - 32);
+  const previewBoxWidthPx = Math.min(previewMaxHeightPx * previewRatio, previewMaxWidthCapPx, previewAvailableWidthPx);
+  const previewBoxHeightPx = previewBoxWidthPx / previewRatio;
+
   if (phase === "done") {
     return (
       <div className="rounded-lg border border-green-300 bg-green-50 p-8 text-center">
@@ -495,8 +548,9 @@ export default function KataRecorder({
         className={
           fullscreen
             ? "relative h-[100dvh] w-full overflow-hidden bg-black"
-            : "relative mx-auto min-h-[85dvh] max-w-md overflow-hidden rounded-lg border border-neutral-300 bg-black [@media(orientation:landscape)]:max-w-4xl"
+            : "relative mx-auto overflow-hidden rounded-lg border border-neutral-300 bg-black"
         }
+        style={fullscreen ? undefined : { width: previewBoxWidthPx, height: previewBoxHeightPx }}
       >
         {/* Title bar and error banner float directly on the recording area
             itself (absolute, top of the box) instead of taking their own
