@@ -4683,6 +4683,7 @@ export async function setCommissionPayoutStatus(formData: FormData) {
     backTo(returnTo, { error: "Invalid request." });
   }
   const { supabase, actorId } = await getActor();
+  await requireCompetitionManager(supabase, actorId, returnTo);
   const { error } = await supabase
     .from("commission_payouts")
     .upsert(
@@ -4709,6 +4710,7 @@ export async function setWinnerPayoutStatus(formData: FormData) {
     backTo(returnTo, { error: "Invalid request." });
   }
   const { supabase, actorId } = await getActor();
+  await requireCompetitionManager(supabase, actorId, returnTo);
   const { error } = await supabase
     .from("winner_payouts")
     .upsert(
@@ -4725,6 +4727,81 @@ export async function setWinnerPayoutStatus(formData: FormData) {
     new_value: { status }, actor_id: actorId,
   });
   backTo(returnTo, { ok: "Payout status updated." });
+}
+
+/** Shared by both receipt-upload actions below — mirrors
+ * uploadCertificateIfPresent's shape (private bucket, random filename), just
+ * pointed at "payout-receipts" instead of "certificates". */
+async function uploadReceiptIfPresent(
+  supabase: SupabaseClient,
+  formData: FormData,
+  prefix: string,
+  returnTo: string,
+): Promise<string | null> {
+  const receipt = formData.get("receipt");
+  if (!(receipt instanceof File) || receipt.size === 0) return null;
+  if (receipt.size > 10 * 1024 * 1024) {
+    backTo(returnTo, { error: "Receipt file is too large (max 10 MB)." });
+  }
+  const ext = (receipt.name.split(".").pop() || "jpg").toLowerCase().slice(0, 5);
+  const path = `${prefix}-${crypto.randomUUID()}.${ext}`;
+  const { error } = await supabase.storage
+    .from("payout-receipts")
+    .upload(path, receipt, { contentType: receipt.type || "image/jpeg" });
+  if (error) backTo(returnTo, { error: "Could not upload the receipt. Please try again." });
+  return path;
+}
+
+/** Attaches a photo/scan of the actual bank transfer to a school/sensei/
+ * referee commission payout — proof behind the Paid button, not just the
+ * checkbox itself. Uploading doesn't change payout status by itself; mark
+ * Paid separately (or first) as today. */
+export async function uploadCommissionReceipt(formData: FormData) {
+  const recipientType = String(formData.get("recipient_type") ?? "");
+  const recipientId = String(formData.get("recipient_id") ?? "");
+  const returnTo = "/admin/commissions";
+  if (!["school", "sensei", "referee"].includes(recipientType) || !recipientId) {
+    backTo(returnTo, { error: "Invalid request." });
+  }
+  const { supabase, actorId } = await getActor();
+  await requireCompetitionManager(supabase, actorId, returnTo);
+  const receiptPath = await uploadReceiptIfPresent(supabase, formData, `commission-${recipientType}`, returnTo);
+  if (!receiptPath) backTo(returnTo, { error: "Choose a receipt file first." });
+  const { error } = await supabase
+    .from("commission_payouts")
+    .upsert(
+      { recipient_type: recipientType, recipient_id: recipientId, receipt_path: receiptPath, updated_at: new Date().toISOString() },
+      { onConflict: "recipient_type,recipient_id" },
+    );
+  if (error) backTo(returnTo, { error: `Could not save the receipt: ${error.message}` });
+  await writeAudit(supabase, {
+    table_name: "commission_payouts", record_id: recipientId, action: "commission_receipt_uploaded",
+    new_value: { recipient_type: recipientType, receipt_path: receiptPath }, actor_id: actorId,
+  });
+  backTo(returnTo, { ok: "Receipt uploaded." });
+}
+
+/** Same as uploadCommissionReceipt, for a Top-3 winner reward payout. */
+export async function uploadWinnerReceipt(formData: FormData) {
+  const registrationId = String(formData.get("registration_id") ?? "");
+  const returnTo = "/admin/commissions";
+  if (!registrationId) backTo(returnTo, { error: "Invalid request." });
+  const { supabase, actorId } = await getActor();
+  await requireCompetitionManager(supabase, actorId, returnTo);
+  const receiptPath = await uploadReceiptIfPresent(supabase, formData, "winner", returnTo);
+  if (!receiptPath) backTo(returnTo, { error: "Choose a receipt file first." });
+  const { error } = await supabase
+    .from("winner_payouts")
+    .upsert(
+      { registration_id: registrationId, receipt_path: receiptPath, updated_at: new Date().toISOString() },
+      { onConflict: "registration_id" },
+    );
+  if (error) backTo(returnTo, { error: `Could not save the receipt: ${error.message}` });
+  await writeAudit(supabase, {
+    table_name: "winner_payouts", record_id: registrationId, action: "winner_receipt_uploaded",
+    new_value: { receipt_path: receiptPath }, actor_id: actorId,
+  });
+  backTo(returnTo, { ok: "Receipt uploaded." });
 }
 
 // ── Participant Support shift log ────────────────────────────────────────────

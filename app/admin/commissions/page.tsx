@@ -1,10 +1,12 @@
+import { createClient } from "@/lib/supabase/server";
 import { schemaReady } from "@/lib/data";
 import { computeCommissions, type CommissionRow } from "@/lib/commissions";
 import { computeWinnerRewards, type WinnerRewardRow } from "@/lib/rewards";
-import { setCommissionPayoutStatus, setWinnerPayoutStatus } from "@/app/actions/admin";
+import { setCommissionPayoutStatus, setWinnerPayoutStatus, uploadCommissionReceipt, uploadWinnerReceipt } from "@/app/actions/admin";
 import { AdminShell } from "@/components/admin";
 import { EmptyState, SetupNotice } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
+import CertificateUploadField from "@/components/CertificateUploadField";
 import { getAllCompetitions } from "@/lib/admin-data";
 import { shortTierName } from "@/lib/invitation-codes";
 
@@ -65,6 +67,70 @@ function RewardPayoutButtons({
   );
 }
 
+/** Admin/Organizer attach a photo/scan of the actual bank transfer here —
+ * proof behind the Paid button, not just the checkbox itself. Uploading
+ * doesn't change payout status by itself, and re-uploading simply replaces
+ * the link (the old file is left in storage, same as certificate re-uploads
+ * elsewhere in the admin panel). */
+function CommissionReceiptCell({
+  recipientType, recipientId, receiptUrl, idPrefix,
+}: { recipientType: string; recipientId: string; receiptUrl: string | null; idPrefix: string }) {
+  return (
+    <div className="space-y-1.5">
+      {receiptUrl && (
+        <a
+          href={receiptUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block text-xs font-semibold text-green-700 underline underline-offset-2"
+        >
+          View receipt
+        </a>
+      )}
+      <form action={uploadCommissionReceipt} className="space-y-1">
+        <input type="hidden" name="recipient_type" value={recipientType} />
+        <input type="hidden" name="recipient_id" value={recipientId} />
+        <CertificateUploadField id={idPrefix} name="receipt" />
+        <button
+          type="submit"
+          className="rounded border border-neutral-300 px-2 py-0.5 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
+        >
+          {receiptUrl ? "Replace receipt" : "Upload receipt"}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+function WinnerReceiptCell({
+  registrationId, receiptUrl, idPrefix,
+}: { registrationId: string; receiptUrl: string | null; idPrefix: string }) {
+  return (
+    <div className="space-y-1.5">
+      {receiptUrl && (
+        <a
+          href={receiptUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block text-xs font-semibold text-green-700 underline underline-offset-2"
+        >
+          View receipt
+        </a>
+      )}
+      <form action={uploadWinnerReceipt} className="space-y-1">
+        <input type="hidden" name="registration_id" value={registrationId} />
+        <CertificateUploadField id={idPrefix} name="receipt" />
+        <button
+          type="submit"
+          className="rounded border border-neutral-300 px-2 py-0.5 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
+        >
+          {receiptUrl ? "Replace receipt" : "Upload receipt"}
+        </button>
+      </form>
+    </div>
+  );
+}
+
 export default async function AdminCommissions({
   searchParams,
 }: {
@@ -86,6 +152,24 @@ export default async function AdminCommissions({
   const allCompetitions = await getAllCompetitions();
   const tierNameById = new Map(allCompetitions.map((c) => [c.id, c.name]));
 
+  // Signed links (1h) for receipt photos in the private payout-receipts
+  // bucket — one batched call per table, same pattern as certificate/kata
+  // video signed URLs elsewhere in the admin panel.
+  const supabase = await createClient();
+  const receiptPaths = [
+    ...rows.map((r) => r.receiptPath),
+    ...rewardRows.map((r) => r.receiptPath),
+  ].filter((p): p is string => !!p);
+  const receiptUrlByPath = new Map<string, string>();
+  if (receiptPaths.length > 0) {
+    const { data: signed } = await supabase.storage
+      .from("payout-receipts")
+      .createSignedUrls(receiptPaths, 3600);
+    for (const s of signed ?? []) {
+      if (s.path && s.signedUrl) receiptUrlByPath.set(s.path, s.signedUrl);
+    }
+  }
+
   return (
     <AdminShell title="Commissions" active="/admin/commissions" flash={{ ok: params.ok, error: params.error }}>
       <p className="mb-6 max-w-3xl text-sm text-neutral-500">
@@ -97,7 +181,8 @@ export default async function AdminCommissions({
         Events by Tier column, where ✓ marks a tier that pays. Referee/Judge earns 10% of every
         judged student&apos;s fee with no minimum and no tier test.
         &quot;Paid&quot; below is just your own record of who you&apos;ve actually paid out via
-        bank transfer — use the bank details shown to do that transfer yourself.
+        bank transfer — use the bank details shown to do that transfer yourself. Attach a photo or
+        scan of the transfer receipt in the Receipt column as proof once you&apos;ve paid.
       </p>
 
       {rows.length === 0 ? (
@@ -117,6 +202,7 @@ export default async function AdminCommissions({
             { key: "commission", label: "Commission (10%)" },
             { key: "bank", label: "Bank" },
             { key: "payout", label: "Payout" },
+            { key: "receipt", label: "Receipt", width: 220 },
           ]}
           csvColumns={[
             { key: "type", label: "Type" },
@@ -131,6 +217,7 @@ export default async function AdminCommissions({
             { key: "bank_account_no", label: "International Bank Account No. (IBAN)" },
             { key: "bank_account_name", label: "Bank Account Holder Name" },
             { key: "payout_status", label: "Payout Status" },
+            { key: "receipt_status", label: "Receipt Uploaded" },
           ]}
           rows={rows.map((r: CommissionRow) => ({
             key: `${r.recipientType}:${r.recipientId}`,
@@ -157,6 +244,15 @@ export default async function AdminCommissions({
             payout_status: r.payoutStatus,
             payout: (
               <PayoutButtons recipientType={r.recipientType} recipientId={r.recipientId} current={r.payoutStatus} />
+            ),
+            receipt_status: r.receiptPath ? "Yes" : "No",
+            receipt: (
+              <CommissionReceiptCell
+                recipientType={r.recipientType}
+                recipientId={r.recipientId}
+                receiptUrl={r.receiptPath ? receiptUrlByPath.get(r.receiptPath) ?? null : null}
+                idPrefix={`receipt-${r.recipientType}-${r.recipientId}`}
+              />
             ),
           }))}
         />
@@ -190,6 +286,7 @@ export default async function AdminCommissions({
             { key: "score", label: "Score" },
             { key: "bank", label: "Bank" },
             { key: "payout", label: "Payout" },
+            { key: "receipt", label: "Receipt", width: 220 },
           ]}
           csvColumns={[
             { key: "competition", label: "Competition" },
@@ -201,6 +298,7 @@ export default async function AdminCommissions({
             { key: "bank_account_no", label: "International Bank Account No. (IBAN)" },
             { key: "bank_account_name", label: "Bank Account Holder Name" },
             { key: "payout_status", label: "Payout Status" },
+            { key: "receipt_status", label: "Receipt Uploaded" },
           ]}
           rows={rewardRows.map((r: WinnerRewardRow) => ({
             key: r.registrationId,
@@ -215,6 +313,14 @@ export default async function AdminCommissions({
             bank_account_name: r.bankAccountName ?? "",
             payout_status: r.payoutStatus,
             payout: <RewardPayoutButtons registrationId={r.registrationId} current={r.payoutStatus} />,
+            receipt_status: r.receiptPath ? "Yes" : "No",
+            receipt: (
+              <WinnerReceiptCell
+                registrationId={r.registrationId}
+                receiptUrl={r.receiptPath ? receiptUrlByPath.get(r.receiptPath) ?? null : null}
+                idPrefix={`receipt-winner-${r.registrationId}`}
+              />
+            ),
           }))}
         />
       )}

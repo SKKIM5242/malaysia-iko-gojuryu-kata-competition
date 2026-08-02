@@ -40,6 +40,7 @@ export interface CommissionRow {
   bankAccountNo: string | null;
   bankAccountName: string | null;
   payoutStatus: "unpaid" | "paid";
+  receiptPath: string | null;
 }
 
 /**
@@ -72,7 +73,7 @@ export async function computeCommissions(): Promise<CommissionRow[]> {
     supabase.from("profiles").select("user_id, email").eq("role", "referee"),
     supabase.from("referee_assignments").select("video_id, referee_user_id"),
     supabase.from("kata_videos").select("id, registration_id"),
-    supabase.from("commission_payouts").select("recipient_type, recipient_id, status"),
+    supabase.from("commission_payouts").select("recipient_type, recipient_id, status, receipt_path"),
   ]);
 
   const feeByCompetition = new Map<string, number>(
@@ -149,6 +150,10 @@ export async function computeCommissions(): Promise<CommissionRow[]> {
     (payouts ?? []).map((p) => [`${p.recipient_type}:${p.recipient_id}`, p.status as "unpaid" | "paid"]),
   );
   const statusFor = (type: string, id: string) => payoutStatus.get(`${type}:${id}`) ?? "unpaid";
+  const receiptPath = new Map<string, string | null>(
+    (payouts ?? []).map((p) => [`${p.recipient_type}:${p.recipient_id}`, p.receipt_path as string | null]),
+  );
+  const receiptFor = (type: string, id: string) => receiptPath.get(`${type}:${id}`) ?? null;
 
   const rows: CommissionRow[] = [];
 
@@ -164,6 +169,7 @@ export async function computeCommissions(): Promise<CommissionRow[]> {
       bankName: s.bank_name as string | null, bankAccountNo: s.bank_account_no as string | null,
       bankAccountName: s.bank_account_name as string | null,
       payoutStatus: statusFor("school", s.id as string),
+      receiptPath: receiptFor("school", s.id as string),
     });
   }
 
@@ -179,6 +185,7 @@ export async function computeCommissions(): Promise<CommissionRow[]> {
       bankName: s.bank_name as string | null, bankAccountNo: s.bank_account_no as string | null,
       bankAccountName: s.bank_account_name as string | null,
       payoutStatus: statusFor("sensei", s.id as string),
+      receiptPath: receiptFor("sensei", s.id as string),
     });
   }
 
@@ -215,6 +222,7 @@ export async function computeCommissions(): Promise<CommissionRow[]> {
       bankName: r.bank_name as string | null, bankAccountNo: r.bank_account_no as string | null,
       bankAccountName: r.bank_account_name as string | null,
       payoutStatus: statusFor("referee", r.id as string),
+      receiptPath: receiptFor("referee", r.id as string),
     });
   }
 

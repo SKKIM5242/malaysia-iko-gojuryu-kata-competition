@@ -13,6 +13,7 @@ export interface WinnerRewardRow {
   bankAccountNo: string | null;
   bankAccountName: string | null;
   payoutStatus: "unpaid" | "paid";
+  receiptPath: string | null;
 }
 
 interface Entry {
@@ -46,11 +47,14 @@ export async function computeWinnerRewards(): Promise<WinnerRewardRow[]> {
 
   const [{ data: categories }, { data: payouts }] = await Promise.all([
     supabase.from("categories").select("id, name"),
-    supabase.from("winner_payouts").select("registration_id, status"),
+    supabase.from("winner_payouts").select("registration_id, status, receipt_path"),
   ]);
   const categoryNameById = new Map((categories ?? []).map((c) => [c.id as string, c.name as string]));
   const payoutStatus = new Map(
     (payouts ?? []).map((p) => [p.registration_id as string, p.status as "unpaid" | "paid"]),
+  );
+  const receiptPathByReg = new Map(
+    (payouts ?? []).map((p) => [p.registration_id as string, p.receipt_path as string | null]),
   );
 
   const entriesWithMeta: Array<{ entry: Entry; competitionName: string; categoryName: string; rank: number }> = [];
@@ -91,6 +95,7 @@ export async function computeWinnerRewards(): Promise<WinnerRewardRow[]> {
       bankAccountNo: (bank?.bank_account_no as string | undefined) ?? null,
       bankAccountName: (bank?.bank_account_name as string | undefined) ?? null,
       payoutStatus: payoutStatus.get(entry.regId) ?? "unpaid",
+      receiptPath: receiptPathByReg.get(entry.regId) ?? null,
     };
   });
 

@@ -62,12 +62,12 @@ export async function updateSession(request: NextRequest) {
     // (admin, organizer/staff, customer_support, referee) gets full access
     // to every /admin listing page, including bank/IC details on Schools,
     // Senseis, Organizers, and Support. /admin/accounts (staff account
-    // approvals + invitation codes), /admin/email-verifications, and
-    // /admin/classes stay restricted to Admin and Organizer/Staff —
-    // Participant Support and Referee/Judge are turned away from just
-    // those three. Write actions for sensitive operations (e.g. assigning
-    // referees, approving registrations) are narrowed further at the
-    // page/action level — see app/actions/admin.ts.
+    // approvals + invitation codes), /admin/email-verifications,
+    // /admin/classes, and /admin/commissions stay restricted to Admin and
+    // Organizer/Staff — Participant Support and Referee/Judge are turned
+    // away from just those four. Write actions for sensitive operations
+    // (e.g. assigning referees, approving registrations) are narrowed
+    // further at the page/action level — see app/actions/admin.ts.
     if (request.nextUrl.pathname.startsWith("/admin")) {
       if (!user) {
         return redirectTo("/login");
@@ -86,7 +86,8 @@ export async function updateSession(request: NextRequest) {
         if (
           path.startsWith("/admin/accounts") ||
           path.startsWith("/admin/email-verifications") ||
-          path.startsWith("/admin/classes")
+          path.startsWith("/admin/classes") ||
+          path.startsWith("/admin/commissions")
         ) {
           return redirectTo("/admin");
         }
