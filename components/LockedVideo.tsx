@@ -27,6 +27,7 @@ const LockedVideo = forwardRef<
       controls
       autoPlay={autoPlay}
       playsInline
+      preload="auto"
       onEnded={onEnded}
       className={className ?? "h-full w-full bg-black object-contain"}
       {...(allowAdvancedControls

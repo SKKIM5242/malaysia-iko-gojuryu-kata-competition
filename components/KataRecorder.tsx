@@ -82,13 +82,19 @@ function drawFrame(
     ctx.font = `bold ${titleFontPx}px Georgia, serif`;
   }
   ctx.fillText(bannerTitle, w / 2, topH * 0.48);
-  // Same shrink-to-fit treatment as the title above -- this line had a
-  // fixed size only, so at some negotiated resolutions it could overflow
-  // past the frame edge instead of shrinking to match.
+  // Same shrink-to-fit treatment as the title above, but its STARTING size
+  // is also capped at a fraction of whatever the title actually ended up
+  // at (not just its own independent proportional guess + floor) -- on a
+  // narrow-but-tall recording, the (longer) title needs much more shrinking
+  // to fit than the (shorter) subtitle does, and two independent floors
+  // could let the subtitle end up the same size as, or bigger than, the
+  // title it's supposed to sit under. Tying it to the title's real size
+  // keeps "title clearly bigger than subtitle" true no matter how much
+  // either one had to shrink.
   const subtitle = "Organized by IKO GOJU-RYU KARATE-DO MALAYSIA SDN BHD";
-  let subtitleFontPx = Math.max(9, Math.round(topH * 0.2));
+  let subtitleFontPx = Math.min(Math.max(9, Math.round(topH * 0.2)), Math.round(titleFontPx * 0.65));
   ctx.font = `${subtitleFontPx}px Arial, sans-serif`;
-  while (subtitleFontPx > 7 && ctx.measureText(subtitle).width > maxTitleWidth) {
+  while (subtitleFontPx > 6 && ctx.measureText(subtitle).width > maxTitleWidth) {
     subtitleFontPx -= 1;
     ctx.font = `${subtitleFontPx}px Arial, sans-serif`;
   }
@@ -173,6 +179,7 @@ export default function KataRecorder({
 
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const reviewVideoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -232,6 +239,15 @@ export default function KataRecorder({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // The `disablepictureinpicture` HTML attribute alone doesn't reliably
+  // suppress every way iOS Safari can offer Picture-in-Picture on a video
+  // (its own "now playing"/Control Center surface in particular) -- setting
+  // the DOM property directly, once the element actually exists, is the
+  // more reliable belt-and-suspenders way to keep it off entirely.
+  useEffect(() => {
+    if (reviewVideoRef.current) reviewVideoRef.current.disablePictureInPicture = true;
+  }, [blobUrl]);
 
   useEffect(() => {
     function onResize() {
@@ -634,7 +650,7 @@ export default function KataRecorder({
             <div className="bg-red-50/95 px-4 py-2 text-sm text-red-800 backdrop-blur-sm">{error}</div>
           )}
           {(phase === "live" || phase === "recording") && (
-            <div className="flex items-center justify-between gap-2 px-2 pt-1">
+            <div className="flex flex-wrap items-center justify-between gap-1 px-2 pt-1">
               {phase === "recording" ? (
                 <div className="flex items-center gap-1.5 rounded-full bg-black/70 px-2.5 py-0.5 text-xs font-semibold text-white">
                   <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" /> LIVE REC {mm}:{ss} / 05:00
@@ -696,6 +712,7 @@ export default function KataRecorder({
             and would otherwise show through underneath. */}
         {(phase === "review" || phase === "uploading") && blobUrl && (
           <video
+            ref={reviewVideoRef}
             src={blobUrl}
             controls
             playsInline
@@ -706,7 +723,7 @@ export default function KataRecorder({
         )}
         {phase === "idle" && (
           <div className="flex h-full items-center justify-center p-8 text-center text-neutral-300">
-            Camera preview appears here once started.
+            Camera preview appears here once camera is enable — click below button.
           </div>
         )}
         {/* Start/Stop (round) lives INSIDE the recording area itself instead
