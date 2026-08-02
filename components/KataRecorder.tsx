@@ -43,19 +43,81 @@ function extensionForMimeType(mimeType: string): string {
 
 /** Draws the branded competition frame: colorful title banner, live camera
  * feed, and a light watermark — all burned into the recorded pixels via
- * canvas.captureStream(), never the raw camera feed. */
+ * canvas.captureStream(), never the raw camera feed. Returns the banner's
+ * height as a fraction of the frame height, so the caller can line up the
+ * DOM title bar directly underneath it instead of guessing a fixed
+ * percentage that may not match what got drawn. */
 function drawFrame(
   ctx: CanvasRenderingContext2D,
   video: HTMLVideoElement,
   w: number,
   h: number,
   watermark: string,
-) {
+): number {
   ctx.drawImage(video, 0, 0, w, h);
 
-  // A bit taller than before to give the now-bigger/bolder title room to
-  // breathe without crowding the subtitle underneath it.
-  const topH = Math.round(h * 0.13);
+  const maxTitleWidth = w * 0.94;
+  const bannerTitle = "MALAYSIA OPEN VIRTUAL KARATE-DO KATA COMPETITION";
+  const subtitle = "Organized by IKO GOJU-RYU KARATE-DO MALAYSIA SDN BHD";
+
+  let topH: number;
+  let titleFontPx: number;
+  let subtitleFontPx: number;
+  let titleY: number;
+  let subtitleY: number;
+
+  // Portrait only: size the two lines from the frame's WIDTH (how much text
+  // actually fits, at a size worth reading) and then make the banner just
+  // tall enough to hold them -- previously topH was a fixed slice of the
+  // frame's HEIGHT, which on a tall portrait recording left a lot of empty
+  // colored background around comparatively small type, and pushed the DOM
+  // title bar below it down further than the (short) text actually needed.
+  // Landscape keeps the original height-proportional sizing since it was
+  // never reported as a problem there.
+  if (h > w) {
+    titleFontPx = Math.round(w * 0.072);
+    ctx.font = `900 ${titleFontPx}px Georgia, serif`;
+    while (titleFontPx > 4 && ctx.measureText(bannerTitle).width > maxTitleWidth) {
+      titleFontPx -= 1;
+      ctx.font = `900 ${titleFontPx}px Georgia, serif`;
+    }
+    subtitleFontPx = Math.round(titleFontPx * 0.5);
+    ctx.font = `${subtitleFontPx}px Arial, sans-serif`;
+    while (subtitleFontPx > 3 && ctx.measureText(subtitle).width > maxTitleWidth) {
+      subtitleFontPx -= 1;
+      ctx.font = `${subtitleFontPx}px Arial, sans-serif`;
+    }
+    const padTop = Math.round(titleFontPx * 0.3);
+    const gap = Math.round(titleFontPx * 0.22);
+    const padBottom = Math.round(subtitleFontPx * 0.4);
+    titleY = padTop + titleFontPx * 0.8;
+    subtitleY = titleY + titleFontPx * 0.3 + gap + subtitleFontPx * 0.8;
+    topH = Math.round(subtitleY + subtitleFontPx * 0.35 + padBottom);
+  } else {
+    // A bit taller than before to give the now-bigger/bolder title room to
+    // breathe without crowding the subtitle underneath it.
+    topH = Math.round(h * 0.13);
+    titleFontPx = Math.max(14, Math.round(topH * 0.4));
+    ctx.font = `900 ${titleFontPx}px Georgia, serif`;
+    while (titleFontPx > 4 && ctx.measureText(bannerTitle).width > maxTitleWidth) {
+      titleFontPx -= 1;
+      ctx.font = `900 ${titleFontPx}px Georgia, serif`;
+    }
+    // Capped at a fraction of whatever the title actually ended up at (not
+    // just its own independent proportional guess + floor) -- on a
+    // narrow-but-tall recording, the (longer) title needs much more
+    // shrinking than the (shorter) subtitle, and two independent floors
+    // could let the subtitle end up the same size as, or bigger than, the
+    // title it's supposed to sit under.
+    subtitleFontPx = Math.min(Math.max(8, Math.round(topH * 0.16)), Math.round(titleFontPx * 0.55));
+    ctx.font = `${subtitleFontPx}px Arial, sans-serif`;
+    while (subtitleFontPx > 3 && ctx.measureText(subtitle).width > maxTitleWidth) {
+      subtitleFontPx -= 1;
+      ctx.font = `${subtitleFontPx}px Arial, sans-serif`;
+    }
+    titleY = topH * 0.4;
+    subtitleY = topH * 0.82;
+  }
 
   // Top banner — colorful gradient declaration
   const grad = ctx.createLinearGradient(0, 0, w, 0);
@@ -71,38 +133,10 @@ function drawFrame(
   ctx.fillStyle = "#ffffff";
   ctx.shadowColor = "rgba(0,0,0,0.6)";
   ctx.shadowBlur = 4;
-  // Shrinks (with no real floor -- 4px is just a sanity minimum, not a size
-  // the loop is allowed to stop shrinking above) until it actually measures
-  // within the frame width. A hard floor like the old "10px minimum" doesn't
-  // guarantee a fit -- on a narrow enough negotiated resolution, even the
-  // floor size can still overflow past the frame edge, which is exactly
-  // what full-width cut-off text on real devices turned out to be.
-  const bannerTitle = "MALAYSIA OPEN VIRTUAL KARATE-DO KATA COMPETITION";
-  let titleFontPx = Math.max(14, Math.round(topH * 0.4));
   ctx.font = `900 ${titleFontPx}px Georgia, serif`;
-  const maxTitleWidth = w * 0.94;
-  while (titleFontPx > 4 && ctx.measureText(bannerTitle).width > maxTitleWidth) {
-    titleFontPx -= 1;
-    ctx.font = `900 ${titleFontPx}px Georgia, serif`;
-  }
-  ctx.fillText(bannerTitle, w / 2, topH * 0.4);
-  // Same shrink-to-fit treatment as the title above, but its STARTING size
-  // is also capped at a fraction of whatever the title actually ended up
-  // at (not just its own independent proportional guess + floor) -- on a
-  // narrow-but-tall recording, the (longer) title needs much more shrinking
-  // to fit than the (shorter) subtitle does, and two independent floors
-  // could let the subtitle end up the same size as, or bigger than, the
-  // title it's supposed to sit under. Tying it to the title's real size
-  // keeps "title clearly bigger than subtitle" true no matter how much
-  // either one had to shrink.
-  const subtitle = "Organized by IKO GOJU-RYU KARATE-DO MALAYSIA SDN BHD";
-  let subtitleFontPx = Math.min(Math.max(8, Math.round(topH * 0.16)), Math.round(titleFontPx * 0.55));
+  ctx.fillText(bannerTitle, w / 2, titleY);
   ctx.font = `${subtitleFontPx}px Arial, sans-serif`;
-  while (subtitleFontPx > 3 && ctx.measureText(subtitle).width > maxTitleWidth) {
-    subtitleFontPx -= 1;
-    ctx.font = `${subtitleFontPx}px Arial, sans-serif`;
-  }
-  ctx.fillText(subtitle, w / 2, topH * 0.82);
+  ctx.fillText(subtitle, w / 2, subtitleY);
   ctx.shadowBlur = 0;
 
   // Light watermark, bottom center of frame -- font size and bottom margin
@@ -118,6 +152,8 @@ function drawFrame(
   ctx.font = `${Math.max(11, Math.round(h * 0.022))}px Arial, sans-serif`;
   ctx.fillText(watermark, w / 2, h - Math.max(14, Math.round(h * 0.025)));
   ctx.restore();
+
+  return topH / h;
 }
 
 function daysBetween(from: Date, to: Date): number {
@@ -204,6 +240,13 @@ export default function KataRecorder({
   // orientation.
   const [videoAspect, setVideoAspect] = useState<number | null>(null);
   const videoAspectRef = useRef(0);
+  // How tall the burned-in header banner actually came out (as a fraction
+  // of frame height), reported back by drawFrame -- the DOM title bar below
+  // uses this to sit directly under the real banner instead of a fixed
+  // guessed percentage that could leave a gap or overlap depending on
+  // orientation and how much the banner's own text needed to shrink.
+  const [bannerRatio, setBannerRatio] = useState(0.13);
+  const bannerRatioRef = useRef(0.13);
   // CSS `aspect-ratio` on a plain block element doesn't shrink-to-fit the
   // way it does on a replaced element (img/video) -- a statically-positioned
   // div with width:auto fills its container's full width first, THEN derives
@@ -367,7 +410,13 @@ export default function KataRecorder({
       setVideoAspect(ratio);
     }
     const ctx = canvas.getContext("2d");
-    if (ctx) drawFrame(ctx, video, canvas.width, canvas.height, watermark);
+    if (ctx) {
+      const newBannerRatio = drawFrame(ctx, video, canvas.width, canvas.height, watermark);
+      if (Number.isFinite(newBannerRatio) && newBannerRatio > 0 && Math.abs(bannerRatioRef.current - newBannerRatio) > 0.002) {
+        bannerRatioRef.current = newBannerRatio;
+        setBannerRatio(newBannerRatio);
+      }
+    }
     rafRef.current = requestAnimationFrame(renderLoop);
   }
 
@@ -624,17 +673,20 @@ export default function KataRecorder({
       >
         {/* Title bar, error banner, the live/recording badges, and the
             review controls all stack in ONE column starting right below the
-            burned-in header banner (its top ~11%) -- previously each piece
-            was independently absolute-positioned at its own guessed offset
-            (top-0, top-12, top-[13%]), which only worked as long as the
-            title stayed on one line. Once a long category name wraps to 2-3
-            lines, a fixed offset below it starts overlapping whatever comes
-            next; stacking in flex-col instead means every piece pushes the
-            next one down automatically, so nothing can overlap no matter
-            how tall the title grows. A background bar behind the title
-            (rather than just a drop-shadow) keeps it legible now that it
-            can span multiple lines over whatever's playing underneath. */}
-        <div className="absolute inset-x-0 top-[13%] z-20 flex flex-col">
+            burned-in header banner -- previously each piece was
+            independently absolute-positioned at its own guessed offset
+            (top-0, top-12, a fixed top-[13%]), which only worked as long as
+            the title stayed on one line AND the banner itself was always
+            the same proportion of the frame. Now it tracks bannerRatio (the
+            real height drawFrame just used, reported back from the render
+            loop) so it always sits directly under the banner with no gap
+            or overlap, on any orientation. Stacking in flex-col underneath
+            that means every piece pushes the next one down automatically,
+            so nothing can overlap no matter how tall the title grows. A
+            background bar behind the title (rather than just a
+            drop-shadow) keeps it legible now that it can span multiple
+            lines over whatever's playing underneath. */}
+        <div className="absolute inset-x-0 z-20 flex flex-col" style={{ top: `${bannerRatio * 100}%` }}>
           {fullscreen && (
             <div className="flex items-start justify-between gap-2 bg-black/45 px-3 py-2 text-white" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.85)" }}>
               <p className="min-w-0 flex-1 break-words text-sm font-bold">
