@@ -31,12 +31,13 @@ const cellInput = "w-full rounded-md border border-neutral-300 px-2 py-1 text-xs
  * as the display label: renaming the labels detached every row from its
  * accounts and silently dropped all nine roles to the hardcoded 250-sign-in
  * fallback, Admin and Organizer included. See migration 0093. */
-function RoleKeySelect({ form, value = "" }: { form: string; value?: string }) {
+function RoleKeySelect({ form, value = "", disabled = false }: { form: string; value?: string; disabled?: boolean }) {
   return (
     <select
       form={form}
       name="role_key"
       defaultValue={value}
+      disabled={disabled}
       className={cellInput}
       title="Which account role this row governs. Blank = a display-only row that governs no account."
     >
@@ -52,8 +53,9 @@ function RoleKeySelect({ form, value = "" }: { form: string; value?: string }) {
 
 /** One place for Admin/Organizer to publish everything readers see:
  * announcements, notes/messages (same mechanism — a note stays a draft, a
- * message is published), and new competition tiers. Other admin-panel
- * roles are turned away — this page is Admin & Organizer only. */
+ * message is published), and new competition tiers, plus every editable
+ * reference table. Participant Support and Referee/Judge can view all of
+ * it — every other admin-panel role is turned away. */
 export default async function AdminContent({
   searchParams,
 }: {
@@ -76,11 +78,14 @@ export default async function AdminContent({
   const { data: myProfile } = user
     ? await supabase.from("profiles").select("role").eq("user_id", user.id).maybeSingle()
     : { data: null };
-  if (!["admin", "organizer", "staff"].includes(myProfile?.role ?? "")) {
+  const role = myProfile?.role ?? null;
+  const canManage = ["admin", "organizer", "staff"].includes(role ?? "");
+  const canView = canManage || ["customer_support", "referee"].includes(role ?? "");
+  if (!canView) {
     return (
       <AdminShell title="Content" active="/admin/content">
         <p className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          This page is for Admin and Organizer accounts only.
+          You don&apos;t have access to this page.
         </p>
       </AdminShell>
     );
@@ -113,121 +118,133 @@ export default async function AdminContent({
   return (
     <AdminShell title="Content" active="/admin/content" flash={{ ok: params.ok, error: params.error }}>
       <p className="mb-6 text-sm text-neutral-500">
-        Create and manage announcements, notes, and messages, and add new competition tiers — all
-        in one place. Admin &amp; Organizer only.
+        {canManage ? (
+          <>
+            Create and manage announcements, notes, and messages, and add new competition tiers —
+            all in one place, plus every editable reference table below.
+          </>
+        ) : (
+          <>
+            <strong>View only.</strong> Admin and Organizer manage announcements, competition
+            tiers, and every reference table below — Participant Support and Referee/Judge can
+            see all of it here but can&apos;t add, edit, or delete anything.
+          </>
+        )}
       </p>
 
-      <div className="grid gap-8 lg:grid-cols-2">
-        <div>
-          <h2 className="mb-3 text-lg font-bold">
-            {editing ? "Edit Announcement / Note / Message" : "New Announcement / Note / Message"}
-          </h2>
-          <Card>
-            <form action={saveAnnouncement} className="space-y-4">
-              <input type="hidden" name="return_to" value={RETURN_TO} />
-              {editing && <input type="hidden" name="id" value={editing.id} />}
-              <div>
-                <label htmlFor="content_title" className={adminLabel}>Title *</label>
-                <input id="content_title" name="title" required defaultValue={editing?.title ?? ""} className={adminInput} />
-              </div>
-              <div>
-                <label htmlFor="content_competition" className={adminLabel}>Competition (optional)</label>
-                <select
-                  id="content_competition"
-                  name="competition_id"
-                  defaultValue={editing?.competition_id ?? ""}
-                  className={adminInput}
-                >
-                  <option value="">— General —</option>
-                  {competitions.map((c) => (
-                    <option key={c.id} value={c.id}>{shortTierName(c.name)}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label htmlFor="content_body" className={adminLabel}>
-                  Body <span className="font-normal text-neutral-400">(markdown: **bold**, lists, links)</span>
-                </label>
-                <textarea id="content_body" name="body" rows={6} defaultValue={editing?.body ?? ""} className={adminInput} />
-              </div>
-              <label className="flex items-center gap-2 text-sm font-medium text-neutral-700">
-                <input
-                  type="checkbox"
-                  name="published"
-                  defaultChecked={editing?.published ?? false}
-                  className="h-4 w-4 rounded border-neutral-300 accent-red-700"
-                />
-                Publish as a public message (unchecked = internal note / draft)
-              </label>
-              <div className="flex gap-2">
-                <button type="submit" className={adminBtn}>{editing ? "Save changes" : "Create"}</button>
-                {editing && (
-                  <Link
-                    href={RETURN_TO}
-                    className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-semibold text-neutral-600 hover:bg-neutral-50"
+      <div className={canManage ? "grid gap-8 lg:grid-cols-2" : ""}>
+        {canManage && (
+          <div>
+            <h2 className="mb-3 text-lg font-bold">
+              {editing ? "Edit Announcement / Note / Message" : "New Announcement / Note / Message"}
+            </h2>
+            <Card>
+              <form action={saveAnnouncement} className="space-y-4">
+                <input type="hidden" name="return_to" value={RETURN_TO} />
+                {editing && <input type="hidden" name="id" value={editing.id} />}
+                <div>
+                  <label htmlFor="content_title" className={adminLabel}>Title *</label>
+                  <input id="content_title" name="title" required defaultValue={editing?.title ?? ""} className={adminInput} />
+                </div>
+                <div>
+                  <label htmlFor="content_competition" className={adminLabel}>Competition (optional)</label>
+                  <select
+                    id="content_competition"
+                    name="competition_id"
+                    defaultValue={editing?.competition_id ?? ""}
+                    className={adminInput}
                   >
-                    Cancel
-                  </Link>
-                )}
-              </div>
-            </form>
-          </Card>
-
-          <h2 className="mt-8 mb-3 text-lg font-bold">Add Competition Tier</h2>
-          <Card>
-            <form action={saveCompetition} className="space-y-4">
-              <input type="hidden" name="return_to" value={RETURN_TO} />
-              <div>
-                <label htmlFor="tier_name" className={adminLabel}>Name *</label>
-                <input id="tier_name" name="name" required className={adminInput} placeholder="e.g. Malaysia Open … — USD 50 Tier" />
-              </div>
-              <div>
-                <label htmlFor="tier_venue" className={adminLabel}>Venue</label>
-                <input id="tier_venue" name="venue" className={adminInput} />
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label htmlFor="tier_event_date" className={adminLabel}>Event date</label>
-                  <input id="tier_event_date" name="event_date" type="date" className={adminInput} />
-                </div>
-                <div>
-                  <label htmlFor="tier_deadline" className={adminLabel}>Registration deadline</label>
-                  <input id="tier_deadline" name="registration_deadline" type="date" className={adminInput} />
-                </div>
-                <div>
-                  <label htmlFor="tier_fee" className={adminLabel}>Fee (USD)</label>
-                  <input id="tier_fee" name="registration_fee_usd" type="number" step="0.01" min="0" className={adminInput} />
-                </div>
-                <div>
-                  <label htmlFor="tier_status" className={adminLabel}>Status</label>
-                  <select id="tier_status" name="status" defaultValue="draft" className={adminInput}>
-                    <option value="draft">Draft</option>
-                    <option value="open">Open (registration live)</option>
-                    <option value="closed">Closed</option>
-                    <option value="completed">Completed</option>
+                    <option value="">— General —</option>
+                    {competitions.map((c) => (
+                      <option key={c.id} value={c.id}>{shortTierName(c.name)}</option>
+                    ))}
                   </select>
                 </div>
-              </div>
-              <div>
-                <label htmlFor="tier_description" className={adminLabel}>Description</label>
-                <textarea id="tier_description" name="description" rows={3} className={adminInput} />
-              </div>
-              <button type="submit" className={adminBtn}>Create competition tier</button>
-              <p className="text-xs text-neutral-400">
-                Categories for the new tier are added on the{" "}
-                <Link href="/admin/competitions" className="font-semibold text-red-700 underline underline-offset-2">
-                  Competitions
-                </Link>{" "}
-                page (Edit → Add Category).
-              </p>
-            </form>
-          </Card>
-        </div>
+                <div>
+                  <label htmlFor="content_body" className={adminLabel}>
+                    Body <span className="font-normal text-neutral-400">(markdown: **bold**, lists, links)</span>
+                  </label>
+                  <textarea id="content_body" name="body" rows={6} defaultValue={editing?.body ?? ""} className={adminInput} />
+                </div>
+                <label className="flex items-center gap-2 text-sm font-medium text-neutral-700">
+                  <input
+                    type="checkbox"
+                    name="published"
+                    defaultChecked={editing?.published ?? false}
+                    className="h-4 w-4 rounded border-neutral-300 accent-red-700"
+                  />
+                  Publish as a public message (unchecked = internal note / draft)
+                </label>
+                <div className="flex gap-2">
+                  <button type="submit" className={adminBtn}>{editing ? "Save changes" : "Create"}</button>
+                  {editing && (
+                    <Link
+                      href={RETURN_TO}
+                      className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-semibold text-neutral-600 hover:bg-neutral-50"
+                    >
+                      Cancel
+                    </Link>
+                  )}
+                </div>
+              </form>
+            </Card>
+
+            <h2 className="mt-8 mb-3 text-lg font-bold">Add Competition Tier</h2>
+            <Card>
+              <form action={saveCompetition} className="space-y-4">
+                <input type="hidden" name="return_to" value={RETURN_TO} />
+                <div>
+                  <label htmlFor="tier_name" className={adminLabel}>Name *</label>
+                  <input id="tier_name" name="name" required className={adminInput} placeholder="e.g. Malaysia Open … — USD 50 Tier" />
+                </div>
+                <div>
+                  <label htmlFor="tier_venue" className={adminLabel}>Venue</label>
+                  <input id="tier_venue" name="venue" className={adminInput} />
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="tier_event_date" className={adminLabel}>Event date</label>
+                    <input id="tier_event_date" name="event_date" type="date" className={adminInput} />
+                  </div>
+                  <div>
+                    <label htmlFor="tier_deadline" className={adminLabel}>Registration deadline</label>
+                    <input id="tier_deadline" name="registration_deadline" type="date" className={adminInput} />
+                  </div>
+                  <div>
+                    <label htmlFor="tier_fee" className={adminLabel}>Fee (USD)</label>
+                    <input id="tier_fee" name="registration_fee_usd" type="number" step="0.01" min="0" className={adminInput} />
+                  </div>
+                  <div>
+                    <label htmlFor="tier_status" className={adminLabel}>Status</label>
+                    <select id="tier_status" name="status" defaultValue="draft" className={adminInput}>
+                      <option value="draft">Draft</option>
+                      <option value="open">Open (registration live)</option>
+                      <option value="closed">Closed</option>
+                      <option value="completed">Completed</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label htmlFor="tier_description" className={adminLabel}>Description</label>
+                  <textarea id="tier_description" name="description" rows={3} className={adminInput} />
+                </div>
+                <button type="submit" className={adminBtn}>Create competition tier</button>
+                <p className="text-xs text-neutral-400">
+                  Categories for the new tier are added on the{" "}
+                  <Link href="/admin/competitions" className="font-semibold text-red-700 underline underline-offset-2">
+                    Competitions
+                  </Link>{" "}
+                  page (Edit → Add Category).
+                </p>
+              </form>
+            </Card>
+          </div>
+        )}
 
         <div>
           <h2 className="mb-3 text-lg font-bold">All Announcements, Notes &amp; Messages</h2>
           {announcements.length === 0 ? (
-            <EmptyState>Nothing yet — create your first one on the left.</EmptyState>
+            <EmptyState>{canManage ? "Nothing yet — create your first one on the left." : "Nothing yet."}</EmptyState>
           ) : (
             <div className="space-y-3">
               {announcements.map((a) => (
@@ -245,33 +262,35 @@ export default async function AdminContent({
                           : ""}
                       </p>
                     </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      <Link
-                        href={`${RETURN_TO}?edit=${a.id}`}
-                        className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
-                      >
-                        Edit
-                      </Link>
-                      <form action={toggleAnnouncement}>
-                        <input type="hidden" name="id" value={a.id} />
-                        <input type="hidden" name="publish" value={a.published ? "false" : "true"} />
-                        <input type="hidden" name="return_to" value={RETURN_TO} />
-                        <button
-                          className={`rounded px-2.5 py-1 text-xs font-semibold text-white ${
-                            a.published ? "bg-amber-600 hover:bg-amber-500" : "bg-green-600 hover:bg-green-500"
-                          }`}
+                    {canManage && (
+                      <div className="flex flex-wrap gap-1.5">
+                        <Link
+                          href={`${RETURN_TO}?edit=${a.id}`}
+                          className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
                         >
-                          {a.published ? "Unpublish" : "Publish"}
-                        </button>
-                      </form>
-                      <form action={deleteAnnouncement}>
-                        <input type="hidden" name="id" value={a.id} />
-                        <input type="hidden" name="return_to" value={RETURN_TO} />
-                        <button className="rounded border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50">
-                          Delete
-                        </button>
-                      </form>
-                    </div>
+                          Edit
+                        </Link>
+                        <form action={toggleAnnouncement}>
+                          <input type="hidden" name="id" value={a.id} />
+                          <input type="hidden" name="publish" value={a.published ? "false" : "true"} />
+                          <input type="hidden" name="return_to" value={RETURN_TO} />
+                          <button
+                            className={`rounded px-2.5 py-1 text-xs font-semibold text-white ${
+                              a.published ? "bg-amber-600 hover:bg-amber-500" : "bg-green-600 hover:bg-green-500"
+                            }`}
+                          >
+                            {a.published ? "Unpublish" : "Publish"}
+                          </button>
+                        </form>
+                        <form action={deleteAnnouncement}>
+                          <input type="hidden" name="id" value={a.id} />
+                          <input type="hidden" name="return_to" value={RETURN_TO} />
+                          <button className="rounded border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50">
+                            Delete
+                          </button>
+                        </form>
+                      </div>
+                    )}
                   </div>
                   {a.body && (
                     <details className="mt-2">
@@ -299,11 +318,12 @@ export default async function AdminContent({
       <details className="mt-10 rounded-lg border border-neutral-200 bg-white" open>
         <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3">
           <div>
-            <h2 className="text-lg font-bold">Access Matrix (Editable)</h2>
+            <h2 className="text-lg font-bold">Access Matrix {canManage ? "(Editable)" : "(View Only)"}</h2>
             <p className="text-sm font-normal text-neutral-500">
-              Add, edit, or delete resources and each role&apos;s access — every cell offers a
-              drop-down of common choices, and free text is also allowed. Shown on Accounts →
-              Access Matrix.
+              {canManage
+                ? "Add, edit, or delete resources and each role's access — every cell offers a drop-down of common choices, and free text is also allowed."
+                : "What each role can actually do, page by page."}{" "}
+              Shown on Accounts → Access Matrix.
             </p>
           </div>
           <span className="shrink-0 rounded-md border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-500 hover:bg-neutral-50">
@@ -311,7 +331,7 @@ export default async function AdminContent({
           </span>
         </summary>
         <div className="space-y-3 border-t border-neutral-100 p-4">
-          {(matrixRows ?? []).length === 0 && (
+          {canManage && (matrixRows ?? []).length === 0 && (
             <form action={seedAccessTables}>
               <input type="hidden" name="return_to" value={RETURN_TO} />
               <button className={adminBtn}>Import current defaults</button>
@@ -322,18 +342,22 @@ export default async function AdminContent({
               lets the row render as ordinary FilterableTable cells (so it
               gets filtering, column resize/wrap, and the scroll sliders for
               free) while still submitting together as one row. */}
-          {(matrixRows ?? []).map((r) => (
-            <form key={r.id} id={`matrix-${r.id}`} action={saveAccessMatrixRow}>
-              <input type="hidden" name="id" value={r.id} />
-              <input type="hidden" name="return_to" value={RETURN_TO} />
-            </form>
-          ))}
-          <form id="matrix-new" action={saveAccessMatrixRow}>
-            <input type="hidden" name="return_to" value={RETURN_TO} />
-          </form>
-          <button form="matrix-new" type="submit" className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-neutral-700">
-            + Add row (fill below, then Save on the new row)
-          </button>
+          {canManage && (
+            <>
+              {(matrixRows ?? []).map((r) => (
+                <form key={r.id} id={`matrix-${r.id}`} action={saveAccessMatrixRow}>
+                  <input type="hidden" name="id" value={r.id} />
+                  <input type="hidden" name="return_to" value={RETURN_TO} />
+                </form>
+              ))}
+              <form id="matrix-new" action={saveAccessMatrixRow}>
+                <input type="hidden" name="return_to" value={RETURN_TO} />
+              </form>
+              <button form="matrix-new" type="submit" className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-neutral-700">
+                + Add row (fill below, then Save on the new row)
+              </button>
+            </>
+          )}
           <FilterableTable
             rowKey="id"
             downloadName="access-matrix"
@@ -359,34 +383,38 @@ export default async function AdminContent({
               { key: "note_csv", label: "Note" },
             ]}
             rows={[
-              {
-                id: "matrix-new-row",
-                position: <input form="matrix-new" name="position" type="number" min="1" placeholder="No." className={cellInput} />,
-                resource: <input form="matrix-new" name="resource" required placeholder="Resource *" className={cellInput} />,
-                admin: <input form="matrix-new" name="admin" list="access_choices" placeholder="Admin" className={cellInput} />,
-                organizer: <input form="matrix-new" name="organizer" list="access_choices" placeholder="Organizer" className={cellInput} />,
-                customer_support: <input form="matrix-new" name="customer_support" list="access_choices" placeholder="P. Support" className={cellInput} />,
-                referee: <input form="matrix-new" name="referee" list="access_choices" placeholder="Referee" className={cellInput} />,
-                note: <input form="matrix-new" name="note" placeholder="Note" className={cellInput} />,
-                actions: <span className="text-xs text-neutral-400">New row — Save above</span>,
-                position_csv: "", resource_csv: "", admin_csv: "", organizer_csv: "", customer_support_csv: "", referee_csv: "", note_csv: "",
-              },
+              ...(canManage
+                ? [
+                    {
+                      id: "matrix-new-row",
+                      position: <input form="matrix-new" name="position" type="number" min="1" placeholder="No." className={cellInput} />,
+                      resource: <input form="matrix-new" name="resource" required placeholder="Resource *" className={cellInput} />,
+                      admin: <input form="matrix-new" name="admin" list="access_choices" placeholder="Admin" className={cellInput} />,
+                      organizer: <input form="matrix-new" name="organizer" list="access_choices" placeholder="Organizer" className={cellInput} />,
+                      customer_support: <input form="matrix-new" name="customer_support" list="access_choices" placeholder="P. Support" className={cellInput} />,
+                      referee: <input form="matrix-new" name="referee" list="access_choices" placeholder="Referee" className={cellInput} />,
+                      note: <input form="matrix-new" name="note" placeholder="Note" className={cellInput} />,
+                      actions: <span className="text-xs text-neutral-400">New row — Save above</span>,
+                      position_csv: "", resource_csv: "", admin_csv: "", organizer_csv: "", customer_support_csv: "", referee_csv: "", note_csv: "",
+                    },
+                  ]
+                : []),
               ...(matrixRows ?? []).map((r) => ({
                 id: r.id as string,
                 position: (
-                  <input form={`matrix-${r.id}`} name="position" type="number" min="1" defaultValue={r.position} className={cellInput} />
+                  <input form={`matrix-${r.id}`} name="position" type="number" min="1" defaultValue={r.position} disabled={!canManage} className={cellInput} />
                 ),
                 resource: (
-                  <input form={`matrix-${r.id}`} name="resource" required defaultValue={r.resource} className={`${cellInput} font-semibold`} />
+                  <input form={`matrix-${r.id}`} name="resource" required defaultValue={r.resource} disabled={!canManage} className={`${cellInput} font-semibold`} />
                 ),
-                admin: <input form={`matrix-${r.id}`} name="admin" list="access_choices" defaultValue={r.admin} className={cellInput} />,
-                organizer: <input form={`matrix-${r.id}`} name="organizer" list="access_choices" defaultValue={r.organizer} className={cellInput} />,
+                admin: <input form={`matrix-${r.id}`} name="admin" list="access_choices" defaultValue={r.admin} disabled={!canManage} className={cellInput} />,
+                organizer: <input form={`matrix-${r.id}`} name="organizer" list="access_choices" defaultValue={r.organizer} disabled={!canManage} className={cellInput} />,
                 customer_support: (
-                  <input form={`matrix-${r.id}`} name="customer_support" list="access_choices" defaultValue={r.customer_support} className={cellInput} />
+                  <input form={`matrix-${r.id}`} name="customer_support" list="access_choices" defaultValue={r.customer_support} disabled={!canManage} className={cellInput} />
                 ),
-                referee: <input form={`matrix-${r.id}`} name="referee" list="access_choices" defaultValue={r.referee} className={cellInput} />,
-                note: <input form={`matrix-${r.id}`} name="note" defaultValue={r.note ?? ""} placeholder="Note" className={cellInput} />,
-                actions: (
+                referee: <input form={`matrix-${r.id}`} name="referee" list="access_choices" defaultValue={r.referee} disabled={!canManage} className={cellInput} />,
+                note: <input form={`matrix-${r.id}`} name="note" defaultValue={r.note ?? ""} placeholder="Note" disabled={!canManage} className={cellInput} />,
+                actions: canManage ? (
                   <span className="flex gap-1.5">
                     <button form={`matrix-${r.id}`} type="submit" className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50">
                       Save
@@ -399,6 +427,8 @@ export default async function AdminContent({
                       Delete
                     </button>
                   </span>
+                ) : (
+                  <span className="text-xs text-neutral-300">—</span>
                 ),
                 position_csv: String(r.position ?? ""),
                 resource_csv: r.resource as string,
@@ -410,13 +440,17 @@ export default async function AdminContent({
               })),
             ]}
           />
-          <CsvUploadForm
-            action={bulkUploadAccessMatrixRows}
-            templateHref="/access-matrix-template.csv"
-            entityLabel="access matrix row"
-          />
+          {canManage && (
+            <CsvUploadForm
+              action={bulkUploadAccessMatrixRows}
+              templateHref="/access-matrix-template.csv"
+              entityLabel="access matrix row"
+            />
+          )}
           {(matrixRows ?? []).length === 0 && (
-            <EmptyState>Table is empty — the built-in defaults are shown until you import or add rows.</EmptyState>
+            <EmptyState>
+              {canManage ? "Table is empty — the built-in defaults are shown until you import or add rows." : "Table is empty."}
+            </EmptyState>
           )}
         </div>
       </details>
@@ -424,7 +458,7 @@ export default async function AdminContent({
       <details className="mt-6 rounded-lg border border-neutral-200 bg-white" open>
         <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3">
           <div>
-            <h2 className="text-lg font-bold">Sign-in Access Matrix (Editable)</h2>
+            <h2 className="text-lg font-bold">Sign-in Access Matrix {canManage ? "(Editable)" : "(View Only)"}</h2>
             <p className="text-sm font-normal text-neutral-500">
               Each role&apos;s default sign-in cap, and whether its valid window follows a
               competition tier&apos;s default dates — read by every new account and by
@@ -452,19 +486,23 @@ export default async function AdminContent({
           </span>
         </summary>
         <div className="space-y-3 border-t border-neutral-100 p-4">
-          {(signInDefaults ?? []).map((r) => (
-            <form key={r.id} id={`signin-${r.id}`} action={saveSignInRoleDefault}>
-              <input type="hidden" name="id" value={r.id} />
-              <input type="hidden" name="return_to" value={RETURN_TO} />
-              <input type="hidden" name="sort_order" value={r.sort_order} />
-            </form>
-          ))}
-          <form id="signin-new" action={saveSignInRoleDefault}>
-            <input type="hidden" name="return_to" value={RETURN_TO} />
-          </form>
-          <button form="signin-new" type="submit" className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-neutral-700">
-            + Add row (fill below, then Save on the new row)
-          </button>
+          {canManage && (
+            <>
+              {(signInDefaults ?? []).map((r) => (
+                <form key={r.id} id={`signin-${r.id}`} action={saveSignInRoleDefault}>
+                  <input type="hidden" name="id" value={r.id} />
+                  <input type="hidden" name="return_to" value={RETURN_TO} />
+                  <input type="hidden" name="sort_order" value={r.sort_order} />
+                </form>
+              ))}
+              <form id="signin-new" action={saveSignInRoleDefault}>
+                <input type="hidden" name="return_to" value={RETURN_TO} />
+              </form>
+              <button form="signin-new" type="submit" className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-neutral-700">
+                + Add row (fill below, then Save on the new row)
+              </button>
+            </>
+          )}
           <FilterableTable
             rowKey="id"
             downloadName="sign-in-access-matrix"
@@ -489,32 +527,36 @@ export default async function AdminContent({
               { key: "notes_csv", label: "Notes" },
             ]}
             rows={[
-              {
-                id: "signin-new-row",
-                role: <input form="signin-new" name="role" required placeholder="Display label *" className={cellInput} />,
-                role_key: <RoleKeySelect form="signin-new" />,
-                default_sign_in_limit: (
-                  <input form="signin-new" name="default_sign_in_limit" type="number" min="0" placeholder="blank = unlimited" className={cellInput} />
-                ),
-                tier_tied: (
-                  <label className="flex items-center justify-center gap-1 text-xs text-neutral-600">
-                    <input form="signin-new" type="checkbox" name="tier_tied" className="h-3.5 w-3.5" /> Tier-tied
-                  </label>
-                ),
-                valid_from: (
-                  <input form="signin-new" name="valid_from" type="date" className={cellInput} title="Valid from (optional override)" />
-                ),
-                valid_until: (
-                  <input form="signin-new" name="valid_until" type="date" className={cellInput} title="Valid until (optional override)" />
-                ),
-                notes: <input form="signin-new" name="notes" placeholder="Note (optional)" className={cellInput} />,
-                actions: <span className="text-xs text-neutral-400">New row — Save above</span>,
-                role_csv: "", role_key_csv: "", default_sign_in_limit_csv: "", tier_tied_csv: "", valid_from_csv: "", valid_until_csv: "", notes_csv: "",
-              },
+              ...(canManage
+                ? [
+                    {
+                      id: "signin-new-row",
+                      role: <input form="signin-new" name="role" required placeholder="Display label *" className={cellInput} />,
+                      role_key: <RoleKeySelect form="signin-new" />,
+                      default_sign_in_limit: (
+                        <input form="signin-new" name="default_sign_in_limit" type="number" min="0" placeholder="blank = unlimited" className={cellInput} />
+                      ),
+                      tier_tied: (
+                        <label className="flex items-center justify-center gap-1 text-xs text-neutral-600">
+                          <input form="signin-new" type="checkbox" name="tier_tied" className="h-3.5 w-3.5" /> Tier-tied
+                        </label>
+                      ),
+                      valid_from: (
+                        <input form="signin-new" name="valid_from" type="date" className={cellInput} title="Valid from (optional override)" />
+                      ),
+                      valid_until: (
+                        <input form="signin-new" name="valid_until" type="date" className={cellInput} title="Valid until (optional override)" />
+                      ),
+                      notes: <input form="signin-new" name="notes" placeholder="Note (optional)" className={cellInput} />,
+                      actions: <span className="text-xs text-neutral-400">New row — Save above</span>,
+                      role_csv: "", role_key_csv: "", default_sign_in_limit_csv: "", tier_tied_csv: "", valid_from_csv: "", valid_until_csv: "", notes_csv: "",
+                    },
+                  ]
+                : []),
               ...(signInDefaults ?? []).map((r) => ({
                 id: r.id as string,
-                role: <input form={`signin-${r.id}`} name="role" required defaultValue={r.role} className={`${cellInput} font-semibold`} />,
-                role_key: <RoleKeySelect form={`signin-${r.id}`} value={(r.role_key as string | null) ?? ""} />,
+                role: <input form={`signin-${r.id}`} name="role" required defaultValue={r.role} disabled={!canManage} className={`${cellInput} font-semibold`} />,
+                role_key: <RoleKeySelect form={`signin-${r.id}`} value={(r.role_key as string | null) ?? ""} disabled={!canManage} />,
                 default_sign_in_limit: (
                   <input
                     form={`signin-${r.id}`}
@@ -523,12 +565,13 @@ export default async function AdminContent({
                     min="0"
                     defaultValue={r.default_sign_in_limit ?? ""}
                     placeholder="blank = unlimited"
+                    disabled={!canManage}
                     className={cellInput}
                   />
                 ),
                 tier_tied: (
                   <label className="flex items-center justify-center gap-1 text-xs text-neutral-600">
-                    <input form={`signin-${r.id}`} type="checkbox" name="tier_tied" defaultChecked={r.tier_tied} className="h-3.5 w-3.5" /> Tier-tied
+                    <input form={`signin-${r.id}`} type="checkbox" name="tier_tied" defaultChecked={r.tier_tied} disabled={!canManage} className="h-3.5 w-3.5" /> Tier-tied
                   </label>
                 ),
                 valid_from: (
@@ -537,6 +580,7 @@ export default async function AdminContent({
                     name="valid_from"
                     type="date"
                     defaultValue={r.valid_from ?? ""}
+                    disabled={!canManage}
                     className={cellInput}
                     title="Optional override — when set, wins over the dynamic tier-derived window"
                   />
@@ -547,12 +591,13 @@ export default async function AdminContent({
                     name="valid_until"
                     type="date"
                     defaultValue={r.valid_until ?? ""}
+                    disabled={!canManage}
                     className={cellInput}
                     title="Optional override — when set, wins over the dynamic tier-derived window"
                   />
                 ),
-                notes: <input form={`signin-${r.id}`} name="notes" defaultValue={r.notes ?? ""} placeholder="Note" className={cellInput} />,
-                actions: (
+                notes: <input form={`signin-${r.id}`} name="notes" defaultValue={r.notes ?? ""} placeholder="Note" disabled={!canManage} className={cellInput} />,
+                actions: canManage ? (
                   <span className="flex gap-1.5">
                     <button form={`signin-${r.id}`} type="submit" className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50">
                       Save
@@ -566,6 +611,8 @@ export default async function AdminContent({
                       Delete
                     </button>
                   </span>
+                ) : (
+                  <span className="text-xs text-neutral-300">—</span>
                 ),
                 role_csv: r.role as string,
                 role_key_csv: ((r.role_key as string | null) ?? "") || "— display only",
@@ -577,12 +624,14 @@ export default async function AdminContent({
               })),
             ]}
           />
-          <CsvUploadForm
-            action={bulkUploadSignInRoleDefaults}
-            templateHref="/sign-in-role-defaults-template.csv"
-            entityLabel="role default"
-            note="Dates use DD/MM/YYYY format. Re-uploading updates existing roles instead of duplicating them."
-          />
+          {canManage && (
+            <CsvUploadForm
+              action={bulkUploadSignInRoleDefaults}
+              templateHref="/sign-in-role-defaults-template.csv"
+              entityLabel="role default"
+              note="Dates use DD/MM/YYYY format. Re-uploading updates existing roles instead of duplicating them."
+            />
+          )}
           {(signInDefaults ?? []).length === 0 && (
             <EmptyState>Table is empty — every role falls back to the built-in 250 default until you add rows.</EmptyState>
           )}
@@ -590,23 +639,27 @@ export default async function AdminContent({
       </details>
 
       <div className="mt-10 space-y-3">
-        <h2 className="text-lg font-bold">&quot;What Your Payment Unlocks&quot; — Access Comparison (Editable)</h2>
+        <h2 className="text-lg font-bold">&quot;What Your Payment Unlocks&quot; — Access Comparison {canManage ? "(Editable)" : "(View Only)"}</h2>
         <p className="text-sm text-neutral-500">
           These rows render on the public Registration page. Columns: Participant · School ·
           Sensei · Referee · Audience · Organizer · Participant Support.
         </p>
-        {(comparisonRows ?? []).map((r) => (
-          <form key={r.id} id={`comparison-${r.id}`} action={saveAccessComparisonRow}>
-            <input type="hidden" name="id" value={r.id} />
-            <input type="hidden" name="return_to" value={RETURN_TO} />
-          </form>
-        ))}
-        <form id="comparison-new" action={saveAccessComparisonRow}>
-          <input type="hidden" name="return_to" value={RETURN_TO} />
-        </form>
-        <button form="comparison-new" type="submit" className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-neutral-700">
-          + Add row (fill below, then Save on the new row)
-        </button>
+        {canManage && (
+          <>
+            {(comparisonRows ?? []).map((r) => (
+              <form key={r.id} id={`comparison-${r.id}`} action={saveAccessComparisonRow}>
+                <input type="hidden" name="id" value={r.id} />
+                <input type="hidden" name="return_to" value={RETURN_TO} />
+              </form>
+            ))}
+            <form id="comparison-new" action={saveAccessComparisonRow}>
+              <input type="hidden" name="return_to" value={RETURN_TO} />
+            </form>
+            <button form="comparison-new" type="submit" className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-neutral-700">
+              + Add row (fill below, then Save on the new row)
+            </button>
+          </>
+        )}
         <FilterableTable
           rowKey="id"
           downloadName="access-comparison"
@@ -636,32 +689,36 @@ export default async function AdminContent({
             { key: "support_csv", label: "P. Support" },
           ]}
           rows={[
-            {
-              id: "comparison-new-row",
-              position: <input form="comparison-new" name="position" type="number" min="1" placeholder="No." className={cellInput} />,
-              what: <input form="comparison-new" name="what" required placeholder="Access row *" className={cellInput} />,
-              participant: <input form="comparison-new" name="participant" list="access_choices" placeholder="Participant" className={cellInput} />,
-              school: <input form="comparison-new" name="school" list="access_choices" placeholder="School" className={cellInput} />,
-              sensei: <input form="comparison-new" name="sensei" list="access_choices" placeholder="Sensei" className={cellInput} />,
-              referee: <input form="comparison-new" name="referee" list="access_choices" placeholder="Referee" className={cellInput} />,
-              audience: <input form="comparison-new" name="audience" list="access_choices" placeholder="Audience" className={cellInput} />,
-              organizer: <input form="comparison-new" name="organizer" list="access_choices" placeholder="Organizer" className={cellInput} />,
-              support: <input form="comparison-new" name="support" list="access_choices" placeholder="P. Support" className={cellInput} />,
-              actions: <span className="text-xs text-neutral-400">New row — Save above</span>,
-              position_csv: "", what_csv: "", participant_csv: "", school_csv: "", sensei_csv: "", referee_csv: "", audience_csv: "", organizer_csv: "", support_csv: "",
-            },
+            ...(canManage
+              ? [
+                  {
+                    id: "comparison-new-row",
+                    position: <input form="comparison-new" name="position" type="number" min="1" placeholder="No." className={cellInput} />,
+                    what: <input form="comparison-new" name="what" required placeholder="Access row *" className={cellInput} />,
+                    participant: <input form="comparison-new" name="participant" list="access_choices" placeholder="Participant" className={cellInput} />,
+                    school: <input form="comparison-new" name="school" list="access_choices" placeholder="School" className={cellInput} />,
+                    sensei: <input form="comparison-new" name="sensei" list="access_choices" placeholder="Sensei" className={cellInput} />,
+                    referee: <input form="comparison-new" name="referee" list="access_choices" placeholder="Referee" className={cellInput} />,
+                    audience: <input form="comparison-new" name="audience" list="access_choices" placeholder="Audience" className={cellInput} />,
+                    organizer: <input form="comparison-new" name="organizer" list="access_choices" placeholder="Organizer" className={cellInput} />,
+                    support: <input form="comparison-new" name="support" list="access_choices" placeholder="P. Support" className={cellInput} />,
+                    actions: <span className="text-xs text-neutral-400">New row — Save above</span>,
+                    position_csv: "", what_csv: "", participant_csv: "", school_csv: "", sensei_csv: "", referee_csv: "", audience_csv: "", organizer_csv: "", support_csv: "",
+                  },
+                ]
+              : []),
             ...(comparisonRows ?? []).map((r) => ({
               id: r.id as string,
-              position: <input form={`comparison-${r.id}`} name="position" type="number" min="1" defaultValue={r.position} className={cellInput} />,
-              what: <input form={`comparison-${r.id}`} name="what" required defaultValue={r.what} className={`${cellInput} font-semibold`} />,
-              participant: <input form={`comparison-${r.id}`} name="participant" list="access_choices" defaultValue={r.participant} className={cellInput} />,
-              school: <input form={`comparison-${r.id}`} name="school" list="access_choices" defaultValue={r.school} className={cellInput} />,
-              sensei: <input form={`comparison-${r.id}`} name="sensei" list="access_choices" defaultValue={r.sensei} className={cellInput} />,
-              referee: <input form={`comparison-${r.id}`} name="referee" list="access_choices" defaultValue={r.referee} className={cellInput} />,
-              audience: <input form={`comparison-${r.id}`} name="audience" list="access_choices" defaultValue={r.audience} className={cellInput} />,
-              organizer: <input form={`comparison-${r.id}`} name="organizer" list="access_choices" defaultValue={r.organizer} className={cellInput} />,
-              support: <input form={`comparison-${r.id}`} name="support" list="access_choices" defaultValue={r.support} className={cellInput} />,
-              actions: (
+              position: <input form={`comparison-${r.id}`} name="position" type="number" min="1" defaultValue={r.position} disabled={!canManage} className={cellInput} />,
+              what: <input form={`comparison-${r.id}`} name="what" required defaultValue={r.what} disabled={!canManage} className={`${cellInput} font-semibold`} />,
+              participant: <input form={`comparison-${r.id}`} name="participant" list="access_choices" defaultValue={r.participant} disabled={!canManage} className={cellInput} />,
+              school: <input form={`comparison-${r.id}`} name="school" list="access_choices" defaultValue={r.school} disabled={!canManage} className={cellInput} />,
+              sensei: <input form={`comparison-${r.id}`} name="sensei" list="access_choices" defaultValue={r.sensei} disabled={!canManage} className={cellInput} />,
+              referee: <input form={`comparison-${r.id}`} name="referee" list="access_choices" defaultValue={r.referee} disabled={!canManage} className={cellInput} />,
+              audience: <input form={`comparison-${r.id}`} name="audience" list="access_choices" defaultValue={r.audience} disabled={!canManage} className={cellInput} />,
+              organizer: <input form={`comparison-${r.id}`} name="organizer" list="access_choices" defaultValue={r.organizer} disabled={!canManage} className={cellInput} />,
+              support: <input form={`comparison-${r.id}`} name="support" list="access_choices" defaultValue={r.support} disabled={!canManage} className={cellInput} />,
+              actions: canManage ? (
                 <span className="flex gap-1.5">
                   <button form={`comparison-${r.id}`} type="submit" className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50">
                     Save
@@ -674,6 +731,8 @@ export default async function AdminContent({
                     Delete
                   </button>
                 </span>
+              ) : (
+                <span className="text-xs text-neutral-300">—</span>
               ),
               position_csv: String(r.position ?? ""),
               what_csv: r.what as string,
@@ -687,32 +746,38 @@ export default async function AdminContent({
             })),
           ]}
         />
-        <CsvUploadForm
-          action={bulkUploadAccessComparisonRows}
-          templateHref="/access-comparison-template.csv"
-          entityLabel="access comparison row"
-        />
+        {canManage && (
+          <CsvUploadForm
+            action={bulkUploadAccessComparisonRows}
+            templateHref="/access-comparison-template.csv"
+            entityLabel="access comparison row"
+          />
+        )}
       </div>
 
       <div className="mt-10 space-y-3">
-        <h2 className="text-lg font-bold">Notification Reference (Editable)</h2>
+        <h2 className="text-lg font-bold">Notification Reference {canManage ? "(Editable)" : "(View Only)"}</h2>
         <p className="text-sm text-neutral-500">
           Every button across the app, and whether clicking it sends an email, a Telegram DM, or a
           &quot;join Telegram group&quot; link — kept here because a button&apos;s name alone often
           doesn&apos;t say which of these actually fire.
         </p>
-        {(notificationRows ?? []).map((r) => (
-          <form key={r.id} id={`notif-ref-${r.id}`} action={saveNotificationReferenceRow}>
-            <input type="hidden" name="id" value={r.id} />
-            <input type="hidden" name="return_to" value={RETURN_TO} />
-          </form>
-        ))}
-        <form id="notif-ref-new" action={saveNotificationReferenceRow}>
-          <input type="hidden" name="return_to" value={RETURN_TO} />
-        </form>
-        <button form="notif-ref-new" type="submit" className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-neutral-700">
-          + Add row (fill below, then Save on the new row)
-        </button>
+        {canManage && (
+          <>
+            {(notificationRows ?? []).map((r) => (
+              <form key={r.id} id={`notif-ref-${r.id}`} action={saveNotificationReferenceRow}>
+                <input type="hidden" name="id" value={r.id} />
+                <input type="hidden" name="return_to" value={RETURN_TO} />
+              </form>
+            ))}
+            <form id="notif-ref-new" action={saveNotificationReferenceRow}>
+              <input type="hidden" name="return_to" value={RETURN_TO} />
+            </form>
+            <button form="notif-ref-new" type="submit" className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-neutral-700">
+              + Add row (fill below, then Save on the new row)
+            </button>
+          </>
+        )}
         <FilterableTable
           rowKey="id"
           downloadName="notification-reference"
@@ -738,28 +803,32 @@ export default async function AdminContent({
             { key: "notes_csv", label: "Notes" },
           ]}
           rows={[
-            {
-              id: "notif-ref-new-row",
-              position: <input form="notif-ref-new" name="position" type="number" min="1" placeholder="No." className={cellInput} />,
-              page: <input form="notif-ref-new" name="page" required placeholder="Page *" className={cellInput} />,
-              button_label: <input form="notif-ref-new" name="button_label" required placeholder="Button *" className={cellInput} />,
-              sends_email: <input form="notif-ref-new" name="sends_email" placeholder="Yes / No / ..." className={cellInput} />,
-              sends_telegram_dm: <input form="notif-ref-new" name="sends_telegram_dm" placeholder="Yes / No / ..." className={cellInput} />,
-              telegram_group_link: <input form="notif-ref-new" name="telegram_group_link" placeholder="Yes / No / ..." className={cellInput} />,
-              notes: <input form="notif-ref-new" name="notes" placeholder="Note (optional)" className={cellInput} />,
-              actions: <span className="text-xs text-neutral-400">New row — Save above</span>,
-              position_csv: "", page_csv: "", button_label_csv: "", sends_email_csv: "", sends_telegram_dm_csv: "", telegram_group_link_csv: "", notes_csv: "",
-            },
+            ...(canManage
+              ? [
+                  {
+                    id: "notif-ref-new-row",
+                    position: <input form="notif-ref-new" name="position" type="number" min="1" placeholder="No." className={cellInput} />,
+                    page: <input form="notif-ref-new" name="page" required placeholder="Page *" className={cellInput} />,
+                    button_label: <input form="notif-ref-new" name="button_label" required placeholder="Button *" className={cellInput} />,
+                    sends_email: <input form="notif-ref-new" name="sends_email" placeholder="Yes / No / ..." className={cellInput} />,
+                    sends_telegram_dm: <input form="notif-ref-new" name="sends_telegram_dm" placeholder="Yes / No / ..." className={cellInput} />,
+                    telegram_group_link: <input form="notif-ref-new" name="telegram_group_link" placeholder="Yes / No / ..." className={cellInput} />,
+                    notes: <input form="notif-ref-new" name="notes" placeholder="Note (optional)" className={cellInput} />,
+                    actions: <span className="text-xs text-neutral-400">New row — Save above</span>,
+                    position_csv: "", page_csv: "", button_label_csv: "", sends_email_csv: "", sends_telegram_dm_csv: "", telegram_group_link_csv: "", notes_csv: "",
+                  },
+                ]
+              : []),
             ...(notificationRows ?? []).map((r) => ({
               id: r.id as string,
-              position: <input form={`notif-ref-${r.id}`} name="position" type="number" min="1" defaultValue={r.position} className={cellInput} />,
-              page: <input form={`notif-ref-${r.id}`} name="page" required defaultValue={r.page} className={`${cellInput} font-semibold`} />,
-              button_label: <input form={`notif-ref-${r.id}`} name="button_label" required defaultValue={r.button_label} className={cellInput} />,
-              sends_email: <input form={`notif-ref-${r.id}`} name="sends_email" defaultValue={r.sends_email} className={cellInput} />,
-              sends_telegram_dm: <input form={`notif-ref-${r.id}`} name="sends_telegram_dm" defaultValue={r.sends_telegram_dm} className={cellInput} />,
-              telegram_group_link: <input form={`notif-ref-${r.id}`} name="telegram_group_link" defaultValue={r.telegram_group_link} className={cellInput} />,
-              notes: <input form={`notif-ref-${r.id}`} name="notes" defaultValue={r.notes ?? ""} placeholder="Note" className={cellInput} />,
-              actions: (
+              position: <input form={`notif-ref-${r.id}`} name="position" type="number" min="1" defaultValue={r.position} disabled={!canManage} className={cellInput} />,
+              page: <input form={`notif-ref-${r.id}`} name="page" required defaultValue={r.page} disabled={!canManage} className={`${cellInput} font-semibold`} />,
+              button_label: <input form={`notif-ref-${r.id}`} name="button_label" required defaultValue={r.button_label} disabled={!canManage} className={cellInput} />,
+              sends_email: <input form={`notif-ref-${r.id}`} name="sends_email" defaultValue={r.sends_email} disabled={!canManage} className={cellInput} />,
+              sends_telegram_dm: <input form={`notif-ref-${r.id}`} name="sends_telegram_dm" defaultValue={r.sends_telegram_dm} disabled={!canManage} className={cellInput} />,
+              telegram_group_link: <input form={`notif-ref-${r.id}`} name="telegram_group_link" defaultValue={r.telegram_group_link} disabled={!canManage} className={cellInput} />,
+              notes: <input form={`notif-ref-${r.id}`} name="notes" defaultValue={r.notes ?? ""} placeholder="Note" disabled={!canManage} className={cellInput} />,
+              actions: canManage ? (
                 <span className="flex gap-1.5">
                   <button form={`notif-ref-${r.id}`} type="submit" className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50">
                     Save
@@ -772,6 +841,8 @@ export default async function AdminContent({
                     Delete
                   </button>
                 </span>
+              ) : (
+                <span className="text-xs text-neutral-300">—</span>
               ),
               position_csv: String(r.position ?? ""),
               page_csv: r.page as string,
@@ -783,32 +854,38 @@ export default async function AdminContent({
             })),
           ]}
         />
-        <CsvUploadForm
-          action={bulkUploadNotificationReferenceRows}
-          templateHref="/notification-reference-template.csv"
-          entityLabel="notification reference row"
-        />
+        {canManage && (
+          <CsvUploadForm
+            action={bulkUploadNotificationReferenceRows}
+            templateHref="/notification-reference-template.csv"
+            entityLabel="notification reference row"
+          />
+        )}
       </div>
 
       <div className="mt-10 space-y-3">
-        <h2 className="text-lg font-bold">Telegram Link Reference (Editable)</h2>
+        <h2 className="text-lg font-bold">Telegram Link Reference {canManage ? "(Editable)" : "(View Only)"}</h2>
         <p className="text-sm text-neutral-500">
           Which roles can ever end up Telegram-linked (able to receive a DM), how they get linked,
           and which roles have no way to link at all today — a DM attempt to an unlinked role is
           always a silent no-op, never an error.
         </p>
-        {(telegramLinkRows ?? []).map((r) => (
-          <form key={r.id} id={`tg-link-${r.id}`} action={saveTelegramLinkReferenceRow}>
-            <input type="hidden" name="id" value={r.id} />
-            <input type="hidden" name="return_to" value={RETURN_TO} />
-          </form>
-        ))}
-        <form id="tg-link-new" action={saveTelegramLinkReferenceRow}>
-          <input type="hidden" name="return_to" value={RETURN_TO} />
-        </form>
-        <button form="tg-link-new" type="submit" className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-neutral-700">
-          + Add row (fill below, then Save on the new row)
-        </button>
+        {canManage && (
+          <>
+            {(telegramLinkRows ?? []).map((r) => (
+              <form key={r.id} id={`tg-link-${r.id}`} action={saveTelegramLinkReferenceRow}>
+                <input type="hidden" name="id" value={r.id} />
+                <input type="hidden" name="return_to" value={RETURN_TO} />
+              </form>
+            ))}
+            <form id="tg-link-new" action={saveTelegramLinkReferenceRow}>
+              <input type="hidden" name="return_to" value={RETURN_TO} />
+            </form>
+            <button form="tg-link-new" type="submit" className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-neutral-700">
+              + Add row (fill below, then Save on the new row)
+            </button>
+          </>
+        )}
         <FilterableTable
           rowKey="id"
           downloadName="telegram-link-reference"
@@ -830,24 +907,28 @@ export default async function AdminContent({
             { key: "notes_csv", label: "Notes" },
           ]}
           rows={[
-            {
-              id: "tg-link-new-row",
-              position: <input form="tg-link-new" name="position" type="number" min="1" placeholder="No." className={cellInput} />,
-              role: <input form="tg-link-new" name="role" required placeholder="Role *" className={cellInput} />,
-              can_be_linked: <input form="tg-link-new" name="can_be_linked" placeholder="Yes / No / ..." className={cellInput} />,
-              how_to_link: <input form="tg-link-new" name="how_to_link" placeholder="How (optional)" className={cellInput} />,
-              notes: <input form="tg-link-new" name="notes" placeholder="Note (optional)" className={cellInput} />,
-              actions: <span className="text-xs text-neutral-400">New row — Save above</span>,
-              position_csv: "", role_csv: "", can_be_linked_csv: "", how_to_link_csv: "", notes_csv: "",
-            },
+            ...(canManage
+              ? [
+                  {
+                    id: "tg-link-new-row",
+                    position: <input form="tg-link-new" name="position" type="number" min="1" placeholder="No." className={cellInput} />,
+                    role: <input form="tg-link-new" name="role" required placeholder="Role *" className={cellInput} />,
+                    can_be_linked: <input form="tg-link-new" name="can_be_linked" placeholder="Yes / No / ..." className={cellInput} />,
+                    how_to_link: <input form="tg-link-new" name="how_to_link" placeholder="How (optional)" className={cellInput} />,
+                    notes: <input form="tg-link-new" name="notes" placeholder="Note (optional)" className={cellInput} />,
+                    actions: <span className="text-xs text-neutral-400">New row — Save above</span>,
+                    position_csv: "", role_csv: "", can_be_linked_csv: "", how_to_link_csv: "", notes_csv: "",
+                  },
+                ]
+              : []),
             ...(telegramLinkRows ?? []).map((r) => ({
               id: r.id as string,
-              position: <input form={`tg-link-${r.id}`} name="position" type="number" min="1" defaultValue={r.position} className={cellInput} />,
-              role: <input form={`tg-link-${r.id}`} name="role" required defaultValue={r.role} className={`${cellInput} font-semibold`} />,
-              can_be_linked: <input form={`tg-link-${r.id}`} name="can_be_linked" defaultValue={r.can_be_linked} className={cellInput} />,
-              how_to_link: <input form={`tg-link-${r.id}`} name="how_to_link" defaultValue={r.how_to_link} className={cellInput} />,
-              notes: <input form={`tg-link-${r.id}`} name="notes" defaultValue={r.notes ?? ""} placeholder="Note" className={cellInput} />,
-              actions: (
+              position: <input form={`tg-link-${r.id}`} name="position" type="number" min="1" defaultValue={r.position} disabled={!canManage} className={cellInput} />,
+              role: <input form={`tg-link-${r.id}`} name="role" required defaultValue={r.role} disabled={!canManage} className={`${cellInput} font-semibold`} />,
+              can_be_linked: <input form={`tg-link-${r.id}`} name="can_be_linked" defaultValue={r.can_be_linked} disabled={!canManage} className={cellInput} />,
+              how_to_link: <input form={`tg-link-${r.id}`} name="how_to_link" defaultValue={r.how_to_link} disabled={!canManage} className={cellInput} />,
+              notes: <input form={`tg-link-${r.id}`} name="notes" defaultValue={r.notes ?? ""} placeholder="Note" disabled={!canManage} className={cellInput} />,
+              actions: canManage ? (
                 <span className="flex gap-1.5">
                   <button form={`tg-link-${r.id}`} type="submit" className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50">
                     Save
@@ -860,6 +941,8 @@ export default async function AdminContent({
                     Delete
                   </button>
                 </span>
+              ) : (
+                <span className="text-xs text-neutral-300">—</span>
               ),
               position_csv: String(r.position ?? ""),
               role_csv: r.role as string,
@@ -869,11 +952,13 @@ export default async function AdminContent({
             })),
           ]}
         />
-        <CsvUploadForm
-          action={bulkUploadTelegramLinkReferenceRows}
-          templateHref="/telegram-link-reference-template.csv"
-          entityLabel="telegram link reference row"
-        />
+        {canManage && (
+          <CsvUploadForm
+            action={bulkUploadTelegramLinkReferenceRows}
+            templateHref="/telegram-link-reference-template.csv"
+            entityLabel="telegram link reference row"
+          />
+        )}
       </div>
     </AdminShell>
   );

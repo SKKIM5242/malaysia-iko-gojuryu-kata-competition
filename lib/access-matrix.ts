@@ -111,6 +111,11 @@ export const ACCESS_MATRIX: AccessRow[] = [
     note: "/admin/email-verifications is Admin/Organizer-only at the route level, same as Accounts — it can manually mark an account verified, bypassing the sign-in gate. markEmailVerified/resendVerificationEmail already gate on requireAdminTier() (admin/organizer/staff), so no action-level change was needed once the route let Organizer through.",
   },
   {
+    resource: "Content page (announcements, competition tiers, access matrix, and every other reference table)",
+    admin: "Full", organizer: "Full", customerSupport: "View only", referee: "View only",
+    note: "canManage (admin/organizer/staff) gates every create/edit/delete control and CSV uploader across all six sections; canView additionally admits Participant Support and Referee/Judge, who see every table's live data with inputs disabled and no Save/Delete/+Add row/upload controls rendered at all.",
+  },
+  {
     resource: "CSV bulk upload — Schools / Senseis / Referees / Audience / Participants / Announcements / Invitation Codes / Content reference tables",
     admin: "Full", organizer: "Full", customerSupport: "Blocked", referee: "Blocked",
     note: "Every one of these bulk-upload actions calls the shared bulkUploadRoleError guard, which restricts to admin/organizer only — Participant Support and Referee are rejected. This is narrower than the single-record Add/Edit/Delete forms next to each uploader (see their own rows above), which stay open to all four.",
