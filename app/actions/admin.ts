@@ -26,7 +26,7 @@ import type { PaymentStatus, Category } from "@/lib/types";
 import { parseCsvWithHeader, parseDDMMYYYY, type CsvUploadResult } from "@/lib/csv-bulk";
 import { PROFILE_ROLE_KEYS } from "@/lib/reference-data";
 import { normalizeIban } from "@/lib/bank";
-import { codePrefix, nextSequentialCode } from "@/lib/invitation-codes";
+import { codePrefix, nextSequentialCode, shortTierName } from "@/lib/invitation-codes";
 import { listTelegramGroups, type TelegramCategory } from "@/lib/telegram";
 import { ACCESS_MATRIX, accessMatrixAnnouncementIntro } from "@/lib/access-matrix";
 import { DEFAULT_COMPARISON_ROWS } from "@/components/AccessComparisonTable";
@@ -4890,6 +4890,201 @@ export async function uploadOtherPayoutReceipt(formData: FormData) {
     table_name: "other_payouts", record_id: id, action: "other_payout_receipt_uploaded", new_value: { receipt_path: receiptPath }, actor_id: actorId,
   });
   backTo(returnTo, { ok: "Receipt uploaded." });
+}
+
+// ── Commissions/Rewards/Other Payouts CSV bulk upload ───────────────────────
+// All three re-use the exact CSV shape each table's own "Download CSV"
+// button already produces -- download, edit the status (and for Other
+// Payouts, any field) column(s), re-upload the same file to override
+// whatever's there now. Commission/Winner rows are otherwise computed live
+// (see lib/commissions.ts / lib/rewards.ts), so only their payout bookkeeping
+// is ever writable; Other Payouts is real stored data, so its upload can
+// both create new rows (blank id) and update existing ones (id present).
+
+const COMMISSION_PAYOUT_CSV_COLUMNS = ["recipient_type", "recipient_id", "status"] as const;
+
+export async function bulkUploadCommissionPayouts(_prev: CsvUploadResult, formData: FormData): Promise<CsvUploadResult> {
+  const returnTo = "/admin/commissions";
+  const file = formData.get("csv_file");
+  if (!(file instanceof File) || file.size === 0) return { done: false, error: "Choose a CSV file to upload." };
+  if (file.size > 5 * 1024 * 1024) return { done: false, error: "CSV file too large (max 5 MB)." };
+
+  const parsed = parseCsvWithHeader(await file.text(), COMMISSION_PAYOUT_CSV_COLUMNS);
+  if ("error" in parsed) return { done: false, error: parsed.error };
+  const { dataRows, get } = parsed;
+  if (dataRows.length === 0) return { done: false, error: "The CSV has no data rows." };
+  if (dataRows.length > 500) return { done: false, error: "Maximum 500 rows per upload." };
+
+  const { supabase, actorId } = await getActor();
+  const roleError = await bulkUploadRoleError(supabase, actorId);
+  if (roleError) return { done: false, error: roleError };
+
+  const failures: Array<{ row: number; name: string; error: string }> = [];
+  let succeeded = 0;
+  for (let i = 0; i < dataRows.length; i++) {
+    const r = dataRows[i];
+    const rowNo = i + 2;
+    const recipientType = get(r, "recipient_type").trim().toLowerCase();
+    const recipientId = get(r, "recipient_id").trim();
+    const status = get(r, "status").trim().toLowerCase();
+    const label = recipientId || `Row ${rowNo}`;
+    if (!["school", "sensei", "referee"].includes(recipientType)) {
+      failures.push({ row: rowNo, name: label, error: "recipient_type must be school, sensei, or referee" });
+      continue;
+    }
+    if (!recipientId) { failures.push({ row: rowNo, name: label, error: "recipient_id is required" }); continue; }
+    if (!["unpaid", "paid"].includes(status)) {
+      failures.push({ row: rowNo, name: label, error: "status must be unpaid or paid" });
+      continue;
+    }
+    const { error } = await supabase
+      .from("commission_payouts")
+      .upsert(
+        {
+          recipient_type: recipientType, recipient_id: recipientId, status,
+          paid_at: status === "paid" ? new Date().toISOString() : null, updated_at: new Date().toISOString(),
+        },
+        { onConflict: "recipient_type,recipient_id" },
+      );
+    if (error) { failures.push({ row: rowNo, name: label, error: "Could not save" }); continue; }
+    await writeAudit(supabase, {
+      table_name: "commission_payouts", record_id: recipientId, action: "commission_payout_bulk_upserted",
+      new_value: { recipient_type: recipientType, status }, actor_id: actorId,
+    });
+    succeeded++;
+  }
+  revalidatePath(returnTo);
+  return { done: true, succeeded, failed: failures.length, failures: failures.slice(0, 50) };
+}
+
+const WINNER_PAYOUT_CSV_COLUMNS = ["registration_id", "status"] as const;
+
+export async function bulkUploadWinnerPayouts(_prev: CsvUploadResult, formData: FormData): Promise<CsvUploadResult> {
+  const returnTo = "/admin/commissions";
+  const file = formData.get("csv_file");
+  if (!(file instanceof File) || file.size === 0) return { done: false, error: "Choose a CSV file to upload." };
+  if (file.size > 5 * 1024 * 1024) return { done: false, error: "CSV file too large (max 5 MB)." };
+
+  const parsed = parseCsvWithHeader(await file.text(), WINNER_PAYOUT_CSV_COLUMNS);
+  if ("error" in parsed) return { done: false, error: parsed.error };
+  const { dataRows, get } = parsed;
+  if (dataRows.length === 0) return { done: false, error: "The CSV has no data rows." };
+  if (dataRows.length > 500) return { done: false, error: "Maximum 500 rows per upload." };
+
+  const { supabase, actorId } = await getActor();
+  const roleError = await bulkUploadRoleError(supabase, actorId);
+  if (roleError) return { done: false, error: roleError };
+
+  const failures: Array<{ row: number; name: string; error: string }> = [];
+  let succeeded = 0;
+  for (let i = 0; i < dataRows.length; i++) {
+    const r = dataRows[i];
+    const rowNo = i + 2;
+    const registrationId = get(r, "registration_id").trim();
+    const status = get(r, "status").trim().toLowerCase();
+    const label = registrationId || `Row ${rowNo}`;
+    if (!registrationId) { failures.push({ row: rowNo, name: label, error: "registration_id is required" }); continue; }
+    if (!["unpaid", "paid"].includes(status)) {
+      failures.push({ row: rowNo, name: label, error: "status must be unpaid or paid" });
+      continue;
+    }
+    const { error } = await supabase
+      .from("winner_payouts")
+      .upsert(
+        { registration_id: registrationId, status, paid_at: status === "paid" ? new Date().toISOString() : null, updated_at: new Date().toISOString() },
+        { onConflict: "registration_id" },
+      );
+    if (error) { failures.push({ row: rowNo, name: label, error: "Could not save" }); continue; }
+    await writeAudit(supabase, {
+      table_name: "winner_payouts", record_id: registrationId, action: "winner_payout_bulk_upserted",
+      new_value: { status }, actor_id: actorId,
+    });
+    succeeded++;
+  }
+  revalidatePath(returnTo);
+  return { done: true, succeeded, failed: failures.length, failures: failures.slice(0, 50) };
+}
+
+const OTHER_PAYOUT_CSV_COLUMNS = ["id", "tier", "description", "amount_usd", "status"] as const;
+
+/** Unlike the two above, every field here is real stored data -- a blank
+ * `id` creates a new row, a populated one updates the matching row (and
+ * fails that row specifically if the id doesn't exist, rather than silently
+ * creating a duplicate from a typo'd id). */
+export async function bulkUploadOtherPayouts(_prev: CsvUploadResult, formData: FormData): Promise<CsvUploadResult> {
+  const returnTo = "/admin/commissions";
+  const file = formData.get("csv_file");
+  if (!(file instanceof File) || file.size === 0) return { done: false, error: "Choose a CSV file to upload." };
+  if (file.size > 5 * 1024 * 1024) return { done: false, error: "CSV file too large (max 5 MB)." };
+
+  const parsed = parseCsvWithHeader(await file.text(), OTHER_PAYOUT_CSV_COLUMNS);
+  if ("error" in parsed) return { done: false, error: parsed.error };
+  const { dataRows, get } = parsed;
+  if (dataRows.length === 0) return { done: false, error: "The CSV has no data rows." };
+  if (dataRows.length > 500) return { done: false, error: "Maximum 500 rows per upload." };
+
+  const { supabase, actorId } = await getActor();
+  const roleError = await bulkUploadRoleError(supabase, actorId);
+  if (roleError) return { done: false, error: roleError };
+
+  const { data: comps } = await supabase.from("competitions").select("id, name");
+  const tierByName = new Map<string, string>();
+  for (const c of comps ?? []) {
+    const id = c.id as string;
+    const name = c.name as string;
+    tierByName.set(name.trim().toLowerCase(), id);
+    tierByName.set(shortTierName(name).trim().toLowerCase(), id);
+  }
+
+  const failures: Array<{ row: number; name: string; error: string }> = [];
+  let succeeded = 0;
+  for (let i = 0; i < dataRows.length; i++) {
+    const r = dataRows[i];
+    const rowNo = i + 2;
+    const id = get(r, "id").trim();
+    const tierRaw = get(r, "tier").trim();
+    const description = get(r, "description").trim();
+    const amountRaw = get(r, "amount_usd").trim();
+    const statusRaw = get(r, "status").trim().toLowerCase() || "unpaid";
+    const label = description || `Row ${rowNo}`;
+
+    if (!["unpaid", "paid"].includes(statusRaw)) {
+      failures.push({ row: rowNo, name: label, error: "status must be unpaid or paid" });
+      continue;
+    }
+    const amount = Number(amountRaw);
+    if (!amountRaw || Number.isNaN(amount) || amount < 0) {
+      failures.push({ row: rowNo, name: label, error: "amount_usd must be a valid non-negative number" });
+      continue;
+    }
+    const competitionId = tierByName.get(tierRaw.toLowerCase());
+    if (!description) { failures.push({ row: rowNo, name: label, error: "description is required" }); continue; }
+    if (!competitionId) {
+      failures.push({ row: rowNo, name: label, error: `tier "${tierRaw}" not recognized — must exactly match a competition tier name` });
+      continue;
+    }
+    const values = {
+      competition_id: competitionId, description, amount_usd: amount, status: statusRaw,
+      paid_at: statusRaw === "paid" ? new Date().toISOString() : null, updated_at: new Date().toISOString(),
+    };
+    if (id) {
+      const { data, error } = await supabase.from("other_payouts").update(values).eq("id", id).select("id");
+      if (error) { failures.push({ row: rowNo, name: label, error: "Could not save" }); continue; }
+      if (!data || data.length === 0) { failures.push({ row: rowNo, name: label, error: `id "${id}" not found` }); continue; }
+      await writeAudit(supabase, {
+        table_name: "other_payouts", record_id: id, action: "other_payout_bulk_updated", new_value: values, actor_id: actorId,
+      });
+    } else {
+      const { data, error } = await supabase.from("other_payouts").insert({ ...values, created_by: actorId }).select("id").single();
+      if (error) { failures.push({ row: rowNo, name: label, error: "Could not save" }); continue; }
+      await writeAudit(supabase, {
+        table_name: "other_payouts", record_id: data!.id, action: "other_payout_bulk_created", new_value: values, actor_id: actorId,
+      });
+    }
+    succeeded++;
+  }
+  revalidatePath(returnTo);
+  return { done: true, succeeded, failed: failures.length, failures: failures.slice(0, 50) };
 }
 
 // ── Participant Support shift log ────────────────────────────────────────────

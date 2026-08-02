@@ -10,11 +10,16 @@ export default function CsvUploadForm({
   templateHref,
   entityLabel,
   note,
+  resultVerb = "added",
 }: {
   action: (state: CsvUploadResult, formData: FormData) => Promise<CsvUploadResult>;
   templateHref: string;
   entityLabel: string;
   note?: string;
+  /** Past-tense verb for the success count, e.g. "added" (default), "updated",
+   * "saved" — lets callers whose upload overrides existing records (instead
+   * of only ever inserting new ones) describe what actually happened. */
+  resultVerb?: string;
 }) {
   const [state, formAction, pending] = useActionState(action, initial);
 
@@ -36,7 +41,7 @@ export default function CsvUploadForm({
           }`}
         >
           <p className="font-bold">
-            {state.succeeded ?? 0} {entityLabel}(s) added, {state.failed ?? 0} failed
+            {state.succeeded ?? 0} {entityLabel}(s) {resultVerb}, {state.failed ?? 0} failed
           </p>
           {state.failures && state.failures.length > 0 && (
             <div className="mt-2 overflow-x-auto rounded border border-neutral-200 bg-white">

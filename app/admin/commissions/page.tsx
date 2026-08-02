@@ -7,11 +7,13 @@ import { computeProfitLossByTier } from "@/lib/profit-loss";
 import {
   setCommissionPayoutStatus, setWinnerPayoutStatus, uploadCommissionReceipt, uploadWinnerReceipt,
   saveOtherPayout, deleteOtherPayout, setOtherPayoutStatus, uploadOtherPayoutReceipt,
+  bulkUploadCommissionPayouts, bulkUploadWinnerPayouts, bulkUploadOtherPayouts,
 } from "@/app/actions/admin";
 import { AdminShell } from "@/components/admin";
 import { EmptyState, SetupNotice } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
 import CertificateUploadField from "@/components/CertificateUploadField";
+import CsvUploadForm from "@/components/CsvUploadForm";
 import ProfitLossSection from "@/components/ProfitLossSection";
 import { getAllCompetitions } from "@/lib/admin-data";
 import { shortTierName } from "@/lib/invitation-codes";
@@ -284,9 +286,13 @@ export default async function AdminCommissions({
             { key: "bank_account_name", label: "Bank Account Holder Name" },
             { key: "payout_status", label: "Payout Status" },
             { key: "receipt_status", label: "Receipt Uploaded" },
+            { key: "recipient_type", label: "recipient_type" },
+            { key: "recipient_id", label: "recipient_id" },
           ]}
           rows={rows.map((r: CommissionRow) => ({
             key: `${r.recipientType}:${r.recipientId}`,
+            recipient_type: r.recipientType,
+            recipient_id: r.recipientId,
             type: TYPE_LABEL[r.recipientType],
             name: r.name,
             participant_count: String(r.participantCount),
@@ -321,6 +327,16 @@ export default async function AdminCommissions({
           }))}
         />
       )}
+
+      <div className="mt-3">
+        <CsvUploadForm
+          action={bulkUploadCommissionPayouts}
+          templateHref="/commission-payouts-template.csv"
+          entityLabel="commission payout"
+          resultVerb="updated"
+          note="This overrides existing payout status only (not the computed commission itself) — easiest is to use the file from ⬆ Download CSV above (already has the right recipient_type/recipient_id), just edit the status column and re-upload."
+        />
+      </div>
 
       <p className="mt-4 text-xs text-neutral-400">
         {payable.length} of {rows.length} currently qualify for a non-zero commission.
@@ -368,9 +384,11 @@ export default async function AdminCommissions({
             { key: "bank_account_name", label: "Bank Account Holder Name" },
             { key: "payout_status", label: "Payout Status" },
             { key: "receipt_status", label: "Receipt Uploaded" },
+            { key: "registration_id", label: "registration_id" },
           ]}
           rows={rewardRows.map((r: WinnerRewardRow) => ({
             key: r.registrationId,
+            registration_id: r.registrationId,
             competition: r.competitionName,
             category: r.categoryName,
             rank: `${MEDALS[r.rank - 1] ?? ""} ${r.rank}`,
@@ -395,6 +413,16 @@ export default async function AdminCommissions({
           }))}
         />
       )}
+
+      <div className="mt-3">
+        <CsvUploadForm
+          action={bulkUploadWinnerPayouts}
+          templateHref="/winner-payouts-template.csv"
+          entityLabel="winner payout"
+          resultVerb="updated"
+          note="This overrides existing payout status only — easiest is to use the file from ⬆ Download CSV above (already has the right registration_id), just edit the status column and re-upload."
+        />
+      </div>
 
       <h2 id="other-payouts" className="mt-10 mb-2 scroll-mt-4 text-lg font-bold text-neutral-900">Other Payouts</h2>
       <p className="mb-6 max-w-3xl text-sm text-neutral-500">
@@ -433,6 +461,7 @@ export default async function AdminCommissions({
           { key: "actions", label: "Actions", width: 130 },
         ]}
         csvColumns={[
+          { key: "id_csv", label: "id" },
           { key: "tier_csv", label: "Tier" },
           { key: "description_csv", label: "Description" },
           { key: "amount_csv", label: "Amount USD" },
@@ -455,7 +484,7 @@ export default async function AdminCommissions({
             status: <span className="text-xs text-neutral-400">—</span>,
             receipt: <span className="text-xs text-neutral-400">—</span>,
             actions: <span className="text-xs text-neutral-400">New row — Save above</span>,
-            tier_csv: "", description_csv: "", amount_csv: "", status_csv: "", receipt_status_csv: "",
+            id_csv: "", tier_csv: "", description_csv: "", amount_csv: "", status_csv: "", receipt_status_csv: "",
           },
           ...(otherPayouts ?? []).map((r: OtherPayoutRow) => ({
             key: r.id,
@@ -507,6 +536,7 @@ export default async function AdminCommissions({
                 </button>
               </span>
             ),
+            id_csv: r.id,
             tier_csv: r.competitionName,
             description_csv: r.description,
             amount_csv: r.amountUsd.toFixed(2),
@@ -516,6 +546,16 @@ export default async function AdminCommissions({
         ]}
       />
       {(otherPayouts ?? []).length === 0 && <EmptyState>No other payouts recorded yet.</EmptyState>}
+
+      <div className="mt-3">
+        <CsvUploadForm
+          action={bulkUploadOtherPayouts}
+          templateHref="/other-payouts-template.csv"
+          entityLabel="other payout"
+          resultVerb="saved"
+          note='Leave "id" blank to create a new payout, or fill it in (from ⬆ Download CSV above) to update an existing one. "tier" must exactly match a tier name or short name (e.g. "USD 10 Tier").'
+        />
+      </div>
 
       <h2 id="profit-loss" className="mt-10 mb-2 scroll-mt-4 text-lg font-bold text-neutral-900">Profit / Loss by Tier</h2>
       <p className="mb-4 max-w-3xl text-sm text-neutral-500">
