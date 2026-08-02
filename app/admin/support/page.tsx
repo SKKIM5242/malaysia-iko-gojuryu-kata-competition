@@ -64,7 +64,6 @@ export default async function AdminSupport({
     ? await supabase.from("profiles").select("role").eq("user_id", user.id).maybeSingle()
     : { data: null };
   const canCreate = ["admin", "organizer", "staff"].includes(myProfile?.role ?? "");
-  const isSuperAdmin = myProfile?.role === "admin";
   const canBulkUpload = ["admin", "organizer"].includes(myProfile?.role ?? "");
   const isCustomerSupport = myProfile?.role === "customer_support";
   const isAdminTier = ["admin", "organizer", "staff", "customer_support"].includes(myProfile?.role ?? "");
@@ -413,7 +412,7 @@ export default async function AdminSupport({
                     >
                       Edit
                     </Link>
-                    {isSuperAdmin && (
+                    {canCreate && (
                       <form action={deleteStaffAccount}>
                         <input type="hidden" name="user_id" value={s.user_id} />
                         <input type="hidden" name="return_to" value="/admin/support" />
@@ -428,8 +427,8 @@ export default async function AdminSupport({
             />
           )}
           <p className="mt-2 text-xs text-neutral-400">
-            Deleting removes the login entirely — the account can&apos;t sign in again. Only
-            the Super Admin can delete; Admin/Organizer can create and edit.
+            Deleting removes the login entirely — the account can&apos;t sign in again. Admin
+            and Organizer can create, edit, and delete a Participant Support login.
           </p>
         </div>
       )}

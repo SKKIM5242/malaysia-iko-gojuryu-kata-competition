@@ -49,6 +49,7 @@ export default async function AdminOrganizers({
     ? await supabase.from("profiles").select("role").eq("user_id", user.id).maybeSingle()
     : { data: null };
   const isSuperAdmin = myProfile?.role === "admin";
+  const isOrganizerTier = ["admin", "organizer", "staff"].includes(myProfile?.role ?? "");
   const myUserId = user?.id ?? null;
 
   const { data: apps } = await supabase
@@ -58,24 +59,28 @@ export default async function AdminOrganizers({
     .order("created_at", { ascending: false });
   const applications = (apps as StaffApp[]) ?? [];
   const competitions = await getAllCompetitions();
-  const staffAccounts = isSuperAdmin
-    ? (await getStaffAccountRecords()).filter((s) => s.role !== "customer_support")
+  const staffAccounts = isOrganizerTier
+    ? (await getStaffAccountRecords()).filter(
+        (s) => s.role !== "customer_support" && (isSuperAdmin || s.role !== "admin"),
+      )
     : [];
   const editingAccount = params.edit ? staffAccounts.find((s) => s.user_id === params.edit) : undefined;
 
   return (
     <AdminShell title="Admin / Organizer" active="/admin/organizers" flash={{ ok: params.ok, error: params.error }}>
-      {isSuperAdmin ? (
+      {isSuperAdmin && (
+        <div className="mb-6">
+          <CsvUploadForm
+            action={bulkUploadOrganizers}
+            templateHref="/organizers-template.csv"
+            entityLabel="account"
+            note={`Each row creates a real login instantly and emails a temporary password — max 200 rows per upload. Dates use DD/MM/YYYY format. ${IBAN_CSV_NOTE}`}
+          />
+        </div>
+      )}
+      {isOrganizerTier ? (
         <div className="mb-8">
-          <div className="mb-6">
-            <CsvUploadForm
-              action={bulkUploadOrganizers}
-              templateHref="/organizers-template.csv"
-              entityLabel="account"
-              note={`Each row creates a real login instantly and emails a temporary password — max 200 rows per upload. Dates use DD/MM/YYYY format. ${IBAN_CSV_NOTE}`}
-            />
-          </div>
-          <h2 className="mb-3 text-lg font-bold">Create An Admin / Organizer Account</h2>
+          <h2 className="mb-3 text-lg font-bold">Create An Organizer Account</h2>
           <Card>
             <form action={createStaffAccount} className="space-y-4">
               <input type="hidden" name="role" value="organizer" />
@@ -170,7 +175,8 @@ export default async function AdminOrganizers({
                 <button type="submit" className={adminBtn}>Create Organizer account</button>
                 <p className="mt-2 text-xs text-neutral-400">
                   Creates a real login instantly (no application or approval step) and emails them a
-                  temporary password. Only the Super Admin can create Organizer accounts.
+                  temporary password. Admin and Organizer can create Organizer accounts — creating a
+                  new Admin account still requires the Supabase dashboard.
                 </p>
               </div>
             </form>
@@ -178,11 +184,11 @@ export default async function AdminOrganizers({
         </div>
       ) : (
         <p className="mb-8 text-sm text-neutral-500">
-          Only the Super Admin can create new Admin / Organizer accounts directly.
+          Only Admin and Organizer can create new Organizer accounts directly.
         </p>
       )}
 
-      {isSuperAdmin && (
+      {isOrganizerTier && (
         <div className="mb-8">
           <h2 className="mb-3 text-lg font-bold">
             {editingAccount ? `Edit ${editingAccount.full_name ?? "Account"}` : "Admin / Organizer Accounts"}
@@ -242,9 +248,10 @@ export default async function AdminOrganizers({
             />
           )}
           <p className="mt-2 text-xs text-neutral-400">
-            Deleting removes the login entirely — the account can&apos;t sign in again. You
-            can&apos;t delete your own account, and the last remaining Super Admin can&apos;t be
-            deleted either.
+            Deleting removes the login entirely — the account can&apos;t sign in again. Admin and
+            Organizer can create, edit, and delete an Organizer login; only the Super Admin can
+            touch an Admin account. You can&apos;t delete your own account, and the last remaining
+            Super Admin can&apos;t be deleted either.
           </p>
         </div>
       )}
@@ -310,10 +317,10 @@ export default async function AdminOrganizers({
         />
       )}
       <p className="mt-4 text-xs text-neutral-400">
-        Approving an application here does not create a login by itself — use the &quot;Create an Admin /
-        Organizer account&quot; form above (Super Admin only) to actually grant access.
+        Approving an application here does not create a login by itself — use the &quot;Create An
+        Organizer Account&quot; form above (Admin/Organizer) to actually grant access.
       </p>
-      {isSuperAdmin && (
+      {isOrganizerTier && (
         <div className="mt-8 space-y-6">
           <InvitationCodeForm
             role="organizer"

@@ -3856,8 +3856,8 @@ export async function createStaffAccount(formData: FormData) {
 
   const { supabase, actorId } = await getActor();
   const actorRole = await getActorRole(supabase, actorId);
-  if (role === "organizer" && actorRole !== "admin") {
-    backTo(returnTo, { error: "Only the Super Admin can create Admin / Organizer accounts." });
+  if (role === "organizer" && !["admin", "organizer", "staff"].includes(actorRole ?? "")) {
+    backTo(returnTo, { error: "Only Admin or Organizer can create an Organizer account." });
   }
   if (role === "customer_support" && !["admin", "organizer", "staff"].includes(actorRole ?? "")) {
     backTo(returnTo, { error: "Only Super Admin or Admin / Organizer can create Participant Support accounts." });
@@ -3925,6 +3925,13 @@ export async function saveStaffAccount(formData: FormData) {
   const actorRole = await getActorRole(supabase, actorId);
   if (!["admin", "organizer", "staff"].includes(actorRole ?? "")) {
     backTo(returnTo, { error: "Only Admin/Organizer can edit staff accounts." });
+  }
+  // Organizer/Staff can edit another Organizer or Participant Support
+  // account, but never an Admin one — only the Super Admin can change a
+  // fellow Admin's details.
+  const { data: targetProfile } = await supabase.from("profiles").select("role").eq("user_id", userId).maybeSingle();
+  if (targetProfile?.role === "admin" && actorRole !== "admin") {
+    backTo(returnTo, { error: "Only the Super Admin can edit an Admin account." });
   }
 
   const full_name = String(formData.get("full_name") ?? "").trim();
@@ -4001,8 +4008,8 @@ export async function deleteStaffAccount(formData: FormData) {
   const returnTo = String(formData.get("return_to") ?? "") || "/admin/organizers";
   const { supabase, actorId } = await getActor();
   const actorRole = await getActorRole(supabase, actorId);
-  if (actorRole !== "admin") {
-    backTo(returnTo, { error: "Only the Super Admin can delete staff accounts." });
+  if (!["admin", "organizer", "staff"].includes(actorRole ?? "")) {
+    backTo(returnTo, { error: "Only Admin or Organizer can delete staff accounts." });
   }
   if (userId === actorId) {
     backTo(returnTo, { error: "You can't delete your own account while signed in as it." });
@@ -4011,6 +4018,12 @@ export async function deleteStaffAccount(formData: FormData) {
   const admin = createAdminClient();
   const { data: target } = await admin.from("profiles").select("role, full_name").eq("user_id", userId).maybeSingle();
   if (!target) backTo(returnTo, { error: "Account not found." });
+  // Organizer/Staff can delete another Organizer or Participant Support
+  // login, but never an Admin one — only the Super Admin can remove a
+  // fellow Admin.
+  if (target!.role === "admin" && actorRole !== "admin") {
+    backTo(returnTo, { error: "Only the Super Admin can delete an Admin account." });
+  }
   if (target!.role === "admin") {
     const { count } = await admin.from("profiles").select("user_id", { count: "exact", head: true }).eq("role", "admin");
     if ((count ?? 0) <= 1) {
@@ -5219,8 +5232,8 @@ export async function resendRegistrationConfirmation(formData: FormData) {
   const returnTo = String(formData.get("return_to") ?? "/admin/records");
   const { supabase, actorId } = await getActor();
   const actorRole = await getActorRole(supabase, actorId);
-  if (!["admin", "organizer", "staff"].includes(actorRole ?? "")) {
-    backTo(returnTo, { error: "Only Admin/Organizer can resend a confirmation email." });
+  if (!["admin", "organizer", "staff", "customer_support"].includes(actorRole ?? "")) {
+    backTo(returnTo, { error: "Only Admin/Organizer/Participant Support can resend a confirmation email." });
   }
 
   const { data: reg } = await supabase

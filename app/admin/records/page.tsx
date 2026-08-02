@@ -92,7 +92,7 @@ export default async function AdminParticipantRecords({
   const isAdmin = myProfile?.role === "admin";
   const canManageSlot = ["admin", "organizer", "staff", "referee"].includes(myProfile?.role ?? "");
   const canLinkAccount = ["admin", "organizer", "staff", "customer_support", "referee"].includes(myProfile?.role ?? "");
-  const canResendEmail = ["admin", "organizer", "staff"].includes(myProfile?.role ?? "");
+  const canResendEmail = ["admin", "organizer", "staff", "customer_support"].includes(myProfile?.role ?? "");
 
   const { data: purchases } = await supabase
     .from("attempt_purchases")

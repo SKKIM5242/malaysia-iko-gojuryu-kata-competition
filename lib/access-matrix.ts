@@ -91,14 +91,24 @@ export const ACCESS_MATRIX: AccessRow[] = [
     note: "Fixed in migration 0029 — previously no storage.objects SELECT policy existed for the kata-videos bucket, so nobody (including Admin) could actually load a recording.",
   },
   {
-    resource: "Organizer / Admin account creation",
-    admin: "Full", organizer: "Blocked", customerSupport: "Blocked", referee: "Blocked",
-    note: "createStaffAccount(role=organizer) requires actorRole === admin.",
+    resource: "Organizer account management (create/edit/delete)",
+    admin: "Full", organizer: "Full — never Admin", customerSupport: "Blocked", referee: "Blocked",
+    note: "createStaffAccount(role=organizer)/saveStaffAccount/deleteStaffAccount all allow admin/organizer/staff, but saveStaffAccount and deleteStaffAccount both reject a non-admin actor whose target is role=admin — an Organizer can manage another Organizer login but never touch the Super Admin's. Creating role=admin isn't possible through this action at all (Supabase dashboard only), so Organizer can never elevate anyone to Admin.",
   },
   {
-    resource: "Participant Support account creation",
+    resource: "Participant Support account management (create/edit/delete)",
     admin: "Full", organizer: "Full", customerSupport: "Blocked", referee: "Blocked",
-    note: "createStaffAccount(role=customer_support) allows admin, organizer, or staff.",
+    note: "createStaffAccount(role=customer_support)/saveStaffAccount/deleteStaffAccount all allow admin/organizer/staff.",
+  },
+  {
+    resource: "Classes (students, fee plans, enrollments, invoices)",
+    admin: "Full", organizer: "Full", customerSupport: "Blocked (route)", referee: "Blocked (route)",
+    note: "/admin/classes is Admin/Organizer/Staff-only at the route level, same pattern as Accounts and Email Verifications.",
+  },
+  {
+    resource: "Participant Records — resend registration confirmation email",
+    admin: "Full", organizer: "Full", customerSupport: "Full", referee: "Blocked",
+    note: "resendRegistrationConfirmation allows admin/organizer/staff/customer_support.",
   },
   {
     resource: "Accounts page (approvals, invitation codes)",
