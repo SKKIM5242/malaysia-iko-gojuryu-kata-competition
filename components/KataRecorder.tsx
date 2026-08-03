@@ -872,9 +872,15 @@ export default function KataRecorder({
               >
                 MALAYSIA OPEN VIRTUAL KARATE-DO KATA COMPETITION
               </p>
+              {/* Sized as ~55% of the title -- the same ratio the burned-in
+                  canvas banner already uses (see drawFrame's landscape
+                  branch below) -- rather than its own independent, much
+                  smaller clamp, which read as a stray small line under a
+                  wide title instead of a subtitle properly filling the
+                  same banner width. */}
               <p
                 className="mt-0.5"
-                style={{ fontSize: "clamp(0.7rem, 1.1vw, 1rem)", textShadow: "0 1px 4px rgba(0,0,0,0.6)" }}
+                style={{ fontSize: "clamp(0.6rem, 1.3vw, 1.25rem)", textShadow: "0 1px 4px rgba(0,0,0,0.6)" }}
               >
                 Organized by IKO GOJU-RYU KARATE-DO MALAYSIA SDN BHD
               </p>
