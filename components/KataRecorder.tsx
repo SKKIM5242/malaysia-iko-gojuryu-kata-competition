@@ -418,74 +418,10 @@ export default function KataRecorder({
   useEffect(() => {
     setIsMobileDevice(/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent));
   }, []);
-  // Sizes the title to occupy a fixed, deliberate fraction of the banner's
-  // own width (95%, the organizer's explicit spec) and the subtitle to
-  // occupy 88% -- but capped at 20% bigger than the subtitle's own natural
-  // (clamp()-derived) size, since growing it enough to hit 88% outright
-  // would make it look nearly as prominent as the title, defeating the
-  // point of it being a subtitle. Text width scales almost exactly
-  // linearly with font-size for a fixed string/font/weight, so one
-  // proportional correction from the current rendered width to the target
-  // width lands very close; a second pass immediately after tightens it
-  // further. useLayoutEffect (not useEffect) so the correction lands
-  // before paint -- no visible flash from the natural size to the
-  // corrected one.
   const desktopTitleRef = useRef<HTMLParagraphElement>(null);
   const desktopSubtitleRef = useRef<HTMLParagraphElement>(null);
   const [desktopTitleFontPx, setDesktopTitleFontPx] = useState<number | null>(null);
   const [desktopSubtitleFontPx, setDesktopSubtitleFontPx] = useState<number | null>(null);
-  useLayoutEffect(() => {
-    if (!(fullscreen && !isMobileDevice)) return;
-    function fitToWidthFraction(
-      el: HTMLElement,
-      container: HTMLElement,
-      targetFraction: number,
-      maxGrowthMultiplier = Infinity,
-    ) {
-      const cs = getComputedStyle(container);
-      const available = container.clientWidth - Number.parseFloat(cs.paddingLeft) - Number.parseFloat(cs.paddingRight);
-      const targetWidth = available * targetFraction;
-      // Reset first so every call re-derives from the natural clamp()
-      // size for the CURRENT container width, not a stale prior
-      // correction -- otherwise a size fitted while narrow would never
-      // grow back after rotating wider or unfolding a foldable, and the
-      // growth cap below would be measured against the wrong baseline.
-      el.style.fontSize = "";
-      const naturalPx = Number.parseFloat(getComputedStyle(el).fontSize);
-      const maxPx = naturalPx * maxGrowthMultiplier;
-      let px = naturalPx;
-      for (let pass = 0; pass < 2 && px > 0; pass++) {
-        const currentWidth = el.getBoundingClientRect().width;
-        if (currentWidth <= 0) break;
-        px = Math.max(6, Math.min(px * (targetWidth / currentWidth), maxPx));
-        el.style.fontSize = `${px}px`;
-      }
-      return px;
-    }
-    function syncBannerText() {
-      const title = desktopTitleRef.current;
-      const subtitle = desktopSubtitleRef.current;
-      const container = title?.parentElement;
-      if (!title || !subtitle || !container) return;
-      setDesktopTitleFontPx(fitToWidthFraction(title, container, 0.95));
-      setDesktopSubtitleFontPx(fitToWidthFraction(subtitle, container, 0.88, 1.2));
-    }
-    syncBannerText();
-    // A single measurement right after mount can land before the Georgia
-    // title face has actually finished loading/swapping in, if it wasn't
-    // already cached -- the browser lays out with a fallback font's
-    // (different) metrics for that first pass, so the fit computed then
-    // can be off. Re-measuring once fonts are confirmed ready, plus once
-    // more on the next frame as a cheap belt-and-suspenders, catches that
-    // without needing to guess how long a swap might take.
-    void document.fonts?.ready?.then(syncBannerText);
-    const raf = requestAnimationFrame(syncBannerText);
-    window.addEventListener("resize", syncBannerText);
-    return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener("resize", syncBannerText);
-    };
-  }, [fullscreen, isMobileDevice, phase]);
   // Custom minimal controls for the review player, replacing the browser's
   // native <video controls> entirely -- on iOS, native controls' own
   // fullscreen-toggle icon has an "X"/collapse affordance that doesn't
@@ -548,6 +484,81 @@ export default function KataRecorder({
   // then), which React flags as a hydration mismatch. The mount effect
   // below corrects it to the real size right after hydration instead.
   const [viewport, setViewport] = useState<{ w: number; h: number }>({ w: 400, h: 800 });
+
+  // Sizes the banner overlay's title to occupy a fixed, deliberate fraction
+  // of the banner's own width (95%, the organizer's explicit spec) and the
+  // subtitle to occupy 88% -- but capped at 20% bigger than the subtitle's
+  // own natural (clamp()-derived) size, since growing it enough to hit 88%
+  // outright would make it look nearly as prominent as the title,
+  // defeating the point of it being a subtitle. Text width scales almost
+  // exactly linearly with font-size for a fixed string/font/weight, so one
+  // proportional correction from the current rendered width to the target
+  // width lands very close; a second pass immediately after tightens it
+  // further. useLayoutEffect (not useEffect) so the correction lands
+  // before paint -- no visible flash from the natural size to the
+  // corrected one. Declared here, below the state it depends on, rather
+  // than up beside its own refs.
+  useLayoutEffect(() => {
+    // Gated on fullscreen alone (not fullscreen-and-desktop) now that the
+    // banner overlay can show on phones and tablets too -- the refs below
+    // are simply null on any render where the overlay isn't mounted, which
+    // syncBannerText already returns early on.
+    if (!fullscreen) return;
+    function fitToWidthFraction(
+      el: HTMLElement,
+      container: HTMLElement,
+      targetFraction: number,
+      maxGrowthMultiplier = Infinity,
+    ) {
+      const cs = getComputedStyle(container);
+      const available = container.clientWidth - Number.parseFloat(cs.paddingLeft) - Number.parseFloat(cs.paddingRight);
+      const targetWidth = available * targetFraction;
+      // Reset first so every call re-derives from the natural clamp()
+      // size for the CURRENT container width, not a stale prior
+      // correction -- otherwise a size fitted while narrow would never
+      // grow back after rotating wider or unfolding a foldable, and the
+      // growth cap below would be measured against the wrong baseline.
+      el.style.fontSize = "";
+      const naturalPx = Number.parseFloat(getComputedStyle(el).fontSize);
+      const maxPx = naturalPx * maxGrowthMultiplier;
+      let px = naturalPx;
+      for (let pass = 0; pass < 2 && px > 0; pass++) {
+        const currentWidth = el.getBoundingClientRect().width;
+        if (currentWidth <= 0) break;
+        px = Math.max(6, Math.min(px * (targetWidth / currentWidth), maxPx));
+        el.style.fontSize = `${px}px`;
+      }
+      return px;
+    }
+    function syncBannerText() {
+      const title = desktopTitleRef.current;
+      const subtitle = desktopSubtitleRef.current;
+      const container = title?.parentElement;
+      if (!title || !subtitle || !container) return;
+      setDesktopTitleFontPx(fitToWidthFraction(title, container, 0.95));
+      setDesktopSubtitleFontPx(fitToWidthFraction(subtitle, container, 0.88, 1.2));
+    }
+    syncBannerText();
+    // A single measurement right after mount can land before the Georgia
+    // title face has actually finished loading/swapping in, if it wasn't
+    // already cached -- the browser lays out with a fallback font's
+    // (different) metrics for that first pass, so the fit computed then
+    // can be off. Re-measuring once fonts are confirmed ready, plus once
+    // more on the next frame as a cheap belt-and-suspenders, catches that
+    // without needing to guess how long a swap might take.
+    void document.fonts?.ready?.then(syncBannerText);
+    const raf = requestAnimationFrame(syncBannerText);
+    window.addEventListener("resize", syncBannerText);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", syncBannerText);
+    };
+    // bannerRatio/videoAspect/viewport are what decide whether the banner
+    // overlay is mounted at all (see showBannerOverlay) -- without them
+    // here, an overlay that only appears once the first drawn frame
+    // reports its real numbers would never get measured, leaving its text
+    // at the raw fallback size.
+  }, [fullscreen, phase, bannerRatio, videoAspect, viewport.w, viewport.h]);
 
   const attemptsLeft = Math.max(0, maxAttempts - attempts);
   const canReRecord = attemptsLeft > 0;
@@ -928,64 +939,53 @@ export default function KataRecorder({
   const previewBoxWidthPx = Math.min(previewMaxHeightPx * previewRatio, previewMaxWidthCapPx, previewAvailableWidthPx);
   const previewBoxHeightPx = previewBoxWidthPx / previewRatio;
 
-  // Where the real (burned-in) banner actually sits, as a % of the
-  // container's height -- only diverges from the raw bannerRatio*100 when
-  // object-contain has to letterbox because the container's shape doesn't
-  // match the camera stream's own aspect ratio. The non-fullscreen preview
-  // box above is deliberately SIZED to match previewRatio exactly, so it
-  // never letterboxes and bannerRatio*100 already lines up correctly there.
-  // Fullscreen instead fills whatever shape the real device screen is --
-  // which varies hugely across phones, tablets, and foldables and rarely
-  // matches the camera's own aspect ratio -- leaving a black gap between
-  // this DOM title bar and the banner actually burned into the canvas
-  // unless that letterbox offset is accounted for here too.
-  let mobileBannerTopPercent = bannerRatio * 100;
+  // Fullscreen crops to fill (object-cover) on EVERY device now, not just
+  // desktop. Mobile used to stay on object-contain, which faithfully
+  // preserves the camera's own aspect ratio -- and therefore letterboxes
+  // hard the moment that shape differs from the phone's screen, which is
+  // exactly the "recording window doesn't fit, big black bars top and
+  // bottom" reported on iPhone SE and the other phones. (iPhone X only
+  // looked right because its unusually tall 375x812 screen happens to sit
+  // close to the stream's own shape; nothing about it was actually more
+  // correct.) The organizer's standing call here, made for desktop but the
+  // same principle throughout: full screen must mean nothing but full
+  // screen, with the banner and watermark re-created as their own layers
+  // rather than protected inside the crop.
+  //
+  // The crop is VISUAL ONLY -- the recording is captured from the canvas's
+  // own pixel buffer via canvas.captureStream(), which no CSS ever
+  // touches, so the submitted file always holds the complete camera frame
+  // plus the burned-in banner and watermark regardless of what the
+  // on-screen preview crops away.
+  //
+  // renderedVideoHeightPx is how tall the video actually paints;
+  // verticalCropFraction is how much of that height object-cover trims off
+  // the TOP specifically (it splits the overflow evenly top and bottom).
+  let renderedVideoHeightPx = viewport.h;
+  let verticalCropFraction = 0;
   if (fullscreen && viewport.w > 0 && viewport.h > 0) {
     const containerRatio = viewport.w / viewport.h;
-    if (Number.isFinite(containerRatio) && previewRatio > containerRatio) {
-      // Video is relatively wider than the container -> object-contain
-      // fills the full width and letterboxes top/bottom; the banner sits
-      // partway down that letterboxed (shorter-than-container) image, not
-      // partway down the full container.
-      const renderedH = viewport.w / previewRatio;
-      const offsetYPx = (viewport.h - renderedH) / 2;
-      mobileBannerTopPercent = ((offsetYPx + bannerRatio * renderedH) / viewport.h) * 100;
-    }
-    // else: video is relatively taller than the container -> object-contain
-    // fills the full height with no vertical letterbox, so the original
-    // bannerRatio*100 (of the full, unletterboxed container height)
-    // already lines up correctly as-is.
-  }
-
-  // Desktop's object-cover crop can trim so little off the top/bottom that
-  // the REAL banner/watermark burned into the canvas (or, during review,
-  // into the recorded file) is still fully or mostly on screen -- showing
-  // the separate DOM copy on top of that then looks like a visible
-  // duplicate, not a helpful fallback. Rather than a strict "any crop at
-  // all" cutoff (which would hide the DOM copy over even an imperceptible
-  // 1% trim) or "some crop happened" (which would defeat the DOM copy's
-  // whole purpose the moment ANY crop occurs), this computes how much of
-  // each element's own burned-in band actually survives the crop and only
-  // shows the DOM copy once that drops below a "no longer reads cleanly
-  // on its own" threshold.
-  let desktopVerticalCropFraction = 0;
-  if (fullscreen && !isMobileDevice && viewport.w > 0 && viewport.h > 0) {
-    const containerRatio = viewport.w / viewport.h;
     if (Number.isFinite(containerRatio) && previewRatio <= containerRatio) {
-      // Video relatively taller/narrower than the container -> object-cover
-      // matches width and crops top/bottom, split evenly between the two.
-      const renderedH = viewport.w / previewRatio;
-      if (renderedH > 0) {
-        desktopVerticalCropFraction = Math.max(0, (renderedH - viewport.h) / renderedH / 2);
+      // Video relatively taller/narrower than the screen -> object-cover
+      // matches the width and crops top/bottom.
+      renderedVideoHeightPx = viewport.w / previewRatio;
+      if (renderedVideoHeightPx > 0) {
+        verticalCropFraction = Math.max(0, (renderedVideoHeightPx - viewport.h) / renderedVideoHeightPx / 2);
       }
     }
-    // else: crops left/right only (video relatively wider than the
-    // container) -- never touches a top/bottom band at all, fraction stays 0.
+    // else: video relatively wider than the screen -> object-cover matches
+    // the HEIGHT and crops left/right only, so no top/bottom band is
+    // trimmed at all and renderedVideoHeightPx stays the viewport height.
   }
+
+  // How much of each burned-in band actually survives that crop. Below this
+  // share it no longer reads cleanly on its own and the DOM copy takes
+  // over; at or above it, adding the DOM copy would just stack a visible
+  // duplicate on top of an already-fine burned-in one.
   const BURNED_IN_SURVIVES_THRESHOLD = 0.85;
   const bannerBurnedInSurvives =
-    bannerRatio > 0 && 1 - desktopVerticalCropFraction / bannerRatio >= BURNED_IN_SURVIVES_THRESHOLD;
-  const showDesktopBannerOverlay = fullscreen && !isMobileDevice && !bannerBurnedInSurvives;
+    bannerRatio > 0 && 1 - verticalCropFraction / bannerRatio >= BURNED_IN_SURVIVES_THRESHOLD;
+  const showBannerOverlay = fullscreen && !bannerBurnedInSurvives;
   // The watermark's own burned-in band height, same real-measured-not-
   // guessed idea as bannerRatio (see drawWatermark's return value) -- only
   // populated for the two directions that actually sit in a horizontal
@@ -998,9 +998,27 @@ export default function KataRecorder({
   const watermarkBurnedInSurvives =
     watermarkIsHorizontalBand &&
     watermarkBandRatio != null &&
-    1 - desktopVerticalCropFraction / watermarkBandRatio >= BURNED_IN_SURVIVES_THRESHOLD;
-  const showDesktopWatermarkOverlay =
-    fullscreen && !isMobileDevice && !(watermarkIsHorizontalBand && watermarkBurnedInSurvives);
+    1 - verticalCropFraction / watermarkBandRatio >= BURNED_IN_SURVIVES_THRESHOLD;
+  const showWatermarkOverlay = fullscreen && !(watermarkIsHorizontalBand && watermarkBurnedInSurvives);
+
+  // Where the burned-in banner's BOTTOM edge actually lands on screen, as a
+  // % of viewport height, so the DOM title bar sits flush underneath it
+  // with neither a black gap nor an overlap. Only used when the burned-in
+  // banner is the one on show -- when the DOM banner overlay takes over it
+  // sits at the very top and the title bar simply stacks under it in
+  // normal flow. Outside fullscreen the preview box is deliberately SIZED
+  // to the video's own ratio, so it neither crops nor letterboxes and the
+  // raw bannerRatio already lines up as-is.
+  // Clamped at 0: a crop deep enough to swallow the banner whole drives the
+  // raw figure negative, which would park the title bar off the top of the
+  // screen. showBannerOverlay is always true in exactly that case (the
+  // banner can't "survive" a crop bigger than itself), so `top` takes the
+  // overlay's own 0 and never reads this -- the clamp just keeps the value
+  // meaningful on its own rather than relying on that coupling holding.
+  const burnedInBannerBottomPercent =
+    fullscreen && viewport.h > 0
+      ? Math.max(0, (((bannerRatio - verticalCropFraction) * renderedVideoHeightPx) / viewport.h) * 100)
+      : bannerRatio * 100;
 
   if (phase === "done") {
     return (
@@ -1148,18 +1166,14 @@ export default function KataRecorder({
         <div
           className="absolute inset-x-0 z-20 flex flex-col"
           style={{
-            // True top whenever desktop fullscreen is cropping (object-cover)
-            // whatever's actually on screen -- the live canvas during
-            // live/recording, and now the review <video> too during
-            // review/uploading, both crop the same way on desktop, so both
-            // need the banner re-created as its own layer rather than
-            // trusting whatever's burned into the cropped element. Mobile
-            // never crops (always object-contain), so it falls back to
-            // mobileBannerTopPercent -- the letterbox-corrected version of
-            // the bannerRatio-based math, lining up under whichever
-            // element's own burned-in banner is currently visible even
-            // when the container's shape doesn't match the video's.
-            top: fullscreen && !isMobileDevice ? 0 : `${mobileBannerTopPercent}%`,
+            // True top whenever the DOM banner overlay is the one on show
+            // (it renders as this stack's own first child, so everything
+            // below it follows in normal flow). Otherwise the burned-in
+            // banner is still the visible one -- on the live canvas during
+            // live/recording, on the review <video> during review/
+            // uploading -- and this sits flush under wherever that
+            // actually landed after the crop.
+            top: showBannerOverlay ? 0 : `${burnedInBannerBottomPercent}%`,
           }}
         >
           {/* enterFullscreen was only ever called once, from startCamera --
@@ -1185,22 +1199,20 @@ export default function KataRecorder({
               </button>
             </div>
           )}
-          {/* Desktop fullscreen crops (object-cover) whatever's actually on
-              screen to guarantee edge-to-edge fill -- the live canvas during
-              live/recording, and the review <video> during review/uploading
-              too, since review playback had its own "screen gets smaller"
-              complaint once it was left on object-contain while live was
-              already filling the screen. Either way, cropping can remove the
-              burned-in banner partially or fully depending on how far the
-              camera's own aspect ratio is from the screen's, so this
-              re-creates the banner as its own layer on top -- but only
-              when showDesktopBannerOverlay says the crop has actually
-              eaten enough of the real one that this is a fallback rather
-              than a visible duplicate sitting on top of an already-fine
-              burned-in banner. Mobile is untouched: it still uses
-              object-contain everywhere (never crops), so its own burned-in
-              banner is already fully visible without needing this. */}
-          {showDesktopBannerOverlay && (
+          {/* Fullscreen crops (object-cover) whatever's actually on screen
+              to guarantee edge-to-edge fill on every device -- the live
+              canvas during live/recording, and the review <video> during
+              review/uploading too, since review playback had its own
+              "screen gets smaller" complaint once it was left on
+              object-contain while live was already filling the screen.
+              Cropping can remove the burned-in banner partially or fully
+              depending on how far the camera's own aspect ratio is from
+              the screen's, so this re-creates the banner as its own layer
+              on top -- but only when showBannerOverlay says the crop has
+              actually eaten enough of the real one that this is a fallback
+              rather than a visible duplicate sitting on top of an
+              already-fine burned-in banner. */}
+          {showBannerOverlay && (
             <div
               className="px-4 py-3 text-center text-white"
               style={{
@@ -1343,21 +1355,21 @@ export default function KataRecorder({
           ref={canvasRef}
           className={
             phase === "live" || phase === "recording"
-              ? `block h-full w-full ${fullscreen && !isMobileDevice ? "object-cover" : "object-contain"}`
+              ? `block h-full w-full ${fullscreen ? "object-cover" : "object-contain"}`
               : "hidden"
           }
         />
         {/* Watermark's own layer, same reasoning and same
-            showDesktopWatermarkOverlay gating as the banner above -- the
+            showWatermarkOverlay gating as the banner above -- the
             burned-in one can end up partially or fully cropped out by
-            desktop's object-cover, whether that's the live canvas or (now)
+            fullscreen's object-cover, whether that's the live canvas or
             the review video, but when the crop barely touches it this DOM
             copy would just double up on top of the still-visible burned-in
             one. Styled/positioned to match what drawWatermark burns into
             the actual recording -- same font/bold/color/direction -- so
             the live preview and the submitted file look consistent when
             this IS showing. */}
-        {showDesktopWatermarkOverlay && (
+        {showWatermarkOverlay && (
           <p
             className="pointer-events-none absolute z-20 whitespace-nowrap px-3"
             style={{
@@ -1420,7 +1432,7 @@ export default function KataRecorder({
                 v.addEventListener("timeupdate", onProbeTimeUpdate);
                 v.currentTime = Number.MAX_SAFE_INTEGER;
               }}
-              className={`block h-full w-full ${fullscreen && !isMobileDevice ? "object-cover" : "object-contain"}`}
+              className={`block h-full w-full ${fullscreen ? "object-cover" : "object-contain"}`}
             />
             {!reviewPlaying && (
               <button
