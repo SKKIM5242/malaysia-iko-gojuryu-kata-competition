@@ -28,7 +28,7 @@ import IbanConfirmCheckbox from "@/components/IbanConfirmCheckbox";
 import BankDetailsNote from "@/components/BankDetailsNote";
 import BankAccountNameField from "@/components/BankAccountNameField";
 import { IBAN_CSV_NOTE } from "@/lib/bank";
-import { EDUCATION_LEVELS, SPOKEN_LANGUAGES, REFERRAL_LABEL, REFERRAL_PLACEHOLDER, STAFF_TITLE_OPTIONS } from "@/lib/reference-data";
+import { EDUCATION_LEVELS, SPOKEN_LANGUAGES, REFERRAL_LABEL, REFERRAL_PLACEHOLDER, SUPPORT_TITLE_OPTIONS } from "@/lib/reference-data";
 
 export const dynamic = "force-dynamic";
 
@@ -187,12 +187,10 @@ export default async function AdminSupport({
                   <input id="cs_full_name" name="full_name" required className={adminInput} />
                 </div>
                 <div>
-                  <label htmlFor="cs_staff_title" className={adminLabel}>
-                    Role <span className="font-normal text-neutral-400">(organizational title, optional)</span>
-                  </label>
-                  <select id="cs_staff_title" name="staff_title" defaultValue="" className={adminInput}>
-                    <option value="">— None —</option>
-                    {STAFF_TITLE_OPTIONS.map((t) => (
+                  <label htmlFor="cs_staff_title" className={adminLabel}>Role *</label>
+                  <select id="cs_staff_title" name="staff_title" required defaultValue="" className={adminInput}>
+                    <option value="" disabled>— Select —</option>
+                    {SUPPORT_TITLE_OPTIONS.map((t) => (
                       <option key={t} value={t}>{t}</option>
                     ))}
                   </select>

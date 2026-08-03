@@ -92,11 +92,14 @@ export const PROFILE_ROLE_KEYS = [
 
 export type ProfileRoleKey = (typeof PROFILE_ROLE_KEYS)[number];
 
-/** Organizational job title for an Organizer/Support account (profiles.
+/** Organizational job title for an Organizer account (profiles.
  * staff_title) -- purely descriptive labeling for internal coordination
  * ("who's the Chief Organizer vs. an Assistant"), entirely separate from
- * PROFILE_ROLE_KEYS above, which is what actually drives permissions. */
-export const STAFF_TITLE_OPTIONS = [
+ * PROFILE_ROLE_KEYS above, which is what actually drives permissions.
+ * Required on the Organizer form -- Support-tier titles live in
+ * SUPPORT_TITLE_OPTIONS below instead, kept out of this list entirely
+ * per the organizer's explicit request. */
+export const ORGANIZER_TITLE_OPTIONS = [
   "Super Admin",
   "Admin",
   "Admin - Support",
@@ -105,6 +108,12 @@ export const STAFF_TITLE_OPTIONS = [
   "Organizer - Assistant",
   "Co-Organizer",
   "Organizer - Secretary",
+] as const;
+
+/** Same idea as ORGANIZER_TITLE_OPTIONS, for the Participant Support form
+ * instead -- required there too, but Admin/Organizer-tier titles are
+ * deliberately excluded from this list. */
+export const SUPPORT_TITLE_OPTIONS = [
   "Chief Support",
   "Chief Region Support",
   "Chief Country Support",

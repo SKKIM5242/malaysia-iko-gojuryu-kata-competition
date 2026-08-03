@@ -3907,6 +3907,9 @@ export async function createStaffAccount(formData: FormData) {
     preferred_region: String(formData.get("preferred_region") ?? "").trim() || null,
     based_country: String(formData.get("based_country") ?? "").trim() || null,
   };
+  if (!extra.staff_title) {
+    backTo(returnTo, { error: "Role is required." });
+  }
   if (!extra.ic_passport || !extra.date_of_birth || !extra.gender) {
     backTo(returnTo, { error: "IC / Passport, date of birth, and gender are required." });
   }
@@ -4008,8 +4011,12 @@ export async function saveStaffAccount(formData: FormData) {
 
   const full_name = String(formData.get("full_name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim();
+  const staff_title = String(formData.get("staff_title") ?? "").trim();
   if (!userId || !full_name || !email) {
     backTo(returnTo, { error: "Full name and email are required." });
+  }
+  if (!staff_title) {
+    backTo(returnTo, { error: "Role is required." });
   }
 
   const values: Record<string, unknown> = {
@@ -4654,6 +4661,7 @@ async function bulkCreateStaffAccounts(formData: FormData, role: "organizer" | "
     const r = dataRows[i];
     const rowNo = i + 2;
     const full_name = get(r, "full_name") || `Row ${rowNo}`;
+    const staff_title = get(r, "staff_title");
     const email = get(r, "email");
     const ic_passport = get(r, "ic_passport");
     const date_of_birth_raw = get(r, "date_of_birth");
@@ -4671,8 +4679,8 @@ async function bulkCreateStaffAccounts(formData: FormData, role: "organizer" | "
       failures.push({ row: rowNo, name: full_name, error: "Invalid date of birth (use DD/MM/YYYY)" });
       continue;
     }
-    if (!full_name || !email || !ic_passport || !date_of_birth || !gender) {
-      failures.push({ row: rowNo, name: full_name, error: "Full name, email, IC/Passport, date of birth, and gender are required" });
+    if (!full_name || !staff_title || !email || !ic_passport || !date_of_birth || !gender) {
+      failures.push({ row: rowNo, name: full_name, error: "Full name, Role, email, IC/Passport, date of birth, and gender are required" });
       continue;
     }
     if (!home_address || !city_town || !postcode || !country || !phone) {
@@ -4684,7 +4692,7 @@ async function bulkCreateStaffAccounts(formData: FormData, role: "organizer" | "
       continue;
     }
     const extra = {
-      staff_title: get(r, "staff_title") || null,
+      staff_title,
       ic_passport,
       date_of_birth,
       gender,

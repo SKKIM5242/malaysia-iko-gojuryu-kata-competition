@@ -9,7 +9,7 @@ import BankDetailsNote from "@/components/BankDetailsNote";
 import BankAccountNameField from "@/components/BankAccountNameField";
 import {
   EDUCATION_LEVELS, SPOKEN_LANGUAGES, REFERRAL_LABEL, REFERRAL_PLACEHOLDER,
-  SUPPORT_REGIONS, WORLD_COUNTRIES, STAFF_TITLE_OPTIONS,
+  SUPPORT_REGIONS, WORLD_COUNTRIES, ORGANIZER_TITLE_OPTIONS, SUPPORT_TITLE_OPTIONS,
 } from "@/lib/reference-data";
 import { shortTierName } from "@/lib/invitation-codes";
 import { formatUSD } from "@/components/ui";
@@ -47,12 +47,10 @@ export default function StaffAccountEditForm({
             <input id={`${idPrefix}_full_name`} name="full_name" required defaultValue={account.full_name ?? ""} className={adminInput} />
           </div>
           <div>
-            <label htmlFor={`${idPrefix}_staff_title`} className={adminLabel}>
-              Role <span className="font-normal text-neutral-400">(organizational title, optional)</span>
-            </label>
-            <select id={`${idPrefix}_staff_title`} name="staff_title" defaultValue={account.staff_title ?? ""} className={adminInput}>
-              <option value="">— None —</option>
-              {STAFF_TITLE_OPTIONS.map((t) => (
+            <label htmlFor={`${idPrefix}_staff_title`} className={adminLabel}>Role *</label>
+            <select id={`${idPrefix}_staff_title`} name="staff_title" required defaultValue={account.staff_title ?? ""} className={adminInput}>
+              <option value="" disabled>— Select —</option>
+              {(showSupportFields ? SUPPORT_TITLE_OPTIONS : ORGANIZER_TITLE_OPTIONS).map((t) => (
                 <option key={t} value={t}>{t}</option>
               ))}
             </select>
