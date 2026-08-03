@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRecordAttempt, submitKataVideo } from "@/app/actions/account";
 import BuyExtraAttemptsButton from "@/components/BuyExtraAttemptsButton";
 import { formatDate, formatDateTime } from "@/components/ui";
 import type { WatermarkSettings } from "@/lib/watermark";
-import type { WatermarkDirection } from "@/lib/types";
 
 const MAX_SECONDS = 5 * 60;
 
@@ -58,18 +57,7 @@ function extensionForMimeType(mimeType: string): string {
  * vertical stacking), 2 diagonals, and a horizontal right-to-left layout
  * for CJK-style reading order (via canvas's own built-in `direction`
  * property, not a rotation). */
-/** Draws the watermark and, for the two horizontal (top/bottom-edge)
- * directions only, returns how much of the frame's height its own drawn
- * band actually occupies -- measured from real glyph metrics (
- * actualBoundingBoxAscent), not guessed -- as the fraction from the band's
- * OWN top edge down to the frame's bottom edge (mirroring how the caller's
- * bannerRatio already measures the banner's own bottom edge down from the
- * frame's TOP). The desktop-fullscreen DOM watermark overlay uses this to
- * decide whether the burned-in one survives an object-cover crop well
- * enough on its own. Returns null for the six vertical/diagonal
- * directions, which don't sit in a single top/bottom band this can
- * describe. */
-function drawWatermark(ctx: CanvasRenderingContext2D, w: number, h: number, settings: WatermarkSettings): number | null {
+function drawWatermark(ctx: CanvasRenderingContext2D, w: number, h: number, settings: WatermarkSettings) {
   const { text, fontSizePx, fontFamily, bold, color, direction } = settings;
   ctx.save();
   ctx.globalAlpha = 0.38;
@@ -141,46 +129,35 @@ function drawWatermark(ctx: CanvasRenderingContext2D, w: number, h: number, sett
       break;
     case "rtl_cjk":
     case "ltr":
-    default: {
+    default:
       ctx.fillText(text, w / 2, h - margin);
-      const metrics = ctx.measureText(text);
-      const ascent = metrics.actualBoundingBoxAscent || fontPx * 0.8;
-      ctx.restore();
-      return (margin + ascent) / h;
-    }
+      break;
   }
   ctx.restore();
-  return null;
 }
 
-/** CSS equivalent of drawWatermark's positioning switch, for the
- * desktop-fullscreen DOM overlay (see its render site below) -- same 8
- * layouts, so the live preview visually matches what's actually burned
- * into the recording instead of only ever showing the plain horizontal
- * case regardless of what the organizer picked. position:absolute is
- * applied by the caller's className; this only returns the placement/
- * rotation properties that differ per direction. */
-function watermarkOverlayPosition(direction: WatermarkDirection): React.CSSProperties {
-  const base: React.CSSProperties = { textAlign: "center" };
-  switch (direction) {
-    case "vertical_ltr_left":
-      return { ...base, left: "0.5rem", top: "50%", transform: "translateY(-50%) rotate(90deg)" };
-    case "vertical_rtl_left":
-      return { ...base, left: "0.5rem", top: "50%", transform: "translateY(-50%) rotate(-90deg)" };
-    case "vertical_ltr_right":
-      return { ...base, right: "0.5rem", top: "50%", transform: "translateY(-50%) rotate(90deg)" };
-    case "vertical_rtl_right":
-      return { ...base, right: "0.5rem", top: "50%", transform: "translateY(-50%) rotate(-90deg)" };
-    case "diagonal_down": // Left Top to Right Bottom
-      return { ...base, left: "50%", top: "50%", transform: "translate(-50%, -50%) rotate(45deg)" };
-    case "diagonal_up": // Left Bottom to Right Top
-      return { ...base, left: "50%", top: "50%", transform: "translate(-50%, -50%) rotate(-45deg)" };
-    case "rtl_cjk":
-      return { ...base, left: 0, right: 0, bottom: "0.5rem", direction: "rtl" };
-    case "ltr":
-    default:
-      return { ...base, left: 0, right: 0, bottom: "0.5rem" };
+/** Scales a font to make `text` render at `targetWidth`, capped at
+ * `maxPx`. Text width scales almost exactly linearly with font-size for a
+ * fixed string/font/weight, so one proportional correction lands very
+ * close and a second pass tightens it -- far cheaper and more precise than
+ * stepping down a pixel at a time until it happens to fit. */
+function fitCanvasFontToWidth(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  targetWidth: number,
+  buildFont: (px: number) => string,
+  startPx: number,
+  maxPx = Infinity,
+): number {
+  let px = Math.max(4, startPx);
+  ctx.font = buildFont(px);
+  for (let pass = 0; pass < 2; pass++) {
+    const current = ctx.measureText(text).width;
+    if (current <= 0) break;
+    px = Math.max(4, Math.min(px * (targetWidth / current), maxPx));
+    ctx.font = buildFont(px);
   }
+  return px;
 }
 
 function drawBannerRect(ctx: CanvasRenderingContext2D, w: number, topH: number) {
@@ -197,21 +174,46 @@ function drawBannerRect(ctx: CanvasRenderingContext2D, w: number, topH: number) 
 /** Draws the branded competition frame: colorful title banner, live camera
  * feed, and a light watermark — all burned into the recorded pixels via
  * canvas.captureStream(), never the raw camera feed. Returns the banner's
- * height and (for the two horizontal watermark directions) the
- * watermark's own band height, both as a fraction of the frame height, so
- * the caller can line up the DOM title bar and decide the DOM watermark
- * overlay's visibility against what actually got drawn instead of
- * guessing a fixed percentage. */
+ * height as a fraction of the frame height so the caller can line the DOM
+ * title bar up against what actually got drawn.
+ *
+ * The camera frame is CENTER-CROPPED into whatever shape the canvas
+ * already is, rather than squeezed to fit it. The caller shapes the canvas
+ * to match the screen, so this is what makes the recording and the
+ * on-screen preview one and the same picture: no letterboxing (the canvas
+ * is the screen's shape), no preview-only crop (the crop happens here, in
+ * the recorded pixels), and no stretching (a center crop preserves the
+ * camera's proportions). */
 function drawFrame(
   ctx: CanvasRenderingContext2D,
   video: HTMLVideoElement,
   w: number,
   h: number,
   watermark: WatermarkSettings,
-): { bannerRatio: number; watermarkBandRatio: number | null } {
-  ctx.drawImage(video, 0, 0, w, h);
+): number {
+  const srcW = video.videoWidth;
+  const srcH = video.videoHeight;
+  const canvasAspect = w / h;
+  let sw = srcW;
+  let sh = srcH;
+  if (srcW / srcH > canvasAspect) {
+    // Camera frame is wider than the canvas -> take a full-height slice.
+    sh = srcH;
+    sw = srcH * canvasAspect;
+  } else {
+    // Taller than the canvas -> take a full-width slice.
+    sw = srcW;
+    sh = srcW / canvasAspect;
+  }
+  ctx.drawImage(video, (srcW - sw) / 2, (srcH - sh) / 2, sw, sh, 0, 0, w, h);
 
-  const maxTitleWidth = w * 0.97;
+  // Row 1 fills 95% of the banner's width, row 2 fills 88% -- the
+  // organizer's explicit spec -- with row 2 additionally capped at 20%
+  // above the size it would otherwise have taken, so it can't grow into
+  // looking as prominent as the title above it.
+  const TITLE_WIDTH_FRACTION = 0.95;
+  const SUBTITLE_WIDTH_FRACTION = 0.88;
+  const SUBTITLE_MAX_GROWTH = 1.2;
   const subtitle = "Organized by IKO GOJU-RYU KARATE-DO MALAYSIA SDN BHD";
 
   // Portrait only: size the title from the frame's WIDTH (how large it can
@@ -227,31 +229,32 @@ function drawFrame(
   // the banner read as bigger/more substantial, per the organizer's ask for
   // a noticeably taller bar, without touching that ceiling. Landscape is
   // unchanged.
+  const bannerTitle = "MALAYSIA OPEN VIRTUAL KARATE-DO KATA COMPETITION";
+  const titleFont = (px: number) => `900 ${px}px Georgia, serif`;
+  const subtitleFont = (px: number) => `${px}px Arial, sans-serif`;
+
   if (h > w) {
-    const bannerTitle = "MALAYSIA OPEN VIRTUAL KARATE-DO KATA COMPETITION";
-    let titleFontPx = Math.round(w * 0.075);
-    ctx.font = `900 ${titleFontPx}px Georgia, serif`;
-    while (titleFontPx > 4 && ctx.measureText(bannerTitle).width > maxTitleWidth) {
-      titleFontPx -= 1;
-      ctx.font = `900 ${titleFontPx}px Georgia, serif`;
-    }
-    // Sized from its OWN width fit now (capped at a generous 85% of the
-    // title, just to keep it reading as secondary) instead of a tight 55%
-    // of the title -- the subtitle's own ~54-character string, in a
-    // lighter/narrower weight than the title's bold 900, has real room of
-    // its own to grow into that the old flat ratio was leaving unused.
-    let subtitleFontPx = Math.round(w * 0.05);
-    ctx.font = `${subtitleFontPx}px Arial, sans-serif`;
-    while (subtitleFontPx > 3 && ctx.measureText(subtitle).width > maxTitleWidth) {
-      subtitleFontPx -= 1;
-      ctx.font = `${subtitleFontPx}px Arial, sans-serif`;
-    }
-    subtitleFontPx = Math.min(subtitleFontPx, Math.round(titleFontPx * 0.85));
-    ctx.font = `${subtitleFontPx}px Arial, sans-serif`;
-    // Padding multipliers deliberately generous (roughly 2.5x the previous
-    // ones) -- this is what actually grows the banner bar itself by the
-    // requested ~150-200%, since the text's own size is already maxed out
-    // against the frame width above.
+    // Portrait: size the title from the frame's WIDTH and make the banner
+    // just tall enough to hold it -- a fixed height-proportional slice left
+    // a lot of empty colored background around comparatively small type on
+    // a tall portrait recording. Splitting the title across multiple lines
+    // was tried to make it bigger, but the organizer confirmed that reads
+    // worse (the whole point is ONE row, matching landscape's own layout).
+    const titleFontPx = fitCanvasFontToWidth(ctx, bannerTitle, w * TITLE_WIDTH_FRACTION, titleFont, Math.round(w * 0.075));
+    // The size row 2 would otherwise have taken, which the 20% growth cap
+    // below is measured against.
+    const subtitleNaturalPx = Math.min(Math.round(w * 0.05), Math.round(titleFontPx * 0.85));
+    const subtitleFontPx = fitCanvasFontToWidth(
+      ctx,
+      subtitle,
+      w * SUBTITLE_WIDTH_FRACTION,
+      subtitleFont,
+      subtitleNaturalPx,
+      subtitleNaturalPx * SUBTITLE_MAX_GROWTH,
+    );
+    // Padding multipliers deliberately generous -- this is what actually
+    // grows the banner bar itself, since the text's own size is already
+    // pinned to its share of the frame width above.
     const padTop = Math.round(titleFontPx * 1.8);
     const gap = Math.round(titleFontPx * 1.1);
     const padBottom = Math.round(subtitleFontPx * 2.0);
@@ -264,37 +267,35 @@ function drawFrame(
     ctx.fillStyle = "#ffffff";
     ctx.shadowColor = "rgba(0,0,0,0.6)";
     ctx.shadowBlur = 4;
-    ctx.font = `900 ${titleFontPx}px Georgia, serif`;
+    ctx.font = titleFont(titleFontPx);
     ctx.fillText(bannerTitle, w / 2, titleY);
-    ctx.font = `${subtitleFontPx}px Arial, sans-serif`;
+    ctx.font = subtitleFont(subtitleFontPx);
     ctx.fillText(subtitle, w / 2, subtitleY);
     ctx.shadowBlur = 0;
 
-    const watermarkBandRatio = drawWatermark(ctx, w, h, watermark);
-    return { bannerRatio: topH / h, watermarkBandRatio };
+    drawWatermark(ctx, w, h, watermark);
+    return topH / h;
   }
 
-  // Landscape: unchanged single-line layout, sized from the frame's height.
-  const bannerTitle = "MALAYSIA OPEN VIRTUAL KARATE-DO KATA COMPETITION";
+  // Landscape: single-line layout, banner height taken from the frame's own
+  // height rather than grown around the text.
   const topH = Math.round(h * 0.13);
-  let titleFontPx = Math.max(14, Math.round(topH * 0.4));
-  ctx.font = `900 ${titleFontPx}px Georgia, serif`;
-  while (titleFontPx > 4 && ctx.measureText(bannerTitle).width > maxTitleWidth) {
-    titleFontPx -= 1;
-    ctx.font = `900 ${titleFontPx}px Georgia, serif`;
-  }
-  // Capped at a fraction of whatever the title actually ended up at (not
-  // just its own independent proportional guess + floor) -- on a
-  // narrow-but-tall recording, the (longer) title needs much more
-  // shrinking than the (shorter) subtitle, and two independent floors
-  // could let the subtitle end up the same size as, or bigger than, the
-  // title it's supposed to sit under.
-  let subtitleFontPx = Math.min(Math.max(8, Math.round(topH * 0.16)), Math.round(titleFontPx * 0.55));
-  ctx.font = `${subtitleFontPx}px Arial, sans-serif`;
-  while (subtitleFontPx > 3 && ctx.measureText(subtitle).width > maxTitleWidth) {
-    subtitleFontPx -= 1;
-    ctx.font = `${subtitleFontPx}px Arial, sans-serif`;
-  }
+  const titleFontPx = fitCanvasFontToWidth(
+    ctx,
+    bannerTitle,
+    w * TITLE_WIDTH_FRACTION,
+    titleFont,
+    Math.max(14, Math.round(topH * 0.4)),
+  );
+  const subtitleNaturalPx = Math.min(Math.max(8, Math.round(topH * 0.16)), Math.round(titleFontPx * 0.55));
+  const subtitleFontPx = fitCanvasFontToWidth(
+    ctx,
+    subtitle,
+    w * SUBTITLE_WIDTH_FRACTION,
+    subtitleFont,
+    subtitleNaturalPx,
+    subtitleNaturalPx * SUBTITLE_MAX_GROWTH,
+  );
   const titleY = topH * 0.4;
   const subtitleY = topH * 0.82;
 
@@ -303,14 +304,14 @@ function drawFrame(
   ctx.fillStyle = "#ffffff";
   ctx.shadowColor = "rgba(0,0,0,0.6)";
   ctx.shadowBlur = 4;
-  ctx.font = `900 ${titleFontPx}px Georgia, serif`;
+  ctx.font = titleFont(titleFontPx);
   ctx.fillText(bannerTitle, w / 2, titleY);
-  ctx.font = `${subtitleFontPx}px Arial, sans-serif`;
+  ctx.font = subtitleFont(subtitleFontPx);
   ctx.fillText(subtitle, w / 2, subtitleY);
   ctx.shadowBlur = 0;
 
-  const watermarkBandRatio = drawWatermark(ctx, w, h, watermark);
-  return { bannerRatio: topH / h, watermarkBandRatio };
+  drawWatermark(ctx, w, h, watermark);
+  return topH / h;
 }
 
 function daysBetween(from: Date, to: Date): number {
@@ -404,24 +405,14 @@ export default function KataRecorder({
   const [agreed, setAgreed] = useState(false);
   const [recordingStartedAt, setRecordingStartedAt] = useState<Date | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
-  // Computed client-side only, after mount (not inline in JSX), so the
-  // server-rendered and first client render both agree it's false --
-  // otherwise reading navigator.userAgent during render risks a hydration
-  // mismatch. Drives object-cover vs object-contain on the live canvas,
-  // and whether the separate banner/watermark overlays below render:
-  // desktop fullscreen crops to guarantee edge-to-edge fill (the
-  // organizer's explicit call), with the banner and watermark re-created
-  // as their own always-visible layers since the crop can otherwise cut
-  // either of those out of the cropped camera image entirely. Mobile
-  // keeps the original single burned-in-canvas behavior untouched.
-  const [isMobileDevice, setIsMobileDevice] = useState(false);
+  // renderLoop re-schedules itself through requestAnimationFrame, so the
+  // `fullscreen` it closed over on the frame it started is frozen at that
+  // value forever. It needs the CURRENT one (to know which shape to give
+  // the canvas), hence a ref mirroring the state rather than the state.
+  const fullscreenRef = useRef(false);
   useEffect(() => {
-    setIsMobileDevice(/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent));
-  }, []);
-  const desktopTitleRef = useRef<HTMLParagraphElement>(null);
-  const desktopSubtitleRef = useRef<HTMLParagraphElement>(null);
-  const [desktopTitleFontPx, setDesktopTitleFontPx] = useState<number | null>(null);
-  const [desktopSubtitleFontPx, setDesktopSubtitleFontPx] = useState<number | null>(null);
+    fullscreenRef.current = fullscreen;
+  }, [fullscreen]);
   // Custom minimal controls for the review player, replacing the browser's
   // native <video controls> entirely -- on iOS, native controls' own
   // fullscreen-toggle icon has an "X"/collapse affordance that doesn't
@@ -464,12 +455,6 @@ export default function KataRecorder({
   // orientation and how much the banner's own text needed to shrink.
   const [bannerRatio, setBannerRatio] = useState(0.13);
   const bannerRatioRef = useRef(0.13);
-  // Same idea as bannerRatio, for the watermark's own band (horizontal
-  // directions only -- see drawWatermark) -- the desktop DOM watermark
-  // overlay uses this real, measured value instead of guessing how much
-  // of the frame height the burned-in watermark actually occupies.
-  const [watermarkBandRatio, setWatermarkBandRatio] = useState<number | null>(null);
-  const watermarkBandRatioRef = useRef<number | null>(null);
   // CSS `aspect-ratio` on a plain block element doesn't shrink-to-fit the
   // way it does on a replaced element (img/video) -- a statically-positioned
   // div with width:auto fills its container's full width first, THEN derives
@@ -484,81 +469,6 @@ export default function KataRecorder({
   // then), which React flags as a hydration mismatch. The mount effect
   // below corrects it to the real size right after hydration instead.
   const [viewport, setViewport] = useState<{ w: number; h: number }>({ w: 400, h: 800 });
-
-  // Sizes the banner overlay's title to occupy a fixed, deliberate fraction
-  // of the banner's own width (95%, the organizer's explicit spec) and the
-  // subtitle to occupy 88% -- but capped at 20% bigger than the subtitle's
-  // own natural (clamp()-derived) size, since growing it enough to hit 88%
-  // outright would make it look nearly as prominent as the title,
-  // defeating the point of it being a subtitle. Text width scales almost
-  // exactly linearly with font-size for a fixed string/font/weight, so one
-  // proportional correction from the current rendered width to the target
-  // width lands very close; a second pass immediately after tightens it
-  // further. useLayoutEffect (not useEffect) so the correction lands
-  // before paint -- no visible flash from the natural size to the
-  // corrected one. Declared here, below the state it depends on, rather
-  // than up beside its own refs.
-  useLayoutEffect(() => {
-    // Gated on fullscreen alone (not fullscreen-and-desktop) now that the
-    // banner overlay can show on phones and tablets too -- the refs below
-    // are simply null on any render where the overlay isn't mounted, which
-    // syncBannerText already returns early on.
-    if (!fullscreen) return;
-    function fitToWidthFraction(
-      el: HTMLElement,
-      container: HTMLElement,
-      targetFraction: number,
-      maxGrowthMultiplier = Infinity,
-    ) {
-      const cs = getComputedStyle(container);
-      const available = container.clientWidth - Number.parseFloat(cs.paddingLeft) - Number.parseFloat(cs.paddingRight);
-      const targetWidth = available * targetFraction;
-      // Reset first so every call re-derives from the natural clamp()
-      // size for the CURRENT container width, not a stale prior
-      // correction -- otherwise a size fitted while narrow would never
-      // grow back after rotating wider or unfolding a foldable, and the
-      // growth cap below would be measured against the wrong baseline.
-      el.style.fontSize = "";
-      const naturalPx = Number.parseFloat(getComputedStyle(el).fontSize);
-      const maxPx = naturalPx * maxGrowthMultiplier;
-      let px = naturalPx;
-      for (let pass = 0; pass < 2 && px > 0; pass++) {
-        const currentWidth = el.getBoundingClientRect().width;
-        if (currentWidth <= 0) break;
-        px = Math.max(6, Math.min(px * (targetWidth / currentWidth), maxPx));
-        el.style.fontSize = `${px}px`;
-      }
-      return px;
-    }
-    function syncBannerText() {
-      const title = desktopTitleRef.current;
-      const subtitle = desktopSubtitleRef.current;
-      const container = title?.parentElement;
-      if (!title || !subtitle || !container) return;
-      setDesktopTitleFontPx(fitToWidthFraction(title, container, 0.95));
-      setDesktopSubtitleFontPx(fitToWidthFraction(subtitle, container, 0.88, 1.2));
-    }
-    syncBannerText();
-    // A single measurement right after mount can land before the Georgia
-    // title face has actually finished loading/swapping in, if it wasn't
-    // already cached -- the browser lays out with a fallback font's
-    // (different) metrics for that first pass, so the fit computed then
-    // can be off. Re-measuring once fonts are confirmed ready, plus once
-    // more on the next frame as a cheap belt-and-suspenders, catches that
-    // without needing to guess how long a swap might take.
-    void document.fonts?.ready?.then(syncBannerText);
-    const raf = requestAnimationFrame(syncBannerText);
-    window.addEventListener("resize", syncBannerText);
-    return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener("resize", syncBannerText);
-    };
-    // bannerRatio/videoAspect/viewport are what decide whether the banner
-    // overlay is mounted at all (see showBannerOverlay) -- without them
-    // here, an overlay that only appears once the first drawn frame
-    // reports its real numbers would never get measured, leaving its text
-    // at the raw fallback size.
-  }, [fullscreen, phase, bannerRatio, videoAspect, viewport.w, viewport.h]);
 
   const attemptsLeft = Math.max(0, maxAttempts - attempts);
   const canReRecord = attemptsLeft > 0;
@@ -734,34 +644,55 @@ export default function KataRecorder({
       rafRef.current = requestAnimationFrame(renderLoop);
       return;
     }
-    if (canvas.width !== video.videoWidth) canvas.width = video.videoWidth;
-    if (canvas.height !== video.videoHeight) canvas.height = video.videoHeight;
-    const ratio = video.videoWidth / video.videoHeight;
+    // Shape the canvas like the screen it's being displayed on, and let
+    // drawFrame center-crop the camera into that shape. The canvas is both
+    // what's shown AND (via captureStream) what's recorded, so making it
+    // the screen's shape is what delivers full-bleed with no black bars
+    // and what-you-see-is-what-you-record at the same time -- the earlier
+    // approaches could only ever buy one at the other's expense, because
+    // they left the canvas at the camera's shape and then argued about how
+    // to display a mismatched picture.
+    //
+    // Resizing a canvas mid-recording disturbs the track captureStream()
+    // is feeding MediaRecorder, so once a take is rolling the shape is
+    // frozen until it stops (a mid-take rotation keeps the shape it
+    // started with rather than corrupting the recording).
+    const recording = recorderRef.current?.state === "recording";
+    if (!recording) {
+      const targetAspect =
+        fullscreenRef.current && window.innerWidth > 0 && window.innerHeight > 0
+          ? window.innerWidth / window.innerHeight
+          : video.videoWidth / video.videoHeight;
+      // Largest region of the source frame matching targetAspect, so the
+      // canvas never upscales beyond what the camera actually delivered.
+      let canvasW: number;
+      let canvasH: number;
+      if (video.videoWidth / video.videoHeight > targetAspect) {
+        canvasH = video.videoHeight;
+        canvasW = Math.round(video.videoHeight * targetAspect);
+      } else {
+        canvasW = video.videoWidth;
+        canvasH = Math.round(video.videoWidth / targetAspect);
+      }
+      if (canvasW > 0 && canvasH > 0) {
+        if (canvas.width !== canvasW) canvas.width = canvasW;
+        if (canvas.height !== canvasH) canvas.height = canvasH;
+      }
+    }
+    // Tracked from the CANVAS (not the raw camera frame) now -- the canvas
+    // is what actually gets displayed, so it's the shape the non-fullscreen
+    // preview box has to match to avoid leaving black gutters of its own.
+    const ratio = canvas.width / canvas.height;
     if (Number.isFinite(ratio) && ratio > 0 && Math.abs(videoAspectRef.current - ratio) > 0.01) {
       videoAspectRef.current = ratio;
       setVideoAspect(ratio);
     }
     const ctx = canvas.getContext("2d");
     if (ctx) {
-      const { bannerRatio: newBannerRatio, watermarkBandRatio: newWatermarkBandRatio } = drawFrame(
-        ctx,
-        video,
-        canvas.width,
-        canvas.height,
-        watermark,
-      );
+      const newBannerRatio = drawFrame(ctx, video, canvas.width, canvas.height, watermark);
       if (Number.isFinite(newBannerRatio) && newBannerRatio > 0 && Math.abs(bannerRatioRef.current - newBannerRatio) > 0.002) {
         bannerRatioRef.current = newBannerRatio;
         setBannerRatio(newBannerRatio);
-      }
-      const prevWatermarkBandRatio = watermarkBandRatioRef.current;
-      const watermarkBandRatioChanged =
-        newWatermarkBandRatio == null
-          ? prevWatermarkBandRatio != null
-          : prevWatermarkBandRatio == null || Math.abs(prevWatermarkBandRatio - newWatermarkBandRatio) > 0.002;
-      if (watermarkBandRatioChanged) {
-        watermarkBandRatioRef.current = newWatermarkBandRatio;
-        setWatermarkBandRatio(newWatermarkBandRatio);
       }
     }
     rafRef.current = requestAnimationFrame(renderLoop);
@@ -939,86 +870,15 @@ export default function KataRecorder({
   const previewBoxWidthPx = Math.min(previewMaxHeightPx * previewRatio, previewMaxWidthCapPx, previewAvailableWidthPx);
   const previewBoxHeightPx = previewBoxWidthPx / previewRatio;
 
-  // Fullscreen crops to fill (object-cover) on EVERY device now, not just
-  // desktop. Mobile used to stay on object-contain, which faithfully
-  // preserves the camera's own aspect ratio -- and therefore letterboxes
-  // hard the moment that shape differs from the phone's screen, which is
-  // exactly the "recording window doesn't fit, big black bars top and
-  // bottom" reported on iPhone SE and the other phones. (iPhone X only
-  // looked right because its unusually tall 375x812 screen happens to sit
-  // close to the stream's own shape; nothing about it was actually more
-  // correct.) The organizer's standing call here, made for desktop but the
-  // same principle throughout: full screen must mean nothing but full
-  // screen, with the banner and watermark re-created as their own layers
-  // rather than protected inside the crop.
-  //
-  // The crop is VISUAL ONLY -- the recording is captured from the canvas's
-  // own pixel buffer via canvas.captureStream(), which no CSS ever
-  // touches, so the submitted file always holds the complete camera frame
-  // plus the burned-in banner and watermark regardless of what the
-  // on-screen preview crops away.
-  //
-  // renderedVideoHeightPx is how tall the video actually paints;
-  // verticalCropFraction is how much of that height object-cover trims off
-  // the TOP specifically (it splits the overflow evenly top and bottom).
-  let renderedVideoHeightPx = viewport.h;
-  let verticalCropFraction = 0;
-  if (fullscreen && viewport.w > 0 && viewport.h > 0) {
-    const containerRatio = viewport.w / viewport.h;
-    if (Number.isFinite(containerRatio) && previewRatio <= containerRatio) {
-      // Video relatively taller/narrower than the screen -> object-cover
-      // matches the width and crops top/bottom.
-      renderedVideoHeightPx = viewport.w / previewRatio;
-      if (renderedVideoHeightPx > 0) {
-        verticalCropFraction = Math.max(0, (renderedVideoHeightPx - viewport.h) / renderedVideoHeightPx / 2);
-      }
-    }
-    // else: video relatively wider than the screen -> object-cover matches
-    // the HEIGHT and crops left/right only, so no top/bottom band is
-    // trimmed at all and renderedVideoHeightPx stays the viewport height.
-  }
-
-  // How much of each burned-in band actually survives that crop. Below this
-  // share it no longer reads cleanly on its own and the DOM copy takes
-  // over; at or above it, adding the DOM copy would just stack a visible
-  // duplicate on top of an already-fine burned-in one.
-  const BURNED_IN_SURVIVES_THRESHOLD = 0.85;
-  const bannerBurnedInSurvives =
-    bannerRatio > 0 && 1 - verticalCropFraction / bannerRatio >= BURNED_IN_SURVIVES_THRESHOLD;
-  const showBannerOverlay = fullscreen && !bannerBurnedInSurvives;
-  // The watermark's own burned-in band height, same real-measured-not-
-  // guessed idea as bannerRatio (see drawWatermark's return value) -- only
-  // populated for the two directions that actually sit in a horizontal
-  // strip at the top or bottom edge; null both before the first frame has
-  // rendered and for the other six (vertical/diagonal), which run along a
-  // much longer, differently shaped path this top/bottom crop math can't
-  // describe, so those (and that brief startup window) keep always
-  // showing the DOM copy, same as before.
-  const watermarkIsHorizontalBand = watermark.direction === "ltr" || watermark.direction === "rtl_cjk";
-  const watermarkBurnedInSurvives =
-    watermarkIsHorizontalBand &&
-    watermarkBandRatio != null &&
-    1 - verticalCropFraction / watermarkBandRatio >= BURNED_IN_SURVIVES_THRESHOLD;
-  const showWatermarkOverlay = fullscreen && !(watermarkIsHorizontalBand && watermarkBurnedInSurvives);
-
-  // Where the burned-in banner's BOTTOM edge actually lands on screen, as a
-  // % of viewport height, so the DOM title bar sits flush underneath it
-  // with neither a black gap nor an overlap. Only used when the burned-in
-  // banner is the one on show -- when the DOM banner overlay takes over it
-  // sits at the very top and the title bar simply stacks under it in
-  // normal flow. Outside fullscreen the preview box is deliberately SIZED
-  // to the video's own ratio, so it neither crops nor letterboxes and the
-  // raw bannerRatio already lines up as-is.
-  // Clamped at 0: a crop deep enough to swallow the banner whole drives the
-  // raw figure negative, which would park the title bar off the top of the
-  // screen. showBannerOverlay is always true in exactly that case (the
-  // banner can't "survive" a crop bigger than itself), so `top` takes the
-  // overlay's own 0 and never reads this -- the clamp just keeps the value
-  // meaningful on its own rather than relying on that coupling holding.
-  const burnedInBannerBottomPercent =
-    fullscreen && viewport.h > 0
-      ? Math.max(0, (((bannerRatio - verticalCropFraction) * renderedVideoHeightPx) / viewport.h) * 100)
-      : bannerRatio * 100;
+  // No crop/letterbox compensation is needed anywhere below any more: the
+  // canvas is drawn at the screen's own shape (see renderLoop), so it
+  // displays 1:1 with neither black bars nor a preview-only crop, and its
+  // burned-in banner and watermark are therefore ALWAYS fully on screen.
+  // That also retires the separate DOM banner/watermark overlays this
+  // component used to layer on top to survive a crop -- with nothing being
+  // cropped there is nothing for them to rescue, and their whole
+  // duplicate-banner failure mode goes with them. bannerRatio maps
+  // straight through as the title bar's offset.
 
   if (phase === "done") {
     return (
@@ -1166,14 +1026,12 @@ export default function KataRecorder({
         <div
           className="absolute inset-x-0 z-20 flex flex-col"
           style={{
-            // True top whenever the DOM banner overlay is the one on show
-            // (it renders as this stack's own first child, so everything
-            // below it follows in normal flow). Otherwise the burned-in
-            // banner is still the visible one -- on the live canvas during
-            // live/recording, on the review <video> during review/
-            // uploading -- and this sits flush under wherever that
-            // actually landed after the crop.
-            top: showBannerOverlay ? 0 : `${burnedInBannerBottomPercent}%`,
+            // Straight off the burned-in banner's own measured height. The
+            // canvas (and the recorded file the review <video> plays back)
+            // is drawn at the screen's shape, so it displays without crop
+            // or letterbox and this percentage lands exactly on the real
+            // banner's bottom edge -- no offset math in between.
+            top: `${bannerRatio * 100}%`,
           }}
         >
           {/* enterFullscreen was only ever called once, from startCamera --
@@ -1197,83 +1055,6 @@ export default function KataRecorder({
               >
                 ⛶ Full screen
               </button>
-            </div>
-          )}
-          {/* Fullscreen crops (object-cover) whatever's actually on screen
-              to guarantee edge-to-edge fill on every device -- the live
-              canvas during live/recording, and the review <video> during
-              review/uploading too, since review playback had its own
-              "screen gets smaller" complaint once it was left on
-              object-contain while live was already filling the screen.
-              Cropping can remove the burned-in banner partially or fully
-              depending on how far the camera's own aspect ratio is from
-              the screen's, so this re-creates the banner as its own layer
-              on top -- but only when showBannerOverlay says the crop has
-              actually eaten enough of the real one that this is a fallback
-              rather than a visible duplicate sitting on top of an
-              already-fine burned-in banner. */}
-          {showBannerOverlay && (
-            <div
-              className="px-4 py-3 text-center text-white"
-              style={{
-                background: "linear-gradient(to right, #b91c1c, #7c2d92, #1d4ed8)",
-                opacity: 0.9,
-              }}
-            >
-              {/* vw-based (not a fixed px size, not a breakpoint jump) so this
-                  scales smoothly with the actual browser window width, from
-                  an 11" laptop up through a 40"+ monitor -- a fixed size
-                  reads fine on one and comically small or oversized on the
-                  other, and window width is what actually matters here, not
-                  physical screen size (a maximized vs. half-width window on
-                  the same monitor should size differently too). */}
-              <p
-                ref={desktopTitleRef}
-                className="whitespace-nowrap font-black"
-                style={{
-                  width: "fit-content",
-                  margin: "0 auto",
-                  fontFamily: "Georgia, serif",
-                  fontSize: desktopTitleFontPx != null ? `${desktopTitleFontPx}px` : "clamp(1.1rem, 2.4vw, 2.25rem)",
-                  textShadow: "0 1px 4px rgba(0,0,0,0.6)",
-                }}
-              >
-                MALAYSIA OPEN VIRTUAL KARATE-DO KATA COMPETITION
-              </p>
-              {/* Both this and the title above need width:fit-content -- a
-                  block-level <p> with no explicit width defaults to FILLING
-                  its container (the full-width banner), regardless of how
-                  much text is actually inside it. getBoundingClientRect on a
-                  plain block <p> was therefore always measuring the SAME
-                  full-banner-width box for both title and subtitle, so their
-                  ratio always came out ~1.0 and no correction was EVER
-                  actually applied, no matter what font-size this resolved to
-                  -- that's the real bug behind every previous attempt at
-                  this looking like it did nothing. fit-content shrink-wraps
-                  each box to its own text (what the measurement below
-                  needs) while staying block-level, so title and subtitle
-                  still stack on separate lines instead of flowing side by
-                  side the way inline-block siblings would; margin:0 auto
-                  re-centers each shrink-wrapped box now that the parent's
-                  text-align can no longer do it (that only centers inline
-                  content, not a block child's own box).
-                  Font-size measured and corrected (see desktopSubtitleFontPx
-                  above) to match the title's own rendered width exactly,
-                  rather than guessing a fixed ratio between two strings of
-                  different length and weight. Falls back to the old clamp()
-                  for the one frame before the measurement effect corrects it. */}
-              <p
-                ref={desktopSubtitleRef}
-                className="whitespace-nowrap"
-                style={{
-                  width: "fit-content",
-                  margin: "2px auto 0",
-                  fontSize: desktopSubtitleFontPx != null ? `${desktopSubtitleFontPx}px` : "clamp(0.6rem, 1.3vw, 1.25rem)",
-                  textShadow: "0 1px 4px rgba(0,0,0,0.6)",
-                }}
-              >
-                Organized by IKO GOJU-RYU KARATE-DO MALAYSIA SDN BHD
-              </p>
             </div>
           )}
           {fullscreen && (
@@ -1354,37 +1135,18 @@ export default function KataRecorder({
         <canvas
           ref={canvasRef}
           className={
+            // object-contain, never object-cover: the canvas is already
+            // drawn at this box's own shape, so contain fills it edge to
+            // edge with nothing to letterbox -- while still guaranteeing
+            // that if the two ever disagree (a rotation landing between
+            // frames, say) the participant sees the whole recorded frame
+            // shrunk rather than a cropped view of a picture whose edges
+            // are silently going into the file regardless.
             phase === "live" || phase === "recording"
-              ? `block h-full w-full ${fullscreen ? "object-cover" : "object-contain"}`
+              ? "block h-full w-full object-contain"
               : "hidden"
           }
         />
-        {/* Watermark's own layer, same reasoning and same
-            showWatermarkOverlay gating as the banner above -- the
-            burned-in one can end up partially or fully cropped out by
-            fullscreen's object-cover, whether that's the live canvas or
-            the review video, but when the crop barely touches it this DOM
-            copy would just double up on top of the still-visible burned-in
-            one. Styled/positioned to match what drawWatermark burns into
-            the actual recording -- same font/bold/color/direction -- so
-            the live preview and the submitted file look consistent when
-            this IS showing. */}
-        {showWatermarkOverlay && (
-          <p
-            className="pointer-events-none absolute z-20 whitespace-nowrap px-3"
-            style={{
-              ...watermarkOverlayPosition(watermark.direction),
-              fontFamily: watermark.fontFamily,
-              fontWeight: watermark.bold ? 900 : 400,
-              color: watermark.color,
-              opacity: 0.7,
-              fontSize: watermark.fontSizePx != null ? `${watermark.fontSizePx}px` : "clamp(0.65rem, 0.9vw, 0.9rem)",
-              textShadow: "0 1px 3px rgba(0,0,0,0.85)",
-            }}
-          >
-            {watermark.text}
-          </p>
-        )}
         {/* Review (and uploading) shows the actual recorded file, in this
             SAME box, instead of a separate plain video underneath it --
             "the same recording screen for the replay." The canvas above is
@@ -1432,7 +1194,7 @@ export default function KataRecorder({
                 v.addEventListener("timeupdate", onProbeTimeUpdate);
                 v.currentTime = Number.MAX_SAFE_INTEGER;
               }}
-              className={`block h-full w-full ${fullscreen ? "object-cover" : "object-contain"}`}
+              className="block h-full w-full object-contain"
             />
             {!reviewPlaying && (
               <button
