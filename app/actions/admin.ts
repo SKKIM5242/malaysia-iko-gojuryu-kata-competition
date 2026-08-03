@@ -3883,6 +3883,7 @@ export async function createStaffAccount(formData: FormData) {
   }
   const extra = {
     short_name: short_name || null,
+    staff_title: String(formData.get("staff_title") ?? "").trim() || null,
     ic_passport: String(formData.get("ic_passport") ?? "").trim() || null,
     date_of_birth: String(formData.get("date_of_birth") ?? "").trim() || null,
     gender: String(formData.get("gender") ?? "").trim() || null,
@@ -4015,6 +4016,7 @@ export async function saveStaffAccount(formData: FormData) {
     full_name,
     email,
     short_name: String(formData.get("short_name") ?? "").trim() || null,
+    staff_title: String(formData.get("staff_title") ?? "").trim() || null,
     ic_passport: String(formData.get("ic_passport") ?? "").trim() || null,
     date_of_birth: String(formData.get("date_of_birth") ?? "").trim() || null,
     gender: String(formData.get("gender") ?? "").trim() || null,

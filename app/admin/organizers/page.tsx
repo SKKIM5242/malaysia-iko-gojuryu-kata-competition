@@ -18,6 +18,7 @@ import IbanConfirmCheckbox from "@/components/IbanConfirmCheckbox";
 import BankDetailsNote from "@/components/BankDetailsNote";
 import BankAccountNameField from "@/components/BankAccountNameField";
 import { IBAN_CSV_NOTE } from "@/lib/bank";
+import { STAFF_TITLE_OPTIONS } from "@/lib/reference-data";
 
 export const dynamic = "force-dynamic";
 
@@ -88,6 +89,17 @@ export default async function AdminOrganizers({
                 <div>
                   <label htmlFor="org_full_name" className={adminLabel}>Full name *</label>
                   <input id="org_full_name" name="full_name" required className={adminInput} />
+                </div>
+                <div>
+                  <label htmlFor="org_staff_title" className={adminLabel}>
+                    Role <span className="font-normal text-neutral-400">(organizational title, optional)</span>
+                  </label>
+                  <select id="org_staff_title" name="staff_title" defaultValue="" className={adminInput}>
+                    <option value="">— None —</option>
+                    {STAFF_TITLE_OPTIONS.map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label htmlFor="org_email" className={adminLabel}>Email *</label>
@@ -208,6 +220,7 @@ export default async function AdminOrganizers({
               downloadName="admin-organizer-accounts"
               columns={[
                 { key: "full_name", label: "Name" },
+                { key: "staff_title", label: "Title" },
                 { key: "reference_id", label: "Reference ID" },
                 { key: "role", label: "Role" },
                 { key: "email", label: "Email" },
@@ -220,6 +233,7 @@ export default async function AdminOrganizers({
                 user_id: s.user_id,
                 reference_id: s.user_id.slice(0, 8).toUpperCase(),
                 full_name: s.full_name ?? "",
+                staff_title: s.staff_title ?? "",
                 role: s.role === "staff" ? "Admin / Organizer (legacy)" : s.role === "admin" ? "Super Admin" : "Organizer",
                 email: s.email ?? "",
                 phone: s.phone ?? "",

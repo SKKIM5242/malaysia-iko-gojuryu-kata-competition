@@ -92,6 +92,30 @@ export const PROFILE_ROLE_KEYS = [
 
 export type ProfileRoleKey = (typeof PROFILE_ROLE_KEYS)[number];
 
+/** Organizational job title for an Organizer/Support account (profiles.
+ * staff_title) -- purely descriptive labeling for internal coordination
+ * ("who's the Chief Organizer vs. an Assistant"), entirely separate from
+ * PROFILE_ROLE_KEYS above, which is what actually drives permissions. */
+export const STAFF_TITLE_OPTIONS = [
+  "Super Admin",
+  "Admin",
+  "Admin - Support",
+  "Chief Organizer",
+  "Chief Organizer & Referee/Judge",
+  "Organizer - Assistant",
+  "Co-Organizer",
+  "Organizer - Secretary",
+  "Chief Support",
+  "Chief Region Support",
+  "Chief Country Support",
+  "Support",
+  "Support Assistant",
+  "Chief of Staff",
+  "Staff by Region",
+  "Staff by Country",
+  "Staff",
+] as const;
+
 /** Human label for a role key, for the Sign-in Access Matrix picker. */
 export const PROFILE_ROLE_KEY_LABELS: Record<ProfileRoleKey, string> = {
   participant: "Participant",

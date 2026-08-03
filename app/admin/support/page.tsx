@@ -28,7 +28,7 @@ import IbanConfirmCheckbox from "@/components/IbanConfirmCheckbox";
 import BankDetailsNote from "@/components/BankDetailsNote";
 import BankAccountNameField from "@/components/BankAccountNameField";
 import { IBAN_CSV_NOTE } from "@/lib/bank";
-import { EDUCATION_LEVELS, SPOKEN_LANGUAGES, REFERRAL_LABEL, REFERRAL_PLACEHOLDER } from "@/lib/reference-data";
+import { EDUCATION_LEVELS, SPOKEN_LANGUAGES, REFERRAL_LABEL, REFERRAL_PLACEHOLDER, STAFF_TITLE_OPTIONS } from "@/lib/reference-data";
 
 export const dynamic = "force-dynamic";
 
@@ -185,6 +185,17 @@ export default async function AdminSupport({
                 <div>
                   <label htmlFor="cs_full_name" className={adminLabel}>Full name *</label>
                   <input id="cs_full_name" name="full_name" required className={adminInput} />
+                </div>
+                <div>
+                  <label htmlFor="cs_staff_title" className={adminLabel}>
+                    Role <span className="font-normal text-neutral-400">(organizational title, optional)</span>
+                  </label>
+                  <select id="cs_staff_title" name="staff_title" defaultValue="" className={adminInput}>
+                    <option value="">— None —</option>
+                    {STAFF_TITLE_OPTIONS.map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="sm:col-span-2">
                   <label htmlFor="cs_short_name" className={adminLabel}>My short name or initial *</label>
@@ -376,6 +387,7 @@ export default async function AdminSupport({
               downloadName="participant-support-accounts"
               columns={[
                 { key: "full_name", label: "Name" },
+                { key: "staff_title", label: "Title" },
                 { key: "short_name", label: "Short Name" },
                 { key: "reference_id", label: "Reference ID" },
                 { key: "email", label: "Email" },
@@ -391,6 +403,7 @@ export default async function AdminSupport({
                 user_id: s.user_id,
                 reference_id: s.user_id.slice(0, 8).toUpperCase(),
                 full_name: s.full_name ?? "",
+                staff_title: s.staff_title ?? "",
                 short_name: s.short_name ?? "",
                 email: s.email ?? "",
                 phone: s.phone ?? "",
