@@ -290,6 +290,18 @@ export default function KataRecorder({
   const [agreed, setAgreed] = useState(false);
   const [recordingStartedAt, setRecordingStartedAt] = useState<Date | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
+  // Computed client-side only, after mount (not inline in JSX), so the
+  // server-rendered and first client render both agree it's false --
+  // otherwise reading navigator.userAgent during render risks a hydration
+  // mismatch. Drives object-cover vs object-contain on the live canvas
+  // below: desktop fullscreen crops to guarantee edge-to-edge fill (the
+  // organizer's explicit call, after confirming a plain resolution/ratio
+  // fix couldn't fully close the gap on real webcam hardware); mobile
+  // keeps the existing preserve-the-whole-frame behavior.
+  const [isMobileDevice, setIsMobileDevice] = useState(false);
+  useEffect(() => {
+    setIsMobileDevice(/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent));
+  }, []);
   // Custom minimal controls for the review player, replacing the browser's
   // native <video controls> entirely -- on iOS, native controls' own
   // fullscreen-toggle icon has an "X"/collapse affordance that doesn't
@@ -899,7 +911,11 @@ export default function KataRecorder({
         <video ref={videoRef} playsInline muted className="hidden" />
         <canvas
           ref={canvasRef}
-          className={phase === "live" || phase === "recording" ? "block h-full w-full object-contain" : "hidden"}
+          className={
+            phase === "live" || phase === "recording"
+              ? `block h-full w-full ${fullscreen && !isMobileDevice ? "object-cover" : "object-contain"}`
+              : "hidden"
+          }
         />
         {/* Review (and uploading) shows the actual recorded file, in this
             SAME box, instead of a separate plain video underneath it --
