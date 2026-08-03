@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRecordAttempt, submitKataVideo } from "@/app/actions/account";
 import BuyExtraAttemptsButton from "@/components/BuyExtraAttemptsButton";
@@ -304,6 +304,33 @@ export default function KataRecorder({
   useEffect(() => {
     setIsMobileDevice(/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent));
   }, []);
+  // Measures the title's actual rendered width and scales the subtitle's
+  // OWN font-size (not a transform -- that would visually squash/stretch
+  // the letterforms) so its rendered width matches, instead of guessing at
+  // a fixed ratio between two strings of different length and weight that
+  // render at different widths per character. useLayoutEffect (not
+  // useEffect) so the correction lands before paint -- no visible flash
+  // from the fallback clamp() size to the corrected one.
+  const desktopTitleRef = useRef<HTMLParagraphElement>(null);
+  const desktopSubtitleRef = useRef<HTMLParagraphElement>(null);
+  const [desktopSubtitleFontPx, setDesktopSubtitleFontPx] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    if (!(fullscreen && !isMobileDevice && (phase === "live" || phase === "recording"))) return;
+    function syncSubtitleWidth() {
+      const title = desktopTitleRef.current;
+      const subtitle = desktopSubtitleRef.current;
+      if (!title || !subtitle) return;
+      const titleWidth = title.getBoundingClientRect().width;
+      const subtitleWidth = subtitle.getBoundingClientRect().width;
+      const currentPx = Number.parseFloat(getComputedStyle(subtitle).fontSize);
+      if (titleWidth > 0 && subtitleWidth > 0 && currentPx > 0) {
+        setDesktopSubtitleFontPx(currentPx * (titleWidth / subtitleWidth));
+      }
+    }
+    syncSubtitleWidth();
+    window.addEventListener("resize", syncSubtitleWidth);
+    return () => window.removeEventListener("resize", syncSubtitleWidth);
+  }, [fullscreen, isMobileDevice, phase]);
   // Custom minimal controls for the review player, replacing the browser's
   // native <video controls> entirely -- on iOS, native controls' own
   // fullscreen-toggle icon has an "X"/collapse affordance that doesn't
@@ -820,6 +847,22 @@ export default function KataRecorder({
         }
         style={fullscreen ? undefined : { width: previewBoxWidthPx, height: previewBoxHeightPx }}
       >
+        {/* enterFullscreen was only ever called once, from startCamera --
+            exiting fullscreen (during live, recording, or review) had no way
+            back in short of restarting the whole camera flow. This covers
+            every phase that still has an active session to return to; idle
+            hasn't started a camera yet, and "done" already returned its own
+            JSX above (its own auto-exits fullscreen too), so phase can only
+            be live/recording/review/uploading by this point anyway. */}
+        {!fullscreen && phase !== "idle" && (
+          <button
+            type="button"
+            onClick={enterFullscreen}
+            className="absolute right-2 top-2 z-30 rounded border border-white/50 bg-black/45 px-2.5 py-1 text-xs font-semibold text-white hover:bg-black/65"
+          >
+            ⛶ Full screen
+          </button>
+        )}
         {/* Title bar, error banner, the live/recording badges, and the
             review controls all stack in ONE column starting right below the
             burned-in header banner -- previously each piece was
@@ -881,6 +924,7 @@ export default function KataRecorder({
                   physical screen size (a maximized vs. half-width window on
                   the same monitor should size differently too). */}
               <p
+                ref={desktopTitleRef}
                 className="font-black"
                 style={{
                   fontFamily: "Georgia, serif",
@@ -890,15 +934,21 @@ export default function KataRecorder({
               >
                 MALAYSIA OPEN VIRTUAL KARATE-DO KATA COMPETITION
               </p>
-              {/* Sized as ~55% of the title -- the same ratio the burned-in
-                  canvas banner already uses (see drawFrame's landscape
-                  branch below) -- rather than its own independent, much
-                  smaller clamp, which read as a stray small line under a
-                  wide title instead of a subtitle properly filling the
-                  same banner width. */}
+              {/* Font-size measured and corrected (see desktopSubtitleFontPx
+                  above) to match the title's own rendered width exactly,
+                  rather than guessing a fixed ratio between two strings of
+                  different length and weight -- the earlier guess (~55% of
+                  the title) rendered narrower than the title, reading as a
+                  stray small line instead of a second row filling the same
+                  width. Falls back to the old clamp() for the one frame
+                  before the measurement effect corrects it. */}
               <p
-                className="mt-0.5"
-                style={{ fontSize: "clamp(0.6rem, 1.3vw, 1.25rem)", textShadow: "0 1px 4px rgba(0,0,0,0.6)" }}
+                ref={desktopSubtitleRef}
+                className="mt-0.5 whitespace-nowrap"
+                style={{
+                  fontSize: desktopSubtitleFontPx != null ? `${desktopSubtitleFontPx}px` : "clamp(0.6rem, 1.3vw, 1.25rem)",
+                  textShadow: "0 1px 4px rgba(0,0,0,0.6)",
+                }}
               >
                 Organized by IKO GOJU-RYU KARATE-DO MALAYSIA SDN BHD
               </p>
