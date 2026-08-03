@@ -400,48 +400,75 @@ export default function KataRecorder({
   useEffect(() => {
     setIsMobileDevice(/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent));
   }, []);
-  // Measures the title's actual rendered width and scales the subtitle's
-  // OWN font-size (not a transform -- that would visually squash/stretch
-  // the letterforms) so its rendered width matches, instead of guessing at
-  // a fixed ratio between two strings of different length and weight that
+  // Shrinks the title to fit the banner's actual available width, then
+  // measures its actual rendered width and scales the subtitle's OWN
+  // font-size (not a transform -- that would visually squash/stretch the
+  // letterforms) so its rendered width matches -- instead of guessing at a
+  // fixed ratio between two strings of different length and weight that
   // render at different widths per character. useLayoutEffect (not
   // useEffect) so the correction lands before paint -- no visible flash
-  // from the fallback clamp() size to the corrected one.
+  // from the fallback/natural size to the corrected one.
   const desktopTitleRef = useRef<HTMLParagraphElement>(null);
   const desktopSubtitleRef = useRef<HTMLParagraphElement>(null);
+  const [desktopTitleFontPx, setDesktopTitleFontPx] = useState<number | null>(null);
   const [desktopSubtitleFontPx, setDesktopSubtitleFontPx] = useState<number | null>(null);
   useLayoutEffect(() => {
     if (!(fullscreen && !isMobileDevice)) return;
-    function syncSubtitleWidth() {
+    function syncBannerText() {
       const title = desktopTitleRef.current;
       const subtitle = desktopSubtitleRef.current;
-      if (!title || !subtitle) return;
-      const titleWidth = title.getBoundingClientRect().width;
-      const subtitleWidth = subtitle.getBoundingClientRect().width;
+      const container = title?.parentElement;
+      if (!title || !subtitle || !container) return;
+      // Clear any earlier shrink first so every call re-measures from the
+      // natural clamp()-derived size for the CURRENT container width --
+      // the title's own 47-character, all-caps, bold string comfortably
+      // fits a real laptop/monitor width (what the clamp() was tuned for)
+      // but can outright overflow a phone- or tablet-width screen, which
+      // this same crop+overlay branch can now also land on (a Surface Duo,
+      // Nest Hub, or foldable's user-agent doesn't always read as
+      // "mobile"). Resetting first means a shrink applied while narrow
+      // also grows back after rotating wider or unfolding, instead of
+      // ratcheting down permanently or surviving a stale prior measurement.
+      title.style.fontSize = "";
+      const cs = getComputedStyle(container);
+      const maxWidth = container.clientWidth - Number.parseFloat(cs.paddingLeft) - Number.parseFloat(cs.paddingRight);
+      let titlePx = Number.parseFloat(getComputedStyle(title).fontSize);
+      let shrunk = false;
+      let guard = 0;
+      while (title.getBoundingClientRect().width > maxWidth && titlePx > 8 && guard < 60) {
+        titlePx -= 1;
+        title.style.fontSize = `${titlePx}px`;
+        shrunk = true;
+        guard += 1;
+      }
+      setDesktopTitleFontPx(shrunk ? titlePx : null);
       // Read the CURRENT rendered size off the actual element (whatever
       // that is right now -- the fallback clamp() the first time this
       // runs, or a previously-corrected size on a later resize) rather
       // than assuming a fixed starting point, so this is self-correcting
       // on every call regardless of what triggered it.
-      const currentPx = Number.parseFloat(getComputedStyle(subtitle).fontSize);
-      if (titleWidth > 0 && subtitleWidth > 0 && currentPx > 0) {
-        setDesktopSubtitleFontPx(currentPx * (titleWidth / subtitleWidth));
+      const titleWidth = title.getBoundingClientRect().width;
+      const subtitleWidth = subtitle.getBoundingClientRect().width;
+      const currentSubtitlePx = Number.parseFloat(getComputedStyle(subtitle).fontSize);
+      if (titleWidth > 0 && subtitleWidth > 0 && currentSubtitlePx > 0) {
+        setDesktopSubtitleFontPx(currentSubtitlePx * (titleWidth / subtitleWidth));
       }
     }
-    syncSubtitleWidth();
+    syncBannerText();
     // A single measurement right after mount can land before the Georgia
     // title face has actually finished loading/swapping in, if it wasn't
     // already cached -- the browser lays out with a fallback font's
-    // (different) metrics for that first pass, so the ratio computed then
-    // can be off. Re-measuring once fonts are confirmed ready, plus once
-    // more on the next frame as a cheap belt-and-suspenders, catches that
-    // without needing to guess how long a swap might take.
-    void document.fonts?.ready?.then(syncSubtitleWidth);
-    const raf = requestAnimationFrame(syncSubtitleWidth);
-    window.addEventListener("resize", syncSubtitleWidth);
+    // (different) metrics for that first pass, so both the shrink and the
+    // ratio computed then can be off. Re-measuring once fonts are
+    // confirmed ready, plus once more on the next frame as a cheap
+    // belt-and-suspenders, catches that without needing to guess how long
+    // a swap might take.
+    void document.fonts?.ready?.then(syncBannerText);
+    const raf = requestAnimationFrame(syncBannerText);
+    window.addEventListener("resize", syncBannerText);
     return () => {
       cancelAnimationFrame(raf);
-      window.removeEventListener("resize", syncSubtitleWidth);
+      window.removeEventListener("resize", syncBannerText);
     };
   }, [fullscreen, isMobileDevice, phase]);
   // Custom minimal controls for the review player, replacing the browser's
@@ -865,6 +892,35 @@ export default function KataRecorder({
   const previewBoxWidthPx = Math.min(previewMaxHeightPx * previewRatio, previewMaxWidthCapPx, previewAvailableWidthPx);
   const previewBoxHeightPx = previewBoxWidthPx / previewRatio;
 
+  // Where the real (burned-in) banner actually sits, as a % of the
+  // container's height -- only diverges from the raw bannerRatio*100 when
+  // object-contain has to letterbox because the container's shape doesn't
+  // match the camera stream's own aspect ratio. The non-fullscreen preview
+  // box above is deliberately SIZED to match previewRatio exactly, so it
+  // never letterboxes and bannerRatio*100 already lines up correctly there.
+  // Fullscreen instead fills whatever shape the real device screen is --
+  // which varies hugely across phones, tablets, and foldables and rarely
+  // matches the camera's own aspect ratio -- leaving a black gap between
+  // this DOM title bar and the banner actually burned into the canvas
+  // unless that letterbox offset is accounted for here too.
+  let mobileBannerTopPercent = bannerRatio * 100;
+  if (fullscreen && viewport.w > 0 && viewport.h > 0) {
+    const containerRatio = viewport.w / viewport.h;
+    if (Number.isFinite(containerRatio) && previewRatio > containerRatio) {
+      // Video is relatively wider than the container -> object-contain
+      // fills the full width and letterboxes top/bottom; the banner sits
+      // partway down that letterboxed (shorter-than-container) image, not
+      // partway down the full container.
+      const renderedH = viewport.w / previewRatio;
+      const offsetYPx = (viewport.h - renderedH) / 2;
+      mobileBannerTopPercent = ((offsetYPx + bannerRatio * renderedH) / viewport.h) * 100;
+    }
+    // else: video is relatively taller than the container -> object-contain
+    // fills the full height with no vertical letterbox, so the original
+    // bannerRatio*100 (of the full, unletterboxed container height)
+    // already lines up correctly as-is.
+  }
+
   if (phase === "done") {
     return (
       <div className="rounded-lg border border-green-300 bg-green-50 p-8 text-center">
@@ -1006,10 +1062,12 @@ export default function KataRecorder({
             // review/uploading, both crop the same way on desktop, so both
             // need the banner re-created as its own layer rather than
             // trusting whatever's burned into the cropped element. Mobile
-            // never crops (always object-contain), so it always falls back
-            // to the original bannerRatio-based math, lining up under
-            // whichever element's own burned-in banner is currently visible.
-            top: fullscreen && !isMobileDevice ? 0 : `${bannerRatio * 100}%`,
+            // never crops (always object-contain), so it falls back to
+            // mobileBannerTopPercent -- the letterbox-corrected version of
+            // the bannerRatio-based math, lining up under whichever
+            // element's own burned-in banner is currently visible even
+            // when the container's shape doesn't match the video's.
+            top: fullscreen && !isMobileDevice ? 0 : `${mobileBannerTopPercent}%`,
           }}
         >
           {/* enterFullscreen was only ever called once, from startCamera --
@@ -1070,7 +1128,7 @@ export default function KataRecorder({
                   width: "fit-content",
                   margin: "0 auto",
                   fontFamily: "Georgia, serif",
-                  fontSize: "clamp(1.1rem, 2.4vw, 2.25rem)",
+                  fontSize: desktopTitleFontPx != null ? `${desktopTitleFontPx}px` : "clamp(1.1rem, 2.4vw, 2.25rem)",
                   textShadow: "0 1px 4px rgba(0,0,0,0.6)",
                 }}
               >
