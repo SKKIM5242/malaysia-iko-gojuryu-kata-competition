@@ -46,15 +46,27 @@ function extensionForMimeType(mimeType: string): string {
  * which reads fine on a small preview thumbnail but is practically
  * invisible once phones and tablets started negotiating much taller/wider
  * real camera resolutions than that was ever sized for). Shared by both
- * the portrait and landscape banner layouts below. */
+ * the portrait and landscape banner layouts below.
+ *
+ * The size was purely height-proportional with no check against the
+ * frame's WIDTH at all -- fine on a wide landscape frame, but on a narrow
+ * portrait one that let the text run past the left/right edges instead of
+ * shrinking to fit, same class of bug the title/subtitle already guard
+ * against with their own shrink-to-fit loops. */
 function drawWatermark(ctx: CanvasRenderingContext2D, w: number, h: number, watermark: string) {
   ctx.save();
   ctx.globalAlpha = 0.38;
   ctx.fillStyle = "#ffffff";
   ctx.shadowColor = "rgba(0,0,0,0.55)";
   ctx.shadowBlur = 3;
-  ctx.font = `${Math.max(11, Math.round(h * 0.022))}px Arial, sans-serif`;
   ctx.textAlign = "center";
+  let fontPx = Math.max(11, Math.round(h * 0.022));
+  ctx.font = `${fontPx}px Arial, sans-serif`;
+  const maxWidth = w * 0.92;
+  while (fontPx > 7 && ctx.measureText(watermark).width > maxWidth) {
+    fontPx -= 1;
+    ctx.font = `${fontPx}px Arial, sans-serif`;
+  }
   ctx.fillText(watermark, w / 2, h - Math.max(14, Math.round(h * 0.025)));
   ctx.restore();
 }
@@ -85,7 +97,7 @@ function drawFrame(
 ): number {
   ctx.drawImage(video, 0, 0, w, h);
 
-  const maxTitleWidth = w * 0.94;
+  const maxTitleWidth = w * 0.97;
   const subtitle = "Organized by IKO GOJU-RYU KARATE-DO MALAYSIA SDN BHD";
 
   // Portrait only: size the title from the frame's WIDTH (how large it can
@@ -95,8 +107,12 @@ function drawFrame(
   // portrait recording. Splitting the title across multiple lines was
   // tried to make it bigger, but the organizer confirmed that reads worse
   // (the whole point is ONE row, matching landscape's own layout) -- back
-  // to a single line, sized to whatever actually fits, even if that's
-  // smaller than the multi-line version was. Landscape is unchanged.
+  // to a single line. A ~50-character title fit to the frame's own width
+  // is a hard ceiling on the FONT itself (there's no more width to give it
+  // without wrapping) -- the generous padding below is what actually makes
+  // the banner read as bigger/more substantial, per the organizer's ask for
+  // a noticeably taller bar, without touching that ceiling. Landscape is
+  // unchanged.
   if (h > w) {
     const bannerTitle = "MALAYSIA OPEN VIRTUAL KARATE-DO KATA COMPETITION";
     let titleFontPx = Math.round(w * 0.075);
@@ -105,15 +121,26 @@ function drawFrame(
       titleFontPx -= 1;
       ctx.font = `900 ${titleFontPx}px Georgia, serif`;
     }
-    let subtitleFontPx = Math.round(titleFontPx * 0.55);
+    // Sized from its OWN width fit now (capped at a generous 85% of the
+    // title, just to keep it reading as secondary) instead of a tight 55%
+    // of the title -- the subtitle's own ~54-character string, in a
+    // lighter/narrower weight than the title's bold 900, has real room of
+    // its own to grow into that the old flat ratio was leaving unused.
+    let subtitleFontPx = Math.round(w * 0.05);
     ctx.font = `${subtitleFontPx}px Arial, sans-serif`;
     while (subtitleFontPx > 3 && ctx.measureText(subtitle).width > maxTitleWidth) {
       subtitleFontPx -= 1;
       ctx.font = `${subtitleFontPx}px Arial, sans-serif`;
     }
-    const padTop = Math.round(titleFontPx * 0.3);
-    const gap = Math.round(titleFontPx * 0.22);
-    const padBottom = Math.round(subtitleFontPx * 0.4);
+    subtitleFontPx = Math.min(subtitleFontPx, Math.round(titleFontPx * 0.85));
+    ctx.font = `${subtitleFontPx}px Arial, sans-serif`;
+    // Padding multipliers deliberately generous (roughly 2.5x the previous
+    // ones) -- this is what actually grows the banner bar itself by the
+    // requested ~150-200%, since the text's own size is already maxed out
+    // against the frame width above.
+    const padTop = Math.round(titleFontPx * 1.8);
+    const gap = Math.round(titleFontPx * 1.1);
+    const padBottom = Math.round(subtitleFontPx * 2.0);
     const titleY = padTop + titleFontPx * 0.8;
     const subtitleY = titleY + titleFontPx * 0.3 + gap + subtitleFontPx * 0.8;
     const topH = Math.round(subtitleY + subtitleFontPx * 0.35 + padBottom);
