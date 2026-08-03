@@ -18,6 +18,7 @@ import { isEmailVerified } from "@/lib/email-verification";
 import SignInInfoTables from "@/components/SignInInfoTables";
 import PendingRecordingsList, { type PendingRegistration } from "@/components/PendingRecordingsList";
 import SignInQuotaLine from "@/components/SignInQuotaLine";
+import { resolveWatermarkSettings, type WatermarkSettings } from "@/lib/watermark";
 import { shortTierName } from "@/lib/invitation-codes";
 
 export const dynamic = "force-dynamic";
@@ -95,10 +96,6 @@ async function getPendingRegistrations(
     }));
 }
 
-function watermarkText(): string {
-  return "Malaysia Open Virtual Karate-do Kata Competition 2026";
-}
-
 interface RecordingContext {
   existingVideo: { id: string; storage_path: string } | null;
   ownVideoUrl: string | null;
@@ -113,6 +110,10 @@ interface RecordingContext {
    * looking identical to whatever was showing before (the recorder never
    * displayed which kata it was for at all). */
   categoryName: string | null;
+  /** This registration's own tier's watermark customization (organizer-set
+   * per competition, Create/Edit Competition page) -- was a single
+   * hardcoded string+styling shared by every tier. */
+  watermark: WatermarkSettings;
 }
 
 /** Everything needed to render the personal recording card for whichever
@@ -143,13 +144,19 @@ async function getRecordingContext(
 
   const { data: registration } = await supabase
     .from("registrations")
-    .select("category:categories(name), competition:competitions(id, event_date, registration_deadline)")
+    .select(
+      "category:categories(name), competition:competitions(id, event_date, registration_deadline, watermark_text, watermark_font_size_px, watermark_font_family, watermark_bold, watermark_color, watermark_direction)",
+    )
     .eq("id", registrationId)
     .maybeSingle();
   const competition = (
     registration as unknown as {
       category: { name: string } | null;
-      competition: { id: string; event_date: string | null; registration_deadline: string | null } | null;
+      competition:
+        | ({ id: string; event_date: string | null; registration_deadline: string | null } & Parameters<
+            typeof resolveWatermarkSettings
+          >[0])
+        | null;
     } | null
   )?.competition ?? null;
   const categoryName =
@@ -176,6 +183,7 @@ async function getRecordingContext(
     registrationDeadline: competition?.registration_deadline ?? null,
     pendingOthers,
     categoryName,
+    watermark: resolveWatermarkSettings(competition),
   };
 }
 
@@ -221,7 +229,7 @@ function PersonalRecordingSection({
             initialAttempts={profile.record_attempts}
             maxAttempts={ctx.maxAttempts}
             hasPendingPurchase={ctx.hasPendingPurchase}
-            watermark={watermarkText()}
+            watermark={ctx.watermark}
             recordingStart={ctx.eventDate}
             recordingEnd={ctx.registrationDeadline}
             categoryName={ctx.categoryName}
@@ -772,13 +780,19 @@ export default async function AccountPage({
 
   const { data: registration } = await supabase
     .from("registrations")
-    .select("category:categories(name), competition:competitions(id, event_date, registration_deadline)")
+    .select(
+      "category:categories(name), competition:competitions(id, event_date, registration_deadline, watermark_text, watermark_font_size_px, watermark_font_family, watermark_bold, watermark_color, watermark_direction)",
+    )
     .eq("id", profile.registration_id)
     .maybeSingle();
   const competition = (
     registration as unknown as {
       category: { name: string } | null;
-      competition: { id: string; event_date: string | null; registration_deadline: string | null } | null;
+      competition:
+        | ({ id: string; event_date: string | null; registration_deadline: string | null } & Parameters<
+            typeof resolveWatermarkSettings
+          >[0])
+        | null;
     } | null
   )?.competition ?? null;
   const categoryName =
@@ -789,6 +803,7 @@ export default async function AccountPage({
     )?.category?.name ?? null;
   const eventDate = competition?.event_date ?? null;
   const registrationDeadline = competition?.registration_deadline ?? null;
+  const watermark = resolveWatermarkSettings(competition);
 
   let ownVideoUrl: string | null = null;
   if (existingVideo) {
@@ -879,7 +894,7 @@ export default async function AccountPage({
               initialAttempts={profile.record_attempts}
               maxAttempts={maxAttempts}
               hasPendingPurchase={hasPendingPurchase}
-              watermark={watermarkText()}
+              watermark={watermark}
               recordingStart={eventDate}
               recordingEnd={registrationDeadline}
               categoryName={categoryName}

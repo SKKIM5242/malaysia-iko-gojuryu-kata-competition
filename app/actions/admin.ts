@@ -9,6 +9,7 @@ import { writeAudit } from "@/lib/audit";
 import { headers } from "next/headers";
 import { kataBaseOf, groupByKata, ageAt, resolveCategory } from "@/lib/division";
 import { KATA_FAMILIES, categoriesInFamily, adjacentKataOf, type KataFamily } from "@/lib/kata-families";
+import { WATERMARK_DIRECTIONS } from "@/lib/watermark";
 import {
   logCategoryMerge, snapshotRegistrationCategories, undoLastCategoryMerge,
   logCategoryDelete, undoLastCategoryDelete,
@@ -332,6 +333,14 @@ export async function saveCompetition(formData: FormData) {
     audience_signin_date: String(formData.get("audience_signin_date") ?? "") || null,
     default_sign_in_valid_from: String(formData.get("default_sign_in_valid_from") ?? "") || null,
     default_sign_in_valid_until: String(formData.get("default_sign_in_valid_until") ?? "") || null,
+    watermark_text: String(formData.get("watermark_text") ?? "").trim() || null,
+    watermark_font_size_px: formData.get("watermark_font_size_px")
+      ? Number(formData.get("watermark_font_size_px"))
+      : null,
+    watermark_font_family: String(formData.get("watermark_font_family") ?? "").trim() || null,
+    watermark_bold: formData.get("watermark_bold") === "true",
+    watermark_color: String(formData.get("watermark_color") ?? "").trim() || null,
+    watermark_direction: String(formData.get("watermark_direction") ?? "ltr"),
   };
   if (!values.name) backTo(returnTo, { error: "Competition name is required." });
   if (
@@ -343,6 +352,12 @@ export async function saveCompetition(formData: FormData) {
   }
   if (values.registration_fee_usd != null && Number.isNaN(values.registration_fee_usd)) {
     backTo(returnTo, { error: "Fee must be a number." });
+  }
+  if (values.watermark_font_size_px != null && (Number.isNaN(values.watermark_font_size_px) || values.watermark_font_size_px < 6)) {
+    backTo(returnTo, { error: "Watermark font size must be a number of at least 6px, or left blank for auto." });
+  }
+  if (!WATERMARK_DIRECTIONS.includes(values.watermark_direction as (typeof WATERMARK_DIRECTIONS)[number])) {
+    backTo(returnTo, { error: "Unknown watermark direction." });
   }
 
   const { supabase, actorId } = await getActor();

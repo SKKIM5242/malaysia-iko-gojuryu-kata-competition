@@ -3,6 +3,7 @@ import { schemaReady } from "@/lib/data";
 import { AdminShell } from "@/components/admin";
 import { SetupNotice } from "@/components/ui";
 import KataRecorder from "@/components/KataRecorder";
+import { resolveWatermarkSettings } from "@/lib/watermark";
 
 export const dynamic = "force-dynamic";
 
@@ -68,7 +69,10 @@ export default async function AdminRecordingPreview() {
               initialAttempts={0}
               maxAttempts={3}
               hasPendingPurchase={false}
-              watermark="PREVIEW — Malaysia Open Virtual Karate-do Kata Competition"
+              watermark={{
+                ...resolveWatermarkSettings(null),
+                text: "PREVIEW — Malaysia Open Virtual Karate-do Kata Competition",
+              }}
               recordingStart={start}
               recordingEnd={end}
             />

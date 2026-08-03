@@ -30,8 +30,30 @@ export interface Competition {
    * alongside "Publish all Certificates" on /admin/certificates. Null falls
    * back to event_date wherever a certificate's date field is rendered. */
   certificate_date: string | null;
+  /** Recording watermark footer, burned into every submitted video for this
+   * tier (see components/KataRecorder.tsx). All null except direction fall
+   * back to the app's own default wording/size/font/color — direction
+   * defaults to 'ltr' at the database level, never null. */
+  watermark_text: string | null;
+  watermark_font_size_px: number | null;
+  watermark_font_family: string | null;
+  watermark_bold: boolean;
+  watermark_color: string | null;
+  watermark_direction: WatermarkDirection;
   created_at: string;
 }
+
+/** Keep in sync with the CHECK constraint on competitions.watermark_direction
+ * (migration 0100) and the <select> options in the admin Competitions form. */
+export type WatermarkDirection =
+  | "ltr"
+  | "vertical_ltr_left"
+  | "vertical_rtl_left"
+  | "diagonal_up"
+  | "diagonal_down"
+  | "vertical_ltr_right"
+  | "vertical_rtl_right"
+  | "rtl_cjk";
 
 export interface School {
   id: string;

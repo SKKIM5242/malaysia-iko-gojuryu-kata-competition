@@ -12,6 +12,10 @@ import ScrollToAnchor from "@/components/ScrollToAnchor";
 import CategoryActionButton from "@/components/CategoryActionButton";
 import { kataBaseOf } from "@/lib/division";
 import { groupByFamily, adjacentKataOf } from "@/lib/kata-families";
+import {
+  WATERMARK_FONT_OPTIONS, WATERMARK_DIRECTION_OPTIONS,
+  DEFAULT_WATERMARK_TEXT, DEFAULT_WATERMARK_FONT_FAMILY, DEFAULT_WATERMARK_COLOR,
+} from "@/lib/watermark";
 import type { Category } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -259,6 +263,97 @@ export default async function AdminCompetitions({
                     Leave the dates blank to fall back to the event date and the &quot;winners announce
                     + 30 days&quot; rule.
                   </p>
+                </div>
+
+                {/* Burned into every recorded video for this tier (see
+                    components/KataRecorder.tsx's drawWatermark) -- every
+                    field left blank/default falls back to the app's
+                    original hardcoded wording/size/font/color, so an
+                    untouched tier looks exactly as it always has. */}
+                <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3">
+                  <p className="text-xs font-bold uppercase tracking-wide text-neutral-500">
+                    Recording watermark footer for this tier
+                  </p>
+                  <div className="mt-2 space-y-4">
+                    <div>
+                      <label htmlFor="watermark_text" className={adminLabel}>
+                        Wording <span className="font-normal text-neutral-400">(blank = &quot;{DEFAULT_WATERMARK_TEXT}&quot;)</span>
+                      </label>
+                      <input
+                        id="watermark_text"
+                        name="watermark_text"
+                        defaultValue={editing?.watermark_text ?? ""}
+                        placeholder={DEFAULT_WATERMARK_TEXT}
+                        className={adminInput}
+                      />
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-4">
+                      <div>
+                        <label htmlFor="watermark_font_size_px" className={adminLabel}>
+                          Font size (px) <span className="font-normal text-neutral-400">(blank = auto)</span>
+                        </label>
+                        <input
+                          id="watermark_font_size_px"
+                          name="watermark_font_size_px"
+                          type="number"
+                          min="6"
+                          step="1"
+                          defaultValue={editing?.watermark_font_size_px ?? ""}
+                          placeholder="Auto"
+                          className={adminInput}
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="watermark_font_family" className={adminLabel}>Font type/style</label>
+                        <select
+                          id="watermark_font_family"
+                          name="watermark_font_family"
+                          defaultValue={editing?.watermark_font_family ?? DEFAULT_WATERMARK_FONT_FAMILY}
+                          className={adminInput}
+                        >
+                          {WATERMARK_FONT_OPTIONS.map((f) => (
+                            <option key={f.value} value={f.value}>{f.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label htmlFor="watermark_color" className={adminLabel}>Color</label>
+                        <input
+                          id="watermark_color"
+                          name="watermark_color"
+                          type="color"
+                          defaultValue={editing?.watermark_color ?? DEFAULT_WATERMARK_COLOR}
+                          className={`${adminInput} h-[38px] p-1`}
+                        />
+                      </div>
+                      <div className="flex items-end pb-2">
+                        <label htmlFor="watermark_bold" className="flex items-center gap-2 text-sm text-neutral-700">
+                          <input
+                            id="watermark_bold"
+                            name="watermark_bold"
+                            type="checkbox"
+                            value="true"
+                            defaultChecked={editing?.watermark_bold ?? false}
+                            className="h-4 w-4 rounded border-neutral-300"
+                          />
+                          Boldness
+                        </label>
+                      </div>
+                    </div>
+                    <div>
+                      <label htmlFor="watermark_direction" className={adminLabel}>Direction of font</label>
+                      <select
+                        id="watermark_direction"
+                        name="watermark_direction"
+                        defaultValue={editing?.watermark_direction ?? "ltr"}
+                        className={adminInput}
+                      >
+                        {WATERMARK_DIRECTION_OPTIONS.map((d) => (
+                          <option key={d.value} value={d.value}>{d.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="flex gap-2">

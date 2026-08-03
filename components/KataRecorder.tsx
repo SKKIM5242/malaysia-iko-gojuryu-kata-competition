@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/client";
 import { useRecordAttempt, submitKataVideo } from "@/app/actions/account";
 import BuyExtraAttemptsButton from "@/components/BuyExtraAttemptsButton";
 import { formatDate, formatDateTime } from "@/components/ui";
+import type { WatermarkSettings } from "@/lib/watermark";
+import type { WatermarkDirection } from "@/lib/types";
 
 const MAX_SECONDS = 5 * 60;
 
@@ -41,34 +43,128 @@ function extensionForMimeType(mimeType: string): string {
   return mimeType.startsWith("video/mp4") ? "mp4" : "webm";
 }
 
-/** Light watermark, bottom center of frame -- font size and bottom margin
- * both scale with the actual recorded resolution (was a fixed "8px"/10px,
- * which reads fine on a small preview thumbnail but is practically
- * invisible once phones and tablets started negotiating much taller/wider
- * real camera resolutions than that was ever sized for). Shared by both
- * the portrait and landscape banner layouts below.
+/** Organizer-configurable watermark (Create/Edit Competition page, per
+ * tier) -- font size and margins still scale with the actual recorded
+ * resolution when the organizer leaves size on auto (was always the case
+ * before this was configurable at all: a fixed "8px"/10px read fine on a
+ * small preview thumbnail but was practically invisible once phones and
+ * tablets started negotiating much taller/wider real camera resolutions
+ * than that was ever sized for). Shared by both the portrait and
+ * landscape banner layouts below.
  *
- * The size was purely height-proportional with no check against the
- * frame's WIDTH at all -- fine on a wide landscape frame, but on a narrow
- * portrait one that let the text run past the left/right edges instead of
- * shrinking to fit, same class of bug the title/subtitle already guard
- * against with their own shrink-to-fit loops. */
-function drawWatermark(ctx: CanvasRenderingContext2D, w: number, h: number, watermark: string) {
+ * direction covers 8 layouts: normal horizontal, 4 vertical placements
+ * (top-to-bottom/bottom-to-top, at the left or right border -- done as a
+ * whole-string 90°/-90° rotation, not true character-by-character CJK
+ * vertical stacking), 2 diagonals, and a horizontal right-to-left layout
+ * for CJK-style reading order (via canvas's own built-in `direction`
+ * property, not a rotation). */
+function drawWatermark(ctx: CanvasRenderingContext2D, w: number, h: number, settings: WatermarkSettings) {
+  const { text, fontSizePx, fontFamily, bold, color, direction } = settings;
   ctx.save();
   ctx.globalAlpha = 0.38;
-  ctx.fillStyle = "#ffffff";
+  ctx.fillStyle = color;
   ctx.shadowColor = "rgba(0,0,0,0.55)";
   ctx.shadowBlur = 3;
   ctx.textAlign = "center";
-  let fontPx = Math.max(11, Math.round(h * 0.022));
-  ctx.font = `${fontPx}px Arial, sans-serif`;
-  const maxWidth = w * 0.92;
-  while (fontPx > 7 && ctx.measureText(watermark).width > maxWidth) {
-    fontPx -= 1;
-    ctx.font = `${fontPx}px Arial, sans-serif`;
+
+  const isVertical =
+    direction === "vertical_ltr_left" ||
+    direction === "vertical_rtl_left" ||
+    direction === "vertical_ltr_right" ||
+    direction === "vertical_rtl_right";
+  const isDiagonal = direction === "diagonal_up" || direction === "diagonal_down";
+  // The text's rendered baseline runs along h once rotated vertical, along
+  // roughly the shorter side (with a bit extra for the diagonal's longer
+  // reach corner-to-corner) once diagonal, and along w otherwise.
+  const availableLength = isVertical ? h * 0.9 : isDiagonal ? Math.min(w, h) * 1.3 : w * 0.92;
+
+  const weight = bold ? "900" : "400";
+  let fontPx = fontSizePx ?? Math.max(11, Math.round(h * 0.022));
+  const applyFont = () => {
+    ctx.font = `${weight} ${fontPx}px ${fontFamily}`;
+  };
+  applyFont();
+  // Only auto-shrink when the organizer left size on auto -- an explicit
+  // px value is a deliberate choice, left alone even if it overflows, same
+  // as every other explicit-vs-auto field in this app (e.g. category caps).
+  if (fontSizePx == null) {
+    while (fontPx > 7 && ctx.measureText(text).width > availableLength) {
+      fontPx -= 1;
+      applyFont();
+    }
   }
-  ctx.fillText(watermark, w / 2, h - Math.max(14, Math.round(h * 0.025)));
+
+  const margin = Math.max(14, Math.round(Math.min(w, h) * 0.025));
+  if (direction === "rtl_cjk") ctx.direction = "rtl";
+
+  switch (direction) {
+    case "vertical_ltr_left":
+      ctx.translate(margin + fontPx * 0.8, h / 2);
+      ctx.rotate(Math.PI / 2);
+      ctx.fillText(text, 0, 0);
+      break;
+    case "vertical_rtl_left":
+      ctx.translate(margin + fontPx * 0.8, h / 2);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillText(text, 0, 0);
+      break;
+    case "vertical_ltr_right":
+      ctx.translate(w - margin - fontPx * 0.8, h / 2);
+      ctx.rotate(Math.PI / 2);
+      ctx.fillText(text, 0, 0);
+      break;
+    case "vertical_rtl_right":
+      ctx.translate(w - margin - fontPx * 0.8, h / 2);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillText(text, 0, 0);
+      break;
+    case "diagonal_down": // Left Top to Right Bottom
+      ctx.translate(w / 2, h / 2);
+      ctx.rotate(Math.PI / 4);
+      ctx.fillText(text, 0, 0);
+      break;
+    case "diagonal_up": // Left Bottom to Right Top
+      ctx.translate(w / 2, h / 2);
+      ctx.rotate(-Math.PI / 4);
+      ctx.fillText(text, 0, 0);
+      break;
+    case "rtl_cjk":
+    case "ltr":
+    default:
+      ctx.fillText(text, w / 2, h - margin);
+      break;
+  }
   ctx.restore();
+}
+
+/** CSS equivalent of drawWatermark's positioning switch, for the
+ * desktop-fullscreen DOM overlay (see its render site below) -- same 8
+ * layouts, so the live preview visually matches what's actually burned
+ * into the recording instead of only ever showing the plain horizontal
+ * case regardless of what the organizer picked. position:absolute is
+ * applied by the caller's className; this only returns the placement/
+ * rotation properties that differ per direction. */
+function watermarkOverlayPosition(direction: WatermarkDirection): React.CSSProperties {
+  const base: React.CSSProperties = { textAlign: "center" };
+  switch (direction) {
+    case "vertical_ltr_left":
+      return { ...base, left: "0.5rem", top: "50%", transform: "translateY(-50%) rotate(90deg)" };
+    case "vertical_rtl_left":
+      return { ...base, left: "0.5rem", top: "50%", transform: "translateY(-50%) rotate(-90deg)" };
+    case "vertical_ltr_right":
+      return { ...base, right: "0.5rem", top: "50%", transform: "translateY(-50%) rotate(90deg)" };
+    case "vertical_rtl_right":
+      return { ...base, right: "0.5rem", top: "50%", transform: "translateY(-50%) rotate(-90deg)" };
+    case "diagonal_down": // Left Top to Right Bottom
+      return { ...base, left: "50%", top: "50%", transform: "translate(-50%, -50%) rotate(45deg)" };
+    case "diagonal_up": // Left Bottom to Right Top
+      return { ...base, left: "50%", top: "50%", transform: "translate(-50%, -50%) rotate(-45deg)" };
+    case "rtl_cjk":
+      return { ...base, left: 0, right: 0, bottom: "0.5rem", direction: "rtl" };
+    case "ltr":
+    default:
+      return { ...base, left: 0, right: 0, bottom: "0.5rem" };
+  }
 }
 
 function drawBannerRect(ctx: CanvasRenderingContext2D, w: number, topH: number) {
@@ -93,7 +189,7 @@ function drawFrame(
   video: HTMLVideoElement,
   w: number,
   h: number,
-  watermark: string,
+  watermark: WatermarkSettings,
 ): number {
   ctx.drawImage(video, 0, 0, w, h);
 
@@ -266,7 +362,7 @@ export default function KataRecorder({
   initialAttempts: number;
   maxAttempts: number;
   hasPendingPurchase: boolean;
-  watermark: string;
+  watermark: WatermarkSettings;
   recordingStart?: string | null;
   recordingEnd?: string | null;
   /** Which kata this specific registration is for — shown on the recorder
@@ -1102,13 +1198,25 @@ export default function KataRecorder({
         {/* Watermark's own always-visible layer, same reasoning as the
             banner re-creation above -- the burned-in one can end up
             partially or fully cropped out by desktop's object-cover,
-            whether that's the live canvas or (now) the review video. */}
+            whether that's the live canvas or (now) the review video.
+            Styled/positioned to match what drawWatermark burns into the
+            actual recording -- same font/bold/color/direction -- so the
+            live preview and the submitted file look consistent, not just
+            "a watermark is present somewhere" on each. */}
         {fullscreen && !isMobileDevice && (
           <p
-            className="pointer-events-none absolute inset-x-0 bottom-2 z-20 px-3 text-center text-white/70"
-            style={{ fontSize: "clamp(0.65rem, 0.9vw, 0.9rem)", textShadow: "0 1px 3px rgba(0,0,0,0.85)" }}
+            className="pointer-events-none absolute z-20 whitespace-nowrap px-3"
+            style={{
+              ...watermarkOverlayPosition(watermark.direction),
+              fontFamily: watermark.fontFamily,
+              fontWeight: watermark.bold ? 900 : 400,
+              color: watermark.color,
+              opacity: 0.7,
+              fontSize: watermark.fontSizePx != null ? `${watermark.fontSizePx}px` : "clamp(0.65rem, 0.9vw, 0.9rem)",
+              textShadow: "0 1px 3px rgba(0,0,0,0.85)",
+            }}
           >
-            {watermark}
+            {watermark.text}
           </p>
         )}
         {/* Review (and uploading) shows the actual recorded file, in this
