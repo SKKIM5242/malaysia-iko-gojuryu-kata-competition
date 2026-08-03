@@ -322,14 +322,31 @@ export default function KataRecorder({
       if (!title || !subtitle) return;
       const titleWidth = title.getBoundingClientRect().width;
       const subtitleWidth = subtitle.getBoundingClientRect().width;
+      // Read the CURRENT rendered size off the actual element (whatever
+      // that is right now -- the fallback clamp() the first time this
+      // runs, or a previously-corrected size on a later resize) rather
+      // than assuming a fixed starting point, so this is self-correcting
+      // on every call regardless of what triggered it.
       const currentPx = Number.parseFloat(getComputedStyle(subtitle).fontSize);
       if (titleWidth > 0 && subtitleWidth > 0 && currentPx > 0) {
         setDesktopSubtitleFontPx(currentPx * (titleWidth / subtitleWidth));
       }
     }
     syncSubtitleWidth();
+    // A single measurement right after mount can land before the Georgia
+    // title face has actually finished loading/swapping in, if it wasn't
+    // already cached -- the browser lays out with a fallback font's
+    // (different) metrics for that first pass, so the ratio computed then
+    // can be off. Re-measuring once fonts are confirmed ready, plus once
+    // more on the next frame as a cheap belt-and-suspenders, catches that
+    // without needing to guess how long a swap might take.
+    void document.fonts?.ready?.then(syncSubtitleWidth);
+    const raf = requestAnimationFrame(syncSubtitleWidth);
     window.addEventListener("resize", syncSubtitleWidth);
-    return () => window.removeEventListener("resize", syncSubtitleWidth);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", syncSubtitleWidth);
+    };
   }, [fullscreen, isMobileDevice, phase]);
   // Custom minimal controls for the review player, replacing the browser's
   // native <video controls> entirely -- on iOS, native controls' own
@@ -449,16 +466,38 @@ export default function KataRecorder({
     };
   }, []);
 
-  // Keeps our own state in sync if the browser's own fullscreen exits some
-  // other way than our own button — the OS back gesture/button on mobile,
-  // or Escape on desktop.
+  // This used to collapse our OWN fullscreen state the instant the
+  // browser's native Fullscreen API dropped for ANY reason, on the
+  // assumption that only an intentional exit (OS gesture, Escape) could
+  // cause that. But native fullscreen is also known to drop on its own in
+  // some browsers when a fresh <video> element mounts inside it -- exactly
+  // what happens the moment Stop finishes and the review player appears --
+  // with nothing to do with the participant wanting to leave. That made
+  // full screen "randomly" vanish right after Stop, and again if it had to
+  // remount during replay.
+  //
+  // Our OWN "fullscreen" state (the CSS fixed-inset-0 overlay) is the real
+  // source of truth for whether the recording UI is maximized; the native
+  // API is just a bonus layered on top (per enterFullscreen's own comment).
+  // So instead of following native fullscreen down, this now tries to bring
+  // native fullscreen back INTO sync with our state -- if it drops while we
+  // should still be fullscreen, just re-request it. The explicit "Exit full
+  // screen" button (and the "done" phase) are the only two places that
+  // actually call setFullscreen(false), and by the time this fires for
+  // either of those, `fullscreen` has already updated to false, so the
+  // re-request is correctly skipped -- this doesn't defeat exiting.
   useEffect(() => {
     function onFsChange() {
-      if (!document.fullscreenElement) setFullscreen(false);
+      if (document.fullscreenElement || !fullscreen) return;
+      const el = containerRef.current as
+        | (HTMLDivElement & { webkitRequestFullscreen?: () => Promise<void> })
+        | null;
+      if (el?.requestFullscreen) void el.requestFullscreen().catch(() => {});
+      else if (el?.webkitRequestFullscreen) void el.webkitRequestFullscreen().catch(() => {});
     }
     document.addEventListener("fullscreenchange", onFsChange);
     return () => document.removeEventListener("fullscreenchange", onFsChange);
-  }, []);
+  }, [fullscreen]);
 
   // Full screen now covers the entire flow -- live, recording, AND review
   // (the header/footer should stay gone through the replay + delete/submit
@@ -847,22 +886,6 @@ export default function KataRecorder({
         }
         style={fullscreen ? undefined : { width: previewBoxWidthPx, height: previewBoxHeightPx }}
       >
-        {/* enterFullscreen was only ever called once, from startCamera --
-            exiting fullscreen (during live, recording, or review) had no way
-            back in short of restarting the whole camera flow. This covers
-            every phase that still has an active session to return to; idle
-            hasn't started a camera yet, and "done" already returned its own
-            JSX above (its own auto-exits fullscreen too), so phase can only
-            be live/recording/review/uploading by this point anyway. */}
-        {!fullscreen && phase !== "idle" && (
-          <button
-            type="button"
-            onClick={enterFullscreen}
-            className="absolute right-2 top-2 z-30 rounded border border-white/50 bg-black/45 px-2.5 py-1 text-xs font-semibold text-white hover:bg-black/65"
-          >
-            ⛶ Full screen
-          </button>
-        )}
         {/* Title bar, error banner, the live/recording badges, and the
             review controls all stack in ONE column starting right below the
             burned-in header banner -- previously each piece was
@@ -893,6 +916,29 @@ export default function KataRecorder({
                 : `${bannerRatio * 100}%`,
           }}
         >
+          {/* enterFullscreen was only ever called once, from startCamera --
+              exiting fullscreen (during live, recording, or review) had no
+              way back in short of restarting the whole camera flow. This
+              covers every phase that still has an active session to return
+              to; idle hasn't started a camera yet, and "done" already
+              returned its own JSX above (its own auto-exits fullscreen too),
+              so phase can only be live/recording/review/uploading here.
+              Placed as the FIRST child in this same flex-col stack (not an
+              independently absolute-positioned button) so it can never
+              overlap the banner above it or the Kata Recording/Submit row
+              below it -- normal document flow pushes both automatically,
+              the same reason the rest of this stack never overlaps either. */}
+          {!fullscreen && phase !== "idle" && (
+            <div className="flex justify-end px-2 pt-1">
+              <button
+                type="button"
+                onClick={enterFullscreen}
+                className="rounded border border-white/50 bg-black/45 px-2.5 py-1 text-xs font-semibold text-white hover:bg-black/65"
+              >
+                ⛶ Full screen
+              </button>
+            </div>
+          )}
           {/* Desktop fullscreen crops the LIVE canvas (object-cover) to
               guarantee edge-to-edge fill, which can crop the burned-in
               banner/watermark partially or fully out of view depending on
