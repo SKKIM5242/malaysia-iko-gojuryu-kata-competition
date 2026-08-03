@@ -88,41 +88,34 @@ function drawFrame(
   const maxTitleWidth = w * 0.94;
   const subtitle = "Organized by IKO GOJU-RYU KARATE-DO MALAYSIA SDN BHD";
 
-  // Portrait only: size from the frame's WIDTH (how large the text can get
-  // before needing to shrink to fit) and make the banner just tall enough
-  // to hold it -- a fixed height-proportional slice left a lot of empty
-  // colored background around comparatively small type on a tall portrait
-  // recording. The fit-loop's floor is set by whichever LINE is longest,
-  // not by the starting font guess -- fewer, shorter lines raise that
-  // ceiling: one line was capped by all ~50 characters, two lines by a
-  // 27-character line, these four by a 14-character line at most --
-  // letting the font actually grow further before hitting the same width
-  // limit each time, which is what makes the banner (and its text)
-  // meaningfully bigger, not just a bigger initial guess that the
-  // fit-loop shrinks right back down anyway. Landscape is unchanged (one
-  // line still fits comfortably there, and it was never reported as a
-  // problem).
+  // Portrait only: size the title from the frame's WIDTH (how large it can
+  // get before needing to shrink to fit) and make the banner just tall
+  // enough to hold it -- a fixed height-proportional slice left a lot of
+  // empty colored background around comparatively small type on a tall
+  // portrait recording. Splitting the title across multiple lines was
+  // tried to make it bigger, but the organizer confirmed that reads worse
+  // (the whole point is ONE row, matching landscape's own layout) -- back
+  // to a single line, sized to whatever actually fits, even if that's
+  // smaller than the multi-line version was. Landscape is unchanged.
   if (h > w) {
-    const titleLines = ["MALAYSIA OPEN", "VIRTUAL", "KARATE-DO KATA", "COMPETITION"];
-    let titleFontPx = Math.round(w * 0.15);
+    const bannerTitle = "MALAYSIA OPEN VIRTUAL KARATE-DO KATA COMPETITION";
+    let titleFontPx = Math.round(w * 0.075);
     ctx.font = `900 ${titleFontPx}px Georgia, serif`;
-    while (titleFontPx > 4 && titleLines.some((line) => ctx.measureText(line).width > maxTitleWidth)) {
+    while (titleFontPx > 4 && ctx.measureText(bannerTitle).width > maxTitleWidth) {
       titleFontPx -= 1;
       ctx.font = `900 ${titleFontPx}px Georgia, serif`;
     }
-    let subtitleFontPx = Math.round(titleFontPx * 0.4);
+    let subtitleFontPx = Math.round(titleFontPx * 0.55);
     ctx.font = `${subtitleFontPx}px Arial, sans-serif`;
     while (subtitleFontPx > 3 && ctx.measureText(subtitle).width > maxTitleWidth) {
       subtitleFontPx -= 1;
       ctx.font = `${subtitleFontPx}px Arial, sans-serif`;
     }
-    const padTop = Math.round(titleFontPx * 0.32);
-    const lineGap = Math.round(titleFontPx * 0.14);
-    const subtitleGap = Math.round(titleFontPx * 0.22);
+    const padTop = Math.round(titleFontPx * 0.3);
+    const gap = Math.round(titleFontPx * 0.22);
     const padBottom = Math.round(subtitleFontPx * 0.4);
-    const titleLineHeight = titleFontPx * 0.85 + lineGap;
-    const titleLineYs = titleLines.map((_, i) => padTop + titleFontPx * 0.8 + i * titleLineHeight);
-    const subtitleY = titleLineYs[titleLineYs.length - 1] + titleFontPx * 0.3 + subtitleGap + subtitleFontPx * 0.8;
+    const titleY = padTop + titleFontPx * 0.8;
+    const subtitleY = titleY + titleFontPx * 0.3 + gap + subtitleFontPx * 0.8;
     const topH = Math.round(subtitleY + subtitleFontPx * 0.35 + padBottom);
 
     drawBannerRect(ctx, w, topH);
@@ -131,7 +124,7 @@ function drawFrame(
     ctx.shadowColor = "rgba(0,0,0,0.6)";
     ctx.shadowBlur = 4;
     ctx.font = `900 ${titleFontPx}px Georgia, serif`;
-    titleLines.forEach((line, i) => ctx.fillText(line, w / 2, titleLineYs[i]));
+    ctx.fillText(bannerTitle, w / 2, titleY);
     ctx.font = `${subtitleFontPx}px Arial, sans-serif`;
     ctx.fillText(subtitle, w / 2, subtitleY);
     ctx.shadowBlur = 0;
