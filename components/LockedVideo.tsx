@@ -3,11 +3,13 @@
 import { forwardRef } from "react";
 
 /**
- * The recording player used inside every floating window. The browser's
- * three-dot overflow menu (Download / Picture-in-Picture / playback rate)
- * is only exposed when `allowAdvancedControls` is true — Admin/Organizer
- * only, per the organizer's instruction; everyone else gets plain
- * play/pause/seek/volume/fullscreen controls with right-click disabled.
+ * The recording player used inside every floating window. Playback rate is
+ * always hidden now — normal speed only, no exceptions — per the
+ * organizer's explicit instruction; the browser's three-dot overflow menu
+ * still additionally exposes Download/Picture-in-Picture only when
+ * `allowAdvancedControls` is true (Admin/Organizer), everyone else gets
+ * plain play/pause/seek/volume/fullscreen controls with right-click
+ * disabled.
  */
 const LockedVideo = forwardRef<
   HTMLVideoElement,
@@ -30,10 +32,10 @@ const LockedVideo = forwardRef<
       preload="auto"
       onEnded={onEnded}
       className={className ?? "h-full w-full bg-black object-contain"}
+      controlsList={allowAdvancedControls ? "noplaybackrate" : "nodownload noplaybackrate noremoteplayback"}
       {...(allowAdvancedControls
         ? {}
         : {
-            controlsList: "nodownload noplaybackrate noremoteplayback",
             disablePictureInPicture: true,
             onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
           })}

@@ -264,6 +264,12 @@ export default function KataRecorder({
   const [seconds, setSeconds] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  // A snapshot of the canvas's own last frame, captured synchronously the
+  // instant recording stops -- used as the review <video>'s poster so the
+  // banner/watermark (already burned into that frame) show immediately,
+  // instead of a blank black box while the browser takes a moment to
+  // decode the very first frame of a freshly-created recording blob.
+  const [posterUrl, setPosterUrl] = useState<string | null>(null);
   const [agreementOpen, setAgreementOpen] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const [recordingStartedAt, setRecordingStartedAt] = useState<Date | null>(null);
@@ -502,6 +508,19 @@ export default function KataRecorder({
         const blob = new Blob(chunksRef.current, { type: mimeType });
         recordedBlobRef.current = blob;
         const url = URL.createObjectURL(blob);
+        // Grab the canvas's own last-drawn frame synchronously, right now --
+        // it already has the banner/watermark burned in, same as every frame
+        // in the recording itself, so there's zero decode delay before the
+        // review screen shows them (unlike waiting on the video element to
+        // decode the actual file, which is what previously left a blank/
+        // banner-less gap right after tapping Stop).
+        try {
+          const poster = canvasRef.current?.toDataURL("image/jpeg", 0.85);
+          if (poster) setPosterUrl(poster);
+        } catch {
+          // Best-effort -- a missing poster just falls back to the video's
+          // own first frame once it decodes, not a hard failure.
+        }
         setBlobUrl(url);
         setPhase("review");
         if (timerRef.current) clearInterval(timerRef.current);
@@ -539,6 +558,7 @@ export default function KataRecorder({
     setAttempts(newCount);
     if (blobUrl) URL.revokeObjectURL(blobUrl);
     setBlobUrl(null);
+    setPosterUrl(null);
     recordedBlobRef.current = null;
     setPhase("live");
   }
@@ -828,7 +848,9 @@ export default function KataRecorder({
           <video
             ref={reviewVideoRef}
             src={blobUrl}
+            poster={posterUrl ?? undefined}
             controls
+            controlsList="nodownload noplaybackrate nofullscreen noremoteplayback"
             playsInline
             preload="auto"
             disablePictureInPicture
