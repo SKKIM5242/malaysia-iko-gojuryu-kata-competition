@@ -274,6 +274,17 @@ export default function KataRecorder({
   const [agreed, setAgreed] = useState(false);
   const [recordingStartedAt, setRecordingStartedAt] = useState<Date | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
+  // Custom minimal controls for the review player, replacing the browser's
+  // native <video controls> entirely -- on iOS, native controls' own
+  // fullscreen-toggle icon has an "X"/collapse affordance that doesn't
+  // actually call this component's own exitFullscreen, leaving the
+  // participant stuck in a confusing state with no reliable way out. With
+  // no native controls at all, there's no OS chrome to conflict with the
+  // app's own "✕ Exit full screen" button, which stays the one way to leave.
+  const [reviewPlaying, setReviewPlaying] = useState(false);
+  const [reviewCurrentTime, setReviewCurrentTime] = useState(0);
+  const [reviewDuration, setReviewDuration] = useState(0);
+  const [reviewMuted, setReviewMuted] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -552,6 +563,27 @@ export default function KataRecorder({
     }
   }
 
+  function toggleReviewPlayback() {
+    const v = reviewVideoRef.current;
+    if (!v) return;
+    if (v.paused || v.ended) void v.play();
+    else v.pause();
+  }
+
+  function toggleReviewMute() {
+    const v = reviewVideoRef.current;
+    if (!v) return;
+    v.muted = !v.muted;
+    setReviewMuted(v.muted);
+  }
+
+  function formatPlaybackTime(seconds: number): string {
+    if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${String(s).padStart(2, "0")}`;
+  }
+
   async function handleReRecord() {
     if (!canReRecord) return;
     const newCount = await useRecordAttempt();
@@ -559,6 +591,9 @@ export default function KataRecorder({
     if (blobUrl) URL.revokeObjectURL(blobUrl);
     setBlobUrl(null);
     setPosterUrl(null);
+    setReviewPlaying(false);
+    setReviewCurrentTime(0);
+    setReviewDuration(0);
     recordedBlobRef.current = null;
     setPhase("live");
   }
@@ -843,19 +878,100 @@ export default function KataRecorder({
             "the same recording screen for the replay." The canvas above is
             hidden here since the live camera feed keeps rendering to it in
             the background (still needed if the participant re-records)
-            and would otherwise show through underneath. */}
+            and would otherwise show through underneath.
+
+            No native `controls` at all -- iOS's own native video-fullscreen
+            chrome (its expand icon, its own "X"/close affordance) doesn't
+            call this component's exitFullscreen, leaving no reliable way
+            out once tapped. A small custom bar below (play/pause, seek,
+            mute -- no fullscreen toggle, no playback rate, no download)
+            covers everything a participant reviewing their own take
+            actually needs, with zero OS chrome to conflict with the app's
+            own "✕ Exit full screen" button. */}
         {(phase === "review" || phase === "uploading") && blobUrl && (
-          <video
-            ref={reviewVideoRef}
-            src={blobUrl}
-            poster={posterUrl ?? undefined}
-            controls
-            controlsList="nodownload noplaybackrate nofullscreen noremoteplayback"
-            playsInline
-            preload="auto"
-            disablePictureInPicture
-            className="block h-full w-full object-contain"
-          />
+          <>
+            <video
+              ref={reviewVideoRef}
+              src={blobUrl}
+              poster={posterUrl ?? undefined}
+              playsInline
+              preload="auto"
+              disablePictureInPicture
+              onClick={toggleReviewPlayback}
+              onPlay={() => setReviewPlaying(true)}
+              onPause={() => setReviewPlaying(false)}
+              onEnded={() => setReviewPlaying(false)}
+              onTimeUpdate={(e) => setReviewCurrentTime(e.currentTarget.currentTime)}
+              onLoadedMetadata={(e) => {
+                const v = e.currentTarget;
+                if (Number.isFinite(v.duration)) {
+                  setReviewDuration(v.duration);
+                  return;
+                }
+                // A freshly-created MediaRecorder blob commonly reports
+                // duration as Infinity in Chrome until the file is actually
+                // seeked through once -- without this, the seek bar below
+                // would have no usable max and never show a real length.
+                const onProbeTimeUpdate = () => {
+                  v.currentTime = 0;
+                  v.removeEventListener("timeupdate", onProbeTimeUpdate);
+                  setReviewDuration(Number.isFinite(v.duration) ? v.duration : 0);
+                };
+                v.addEventListener("timeupdate", onProbeTimeUpdate);
+                v.currentTime = Number.MAX_SAFE_INTEGER;
+              }}
+              className="block h-full w-full object-contain"
+            />
+            {!reviewPlaying && (
+              <button
+                type="button"
+                onClick={toggleReviewPlayback}
+                aria-label="Play"
+                className="absolute left-1/2 top-1/2 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-3xl text-white shadow-lg"
+              >
+                ▶
+              </button>
+            )}
+            <div className="absolute inset-x-0 bottom-0 z-10 flex flex-col gap-1.5 bg-gradient-to-t from-black/75 to-transparent px-3 pb-3 pt-10">
+              <input
+                type="range"
+                min={0}
+                max={reviewDuration || 0}
+                step={0.1}
+                value={Math.min(reviewCurrentTime, reviewDuration || 0)}
+                onChange={(e) => {
+                  const t = Number(e.target.value);
+                  if (reviewVideoRef.current) reviewVideoRef.current.currentTime = t;
+                  setReviewCurrentTime(t);
+                }}
+                aria-label="Seek"
+                className="h-1.5 w-full cursor-pointer accent-red-600"
+              />
+              <div className="flex items-center justify-between gap-2 text-xs font-semibold text-white">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={toggleReviewPlayback}
+                    aria-label={reviewPlaying ? "Pause" : "Play"}
+                    className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 hover:bg-white/30"
+                  >
+                    {reviewPlaying ? "❚❚" : "▶"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={toggleReviewMute}
+                    aria-label={reviewMuted ? "Unmute" : "Mute"}
+                    className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 hover:bg-white/30"
+                  >
+                    {reviewMuted ? "🔇" : "🔊"}
+                  </button>
+                </div>
+                <span style={{ textShadow: "0 1px 2px rgba(0,0,0,0.8)" }}>
+                  {formatPlaybackTime(reviewCurrentTime)} / {formatPlaybackTime(reviewDuration)}
+                </span>
+              </div>
+            </div>
+          </>
         )}
         {phase === "idle" && (
           <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center text-neutral-300">
@@ -902,18 +1018,28 @@ export default function KataRecorder({
               onClick={enterFullscreen}
               aria-label="Full screen"
               title="Fill the whole phone/tablet screen for recording, header and footer temporarily hidden"
-              className="absolute bottom-3 right-3 flex h-11 w-11 items-center justify-center rounded-md border border-white/50 bg-black/60 text-lg text-white shadow-lg"
+              className={
+                // Clears the review screen's own bottom control bar (seek/
+                // play/mute, roughly the bottom ~90px) -- live/recording
+                // have nothing else down there, so sitting a bit higher
+                // there too is harmless, just avoids two different
+                // positions for one button depending on phase.
+                (phase === "review" || phase === "uploading" ? "bottom-24" : "bottom-3") +
+                " absolute right-3 flex h-11 w-11 items-center justify-center rounded-md border border-white/50 bg-black/60 text-lg text-white shadow-lg"
+              }
             >
               ⛶
             </button>
           )}
         {/* Only shown once there's an actual submitted/reviewable take --
             bottom-center, plain white text (no background box) so it reads
-            as part of the recording itself, right above the burned-in
-            watermark rather than competing with the video controls bar. */}
+            as part of the recording itself. Sits above the custom seek/
+            play/mute bar now (that bar occupies roughly the bottom ~90px),
+            not right above the burned-in watermark as before -- the bar's
+            own gradient already covers that area. */}
         {phase === "review" && recordingStartedAt && (
           <div
-            className="pointer-events-none absolute inset-x-0 bottom-12 text-center text-xs font-semibold text-white"
+            className="pointer-events-none absolute inset-x-0 bottom-20 text-center text-xs font-semibold text-white"
             style={{ textShadow: "0 1px 3px rgba(0,0,0,0.85)" }}
           >
             Recording dated {formatDateTime(recordingStartedAt.toISOString())}
