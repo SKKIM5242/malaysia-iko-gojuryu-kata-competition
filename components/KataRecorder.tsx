@@ -400,69 +400,56 @@ export default function KataRecorder({
   useEffect(() => {
     setIsMobileDevice(/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent));
   }, []);
-  // Shrinks the title to fit the banner's actual available width, then
-  // measures its actual rendered width and scales the subtitle's OWN
-  // font-size (not a transform -- that would visually squash/stretch the
-  // letterforms) so its rendered width matches -- instead of guessing at a
-  // fixed ratio between two strings of different length and weight that
-  // render at different widths per character. useLayoutEffect (not
-  // useEffect) so the correction lands before paint -- no visible flash
-  // from the fallback/natural size to the corrected one.
+  // Sizes the title and subtitle to each occupy a fixed, deliberate
+  // fraction of the banner's own width -- 95% and 76% respectively, the
+  // organizer's explicit spec -- rather than the subtitle merely matching
+  // whatever width the title happens to render at. Text width scales
+  // almost exactly linearly with font-size for a fixed string/font/weight,
+  // so one proportional correction from the current rendered width to the
+  // target width lands very close; a second pass immediately after
+  // tightens it further. useLayoutEffect (not useEffect) so the correction
+  // lands before paint -- no visible flash from the natural size to the
+  // corrected one.
   const desktopTitleRef = useRef<HTMLParagraphElement>(null);
   const desktopSubtitleRef = useRef<HTMLParagraphElement>(null);
   const [desktopTitleFontPx, setDesktopTitleFontPx] = useState<number | null>(null);
   const [desktopSubtitleFontPx, setDesktopSubtitleFontPx] = useState<number | null>(null);
   useLayoutEffect(() => {
     if (!(fullscreen && !isMobileDevice)) return;
+    function fitToWidthFraction(el: HTMLElement, container: HTMLElement, targetFraction: number) {
+      const cs = getComputedStyle(container);
+      const available = container.clientWidth - Number.parseFloat(cs.paddingLeft) - Number.parseFloat(cs.paddingRight);
+      const targetWidth = available * targetFraction;
+      // Reset first so every call re-derives from the natural clamp()
+      // size for the CURRENT container width, not a stale prior
+      // correction -- otherwise a size fitted while narrow would never
+      // grow back after rotating wider or unfolding a foldable.
+      el.style.fontSize = "";
+      let px = Number.parseFloat(getComputedStyle(el).fontSize);
+      for (let pass = 0; pass < 2 && px > 0; pass++) {
+        const currentWidth = el.getBoundingClientRect().width;
+        if (currentWidth <= 0) break;
+        px = Math.max(6, px * (targetWidth / currentWidth));
+        el.style.fontSize = `${px}px`;
+      }
+      return px;
+    }
     function syncBannerText() {
       const title = desktopTitleRef.current;
       const subtitle = desktopSubtitleRef.current;
       const container = title?.parentElement;
       if (!title || !subtitle || !container) return;
-      // Clear any earlier shrink first so every call re-measures from the
-      // natural clamp()-derived size for the CURRENT container width --
-      // the title's own 47-character, all-caps, bold string comfortably
-      // fits a real laptop/monitor width (what the clamp() was tuned for)
-      // but can outright overflow a phone- or tablet-width screen, which
-      // this same crop+overlay branch can now also land on (a Surface Duo,
-      // Nest Hub, or foldable's user-agent doesn't always read as
-      // "mobile"). Resetting first means a shrink applied while narrow
-      // also grows back after rotating wider or unfolding, instead of
-      // ratcheting down permanently or surviving a stale prior measurement.
-      title.style.fontSize = "";
-      const cs = getComputedStyle(container);
-      const maxWidth = container.clientWidth - Number.parseFloat(cs.paddingLeft) - Number.parseFloat(cs.paddingRight);
-      let titlePx = Number.parseFloat(getComputedStyle(title).fontSize);
-      let shrunk = false;
-      let guard = 0;
-      while (title.getBoundingClientRect().width > maxWidth && titlePx > 8 && guard < 60) {
-        titlePx -= 1;
-        title.style.fontSize = `${titlePx}px`;
-        shrunk = true;
-        guard += 1;
-      }
-      setDesktopTitleFontPx(shrunk ? titlePx : null);
-      // Read the CURRENT rendered size off the actual element (whatever
-      // that is right now -- the fallback clamp() the first time this
-      // runs, or a previously-corrected size on a later resize) rather
-      // than assuming a fixed starting point, so this is self-correcting
-      // on every call regardless of what triggered it.
-      const titleWidth = title.getBoundingClientRect().width;
-      const subtitleWidth = subtitle.getBoundingClientRect().width;
-      const currentSubtitlePx = Number.parseFloat(getComputedStyle(subtitle).fontSize);
-      if (titleWidth > 0 && subtitleWidth > 0 && currentSubtitlePx > 0) {
-        setDesktopSubtitleFontPx(currentSubtitlePx * (titleWidth / subtitleWidth));
-      }
+      setDesktopTitleFontPx(fitToWidthFraction(title, container, 0.95));
+      setDesktopSubtitleFontPx(fitToWidthFraction(subtitle, container, 0.76));
     }
     syncBannerText();
     // A single measurement right after mount can land before the Georgia
     // title face has actually finished loading/swapping in, if it wasn't
     // already cached -- the browser lays out with a fallback font's
-    // (different) metrics for that first pass, so both the shrink and the
-    // ratio computed then can be off. Re-measuring once fonts are
-    // confirmed ready, plus once more on the next frame as a cheap
-    // belt-and-suspenders, catches that without needing to guess how long
-    // a swap might take.
+    // (different) metrics for that first pass, so the fit computed then
+    // can be off. Re-measuring once fonts are confirmed ready, plus once
+    // more on the next frame as a cheap belt-and-suspenders, catches that
+    // without needing to guess how long a swap might take.
     void document.fonts?.ready?.then(syncBannerText);
     const raf = requestAnimationFrame(syncBannerText);
     window.addEventListener("resize", syncBannerText);
@@ -921,6 +908,49 @@ export default function KataRecorder({
     // already lines up correctly as-is.
   }
 
+  // Desktop's object-cover crop can trim so little off the top/bottom that
+  // the REAL banner/watermark burned into the canvas (or, during review,
+  // into the recorded file) is still fully or mostly on screen -- showing
+  // the separate DOM copy on top of that then looks like a visible
+  // duplicate, not a helpful fallback. Rather than a strict "any crop at
+  // all" cutoff (which would hide the DOM copy over even an imperceptible
+  // 1% trim) or "some crop happened" (which would defeat the DOM copy's
+  // whole purpose the moment ANY crop occurs), this computes how much of
+  // each element's own burned-in band actually survives the crop and only
+  // shows the DOM copy once that drops below a "no longer reads cleanly
+  // on its own" threshold.
+  let desktopVerticalCropFraction = 0;
+  if (fullscreen && !isMobileDevice && viewport.w > 0 && viewport.h > 0) {
+    const containerRatio = viewport.w / viewport.h;
+    if (Number.isFinite(containerRatio) && previewRatio <= containerRatio) {
+      // Video relatively taller/narrower than the container -> object-cover
+      // matches width and crops top/bottom, split evenly between the two.
+      const renderedH = viewport.w / previewRatio;
+      if (renderedH > 0) {
+        desktopVerticalCropFraction = Math.max(0, (renderedH - viewport.h) / renderedH / 2);
+      }
+    }
+    // else: crops left/right only (video relatively wider than the
+    // container) -- never touches a top/bottom band at all, fraction stays 0.
+  }
+  const BURNED_IN_SURVIVES_THRESHOLD = 0.85;
+  const bannerBurnedInSurvives =
+    bannerRatio > 0 && 1 - desktopVerticalCropFraction / bannerRatio >= BURNED_IN_SURVIVES_THRESHOLD;
+  const showDesktopBannerOverlay = fullscreen && !isMobileDevice && !bannerBurnedInSurvives;
+  // The watermark's own burned-in band height isn't tracked as precisely
+  // as the banner's (drawWatermark doesn't report one back) -- 10% of the
+  // frame height is a generous estimate of its margin+text band for the
+  // two directions that actually sit in a horizontal strip at the top or
+  // bottom edge. The other six (vertical/diagonal) run along a much
+  // longer, differently shaped path this top/bottom crop math doesn't
+  // describe, so those keep always showing the DOM copy, same as before.
+  const WATERMARK_BAND_RATIO = 0.1;
+  const watermarkIsHorizontalBand = watermark.direction === "ltr" || watermark.direction === "rtl_cjk";
+  const watermarkBurnedInSurvives =
+    watermarkIsHorizontalBand && 1 - desktopVerticalCropFraction / WATERMARK_BAND_RATIO >= BURNED_IN_SURVIVES_THRESHOLD;
+  const showDesktopWatermarkOverlay =
+    fullscreen && !isMobileDevice && !(watermarkIsHorizontalBand && watermarkBurnedInSurvives);
+
   if (phase === "done") {
     return (
       <div className="rounded-lg border border-green-300 bg-green-50 p-8 text-center">
@@ -1099,14 +1129,16 @@ export default function KataRecorder({
               too, since review playback had its own "screen gets smaller"
               complaint once it was left on object-contain while live was
               already filling the screen. Either way, cropping can remove the
-              burned-in banner/watermark partially or fully depending on how
-              far the camera's own aspect ratio is from the screen's, so this
-              re-creates the banner as its own always-visible layer on top,
-              never at the mercy of that crop, for every phase that crops.
-              Mobile is untouched: it still uses object-contain everywhere
-              (never crops), so its own burned-in banner is already fully
-              visible without needing this. */}
-          {fullscreen && !isMobileDevice && (
+              burned-in banner partially or fully depending on how far the
+              camera's own aspect ratio is from the screen's, so this
+              re-creates the banner as its own layer on top -- but only
+              when showDesktopBannerOverlay says the crop has actually
+              eaten enough of the real one that this is a fallback rather
+              than a visible duplicate sitting on top of an already-fine
+              burned-in banner. Mobile is untouched: it still uses
+              object-contain everywhere (never crops), so its own burned-in
+              banner is already fully visible without needing this. */}
+          {showDesktopBannerOverlay && (
             <div
               className="px-4 py-3 text-center text-white"
               style={{
@@ -1253,15 +1285,17 @@ export default function KataRecorder({
               : "hidden"
           }
         />
-        {/* Watermark's own always-visible layer, same reasoning as the
-            banner re-creation above -- the burned-in one can end up
-            partially or fully cropped out by desktop's object-cover,
-            whether that's the live canvas or (now) the review video.
-            Styled/positioned to match what drawWatermark burns into the
-            actual recording -- same font/bold/color/direction -- so the
-            live preview and the submitted file look consistent, not just
-            "a watermark is present somewhere" on each. */}
-        {fullscreen && !isMobileDevice && (
+        {/* Watermark's own layer, same reasoning and same
+            showDesktopWatermarkOverlay gating as the banner above -- the
+            burned-in one can end up partially or fully cropped out by
+            desktop's object-cover, whether that's the live canvas or (now)
+            the review video, but when the crop barely touches it this DOM
+            copy would just double up on top of the still-visible burned-in
+            one. Styled/positioned to match what drawWatermark burns into
+            the actual recording -- same font/bold/color/direction -- so
+            the live preview and the submitted file look consistent when
+            this IS showing. */}
+        {showDesktopWatermarkOverlay && (
           <p
             className="pointer-events-none absolute z-20 whitespace-nowrap px-3"
             style={{
