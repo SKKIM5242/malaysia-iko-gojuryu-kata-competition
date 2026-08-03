@@ -837,17 +837,35 @@ export default function KataRecorder({
             lines over whatever's playing underneath. */}
         <div
           className="absolute inset-x-0 z-20 flex flex-col"
-          style={{ top: fullscreen && !isMobileDevice ? 0 : `${bannerRatio * 100}%` }}
+          style={{
+            // True top only while the desktop-only banner overlay below is
+            // actually showing (live/recording) -- review's "Kata Recording"
+            // bar needs to fall back to the ORIGINAL bannerRatio-based math,
+            // unchanged from before any of this, so it still lines up under
+            // the review <video>'s own object-contain'd (never cropped)
+            // burned-in banner instead of sitting at true top over it.
+            top:
+              fullscreen && !isMobileDevice && (phase === "live" || phase === "recording")
+                ? 0
+                : `${bannerRatio * 100}%`,
+          }}
         >
-          {/* Desktop fullscreen crops the canvas (object-cover) to guarantee
-              edge-to-edge fill, which can crop the burned-in banner/watermark
-              partially or fully out of view depending on how far the camera's
-              own aspect ratio is from the screen's -- this re-creates the
-              banner as its own always-visible layer on top, so it's never at
-              the mercy of that crop. Mobile is untouched: it still uses
-              object-contain (never crops), so the canvas's own burned-in
-              banner is already fully visible there without needing this. */}
-          {fullscreen && !isMobileDevice && (
+          {/* Desktop fullscreen crops the LIVE canvas (object-cover) to
+              guarantee edge-to-edge fill, which can crop the burned-in
+              banner/watermark partially or fully out of view depending on
+              how far the camera's own aspect ratio is from the screen's --
+              this re-creates the banner as its own always-visible layer on
+              top, so it's never at the mercy of that crop. Mobile is
+              untouched: it still uses object-contain (never crops), so the
+              canvas's own burned-in banner is already fully visible there
+              without needing this.
+              Gated to live/recording only, same as the watermark overlay
+              below -- review plays back the actual recorded FILE in a plain
+              object-contain <video> (never cropped, so its own burned-in
+              banner is already fully visible on its own), and this overlay
+              rendering there too just doubled it up, drifting out of
+              alignment as the object-contain video shrinks to fit. */}
+          {fullscreen && !isMobileDevice && (phase === "live" || phase === "recording") && (
             <div
               className="px-4 py-3 text-center text-white"
               style={{
