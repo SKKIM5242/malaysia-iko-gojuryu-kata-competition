@@ -225,7 +225,15 @@ function daysBetween(from: Date, to: Date): number {
  * fights the sensor's native orientation on real devices. Confirmed on
  * device: request the SENSOR-shaped shape opposite the screen's own
  * orientation, scaled to this device's own measured proportions rather
- * than a fixed preset. */
+ * than a fixed preset.
+ *
+ * That inversion is a PHONE-only quirk, though -- a desktop/laptop webcam
+ * has no such physical rotation, so inverting there instead asks for a
+ * narrow portrait frame from a sensor that's always landscape, and the
+ * driver hands back a badly cropped sliver instead of the full picture.
+ * That's exactly what left desktop's fullscreen view heavily letterboxed
+ * left/right even after the phone-orientation fix above. Desktop requests
+ * the SAME shape as its own screen, never inverted. */
 function idealVideoDimensions(): { width: number; height: number } {
   if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
     return { width: 1280, height: 720 };
@@ -235,7 +243,15 @@ function idealVideoDimensions(): { width: number; height: number } {
   const screenShort = Math.max(Math.min(window.innerWidth, window.innerHeight), 240);
   const longEdge = 1280;
   const shortEdge = Math.max(400, Math.round(longEdge * (screenShort / screenLong)));
-  return landscape ? { width: shortEdge, height: longEdge } : { width: longEdge, height: shortEdge };
+  const isMobile = typeof navigator !== "undefined" && /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  // Phones: always request the shape OPPOSITE the screen (the sensor-
+  // rotation quirk this function exists for). Desktop: always request the
+  // SAME shape as the screen -- a webcam has no rotated sensor to correct
+  // for, so matching is what actually fills the frame instead of
+  // letterboxing it.
+  const matchesScreen = landscape ? { width: longEdge, height: shortEdge } : { width: shortEdge, height: longEdge };
+  const opposesScreen = landscape ? { width: shortEdge, height: longEdge } : { width: longEdge, height: shortEdge };
+  return isMobile ? opposesScreen : matchesScreen;
 }
 
 export default function KataRecorder({
