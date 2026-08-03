@@ -58,7 +58,18 @@ function extensionForMimeType(mimeType: string): string {
  * vertical stacking), 2 diagonals, and a horizontal right-to-left layout
  * for CJK-style reading order (via canvas's own built-in `direction`
  * property, not a rotation). */
-function drawWatermark(ctx: CanvasRenderingContext2D, w: number, h: number, settings: WatermarkSettings) {
+/** Draws the watermark and, for the two horizontal (top/bottom-edge)
+ * directions only, returns how much of the frame's height its own drawn
+ * band actually occupies -- measured from real glyph metrics (
+ * actualBoundingBoxAscent), not guessed -- as the fraction from the band's
+ * OWN top edge down to the frame's bottom edge (mirroring how the caller's
+ * bannerRatio already measures the banner's own bottom edge down from the
+ * frame's TOP). The desktop-fullscreen DOM watermark overlay uses this to
+ * decide whether the burned-in one survives an object-cover crop well
+ * enough on its own. Returns null for the six vertical/diagonal
+ * directions, which don't sit in a single top/bottom band this can
+ * describe. */
+function drawWatermark(ctx: CanvasRenderingContext2D, w: number, h: number, settings: WatermarkSettings): number | null {
   const { text, fontSizePx, fontFamily, bold, color, direction } = settings;
   ctx.save();
   ctx.globalAlpha = 0.38;
@@ -130,11 +141,16 @@ function drawWatermark(ctx: CanvasRenderingContext2D, w: number, h: number, sett
       break;
     case "rtl_cjk":
     case "ltr":
-    default:
+    default: {
       ctx.fillText(text, w / 2, h - margin);
-      break;
+      const metrics = ctx.measureText(text);
+      const ascent = metrics.actualBoundingBoxAscent || fontPx * 0.8;
+      ctx.restore();
+      return (margin + ascent) / h;
+    }
   }
   ctx.restore();
+  return null;
 }
 
 /** CSS equivalent of drawWatermark's positioning switch, for the
@@ -181,16 +197,18 @@ function drawBannerRect(ctx: CanvasRenderingContext2D, w: number, topH: number) 
 /** Draws the branded competition frame: colorful title banner, live camera
  * feed, and a light watermark — all burned into the recorded pixels via
  * canvas.captureStream(), never the raw camera feed. Returns the banner's
- * height as a fraction of the frame height, so the caller can line up the
- * DOM title bar directly underneath it instead of guessing a fixed
- * percentage that may not match what got drawn. */
+ * height and (for the two horizontal watermark directions) the
+ * watermark's own band height, both as a fraction of the frame height, so
+ * the caller can line up the DOM title bar and decide the DOM watermark
+ * overlay's visibility against what actually got drawn instead of
+ * guessing a fixed percentage. */
 function drawFrame(
   ctx: CanvasRenderingContext2D,
   video: HTMLVideoElement,
   w: number,
   h: number,
   watermark: WatermarkSettings,
-): number {
+): { bannerRatio: number; watermarkBandRatio: number | null } {
   ctx.drawImage(video, 0, 0, w, h);
 
   const maxTitleWidth = w * 0.97;
@@ -252,8 +270,8 @@ function drawFrame(
     ctx.fillText(subtitle, w / 2, subtitleY);
     ctx.shadowBlur = 0;
 
-    drawWatermark(ctx, w, h, watermark);
-    return topH / h;
+    const watermarkBandRatio = drawWatermark(ctx, w, h, watermark);
+    return { bannerRatio: topH / h, watermarkBandRatio };
   }
 
   // Landscape: unchanged single-line layout, sized from the frame's height.
@@ -291,8 +309,8 @@ function drawFrame(
   ctx.fillText(subtitle, w / 2, subtitleY);
   ctx.shadowBlur = 0;
 
-  drawWatermark(ctx, w, h, watermark);
-  return topH / h;
+  const watermarkBandRatio = drawWatermark(ctx, w, h, watermark);
+  return { bannerRatio: topH / h, watermarkBandRatio };
 }
 
 function daysBetween(from: Date, to: Date): number {
@@ -400,15 +418,17 @@ export default function KataRecorder({
   useEffect(() => {
     setIsMobileDevice(/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent));
   }, []);
-  // Sizes the title and subtitle to each occupy a fixed, deliberate
-  // fraction of the banner's own width -- 95% and 76% respectively, the
-  // organizer's explicit spec -- rather than the subtitle merely matching
-  // whatever width the title happens to render at. Text width scales
-  // almost exactly linearly with font-size for a fixed string/font/weight,
-  // so one proportional correction from the current rendered width to the
-  // target width lands very close; a second pass immediately after
-  // tightens it further. useLayoutEffect (not useEffect) so the correction
-  // lands before paint -- no visible flash from the natural size to the
+  // Sizes the title to occupy a fixed, deliberate fraction of the banner's
+  // own width (95%, the organizer's explicit spec) and the subtitle to
+  // occupy 88% -- but capped at 20% bigger than the subtitle's own natural
+  // (clamp()-derived) size, since growing it enough to hit 88% outright
+  // would make it look nearly as prominent as the title, defeating the
+  // point of it being a subtitle. Text width scales almost exactly
+  // linearly with font-size for a fixed string/font/weight, so one
+  // proportional correction from the current rendered width to the target
+  // width lands very close; a second pass immediately after tightens it
+  // further. useLayoutEffect (not useEffect) so the correction lands
+  // before paint -- no visible flash from the natural size to the
   // corrected one.
   const desktopTitleRef = useRef<HTMLParagraphElement>(null);
   const desktopSubtitleRef = useRef<HTMLParagraphElement>(null);
@@ -416,20 +436,28 @@ export default function KataRecorder({
   const [desktopSubtitleFontPx, setDesktopSubtitleFontPx] = useState<number | null>(null);
   useLayoutEffect(() => {
     if (!(fullscreen && !isMobileDevice)) return;
-    function fitToWidthFraction(el: HTMLElement, container: HTMLElement, targetFraction: number) {
+    function fitToWidthFraction(
+      el: HTMLElement,
+      container: HTMLElement,
+      targetFraction: number,
+      maxGrowthMultiplier = Infinity,
+    ) {
       const cs = getComputedStyle(container);
       const available = container.clientWidth - Number.parseFloat(cs.paddingLeft) - Number.parseFloat(cs.paddingRight);
       const targetWidth = available * targetFraction;
       // Reset first so every call re-derives from the natural clamp()
       // size for the CURRENT container width, not a stale prior
       // correction -- otherwise a size fitted while narrow would never
-      // grow back after rotating wider or unfolding a foldable.
+      // grow back after rotating wider or unfolding a foldable, and the
+      // growth cap below would be measured against the wrong baseline.
       el.style.fontSize = "";
-      let px = Number.parseFloat(getComputedStyle(el).fontSize);
+      const naturalPx = Number.parseFloat(getComputedStyle(el).fontSize);
+      const maxPx = naturalPx * maxGrowthMultiplier;
+      let px = naturalPx;
       for (let pass = 0; pass < 2 && px > 0; pass++) {
         const currentWidth = el.getBoundingClientRect().width;
         if (currentWidth <= 0) break;
-        px = Math.max(6, px * (targetWidth / currentWidth));
+        px = Math.max(6, Math.min(px * (targetWidth / currentWidth), maxPx));
         el.style.fontSize = `${px}px`;
       }
       return px;
@@ -440,7 +468,7 @@ export default function KataRecorder({
       const container = title?.parentElement;
       if (!title || !subtitle || !container) return;
       setDesktopTitleFontPx(fitToWidthFraction(title, container, 0.95));
-      setDesktopSubtitleFontPx(fitToWidthFraction(subtitle, container, 0.76));
+      setDesktopSubtitleFontPx(fitToWidthFraction(subtitle, container, 0.88, 1.2));
     }
     syncBannerText();
     // A single measurement right after mount can land before the Georgia
@@ -500,6 +528,12 @@ export default function KataRecorder({
   // orientation and how much the banner's own text needed to shrink.
   const [bannerRatio, setBannerRatio] = useState(0.13);
   const bannerRatioRef = useRef(0.13);
+  // Same idea as bannerRatio, for the watermark's own band (horizontal
+  // directions only -- see drawWatermark) -- the desktop DOM watermark
+  // overlay uses this real, measured value instead of guessing how much
+  // of the frame height the burned-in watermark actually occupies.
+  const [watermarkBandRatio, setWatermarkBandRatio] = useState<number | null>(null);
+  const watermarkBandRatioRef = useRef<number | null>(null);
   // CSS `aspect-ratio` on a plain block element doesn't shrink-to-fit the
   // way it does on a replaced element (img/video) -- a statically-positioned
   // div with width:auto fills its container's full width first, THEN derives
@@ -698,10 +732,25 @@ export default function KataRecorder({
     }
     const ctx = canvas.getContext("2d");
     if (ctx) {
-      const newBannerRatio = drawFrame(ctx, video, canvas.width, canvas.height, watermark);
+      const { bannerRatio: newBannerRatio, watermarkBandRatio: newWatermarkBandRatio } = drawFrame(
+        ctx,
+        video,
+        canvas.width,
+        canvas.height,
+        watermark,
+      );
       if (Number.isFinite(newBannerRatio) && newBannerRatio > 0 && Math.abs(bannerRatioRef.current - newBannerRatio) > 0.002) {
         bannerRatioRef.current = newBannerRatio;
         setBannerRatio(newBannerRatio);
+      }
+      const prevWatermarkBandRatio = watermarkBandRatioRef.current;
+      const watermarkBandRatioChanged =
+        newWatermarkBandRatio == null
+          ? prevWatermarkBandRatio != null
+          : prevWatermarkBandRatio == null || Math.abs(prevWatermarkBandRatio - newWatermarkBandRatio) > 0.002;
+      if (watermarkBandRatioChanged) {
+        watermarkBandRatioRef.current = newWatermarkBandRatio;
+        setWatermarkBandRatio(newWatermarkBandRatio);
       }
     }
     rafRef.current = requestAnimationFrame(renderLoop);
@@ -937,17 +986,19 @@ export default function KataRecorder({
   const bannerBurnedInSurvives =
     bannerRatio > 0 && 1 - desktopVerticalCropFraction / bannerRatio >= BURNED_IN_SURVIVES_THRESHOLD;
   const showDesktopBannerOverlay = fullscreen && !isMobileDevice && !bannerBurnedInSurvives;
-  // The watermark's own burned-in band height isn't tracked as precisely
-  // as the banner's (drawWatermark doesn't report one back) -- 10% of the
-  // frame height is a generous estimate of its margin+text band for the
-  // two directions that actually sit in a horizontal strip at the top or
-  // bottom edge. The other six (vertical/diagonal) run along a much
-  // longer, differently shaped path this top/bottom crop math doesn't
-  // describe, so those keep always showing the DOM copy, same as before.
-  const WATERMARK_BAND_RATIO = 0.1;
+  // The watermark's own burned-in band height, same real-measured-not-
+  // guessed idea as bannerRatio (see drawWatermark's return value) -- only
+  // populated for the two directions that actually sit in a horizontal
+  // strip at the top or bottom edge; null both before the first frame has
+  // rendered and for the other six (vertical/diagonal), which run along a
+  // much longer, differently shaped path this top/bottom crop math can't
+  // describe, so those (and that brief startup window) keep always
+  // showing the DOM copy, same as before.
   const watermarkIsHorizontalBand = watermark.direction === "ltr" || watermark.direction === "rtl_cjk";
   const watermarkBurnedInSurvives =
-    watermarkIsHorizontalBand && 1 - desktopVerticalCropFraction / WATERMARK_BAND_RATIO >= BURNED_IN_SURVIVES_THRESHOLD;
+    watermarkIsHorizontalBand &&
+    watermarkBandRatio != null &&
+    1 - desktopVerticalCropFraction / watermarkBandRatio >= BURNED_IN_SURVIVES_THRESHOLD;
   const showDesktopWatermarkOverlay =
     fullscreen && !isMobileDevice && !(watermarkIsHorizontalBand && watermarkBurnedInSurvives);
 
@@ -1062,8 +1113,19 @@ export default function KataRecorder({
 
       <div
         className={
+          // h-full (not h-[100dvh]) -- this div's own parent (containerRef,
+          // just above) is already `fixed inset-0`, which the browser
+          // always resolves to the EXACT viewport box directly (no unit
+          // conversion involved at all), so inheriting that via a plain
+          // percentage is strictly more reliable than re-deriving the
+          // viewport height a second time through a dvh calculation --
+          // some emulated/embedded viewports (device-toolbar previews in
+          // particular) have been seen resolving 100dvh a little short of
+          // the real fixed box, leaving a sliver at the very bottom edge
+          // where whatever else on the page also sits fixed-to-bottom
+          // (the site footer) could show through.
           fullscreen
-            ? "relative h-[100dvh] w-full overflow-hidden bg-black"
+            ? "relative h-full w-full overflow-hidden bg-black"
             : "relative mx-auto overflow-hidden rounded-lg border border-neutral-300 bg-black"
         }
         style={fullscreen ? undefined : { width: previewBoxWidthPx, height: previewBoxHeightPx }}
