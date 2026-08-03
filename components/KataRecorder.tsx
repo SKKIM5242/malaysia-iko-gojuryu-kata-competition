@@ -458,8 +458,20 @@ export default function KataRecorder({
     setError(null);
     try {
       const { width, height } = idealVideoDimensions();
+      // aspectRatio alongside width/height: a webcam's supported resolution
+      // list rarely contains the exact pixels requested, and browsers weigh
+      // width/height "ideal" hints fairly loosely when picking among what's
+      // actually available. Giving the ratio explicitly too makes shape
+      // matching (not just pixel count) part of what the browser optimizes
+      // for, so it's less likely to hand back something needlessly narrower
+      // than the screen even when it can't hit the exact size requested.
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment", width: { ideal: width }, height: { ideal: height } },
+        video: {
+          facingMode: "environment",
+          width: { ideal: width },
+          height: { ideal: height },
+          aspectRatio: { ideal: width / height },
+        },
         audio: true,
       });
       streamRef.current = stream;
