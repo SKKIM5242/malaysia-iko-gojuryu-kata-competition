@@ -53,7 +53,11 @@ function extensionForMimeType(mimeType: string): string {
  * portrait one that let the text run past the left/right edges instead of
  * shrinking to fit, same class of bug the title/subtitle already guard
  * against with their own shrink-to-fit loops. */
-function drawWatermark(ctx: CanvasRenderingContext2D, w: number, h: number, watermark: string) {
+/** Returns the watermark's own protected height, as a fraction of h --
+ * mirrors drawFrame's bannerRatio return, so the desktop-fullscreen crop
+ * (see applyDesktopCrop) can keep this text in frame the same way it
+ * already keeps the title banner in frame, instead of a guessed constant. */
+function drawWatermark(ctx: CanvasRenderingContext2D, w: number, h: number, watermark: string): number {
   ctx.save();
   ctx.globalAlpha = 0.38;
   ctx.fillStyle = "#ffffff";
@@ -67,8 +71,14 @@ function drawWatermark(ctx: CanvasRenderingContext2D, w: number, h: number, wate
     fontPx -= 1;
     ctx.font = `${fontPx}px Arial, sans-serif`;
   }
-  ctx.fillText(watermark, w / 2, h - Math.max(14, Math.round(h * 0.025)));
+  const bottomMargin = Math.max(14, Math.round(h * 0.025));
+  ctx.fillText(watermark, w / 2, h - bottomMargin);
   ctx.restore();
+  // Baseline sits bottomMargin above the edge; the glyphs themselves rise
+  // roughly fontPx above that baseline. A little extra buffer on top
+  // absorbs the shadowBlur so the crop line clears the glyph, not just
+  // the baseline.
+  return (bottomMargin + fontPx * 1.15) / h;
 }
 
 function drawBannerRect(ctx: CanvasRenderingContext2D, w: number, topH: number) {
@@ -85,16 +95,18 @@ function drawBannerRect(ctx: CanvasRenderingContext2D, w: number, topH: number) 
 /** Draws the branded competition frame: colorful title banner, live camera
  * feed, and a light watermark — all burned into the recorded pixels via
  * canvas.captureStream(), never the raw camera feed. Returns the banner's
- * height as a fraction of the frame height, so the caller can line up the
- * DOM title bar directly underneath it instead of guessing a fixed
- * percentage that may not match what got drawn. */
+ * and the watermark's own heights, each as a fraction of the frame height,
+ * so callers can line the DOM title bar up directly underneath the banner
+ * (as before), and can now also keep a desktop-fullscreen crop (see
+ * applyDesktopCrop) from ever cutting into either one, instead of guessing
+ * fixed percentages that may not match what actually got drawn. */
 function drawFrame(
   ctx: CanvasRenderingContext2D,
   video: HTMLVideoElement,
   w: number,
   h: number,
   watermark: string,
-): number {
+): { bannerFrac: number; footerFrac: number } {
   ctx.drawImage(video, 0, 0, w, h);
 
   const maxTitleWidth = w * 0.97;
@@ -156,8 +168,8 @@ function drawFrame(
     ctx.fillText(subtitle, w / 2, subtitleY);
     ctx.shadowBlur = 0;
 
-    drawWatermark(ctx, w, h, watermark);
-    return topH / h;
+    const footerFrac = drawWatermark(ctx, w, h, watermark);
+    return { bannerFrac: topH / h, footerFrac };
   }
 
   // Landscape: unchanged single-line layout, sized from the frame's height.
@@ -195,8 +207,8 @@ function drawFrame(
   ctx.fillText(subtitle, w / 2, subtitleY);
   ctx.shadowBlur = 0;
 
-  drawWatermark(ctx, w, h, watermark);
-  return topH / h;
+  const footerFrac = drawWatermark(ctx, w, h, watermark);
+  return { bannerFrac: topH / h, footerFrac };
 }
 
 function daysBetween(from: Date, to: Date): number {
@@ -290,17 +302,21 @@ export default function KataRecorder({
   const [agreed, setAgreed] = useState(false);
   const [recordingStartedAt, setRecordingStartedAt] = useState<Date | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
-  // Computed client-side only, after mount (not inline in JSX), so the
-  // server-rendered and first client render both agree it's false --
-  // otherwise reading navigator.userAgent during render risks a hydration
-  // mismatch. Drives object-cover vs object-contain on the live canvas
-  // below: desktop fullscreen crops to guarantee edge-to-edge fill (the
-  // organizer's explicit call, after confirming a plain resolution/ratio
-  // fix couldn't fully close the gap on real webcam hardware); mobile
-  // keeps the existing preserve-the-whole-frame behavior.
-  const [isMobileDevice, setIsMobileDevice] = useState(false);
+  // renderLoop keeps recursively scheduling the SAME closure it started
+  // with (requestAnimationFrame(renderLoop) calls itself, not a fresh
+  // reference from a later render), so reading `fullscreen` state directly
+  // inside it would freeze at whatever it was when recording started.
+  // Refs escape that: the ref object itself is stable across renders, only
+  // .current changes, so keeping this in sync wherever fullscreen state
+  // changes gives the loop a live value despite its stale closure.
+  const fullscreenRef = useRef(false);
+  // Also read inside renderLoop's stale closure -- computed once client-side
+  // after mount (not inline in JSX), so the server-rendered and first
+  // client render both agree, avoiding a hydration mismatch from reading
+  // navigator.userAgent during render.
+  const isMobileDeviceRef = useRef(false);
   useEffect(() => {
-    setIsMobileDevice(/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent));
+    isMobileDeviceRef.current = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
   }, []);
   // Custom minimal controls for the review player, replacing the browser's
   // native <video controls> entirely -- on iOS, native controls' own
@@ -344,6 +360,11 @@ export default function KataRecorder({
   // orientation and how much the banner's own text needed to shrink.
   const [bannerRatio, setBannerRatio] = useState(0.13);
   const bannerRatioRef = useRef(0.13);
+  // Same idea as bannerRatioRef, but for the watermark footer -- no DOM
+  // element needs this one (the watermark only ever exists burned into the
+  // canvas), it's purely for applyDesktopCrop below to know how much of the
+  // frame's bottom edge it must never crop into.
+  const footerRatioRef = useRef(0.05);
   // CSS `aspect-ratio` on a plain block element doesn't shrink-to-fit the
   // way it does on a replaced element (img/video) -- a statically-positioned
   // div with width:auto fills its container's full width first, THEN derives
@@ -454,6 +475,7 @@ export default function KataRecorder({
    * already covers the requirement either way. */
   function enterFullscreen() {
     setFullscreen(true);
+    fullscreenRef.current = true;
     const el = containerRef.current as
       | (HTMLDivElement & { webkitRequestFullscreen?: () => Promise<void> })
       | null;
@@ -463,7 +485,65 @@ export default function KataRecorder({
 
   function exitFullscreen() {
     setFullscreen(false);
+    fullscreenRef.current = false;
     if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+  }
+
+  /** Desktop fullscreen only: zooms the canvas's on-screen box just enough
+   * to shrink the black bars from a camera whose aspect ratio doesn't match
+   * the screen's, capped so the crop can never reach into the burned-in
+   * banner (top) or watermark (footerRatioRef, bottom) -- both stay in
+   * frame even if that leaves some residual letterboxing on hardware whose
+   * mismatch is too big to fully close this way. Mobile, and any other
+   * state, just clears the override so the className's plain object-contain
+   * sizing applies. Only touches on-screen CSS sizing -- canvas.width/height
+   * (the actual recorded pixel buffer captured via canvas.captureStream)
+   * are untouched, so what gets submitted is unaffected either way. */
+  function applyDesktopCrop(canvas: HTMLCanvasElement, videoRatio: number) {
+    const clear = () => {
+      canvas.style.position = "";
+      canvas.style.width = "";
+      canvas.style.height = "";
+      canvas.style.top = "";
+      canvas.style.left = "";
+    };
+    if (!fullscreenRef.current || isMobileDeviceRef.current || !Number.isFinite(videoRatio) || videoRatio <= 0) {
+      clear();
+      return;
+    }
+    const containerW = window.innerWidth;
+    const containerH = window.innerHeight;
+    if (containerW <= 0 || containerH <= 0) return;
+    const containerRatio = containerW / containerH;
+    if (videoRatio >= containerRatio) {
+      // Camera's already at least as wide as the screen -- plain contain
+      // already fills the width with no crop needed.
+      clear();
+      return;
+    }
+    const topBudget = bannerRatioRef.current;
+    const bottomBudget = footerRatioRef.current;
+    const totalBudget = topBudget + bottomBudget;
+    // (scale-1)/scale is the fraction of the ORIGINAL frame height that
+    // gets cropped away at a given zoom -- solved for scale, so the crop
+    // never exceeds the banner+watermark budget, capped again at whatever
+    // scale would fully close the gap (never zoom in further than needed).
+    const scaleForBudget = totalBudget < 1 ? 1 / (1 - totalBudget) : Infinity;
+    const scaleForFullCover = containerRatio / videoRatio;
+    const scale = Math.max(1, Math.min(scaleForBudget, scaleForFullCover));
+    const renderedHeight = containerH * scale;
+    const renderedWidth = renderedHeight * videoRatio;
+    const overflow = renderedHeight - containerH;
+    // Split whatever needs to be cropped in proportion to each side's own
+    // budget (not evenly) -- the banner is usually the bigger of the two,
+    // so it can absorb more crop before the watermark's much smaller
+    // margin would be touched at all.
+    const topCrop = overflow <= 0 || totalBudget <= 0 ? overflow / 2 : overflow * (topBudget / totalBudget);
+    canvas.style.position = "absolute";
+    canvas.style.width = `${renderedWidth}px`;
+    canvas.style.height = `${renderedHeight}px`;
+    canvas.style.left = `${(containerW - renderedWidth) / 2}px`;
+    canvas.style.top = `${-topCrop}px`;
   }
 
   async function startCamera() {
@@ -520,12 +600,16 @@ export default function KataRecorder({
     }
     const ctx = canvas.getContext("2d");
     if (ctx) {
-      const newBannerRatio = drawFrame(ctx, video, canvas.width, canvas.height, watermark);
-      if (Number.isFinite(newBannerRatio) && newBannerRatio > 0 && Math.abs(bannerRatioRef.current - newBannerRatio) > 0.002) {
-        bannerRatioRef.current = newBannerRatio;
-        setBannerRatio(newBannerRatio);
+      const { bannerFrac, footerFrac } = drawFrame(ctx, video, canvas.width, canvas.height, watermark);
+      if (Number.isFinite(bannerFrac) && bannerFrac > 0 && Math.abs(bannerRatioRef.current - bannerFrac) > 0.002) {
+        bannerRatioRef.current = bannerFrac;
+        setBannerRatio(bannerFrac);
+      }
+      if (Number.isFinite(footerFrac) && footerFrac > 0) {
+        footerRatioRef.current = footerFrac;
       }
     }
+    applyDesktopCrop(canvas, ratio);
     rafRef.current = requestAnimationFrame(renderLoop);
   }
 
@@ -911,11 +995,7 @@ export default function KataRecorder({
         <video ref={videoRef} playsInline muted className="hidden" />
         <canvas
           ref={canvasRef}
-          className={
-            phase === "live" || phase === "recording"
-              ? `block h-full w-full ${fullscreen && !isMobileDevice ? "object-cover" : "object-contain"}`
-              : "hidden"
-          }
+          className={phase === "live" || phase === "recording" ? "block h-full w-full object-contain" : "hidden"}
         />
         {/* Review (and uploading) shows the actual recorded file, in this
             SAME box, instead of a separate plain video underneath it --
