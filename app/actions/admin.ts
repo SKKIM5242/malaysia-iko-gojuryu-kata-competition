@@ -4616,7 +4616,7 @@ export async function bulkUploadAnnouncements(_prev: CsvUploadResult, formData: 
 }
 
 const STAFF_CSV_COLUMNS = [
-  "full_name", "email", "ic_passport", "date_of_birth", "gender", "belt_rank",
+  "full_name", "staff_title", "email", "ic_passport", "date_of_birth", "gender", "belt_rank",
   "home_address", "city_town", "postcode", "country", "phone",
   "bank_name", "bank_account_no", "bank_account_name",
 ] as const;
@@ -4684,6 +4684,7 @@ async function bulkCreateStaffAccounts(formData: FormData, role: "organizer" | "
       continue;
     }
     const extra = {
+      staff_title: get(r, "staff_title") || null,
       ic_passport,
       date_of_birth,
       gender,
