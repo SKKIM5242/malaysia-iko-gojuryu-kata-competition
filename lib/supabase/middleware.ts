@@ -65,9 +65,15 @@ export async function updateSession(request: NextRequest) {
     // approvals + invitation codes), /admin/email-verifications,
     // /admin/classes, and /admin/commissions stay restricted to Admin and
     // Organizer/Staff — Participant Support and Referee/Judge are turned
-    // away from just those four. Write actions for sensitive operations
-    // (e.g. assigning referees, approving registrations) are narrowed
-    // further at the page/action level — see app/actions/admin.ts.
+    // away from just those four. /admin/competitions (competition-tier
+    // creation and category structure) is Referee/Judge's own additional
+    // restriction, on top of those four — judging shouldn't come with the
+    // ability to restructure categories mid-competition. Kata Categories
+    // (/kata-categories, outside /admin) is where Referee/Judge keeps
+    // view-only access to the same category list instead. Write actions
+    // for sensitive operations (e.g. assigning referees, approving
+    // registrations) are narrowed further at the page/action level — see
+    // app/actions/admin.ts.
     if (request.nextUrl.pathname.startsWith("/admin")) {
       if (!user) {
         return redirectTo("/login");
@@ -89,6 +95,9 @@ export async function updateSession(request: NextRequest) {
           path.startsWith("/admin/classes") ||
           path.startsWith("/admin/commissions")
         ) {
+          return redirectTo("/admin");
+        }
+        if (role === "referee" && path.startsWith("/admin/competitions")) {
           return redirectTo("/admin");
         }
       } else {
