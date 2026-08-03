@@ -969,8 +969,10 @@ export default function KataRecorder({
                   the same monitor should size differently too). */}
               <p
                 ref={desktopTitleRef}
-                className="font-black"
+                className="whitespace-nowrap font-black"
                 style={{
+                  width: "fit-content",
+                  margin: "0 auto",
                   fontFamily: "Georgia, serif",
                   fontSize: "clamp(1.1rem, 2.4vw, 2.25rem)",
                   textShadow: "0 1px 4px rgba(0,0,0,0.6)",
@@ -978,18 +980,34 @@ export default function KataRecorder({
               >
                 MALAYSIA OPEN VIRTUAL KARATE-DO KATA COMPETITION
               </p>
-              {/* Font-size measured and corrected (see desktopSubtitleFontPx
+              {/* Both this and the title above need width:fit-content -- a
+                  block-level <p> with no explicit width defaults to FILLING
+                  its container (the full-width banner), regardless of how
+                  much text is actually inside it. getBoundingClientRect on a
+                  plain block <p> was therefore always measuring the SAME
+                  full-banner-width box for both title and subtitle, so their
+                  ratio always came out ~1.0 and no correction was EVER
+                  actually applied, no matter what font-size this resolved to
+                  -- that's the real bug behind every previous attempt at
+                  this looking like it did nothing. fit-content shrink-wraps
+                  each box to its own text (what the measurement below
+                  needs) while staying block-level, so title and subtitle
+                  still stack on separate lines instead of flowing side by
+                  side the way inline-block siblings would; margin:0 auto
+                  re-centers each shrink-wrapped box now that the parent's
+                  text-align can no longer do it (that only centers inline
+                  content, not a block child's own box).
+                  Font-size measured and corrected (see desktopSubtitleFontPx
                   above) to match the title's own rendered width exactly,
                   rather than guessing a fixed ratio between two strings of
-                  different length and weight -- the earlier guess (~55% of
-                  the title) rendered narrower than the title, reading as a
-                  stray small line instead of a second row filling the same
-                  width. Falls back to the old clamp() for the one frame
-                  before the measurement effect corrects it. */}
+                  different length and weight. Falls back to the old clamp()
+                  for the one frame before the measurement effect corrects it. */}
               <p
                 ref={desktopSubtitleRef}
-                className="mt-0.5 whitespace-nowrap"
+                className="whitespace-nowrap"
                 style={{
+                  width: "fit-content",
+                  margin: "2px auto 0",
                   fontSize: desktopSubtitleFontPx != null ? `${desktopSubtitleFontPx}px` : "clamp(0.6rem, 1.3vw, 1.25rem)",
                   textShadow: "0 1px 4px rgba(0,0,0,0.6)",
                 }}
