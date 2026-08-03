@@ -4,7 +4,9 @@ import { schemaReady, getCategories } from "@/lib/data";
 import { getAllCompetitions } from "@/lib/admin-data";
 import { loadRecordingsByCategory } from "@/lib/arena";
 import { groupByFamily, adjacentKataOf } from "@/lib/kata-families";
+import { kataBaseOf } from "@/lib/division";
 import KataGroupDragZone from "@/components/KataGroupDragZone";
+import SubcategoryDragZone from "@/components/SubcategoryDragZone";
 import CategoryActionButton from "@/components/CategoryActionButton";
 import { NoTranslate, SetupNotice, SiteFooter, SiteHeader } from "@/components/ui";
 import AuthForms from "@/components/AuthForms";
@@ -90,6 +92,42 @@ export default async function KataCategoriesPage() {
   // Competitions page. Referee/Audience/Support keep view-only access.
   const canManageKata = ["admin", "organizer", "staff"].includes(profile.role);
 
+  // Same "Undo last merge (N)" / "Undo delete (N)" stack as the admin
+  // Competitions page, mirrored here so organizers don't have to leave this
+  // page to undo something they just did from it. See that page for the
+  // full reasoning on how these counts are computed.
+  const mergeStatsByCompetition = new Map<string, { count: number; description: string | null }>();
+  const deleteStatsByCompetition = new Map<string, { count: number; description: string | null }>();
+  if (canManageKata) {
+    const [{ data: mergeLogRows }, { data: deleteLogRows }] = await Promise.all([
+      supabase
+        .from("category_merge_log")
+        .select("competition_id, description, created_at")
+        .is("undone_at", null)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("category_delete_log")
+        .select("competition_id, category, created_at")
+        .is("undone_at", null)
+        .order("created_at", { ascending: false }),
+    ]);
+    for (const row of (mergeLogRows as Array<{ competition_id: string; description: string | null }>) ?? []) {
+      const existing = mergeStatsByCompetition.get(row.competition_id);
+      if (existing) existing.count += 1;
+      else mergeStatsByCompetition.set(row.competition_id, { count: 1, description: row.description });
+    }
+    for (const row of (deleteLogRows as Array<{ competition_id: string; category: { name?: string } | null }>) ?? []) {
+      const existing = deleteStatsByCompetition.get(row.competition_id);
+      if (existing) existing.count += 1;
+      else {
+        deleteStatsByCompetition.set(row.competition_id, {
+          count: 1,
+          description: row.category?.name ? `Restore "${row.category.name}"` : null,
+        });
+      }
+    }
+  }
+
   return (
     <>
       <SiteHeader />
@@ -120,20 +158,95 @@ export default async function KataCategoriesPage() {
 
               return (
                 <div key={competition.id} className="mb-12">
-                  <h2 className="mb-3 text-lg font-bold">{competition.name}</h2>
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <h2 className="text-lg font-bold">{competition.name}</h2>
+                    {canManageKata && (
+                      <span className="flex flex-wrap items-center gap-2">
+                        <Link
+                          href={`/admin/competitions?addcat=${competition.id}`}
+                          className="rounded border border-neutral-300 px-2 py-0.5 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
+                        >
+                          + Add category
+                        </Link>
+                        <CategoryActionButton
+                          actionName="undoMerge"
+                          fields={{ competition_id: competition.id, return_to: "/kata-categories" }}
+                          className={
+                            (mergeStatsByCompetition.get(competition.id)?.count ?? 0) > 0
+                              ? "rounded border border-orange-300 px-2 py-0.5 text-xs font-semibold text-orange-700 hover:bg-orange-50"
+                              : "rounded border border-neutral-200 px-2 py-0.5 text-xs font-semibold text-neutral-400 hover:bg-neutral-50"
+                          }
+                          title={
+                            mergeStatsByCompetition.get(competition.id)?.description ??
+                            "No merge has been done for this tier yet — nothing to undo."
+                          }
+                          confirmMessage={
+                            (mergeStatsByCompetition.get(competition.id)?.count ?? 0) > 0
+                              ? `Undo the most recent merge for this tier?\n\n${mergeStatsByCompetition.get(competition.id)?.description ?? ""}\n\nThis restores the categories it combined and moves registrations back to where they were. Click again afterward to step back one merge further, if more than one was done.`
+                              : undefined
+                          }
+                        >
+                          ↺ Undo last merge ({mergeStatsByCompetition.get(competition.id)?.count ?? 0})
+                        </CategoryActionButton>
+                        <CategoryActionButton
+                          actionName="undoDelete"
+                          fields={{ competition_id: competition.id, return_to: "/kata-categories" }}
+                          className={
+                            (deleteStatsByCompetition.get(competition.id)?.count ?? 0) > 0
+                              ? "rounded border border-orange-300 px-2 py-0.5 text-xs font-semibold text-orange-700 hover:bg-orange-50"
+                              : "rounded border border-neutral-200 px-2 py-0.5 text-xs font-semibold text-neutral-400 hover:bg-neutral-50"
+                          }
+                          title={
+                            deleteStatsByCompetition.get(competition.id)?.description ??
+                            "No category has been deleted for this tier yet — nothing to undo."
+                          }
+                          confirmMessage={
+                            (deleteStatsByCompetition.get(competition.id)?.count ?? 0) > 0
+                              ? `Undo the most recent category delete for this tier?\n\n${deleteStatsByCompetition.get(competition.id)?.description ?? ""}\n\nThis recreates the deleted category. Click again afterward to step back one delete further, if more than one was done.`
+                              : undefined
+                          }
+                        >
+                          ↺ Undo delete ({deleteStatsByCompetition.get(competition.id)?.count ?? 0})
+                        </CategoryActionButton>
+                      </span>
+                    )}
+                  </div>
                   {cats.length === 0 ? (
                     <p className="text-sm text-neutral-400">Categories have not been published yet.</p>
                   ) : (
                     <div className="space-y-6">
-                      {groupByFamily(cats).map(([family, kataGroups]) => (
+                      {groupByFamily(cats).map(([family, kataGroups]) => {
+                        const totalCats = kataGroups.reduce((sum, [, subCats]) => sum + subCats.length, 0);
+                        const alreadyMerged =
+                          kataGroups.length === 1 &&
+                          kataGroups[0][1].length === 1 &&
+                          kataGroups[0][0] === `${family} Kata — Combined (All Kata, Belts, Ages & Genders)`;
+                        return (
                         <div key={family}>
-                          <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-neutral-500">
-                            {family} Kata
-                          </h3>
+                          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                            <h3 className="text-xs font-bold uppercase tracking-wide text-neutral-500">
+                              {family} Kata
+                            </h3>
+                            {canManageKata && !alreadyMerged && (
+                              <CategoryActionButton
+                                actionName="mergeFamily"
+                                fields={{ competition_id: competition.id, family, return_to: "/kata-categories" }}
+                                className="rounded border border-sky-300 px-2 py-0.5 text-xs font-semibold text-sky-700 hover:bg-sky-50"
+                                title={`Combine every ${family} Kata sub-category — any kata, belt, age, or gender within this group — into one category`}
+                                confirmMessage={`Merge all ${totalCats} ${family} Kata categories (every kata, belt, age, and gender in this group) into ONE combined category for this tier?\n\nExisting registrations move over automatically — no resubmission needed. This also means new registrants can no longer be placed into a specific ${family} kata/belt/age slot afterward, the same as the existing Merge → Mix and Merge age buttons. Best done once registration for this tier is effectively closed.`}
+                              >
+                                Merge all {family} Kata ({totalCats}) → one category
+                              </CategoryActionButton>
+                            )}
+                          </div>
                           <div className="space-y-2" data-drag-list={`kata-cat-groups-${competition.id}-${family}`}>
                             {kataGroups.map(([base, subCats]) => {
                               const neighborAbove = adjacentKataOf(base, "above");
                               const neighborBelow = adjacentKataOf(base, "below");
+                              const kyuCats = subCats.filter((cat) => cat.belt_group === "kyu");
+                              const danCats = subCats.filter((cat) => cat.belt_group === "dan");
+                              const kyuMerged = kyuCats.length === 1 && kyuCats[0].name === `${base} — Color/Kyu Belt — Combined (All Ages & Genders)`;
+                              const danMerged = danCats.length === 1 && danCats[0].name === `${base} — Black Belt & Dan Holders — Combined (All Ages & Genders)`;
                               return (
                               <details key={base} data-drag-item={base} className="rounded-lg border border-neutral-200 bg-white shadow-sm">
                                 <summary className="flex cursor-pointer items-center gap-2 px-4 py-2.5 text-sm font-semibold text-neutral-800 hover:bg-neutral-50">
@@ -150,7 +263,7 @@ export default async function KataCategoriesPage() {
                                       <span className="font-normal text-neutral-400">({subCats.length} sub-categories)</span>
                                     </span>
                                   )}
-                                  {canManageKata && (neighborAbove || neighborBelow) && (
+                                  {canManageKata && (neighborAbove || neighborBelow || kyuCats.length > 1 || danCats.length > 1) && (
                                     <span className="ml-auto flex flex-wrap gap-1">
                                       {neighborAbove && (
                                         <CategoryActionButton
@@ -174,6 +287,28 @@ export default async function KataCategoriesPage() {
                                           Merge with kata below ↓
                                         </CategoryActionButton>
                                       )}
+                                      {kyuCats.length > 1 && !kyuMerged && (
+                                        <CategoryActionButton
+                                          actionName="mergeBeltGroup"
+                                          fields={{ competition_id: competition.id, kata_base: base, belt_group: "kyu", return_to: "/kata-categories" }}
+                                          className="rounded border border-teal-300 px-2 py-0.5 text-xs font-normal text-teal-700 hover:bg-teal-50"
+                                          title={`Combine every Color/Kyu Belt sub-category (any age or gender) for ${base} into one`}
+                                          confirmMessage={`Merge all ${kyuCats.length} Color/Kyu Belt categories for "${base}" (every age and gender) into ONE combined category?\n\nExisting registrations move over automatically.`}
+                                        >
+                                          Merge Color/Kyu Belt ({kyuCats.length})
+                                        </CategoryActionButton>
+                                      )}
+                                      {danCats.length > 1 && !danMerged && (
+                                        <CategoryActionButton
+                                          actionName="mergeBeltGroup"
+                                          fields={{ competition_id: competition.id, kata_base: base, belt_group: "dan", return_to: "/kata-categories" }}
+                                          className="rounded border border-indigo-300 px-2 py-0.5 text-xs font-normal text-indigo-700 hover:bg-indigo-50"
+                                          title={`Combine every Black Belt & Dan Holders sub-category (any age or gender) for ${base} into one`}
+                                          confirmMessage={`Merge all ${danCats.length} Black Belt & Dan Holders categories for "${base}" (every age and gender) into ONE combined category?\n\nExisting registrations move over automatically.`}
+                                        >
+                                          Merge Black Belt & Dan ({danCats.length})
+                                        </CategoryActionButton>
+                                      )}
                                     </span>
                                   )}
                                 </summary>
@@ -182,20 +317,73 @@ export default async function KataCategoriesPage() {
                                     const taken = categoryTaken.get(cat.id) ?? 0;
                                     const left = cat.max_participants != null ? Math.max(0, cat.max_participants - taken) : null;
                                     const recordings = recordingsByCategory.get(cat.id) ?? [];
+                                    const subLabel = cat.name.split(" — ").slice(1).join(" — ") || cat.name;
+                                    const nameRow = (
+                                      <div className="flex flex-1 items-center justify-between gap-2">
+                                        <span className="text-sm font-semibold text-neutral-700">{subLabel}</span>
+                                        <span
+                                          className={`shrink-0 text-xs whitespace-nowrap ${left === 0 ? "font-semibold text-red-600" : "text-neutral-400"}`}
+                                        >
+                                          {cat.max_participants != null
+                                            ? `${taken}/${cat.max_participants} taken (${left} left)`
+                                            : `${taken} taken (no cap)`}
+                                        </span>
+                                      </div>
+                                    );
                                     return (
-                                      <div key={cat.id} className="border-t border-neutral-100 pt-3 first:border-t-0 first:pt-0">
-                                        <div className="flex items-center justify-between gap-2">
-                                          <span className="text-sm font-semibold text-neutral-700">
-                                            {cat.name.split(" — ").slice(1).join(" — ") || cat.name}
-                                          </span>
-                                          <span
-                                            className={`shrink-0 text-xs whitespace-nowrap ${left === 0 ? "font-semibold text-red-600" : "text-neutral-400"}`}
-                                          >
-                                            {cat.max_participants != null
-                                              ? `${taken}/${cat.max_participants} taken (${left} left)`
-                                              : `${taken} taken (no cap)`}
-                                          </span>
+                                      <div key={cat.id} data-drag-item={cat.id} className="border-t border-neutral-100 pt-3 first:border-t-0 first:pt-0">
+                                        <div className="flex items-center gap-2">
+                                          {canManageKata ? (
+                                            <SubcategoryDragZone categoryId={cat.id} label={subLabel} returnTo="/kata-categories">
+                                              {nameRow}
+                                            </SubcategoryDragZone>
+                                          ) : (
+                                            nameRow
+                                          )}
                                         </div>
+                                        {canManageKata && (
+                                          <div className="mt-1 flex flex-wrap gap-1">
+                                            {(cat.gender === "male" || cat.gender === "female") && (
+                                              <CategoryActionButton
+                                                actionName="mergeToMix"
+                                                fields={{ category_id: cat.id, return_to: "/kata-categories" }}
+                                                className="rounded border border-amber-300 px-2 py-0.5 text-xs text-amber-700 hover:bg-amber-50"
+                                                title="Move this category's (and its Male/Female sibling's) registrations into a shared Mix (Male & Female) category"
+                                              >
+                                                Merge → Mix
+                                              </CategoryActionButton>
+                                            )}
+                                            <CategoryActionButton
+                                              actionName="mergeAgeGroup"
+                                              fields={{ category_id: cat.id, direction: "before", return_to: "/kata-categories" }}
+                                              className="rounded border border-purple-300 px-2 py-0.5 text-xs text-purple-700 hover:bg-purple-50"
+                                              title="Merge with the earlier age group (same kata, belt, and gender) — the age range widens to cover both; repeat to combine 2 or 3 age groups"
+                                            >
+                                              ⇤ Merge age
+                                            </CategoryActionButton>
+                                            <CategoryActionButton
+                                              actionName="mergeAgeGroup"
+                                              fields={{ category_id: cat.id, direction: "after", return_to: "/kata-categories" }}
+                                              className="rounded border border-purple-300 px-2 py-0.5 text-xs text-purple-700 hover:bg-purple-50"
+                                              title="Merge with the later age group (same kata, belt, and gender) — the age range widens to cover both; repeat to combine 2 or 3 age groups"
+                                            >
+                                              Merge age ⇥
+                                            </CategoryActionButton>
+                                            <Link
+                                              href={`/admin/competitions?editcat=${cat.id}`}
+                                              className="rounded border border-neutral-300 px-2 py-0.5 text-xs text-neutral-600 hover:bg-neutral-50"
+                                            >
+                                              Edit
+                                            </Link>
+                                            <CategoryActionButton
+                                              actionName="delete"
+                                              fields={{ id: cat.id, return_to: "/kata-categories" }}
+                                              className="rounded border border-red-200 px-2 py-0.5 text-xs text-red-600 hover:bg-red-50"
+                                            >
+                                              Delete
+                                            </CategoryActionButton>
+                                          </div>
+                                        )}
                                         {recordings.length === 0 ? (
                                           <p className="mt-1 text-xs text-neutral-400">No recordings submitted yet.</p>
                                         ) : (
@@ -229,7 +417,8 @@ export default async function KataCategoriesPage() {
                             })}
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
