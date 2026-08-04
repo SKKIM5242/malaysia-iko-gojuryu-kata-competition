@@ -10,6 +10,7 @@ import KataRecorder from "@/components/KataRecorder";
 import VideoWatchButton from "@/components/VideoWatchButton";
 import RefereeScoring, { type ScoringItem } from "@/components/RefereeScoring";
 import CertificatesSection from "@/components/CertificatesSection";
+import IssueReportForm from "@/components/IssueReportForm";
 import { getAllTelegramLinks, getTelegramBotConnectUrl } from "@/lib/telegram";
 import { isWithinSignInQuota } from "@/lib/sign-in-quota";
 import SubscriptionBlocked from "@/components/SubscriptionBlocked";
@@ -307,13 +308,14 @@ export default async function AccountPage({
   const SignOutButton = (
     <div>
       <form action={signOut}>
-        <button className="rounded-md border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-50">
+        <button className="rounded-md bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-600">
           Sign out
         </button>
       </form>
       <p className="mt-1.5 text-xs text-neutral-400">
         Signing out takes you to the Sign in / Create account page.
       </p>
+      <IssueReportForm />
     </div>
   );
 

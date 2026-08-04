@@ -762,6 +762,86 @@ async function organizerRecipients(): Promise<
   }));
 }
 
+/** Tells Admin, Organizer and every Participant Support account that a
+ * participant has filed a technical issue report, on whichever channels
+ * each of them has connected. Best-effort like the rest of this file: the
+ * report is already saved by the time this runs, so a dead Telegram token
+ * or missing Resend key must never fail the participant's submission. */
+export async function notifyStaffIssueReport(input: {
+  reportId: string;
+  reporterName: string;
+  subject: string;
+  page: string;
+  section: string;
+  viewTypeLabel: string;
+  deviceName: string;
+  screenSpec: string;
+  screenshotCount: number;
+}): Promise<void> {
+  const { data } = await createAdminClient()
+    .from("profiles")
+    .select("email, full_name, telegram_chat_id")
+    .in("role", ["admin", "organizer", "staff", "customer_support"])
+    .eq("approved", true);
+  const recipients = data ?? [];
+  if (recipients.length === 0) return;
+
+  const link = `${appUrl()}/admin/issue-reports`;
+  const lines = [
+    `New technical issue report from ${input.reporterName}.`,
+    "",
+    `Subject: ${input.subject}`,
+    `Page: ${input.page}`,
+    `Section: ${input.section}`,
+    `View affected: ${input.viewTypeLabel}`,
+    `Device: ${input.deviceName}`,
+    `Screen: ${input.screenSpec}`,
+    `Screenshots attached: ${input.screenshotCount}`,
+    "",
+    `Review and reply here: ${link}`,
+  ];
+  const emailText = [...lines, "", "— Malaysia Open Virtual Karate-do Kata Competition"].join("\n");
+  const telegramText = lines.join("\n");
+
+  await Promise.allSettled(
+    recipients.flatMap((r) => [
+      r.email ? sendEmail(r.email as string, `New issue report: ${input.subject}`, emailText) : Promise.resolve(),
+      sendDirectTelegramDM((r.telegram_chat_id as string | null) ?? null, telegramText),
+    ]),
+  );
+}
+
+/** Posts a staff-composed message into a Telegram GROUP chat, for the
+ * issue-report triage table's "notify the group" button. Distinct from
+ * sendAdminTelegramDM only in intent — same Bot API call, but the chat id
+ * is a group's rather than a person's, and like that one it reports
+ * success/failure back because a staff member chose to send it. */
+export async function sendTelegramGroupMessage(
+  chatId: string,
+  text: string,
+): Promise<{ ok: boolean; error?: string }> {
+  return sendAdminTelegramDM(chatId, text);
+}
+
+/** Sends a staff-composed email reply to whoever filed an issue report.
+ * Reports success/failure back for the same reason as the Telegram sends
+ * above: this is an explicit action, not a background side effect. */
+export async function sendIssueReportEmail(
+  to: string,
+  subject: string,
+  text: string,
+): Promise<{ ok: boolean; error?: string }> {
+  if (!process.env.RESEND_API_KEY) {
+    return { ok: false, error: "Email is not configured (RESEND_API_KEY missing)." };
+  }
+  try {
+    await sendEmail(to, subject, text);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Failed to send the email." };
+  }
+}
+
 /** Sends a manually-composed Telegram DM from the admin panel (see
  * sendAdminTelegramDirectMessage in app/actions/admin.ts). Unlike every
  * other notify function in this file, this is a deliberate, explicit send
