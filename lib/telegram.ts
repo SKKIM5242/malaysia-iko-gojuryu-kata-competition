@@ -57,6 +57,45 @@ export async function listTelegramGroups(): Promise<TelegramGroupRow[]> {
   }));
 }
 
+/** The Bot API chat id for a group, derived from its member link.
+ *
+ * The groups table stores invite links and member links, not chat ids —
+ * a `https://t.me/c/<internal id>/<topic>` member link is the only place
+ * the id appears. Telegram's Bot API addresses a supergroup as -100
+ * followed by that internal id, so the member link is enough to post to
+ * the group without the organizer having to find and paste a raw numeric
+ * id anywhere. Returns null when a group has no member link set yet
+ * (they're optional — see TelegramGroupRow.memberUrl), in which case
+ * there's nothing to derive from and the group simply can't be posted to
+ * until one is added on /admin/telegram. */
+export function telegramGroupChatId(memberUrl: string | null): string | null {
+  if (!memberUrl) return null;
+  const match = memberUrl.match(/t\.me\/c\/(\d+)/);
+  return match ? `-100${match[1]}` : null;
+}
+
+/** Which group a given account's own people are in, so a compose box can
+ * default to the sensible one rather than making staff pick every time.
+ * Mirrors the category split the registration flow already uses. */
+export function telegramCategoryForRole(role: string | null): TelegramCategory {
+  switch (role) {
+    case "school":
+    case "sensei":
+      return "school";
+    case "referee":
+      return "referee";
+    case "audience":
+      return "audience";
+    case "admin":
+    case "organizer":
+    case "staff":
+    case "customer_support":
+      return "staff";
+    default:
+      return "participant";
+  }
+}
+
 export async function getTelegramLink(category: string): Promise<string | null> {
   const groups = await listTelegramGroups();
   return groups.find((g) => g.category === category)?.url ?? null;

@@ -17,6 +17,7 @@ import {
   sendTelegramGroupMessage,
   sendIssueReportEmail,
 } from "@/lib/notify";
+import { listTelegramGroups, telegramGroupChatId } from "@/lib/telegram";
 
 const STAFF_ROLES = ["admin", "organizer", "staff", "customer_support"];
 
@@ -203,7 +204,7 @@ export async function sendIssueReportMessage(
   const channel = (formData.get("channel") as string | null)?.trim() ?? "";
   const body = (formData.get("body") as string | null)?.trim() ?? "";
   const subject = (formData.get("subject") as string | null)?.trim() ?? "";
-  const groupChatId = (formData.get("group_chat_id") as string | null)?.trim() ?? "";
+  const groupCategory = (formData.get("group_category") as string | null)?.trim() ?? "";
   if (!reportId) return { error: "Missing report id." };
   if (!body) return { error: "Please write a message before sending." };
   if (!["telegram_dm", "telegram_group", "email"].includes(channel)) {
@@ -219,6 +220,7 @@ export async function sendIssueReportMessage(
   if (!report) return { error: "That report no longer exists." };
 
   let result: { ok: boolean; error?: string };
+  let targetLabel: string | null = null;
   if (channel === "telegram_dm") {
     const { data: reporterProfile } = await admin
       .from("profiles")
@@ -230,9 +232,24 @@ export async function sendIssueReportMessage(
       ? await sendAdminTelegramDM(chatId, body)
       : { ok: false, error: "This participant hasn't connected Telegram, so a DM can't reach them." };
   } else if (channel === "telegram_group") {
-    result = groupChatId
-      ? await sendTelegramGroupMessage(groupChatId, body)
-      : { ok: false, error: "Please enter the Telegram group chat id to notify." };
+    // The chat id is resolved here from the groups table rather than typed
+    // in: staff pick a group by name, and its id is derived from the
+    // member link the organizer already maintains on /admin/telegram.
+    const group = groupCategory
+      ? (await listTelegramGroups()).find((g) => g.category === groupCategory)
+      : undefined;
+    if (!group) {
+      result = { ok: false, error: "Please choose which Telegram group to notify." };
+    } else {
+      targetLabel = group.label;
+      const chatId = telegramGroupChatId(group.memberUrl);
+      result = chatId
+        ? await sendTelegramGroupMessage(chatId, body)
+        : {
+            ok: false,
+            error: `"${group.label}" has no member link set, so its chat id can't be worked out. Add one on Admin → Telegram Links first.`,
+          };
+    }
   } else {
     const to = (report.reporter_email as string | null) ?? "";
     result = to
@@ -248,6 +265,7 @@ export async function sendIssueReportMessage(
     report_id: reportId,
     channel,
     subject: channel === "email" ? subject || null : null,
+    target_label: targetLabel,
     body,
     sent_by: staff.user?.id ?? null,
     sent_by_name: staff.name ?? null,

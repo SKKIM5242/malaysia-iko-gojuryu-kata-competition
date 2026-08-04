@@ -18,11 +18,20 @@ export interface IssueMessageView {
   id: string;
   channel: string;
   subject: string | null;
+  targetLabel: string | null;
   body: string;
   sentByName: string | null;
   ok: boolean;
   error: string | null;
   createdAt: string;
+}
+
+export interface TelegramGroupChoice {
+  category: string;
+  label: string;
+  /** Null when the group has no member link, so its chat id can't be
+   * derived — offered but not selectable, with the reason shown. */
+  canSend: boolean;
 }
 
 const inputClass =
@@ -41,14 +50,43 @@ function ComposeBox({
   reportId,
   channel,
   defaultSubject,
+  groups,
+  defaultGroupCategory,
+  reporterName,
+  reporterEmail,
   onDone,
 }: {
   reportId: string;
   channel: IssueMessageChannel;
   defaultSubject: string;
+  groups: TelegramGroupChoice[];
+  defaultGroupCategory: string;
+  reporterName: string | null;
+  reporterEmail: string | null;
   onDone: () => void;
 }) {
   const [state, formAction, pending] = useActionState(sendIssueReportMessage, initial);
+  const [body, setBody] = useState("");
+  const [subject, setSubject] = useState(defaultSubject);
+  const [groupCategory, setGroupCategory] = useState(defaultGroupCategory);
+  // Nothing is sent straight from the compose box: the button opens a
+  // confirmation showing exactly what is about to go out and where, since
+  // a Telegram group post reaches everyone in that group at once and
+  // can't be recalled.
+  const [confirming, setConfirming] = useState(false);
+
+  const chosenGroup = groups.find((g) => g.category === groupCategory);
+  const recipient =
+    channel === "telegram_group"
+      ? chosenGroup
+        ? `Telegram group — ${chosenGroup.label}`
+        : "no group chosen"
+      : channel === "telegram_dm"
+        ? `Telegram DM — ${reporterName ?? "the reporter"}`
+        : `Email — ${reporterEmail ?? "no address on file"}`;
+  const canConfirm =
+    body.trim().length > 0 && (channel !== "telegram_group" || Boolean(chosenGroup?.canSend));
+
   return (
     <form action={formAction} className="mt-2 space-y-2 rounded-md border border-neutral-300 bg-neutral-50 p-3">
       <input type="hidden" name="report_id" value={reportId} />
@@ -56,25 +94,100 @@ function ComposeBox({
       <p className="text-xs font-bold uppercase tracking-wide text-neutral-500">
         Write a {CHANNEL_LABELS[channel]} message
       </p>
+
       {channel === "email" && (
-        <input name="subject" defaultValue={defaultSubject} className={inputClass} placeholder="Email subject" />
-      )}
-      {channel === "telegram_group" && (
         <input
-          name="group_chat_id"
+          name="subject"
+          value={subject}
+          onChange={(e) => setSubject(e.target.value)}
           className={inputClass}
-          placeholder="Telegram group chat id (e.g. -1001234567890)"
+          placeholder="Email subject"
         />
       )}
-      <textarea name="body" rows={4} required className={inputClass} placeholder="Your message…" />
+
+      {channel === "telegram_group" && (
+        <>
+          <select
+            name="group_category"
+            value={groupCategory}
+            onChange={(e) => setGroupCategory(e.target.value)}
+            className={inputClass}
+          >
+            <option value="">Choose which group to notify…</option>
+            {groups.map((g) => (
+              <option key={g.category} value={g.category} disabled={!g.canSend}>
+                {g.label}
+                {g.canSend ? "" : " — no member link set, can't post"}
+              </option>
+            ))}
+          </select>
+          {chosenGroup && !chosenGroup.canSend && (
+            <p className="text-xs font-semibold text-amber-700">
+              {chosenGroup.label} has no member link on Admin → Telegram Links, so its chat id can&apos;t be worked
+              out. Add one there first.
+            </p>
+          )}
+        </>
+      )}
+
+      <textarea
+        name="body"
+        rows={4}
+        required
+        value={body}
+        onChange={(e) => setBody(e.target.value)}
+        className={inputClass}
+        placeholder="Your message…"
+      />
+
+      {confirming && (
+        <div className="space-y-2 rounded-md border border-amber-300 bg-amber-50 p-3">
+          <p className="text-xs font-bold uppercase tracking-wide text-amber-900">Confirm before sending</p>
+          <p className="text-sm text-amber-900">
+            <span className="font-semibold">Goes to:</span> {recipient}
+          </p>
+          {channel === "email" && (
+            <p className="text-sm text-amber-900">
+              <span className="font-semibold">Subject:</span> {subject || "(none)"}
+            </p>
+          )}
+          <p className="whitespace-pre-wrap rounded border border-amber-200 bg-white px-2 py-1.5 text-sm text-neutral-800">
+            {body}
+          </p>
+          <p className="text-xs text-amber-800">
+            This message will also be saved against this report, in the record below, whether or not it sends.
+          </p>
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="submit"
-          disabled={pending}
-          className="rounded-md bg-red-700 px-4 py-1.5 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-60"
-        >
-          {pending ? "Sending…" : "Send & save"}
-        </button>
+        {confirming ? (
+          <>
+            <button
+              type="submit"
+              disabled={pending}
+              className="rounded-md bg-red-700 px-4 py-1.5 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-60"
+            >
+              {pending ? "Sending…" : `Send to ${channel === "telegram_group" ? "group" : "reporter"} & save`}
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirming(false)}
+              className="rounded-md border border-neutral-300 bg-white px-4 py-1.5 text-sm font-semibold text-neutral-700 hover:bg-neutral-100"
+            >
+              Back to editing
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            disabled={!canConfirm}
+            onClick={() => setConfirming(true)}
+            className="rounded-md bg-neutral-900 px-4 py-1.5 text-sm font-semibold text-white hover:bg-neutral-700 disabled:opacity-40"
+          >
+            Review &amp; send…
+          </button>
+        )}
         <button
           type="button"
           onClick={onDone}
@@ -92,6 +205,8 @@ export default function IssueReportRow({
   report,
   messages,
   screenshotUrls,
+  groups,
+  defaultGroupCategory,
 }: {
   report: {
     id: string;
@@ -105,6 +220,8 @@ export default function IssueReportRow({
   };
   messages: IssueMessageView[];
   screenshotUrls: string[];
+  groups: TelegramGroupChoice[];
+  defaultGroupCategory: string;
 }) {
   const [openChannel, setOpenChannel] = useState<IssueMessageChannel | null>(null);
   const [saveState, saveAction, saving] = useActionState(updateIssueReport, initial);
@@ -194,6 +311,10 @@ export default function IssueReportRow({
           reportId={report.id}
           channel={openChannel}
           defaultSubject={`Re: ${report.subject}`}
+          groups={groups}
+          defaultGroupCategory={defaultGroupCategory}
+          reporterName={report.reporterName}
+          reporterEmail={report.reporterEmail}
           onDone={() => setOpenChannel(null)}
         />
       )}
@@ -208,6 +329,7 @@ export default function IssueReportRow({
               <li key={m.id} className="rounded border border-neutral-200 bg-white px-3 py-2 text-xs">
                 <span className="font-semibold text-neutral-700">
                   {CHANNEL_LABELS[m.channel as IssueMessageChannel] ?? m.channel}
+                  {m.targetLabel ? ` → ${m.targetLabel}` : ""}
                 </span>{" "}
                 <span className={m.ok ? "text-green-700" : "text-red-700"}>{m.ok ? "sent" : "failed"}</span>
                 <span className="text-neutral-400">

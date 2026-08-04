@@ -3,7 +3,15 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { schemaReady } from "@/lib/data";
 import { AdminShell } from "@/components/admin";
 import { SetupNotice } from "@/components/ui";
-import IssueReportRow, { type IssueMessageView } from "@/components/IssueReportRow";
+import IssueReportRow, {
+  type IssueMessageView,
+  type TelegramGroupChoice,
+} from "@/components/IssueReportRow";
+import {
+  listTelegramGroups,
+  telegramCategoryForRole,
+  telegramGroupChatId,
+} from "@/lib/telegram";
 import {
   ISSUE_REPORT_NOTE,
   screenSpecLabel,
@@ -57,6 +65,27 @@ export default async function AdminIssueReports() {
     .order("created_at", { ascending: false });
   const rows = reports ?? [];
 
+  // Staff pick a group by name; the chat id is derived from the member link
+  // the organizer already maintains, so nobody has to paste a raw id.
+  const groups: TelegramGroupChoice[] = (await listTelegramGroups()).map((g) => ({
+    category: g.category,
+    label: g.label,
+    canSend: telegramGroupChatId(g.memberUrl) !== null,
+  }));
+
+  // Default the group picker to the one the REPORTER's own account sits in
+  // — a participant's issue belongs in the Participants group, not
+  // wherever the staff member happens to be.
+  const reporterIds = rows
+    .map((r) => r.reporter_user_id as string | null)
+    .filter((id): id is string => Boolean(id));
+  const { data: reporterProfiles } = reporterIds.length
+    ? await admin.from("profiles").select("user_id, role").in("user_id", reporterIds)
+    : { data: [] };
+  const roleByUser = new Map(
+    (reporterProfiles ?? []).map((p) => [p.user_id as string, (p.role as string | null) ?? null]),
+  );
+
   const { data: allMessages } = rows.length
     ? await admin
         .from("issue_report_messages")
@@ -93,6 +122,7 @@ export default async function AdminIssueReports() {
       id: m.id as string,
       channel: m.channel as string,
       subject: (m.subject as string | null) ?? null,
+      targetLabel: (m.target_label as string | null) ?? null,
       body: m.body as string,
       sentByName: (m.sent_by_name as string | null) ?? null,
       ok: Boolean(m.ok),
@@ -172,6 +202,10 @@ export default async function AdminIssueReports() {
                     }}
                     messages={messagesByReport.get(r.id as string) ?? []}
                     screenshotUrls={urlsByReport.get(r.id as string) ?? []}
+                    groups={groups}
+                    defaultGroupCategory={telegramCategoryForRole(
+                      roleByUser.get((r.reporter_user_id as string | null) ?? "") ?? null,
+                    )}
                   />
                 </div>
               </div>
