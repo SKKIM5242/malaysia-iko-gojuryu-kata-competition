@@ -903,19 +903,31 @@ export default function KataRecorder({
   const mm = String(Math.floor(seconds / 60)).padStart(2, "0");
   const ss = String(seconds % 60).padStart(2, "0");
 
-  // Fit the box within an 85dvh-tall, viewport-width-minus-margins budget
+  // Fit the box within a height and viewport-width-minus-margins budget
   // while preserving the real video's aspect ratio -- whichever dimension
   // (the height budget or the width budget) is more restrictive wins,
   // exactly like object-contain's own math, but applied to the CONTAINER
   // so it hugs the video instead of leaving it stranded inside a
-  // mis-shaped box. Falls back to a portrait guess before the camera has
-  // reported its real dimensions (idle placeholder / not started yet).
+  // mis-shaped box.
+  //
+  // Before the camera has reported anything, fall back to the SCREEN's own
+  // shape rather than a fixed 9/16 portrait guess: that guess turned the
+  // idle placeholder into a tall black slab on any landscape screen (a
+  // 370x657 column on a laptop), and it isn't even what the recording will
+  // look like -- the canvas is drawn at the screen's shape now, so the
+  // screen's shape is the honest preview of what's coming.
   // Defensive fallback: even though renderLoop now guards against feeding
   // a degenerate value into videoAspect, a bad value here would divide the
   // box's height by zero/Infinity and make the whole recording screen
   // silently vanish, so re-check it right at the point of use too.
-  const previewRatio = videoAspect && Number.isFinite(videoAspect) && videoAspect > 0 ? videoAspect : 9 / 16;
-  const previewMaxHeightPx = viewport.h * 0.85;
+  const idleRatio = viewport.w > 0 && viewport.h > 0 ? viewport.w / viewport.h : 9 / 16;
+  const previewRatio = videoAspect && Number.isFinite(videoAspect) && videoAspect > 0 ? videoAspect : idleRatio;
+  // Idle gets a smaller share of the screen than a running camera does --
+  // nothing is being watched yet, and an 85%-tall black box pushed the
+  // "Enable camera" button and the instructions around it off the bottom
+  // on a short screen, which is the one thing that has to stay reachable
+  // at this point.
+  const previewMaxHeightPx = viewport.h * (phase === "idle" ? 0.5 : 0.85);
   const previewMaxWidthCapPx = previewRatio > 1 ? 896 : 448;
   const previewAvailableWidthPx = Math.max(200, viewport.w - 32);
   const previewBoxWidthPx = Math.min(previewMaxHeightPx * previewRatio, previewMaxWidthCapPx, previewAvailableWidthPx);
@@ -1057,7 +1069,26 @@ export default function KataRecorder({
             ? "relative h-full w-full overflow-hidden bg-black"
             : "relative mx-auto overflow-hidden rounded-lg border border-neutral-300 bg-black"
         }
-        style={fullscreen ? undefined : { width: previewBoxWidthPx, height: previewBoxHeightPx }}
+        style={
+          fullscreen
+            ? undefined
+            : {
+                width: previewBoxWidthPx,
+                height: previewBoxHeightPx,
+                // Hard CSS guard on top of the pixel maths above. `viewport`
+                // deliberately starts at a fixed 400x800 placeholder so the
+                // server and client render the same thing, and is only
+                // corrected to the real size by an effect after mount -- on
+                // any screen narrower than 400 that first paint computes a
+                // box wider than the page, which is what was pushing the
+                // whole layout sideways and clipping this box's right edge
+                // (and the Enable camera button with it). maxWidth is
+                // resolved by the browser against the real container, so it
+                // holds on that first paint too, before any JS has measured
+                // anything.
+                maxWidth: "100%",
+              }
+        }
       >
         {/* Title bar, error banner, the live/recording badges, and the
             review controls all stack in ONE column starting right below the
