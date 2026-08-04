@@ -160,6 +160,56 @@ function fitCanvasFontToWidth(
   return px;
 }
 
+/** Draws `text` centred on `centerX` spanning `targetWidth`, keeping
+ * whatever font size is already set on `ctx` and making up the shortfall
+ * with letter spacing (tracking) instead of by growing the type.
+ *
+ * This is what lets row 2 span its share of the banner while still
+ * rendering markedly smaller than row 1. The two only look contradictory
+ * if width has to come from font size alone: row 2's string is LONGER
+ * than row 1's (51 characters vs 47) and set in a lighter, narrower face,
+ * so matching row 1's share of the width by size would need it about 3%
+ * BIGGER than the title it sits under. Spreading a small face across the
+ * width is the ordinary typographic answer, and reads as deliberate.
+ *
+ * Silently falls back to plain centred text where canvas letterSpacing
+ * isn't supported (pre-2023 browsers), which loses the spread but never
+ * the legibility. */
+function drawTextToWidth(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  targetWidth: number,
+  centerX: number,
+  y: number,
+) {
+  const tracked = ctx as CanvasRenderingContext2D & { letterSpacing?: string };
+  if (typeof tracked.letterSpacing !== "string" || text.length < 2) {
+    ctx.fillText(text, centerX, y);
+    return;
+  }
+  tracked.letterSpacing = "0px";
+  const natural = ctx.measureText(text).width;
+  if (natural <= 0 || targetWidth <= natural) {
+    ctx.fillText(text, centerX, y);
+    return;
+  }
+  let spacing = (targetWidth - natural) / text.length;
+  tracked.letterSpacing = `${spacing}px`;
+  // Browsers differ on whether the gap after the LAST character counts
+  // toward the measured width, so re-measure once and correct rather than
+  // trusting the first estimate.
+  const measured = ctx.measureText(text).width;
+  if (measured > 0) {
+    spacing += (targetWidth - measured) / text.length;
+    tracked.letterSpacing = `${spacing}px`;
+  }
+  // Shift back by half a gap: the trailing space is included in the run's
+  // measured width, so a centred draw would otherwise sit visibly right of
+  // true centre.
+  ctx.fillText(text, centerX - spacing / 2, y);
+  tracked.letterSpacing = "0px";
+}
+
 function drawBannerRect(ctx: CanvasRenderingContext2D, w: number, topH: number) {
   const grad = ctx.createLinearGradient(0, 0, w, 0);
   grad.addColorStop(0, "#b91c1c");
@@ -207,13 +257,13 @@ function drawFrame(
   }
   ctx.drawImage(video, (srcW - sw) / 2, (srcH - sh) / 2, sw, sh, 0, 0, w, h);
 
-  // Row 1 fills 95% of the banner's width, row 2 fills 88% -- the
-  // organizer's explicit spec -- with row 2 additionally capped at 20%
-  // above the size it would otherwise have taken, so it can't grow into
-  // looking as prominent as the title above it.
+  // The organizer's spec: row 1 fills 95% of the banner's width, row 2
+  // fills 88% while rendering 40-50% smaller than row 1. Row 2 gets there
+  // on tracking rather than size (see drawTextToWidth) -- 45%, the middle
+  // of the requested range.
   const TITLE_WIDTH_FRACTION = 0.95;
   const SUBTITLE_WIDTH_FRACTION = 0.88;
-  const SUBTITLE_MAX_GROWTH = 1.2;
+  const SUBTITLE_SIZE_OF_TITLE = 0.55;
   const subtitle = "Organized by IKO GOJU-RYU KARATE-DO MALAYSIA SDN BHD";
 
   // Portrait only: size the title from the frame's WIDTH (how large it can
@@ -241,17 +291,7 @@ function drawFrame(
     // was tried to make it bigger, but the organizer confirmed that reads
     // worse (the whole point is ONE row, matching landscape's own layout).
     const titleFontPx = fitCanvasFontToWidth(ctx, bannerTitle, w * TITLE_WIDTH_FRACTION, titleFont, Math.round(w * 0.075));
-    // The size row 2 would otherwise have taken, which the 20% growth cap
-    // below is measured against.
-    const subtitleNaturalPx = Math.min(Math.round(w * 0.05), Math.round(titleFontPx * 0.85));
-    const subtitleFontPx = fitCanvasFontToWidth(
-      ctx,
-      subtitle,
-      w * SUBTITLE_WIDTH_FRACTION,
-      subtitleFont,
-      subtitleNaturalPx,
-      subtitleNaturalPx * SUBTITLE_MAX_GROWTH,
-    );
+    const subtitleFontPx = titleFontPx * SUBTITLE_SIZE_OF_TITLE;
     // Padding multipliers deliberately generous -- this is what actually
     // grows the banner bar itself, since the text's own size is already
     // pinned to its share of the frame width above.
@@ -270,7 +310,7 @@ function drawFrame(
     ctx.font = titleFont(titleFontPx);
     ctx.fillText(bannerTitle, w / 2, titleY);
     ctx.font = subtitleFont(subtitleFontPx);
-    ctx.fillText(subtitle, w / 2, subtitleY);
+    drawTextToWidth(ctx, subtitle, w * SUBTITLE_WIDTH_FRACTION, w / 2, subtitleY);
     ctx.shadowBlur = 0;
 
     drawWatermark(ctx, w, h, watermark);
@@ -287,15 +327,7 @@ function drawFrame(
     titleFont,
     Math.max(14, Math.round(topH * 0.4)),
   );
-  const subtitleNaturalPx = Math.min(Math.max(8, Math.round(topH * 0.16)), Math.round(titleFontPx * 0.55));
-  const subtitleFontPx = fitCanvasFontToWidth(
-    ctx,
-    subtitle,
-    w * SUBTITLE_WIDTH_FRACTION,
-    subtitleFont,
-    subtitleNaturalPx,
-    subtitleNaturalPx * SUBTITLE_MAX_GROWTH,
-  );
+  const subtitleFontPx = titleFontPx * SUBTITLE_SIZE_OF_TITLE;
   const titleY = topH * 0.4;
   const subtitleY = topH * 0.82;
 
@@ -307,7 +339,7 @@ function drawFrame(
   ctx.font = titleFont(titleFontPx);
   ctx.fillText(bannerTitle, w / 2, titleY);
   ctx.font = subtitleFont(subtitleFontPx);
-  ctx.fillText(subtitle, w / 2, subtitleY);
+  drawTextToWidth(ctx, subtitle, w * SUBTITLE_WIDTH_FRACTION, w / 2, subtitleY);
   ctx.shadowBlur = 0;
 
   drawWatermark(ctx, w, h, watermark);
