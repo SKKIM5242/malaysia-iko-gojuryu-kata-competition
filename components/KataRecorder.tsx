@@ -78,7 +78,23 @@ function drawWatermark(ctx: CanvasRenderingContext2D, w: number, h: number, sett
   const availableLength = isVertical ? h * 0.9 : isDiagonal ? Math.min(w, h) * 1.3 : w * 0.92;
 
   const weight = bold ? "900" : "400";
-  let fontPx = fontSizePx ?? Math.max(11, Math.round(h * 0.022));
+  // Auto size is taken from availableLength -- the axis the text actually
+  // runs along -- not from the frame HEIGHT regardless of direction, which
+  // is what it used to do. Height-based sizing made the same watermark
+  // render about three times larger relative to the frame in portrait than
+  // in landscape (2.2% of a 720-wide portrait frame's width vs 1.2% of a
+  // 1280-wide landscape one), so it looked like a different design on
+  // every device and orientation. Measuring against the axis it's drawn
+  // along makes one setting look the same everywhere -- and it's the axis
+  // the shrink-to-fit below tests against anyway, so the starting size and
+  // the constraint are finally in the same units.
+  //
+  // Deliberately NOT rounded to a whole pixel: canvas takes fractional font
+  // sizes, and rounding reintroduced a few percent of per-frame variation
+  // (a 14.6px ideal rounding up to 15 on one frame and 17.5 down to 17 on
+  // another) in exactly the consistency this is here to deliver.
+  const AUTO_SIZE_OF_LENGTH = 0.027;
+  let fontPx = fontSizePx ?? Math.max(10, availableLength * AUTO_SIZE_OF_LENGTH);
   const applyFont = () => {
     ctx.font = `${weight} ${fontPx}px ${fontFamily}`;
   };
