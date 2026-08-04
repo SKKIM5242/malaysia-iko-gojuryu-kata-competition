@@ -580,6 +580,41 @@ export default function KataRecorder({
     };
   }, []);
 
+  // Re-ask the camera for the CURRENT orientation's shape whenever the
+  // viewport changes.
+  //
+  // getUserMedia was only ever called once, in startCamera, so the stream
+  // kept whatever shape it was negotiated with at that moment. Start in
+  // portrait and rotate to landscape and the stream stayed portrait while
+  // the screen turned landscape -- and since the canvas may only depart
+  // from the camera's shape by the crop clamp's 15%, it stayed pinned
+  // portrait too, leaving about 65% of a landscape screen as black bars.
+  // That is the landscape recording window in the organizer's screenshots;
+  // portrait looked fine purely because it was the orientation the stream
+  // happened to be negotiated in.
+  //
+  // applyConstraints re-negotiates the live track in place, so there's no
+  // visible restart and no new permission prompt. Deliberately NOT run
+  // while recording: the take in progress is being captured from the
+  // canvas, whose size is frozen for the duration, and swapping the source
+  // shape underneath it mid-recording risks disturbing that.
+  useEffect(() => {
+    if (phase !== "live") return;
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track) return;
+    const { width, height } = idealVideoDimensions();
+    void track
+      .applyConstraints({
+        width: { ideal: width },
+        height: { ideal: height },
+        aspectRatio: { ideal: width / height },
+      })
+      // Best-effort: a camera that can't honour the new shape just keeps
+      // its old one, and the crop clamp still bounds how far the canvas
+      // may drift from it.
+      .catch(() => {});
+  }, [phase, viewport.w, viewport.h]);
+
   // This used to collapse our OWN fullscreen state the instant the
   // browser's native Fullscreen API dropped for ANY reason, on the
   // assumption that only an intentional exit (OS gesture, Escape) could

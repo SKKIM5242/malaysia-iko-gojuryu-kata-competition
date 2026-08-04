@@ -79,10 +79,19 @@ export function SiteHeader() {
                 phones or sat needlessly small on wider ones. Scales with
                 the viewport instead, so it stays on one line at any width
                 this breakpoint covers. */}
-            <span className="block whitespace-nowrap text-[clamp(7.5px,2.9vw,11px)] font-bold tracking-wide sm:text-sm sm:whitespace-normal">
+            {/* vw coefficients measured, not estimated: at the previous
+                2.9vw/2.15vw the title ran past the right edge on every
+                width from 320 to 375 (iPhone SE is 375 — that's the
+                clipped "COMPETITION"), and the subtitle all the way up to
+                412. These are the tightest coefficients that still fit the
+                space actually left over after the header's own padding,
+                the crest and the gap, at every width below the sm
+                breakpoint — where the text is allowed to wrap and none of
+                this applies. */}
+            <span className="block whitespace-nowrap text-[clamp(6.5px,2.7vw,11px)] font-bold tracking-wide sm:text-sm sm:whitespace-normal">
               MALAYSIA OPEN VIRTUAL KARATE-DO KATA COMPETITION
             </span>
-            <span className="block whitespace-nowrap text-[clamp(6px,2.15vw,8.5px)] font-bold tracking-wide sm:whitespace-normal sm:text-sm [@media(max-height:500px)_and_(orientation:landscape)]:text-[clamp(5px,1.5vw,6.5px)]">
+            <span className="block whitespace-nowrap text-[clamp(5px,1.95vw,8.5px)] font-bold tracking-wide sm:whitespace-normal sm:text-sm [@media(max-height:500px)_and_(orientation:landscape)]:text-[clamp(5px,1.5vw,6.5px)]">
               Goju-ryu or IKO Goju-ryu Version Only &amp; Open Version for Kobudo (Weapon) Kata
             </span>
           </span>
