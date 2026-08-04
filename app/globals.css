@@ -17,3 +17,16 @@ body {
   left: -9999px;
   top: -9999px;
 }
+
+/* While the Kata recorder is in full screen, hide the site's own fixed
+   page chrome. The recorder's overlay is `fixed inset-0` with a z-index far
+   above the footer's, so in principle it already covers it — but the
+   footer kept showing through along the bottom edge on real devices
+   anyway, and "full screen" should mean the site's furniture is gone
+   regardless of which stacking or containing-block subtlety is behind
+   that. Hiding it outright is deterministic, where relying on the overlay
+   winning a paint-order argument is not. Restored the moment the class is
+   removed (see KataRecorder's fullscreen effect). */
+body.kata-recorder-fullscreen [data-mobile-footer] {
+  display: none !important;
+}

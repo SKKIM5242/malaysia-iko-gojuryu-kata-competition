@@ -586,6 +586,15 @@ export default function KataRecorder({
     };
   }, []);
 
+  // Take the site's fixed footer out of the page entirely while full
+  // screen is up (see app/globals.css). Cleaned up on exit AND on unmount,
+  // so navigating away mid-recording can't strand the footer hidden.
+  useEffect(() => {
+    if (!fullscreen) return;
+    document.body.classList.add("kata-recorder-fullscreen");
+    return () => document.body.classList.remove("kata-recorder-fullscreen");
+  }, [fullscreen]);
+
   // Track the recording box's real size. A ResizeObserver rather than the
   // window resize handler above: this fires for every reason the box's own
   // size can change -- rotation, browser UI appearing or retracting,
@@ -788,19 +797,24 @@ export default function KataRecorder({
       const box = containerBoxRef.current;
       const screenAspect =
         fullscreenRef.current && box.w > 0 && box.h > 0 ? box.w / box.h : cameraAspect;
-      // Never crop away more than this share of the camera frame, however
-      // far its shape is from the screen's. Filling the screen is worth a
-      // slim crop; it is NOT worth cutting the performer out of their own
-      // kata, and the judges have to see the whole routine either way.
-      // Past the limit the canvas keeps more of the camera than the screen
-      // asked for and the display letterboxes the difference -- a thin bar
-      // is a far better failure than a missing head or feet.
+      // How much of the camera frame we must keep. Below this the canvas
+      // stops matching the box and the display letterboxes the difference.
       //
-      // In practice this should rarely bind now that the camera is asked
-      // for the screen's own shape (see idealVideoDimensions): it is the
-      // backstop for cameras that can only deliver a fixed aspect ratio,
-      // not the normal path.
-      const MIN_FRAME_KEPT = 0.85;
+      // This is the backstop for a camera that can only deliver its native
+      // aspect ratio and ignores the shape we asked for; when the camera
+      // does honour the request there's no mismatch and it never binds.
+      // It was 0.85, which was far too strict to be a backstop: a phone in
+      // LANDSCAPE has a very wide box (iPhone XR 2.16, Pixel 2.22, Z Fold
+      // 2.56) and filling it from a 16:9 frame keeps 82%, 80% and 69%
+      // respectively -- all of which 0.85 refused, which is why landscape
+      // still had bars down both sides after every earlier fix. 0.68
+      // clears every device in the organizer's list.
+      //
+      // Cropping this hard is safe here in a way it wouldn't be otherwise,
+      // because the preview is what gets recorded: a participant framed
+      // too tight sees it live and steps back, rather than finding out
+      // afterwards.
+      const MIN_FRAME_KEPT = 0.68;
       const targetAspect = Math.min(
         Math.max(screenAspect, cameraAspect * MIN_FRAME_KEPT),
         cameraAspect / MIN_FRAME_KEPT,
