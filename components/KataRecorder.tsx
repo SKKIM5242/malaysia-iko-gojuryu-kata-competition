@@ -1070,7 +1070,16 @@ export default function KataRecorder({
   return (
     <div
       ref={containerRef}
-      className={fullscreen ? "fixed inset-0 z-[300] bg-black" : "space-y-4"}
+      // The attribute is what the stylesheet keys the "hide the site's
+      // footer" rule off (via body:has(...)), so hiding it needs no
+      // JavaScript beyond rendering this element -- one less moving part
+      // than the body class, which is kept alongside it as a fallback for
+      // browsers without :has().
+      data-kata-fullscreen={fullscreen ? "" : undefined}
+      // z-index raised well clear of every other fixed layer in the app
+      // (the footer sits at 40, the accessibility toolbar at 60, modals at
+      // 150-200) so nothing can paint over the recording area.
+      className={fullscreen ? "fixed inset-0 z-[999] bg-black" : "space-y-4"}
     >
       {!fullscreen && categoryName && (
         <p className="text-sm font-bold text-neutral-800">Recording: {categoryName}</p>

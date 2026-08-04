@@ -27,6 +27,7 @@ body {
    that. Hiding it outright is deterministic, where relying on the overlay
    winning a paint-order argument is not. Restored the moment the class is
    removed (see KataRecorder's fullscreen effect). */
-body.kata-recorder-fullscreen [data-mobile-footer] {
+body.kata-recorder-fullscreen [data-mobile-footer],
+body:has([data-kata-fullscreen]) [data-mobile-footer] {
   display: none !important;
 }
