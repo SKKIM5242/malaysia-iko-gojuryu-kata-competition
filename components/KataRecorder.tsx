@@ -475,6 +475,12 @@ export default function KataRecorder({
   const [reviewMuted, setReviewMuted] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  // The recording box's REAL painted size, kept in a ref because
+  // renderLoop re-schedules itself through requestAnimationFrame and would
+  // otherwise read whatever value it closed over on its first frame. This
+  // is what the canvas is sized against, so that the picture and the box
+  // it sits in can never disagree and leave a letterbox gap.
+  const containerBoxRef = useRef<{ w: number; h: number }>({ w: 0, h: 0 });
   const videoRef = useRef<HTMLVideoElement>(null);
   const reviewVideoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -579,6 +585,31 @@ export default function KataRecorder({
       window.removeEventListener("orientationchange", onOrientationChange);
     };
   }, []);
+
+  // Track the recording box's real size. A ResizeObserver rather than the
+  // window resize handler above: this fires for every reason the box's own
+  // size can change -- rotation, browser UI appearing or retracting,
+  // entering or leaving fullscreen, a device-toolbar resize -- including
+  // the ones that never produce a window resize event at all, and it
+  // reports the element's own measured box rather than a viewport figure
+  // that may not match it.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const measure = () => {
+      const rect = el.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        containerBoxRef.current = { w: rect.width, h: rect.height };
+      }
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+    // phase is a dependency because the box only exists once past the
+    // early returns above, and fullscreen because entering it swaps the
+    // element's positioning entirely.
+  }, [fullscreen, phase]);
 
   // Re-ask the camera for the CURRENT orientation's shape whenever the
   // viewport changes.
@@ -744,10 +775,19 @@ export default function KataRecorder({
     const recording = recorderRef.current?.state === "recording";
     if (!recording) {
       const cameraAspect = video.videoWidth / video.videoHeight;
+      // Measured from the box the canvas is actually painted into, NOT from
+      // window.innerWidth/innerHeight. Those are a second, independent
+      // source of truth for "how big is the screen", and when they disagree
+      // with the real `fixed inset-0` box even slightly -- which they do
+      // wherever the visual and layout viewports differ, mobile browser UI
+      // and emulated device toolbars included -- object-contain faithfully
+      // letterboxes the difference. That mismatch is the residual black
+      // band along the bottom on iPhone SE and XR in portrait. Measuring
+      // the element itself makes the canvas match its container by
+      // construction, so there is nothing left to letterbox.
+      const box = containerBoxRef.current;
       const screenAspect =
-        fullscreenRef.current && window.innerWidth > 0 && window.innerHeight > 0
-          ? window.innerWidth / window.innerHeight
-          : cameraAspect;
+        fullscreenRef.current && box.w > 0 && box.h > 0 ? box.w / box.h : cameraAspect;
       // Never crop away more than this share of the camera frame, however
       // far its shape is from the screen's. Filling the screen is worth a
       // slim crop; it is NOT worth cutting the performer out of their own
