@@ -358,15 +358,16 @@ function idealVideoDimensions(): { width: number; height: number } {
   const screenShort = Math.max(Math.min(window.innerWidth, window.innerHeight), 240);
   const longEdge = 1280;
   const shortEdge = Math.max(400, Math.round(longEdge * (screenShort / screenLong)));
-  const isMobile = typeof navigator !== "undefined" && /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-  // Phones: always request the shape OPPOSITE the screen (the sensor-
-  // rotation quirk this function exists for). Desktop: always request the
-  // SAME shape as the screen -- a webcam has no rotated sensor to correct
-  // for, so matching is what actually fills the frame instead of
-  // letterboxing it.
-  const matchesScreen = landscape ? { width: longEdge, height: shortEdge } : { width: shortEdge, height: longEdge };
-  const opposesScreen = landscape ? { width: shortEdge, height: longEdge } : { width: longEdge, height: shortEdge };
-  return isMobile ? opposesScreen : matchesScreen;
+  // Always ask for the screen's OWN shape, on every device. This used to
+  // ask phones for the opposite shape, to compensate for a preview that
+  // letterboxed whatever it was given -- but the canvas is now drawn at the
+  // screen's shape and center-crops the camera into it, so deliberately
+  // requesting the wrong shape means throwing most of the frame away: a
+  // landscape phone asking for a portrait stream keeps only ~32% of it,
+  // which is what was cropping the performer down to their forehead.
+  // Matching keeps ~100%, and any residual mismatch is bounded by the crop
+  // clamp in renderLoop rather than by guessing at the request.
+  return landscape ? { width: longEdge, height: shortEdge } : { width: shortEdge, height: longEdge };
 }
 
 export default function KataRecorder({
@@ -659,10 +660,28 @@ export default function KataRecorder({
     // started with rather than corrupting the recording).
     const recording = recorderRef.current?.state === "recording";
     if (!recording) {
-      const targetAspect =
+      const cameraAspect = video.videoWidth / video.videoHeight;
+      const screenAspect =
         fullscreenRef.current && window.innerWidth > 0 && window.innerHeight > 0
           ? window.innerWidth / window.innerHeight
-          : video.videoWidth / video.videoHeight;
+          : cameraAspect;
+      // Never crop away more than this share of the camera frame, however
+      // far its shape is from the screen's. Filling the screen is worth a
+      // slim crop; it is NOT worth cutting the performer out of their own
+      // kata, and the judges have to see the whole routine either way.
+      // Past the limit the canvas keeps more of the camera than the screen
+      // asked for and the display letterboxes the difference -- a thin bar
+      // is a far better failure than a missing head or feet.
+      //
+      // In practice this should rarely bind now that the camera is asked
+      // for the screen's own shape (see idealVideoDimensions): it is the
+      // backstop for cameras that can only deliver a fixed aspect ratio,
+      // not the normal path.
+      const MIN_FRAME_KEPT = 0.85;
+      const targetAspect = Math.min(
+        Math.max(screenAspect, cameraAspect * MIN_FRAME_KEPT),
+        cameraAspect / MIN_FRAME_KEPT,
+      );
       // Largest region of the source frame matching targetAspect, so the
       // canvas never upscales beyond what the camera actually delivered.
       let canvasW: number;
