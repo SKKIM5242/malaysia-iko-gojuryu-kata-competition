@@ -112,6 +112,7 @@ export default function FloatingWindow({
   // of that bar, which is the letterbox this exists to remove.
   useEffect(() => {
     if (!fitAspect || !Number.isFinite(fitAspect) || fitAspect <= 0) return;
+    const applyFit = () => {
     const win = winRef.current;
     const content = contentRef.current;
     const chrome = win && content ? Math.max(0, win.offsetHeight - content.offsetHeight) : 40;
@@ -143,6 +144,17 @@ export default function FloatingWindow({
       w,
       h,
     });
+    };
+    applyFit();
+    // Re-fit on rotation and any other viewport change: a window shaped
+    // for portrait is the wrong shape the moment the phone is turned, and
+    // would go back to letterboxing what it was fitted to.
+    window.addEventListener("resize", applyFit);
+    window.addEventListener("orientationchange", applyFit);
+    return () => {
+      window.removeEventListener("resize", applyFit);
+      window.removeEventListener("orientationchange", applyFit);
+    };
   }, [fitAspect]);
 
   const bringToFront = () => setZ(++zCounter);

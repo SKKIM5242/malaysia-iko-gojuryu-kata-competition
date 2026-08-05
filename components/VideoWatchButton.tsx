@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import FloatingWindow from "@/components/FloatingWindow";
 import LockedVideo from "@/components/LockedVideo";
 
@@ -32,6 +32,34 @@ export default function VideoWatchButton({
   // window opens maximized on that first beat and reshapes to hug the
   // video the moment its shape is known, rather than guessing at one.
   const [aspect, setAspect] = useState<number | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  // The whole reshape hangs on learning the recording's dimensions, and
+  // loadedmetadata is a single event that has to be caught: if it fires
+  // before this listener is attached, or the element is swapped, or the
+  // browser reports it in a way that beats the first paint, the window
+  // simply never reshapes and the recording sits letterboxed -- which is
+  // exactly the state the organizer kept photographing. So the event is
+  // now a fast path, not the only path: while the window is open and the
+  // shape is still unknown, poll the element for it as well. Both write
+  // the same value, whichever gets there first, and polling stops as soon
+  // as it is known.
+  useEffect(() => {
+    if (!open || aspect !== null) return;
+    let frames = 0;
+    const timer = setInterval(() => {
+      const v = videoRef.current;
+      if (v && v.videoWidth > 0 && v.videoHeight > 0) {
+        setAspect(v.videoWidth / v.videoHeight);
+        clearInterval(timer);
+      } else if (++frames > 60) {
+        // ~12s: the recording is unplayable or still buffering. Give up
+        // rather than poll forever; the window keeps its opening size.
+        clearInterval(timer);
+      }
+    }, 200);
+    return () => clearInterval(timer);
+  }, [open, aspect]);
 
   if (!url) return null;
 
@@ -64,6 +92,7 @@ export default function VideoWatchButton({
         >
           <div className="h-full bg-black">
             <LockedVideo
+              ref={videoRef}
               src={url}
               autoPlay
               allowAdvancedControls={allowAdvancedControls}
