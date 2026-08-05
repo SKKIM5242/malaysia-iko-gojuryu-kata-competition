@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { AdminShell, adminBtn, adminBtnSecondary } from "@/components/admin";
 import { EmptyState, SetupNotice, formatDateTime } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
+import DateField from "@/components/DateField";
 
 export const dynamic = "force-dynamic";
 
@@ -67,15 +68,15 @@ export default async function AdminActivityLog({
       <form method="get" className="mb-4 flex flex-wrap items-end gap-3 rounded-md border border-neutral-200 bg-neutral-50 p-3">
         <div>
           <label htmlFor="from" className="mb-1 block text-xs font-medium text-neutral-600">From</label>
-          <input
-            id="from" type="date" name="from" defaultValue={params.from ?? ""}
+          <DateField
+            id="from" name="from" required={false} defaultValueISO={params.from ?? ""}
             className="rounded-md border border-neutral-300 bg-white px-2 py-1 text-sm"
           />
         </div>
         <div>
           <label htmlFor="to" className="mb-1 block text-xs font-medium text-neutral-600">To</label>
-          <input
-            id="to" type="date" name="to" defaultValue={params.to ?? ""}
+          <DateField
+            id="to" name="to" required={false} defaultValueISO={params.to ?? ""}
             className="rounded-md border border-neutral-300 bg-white px-2 py-1 text-sm"
           />
         </div>

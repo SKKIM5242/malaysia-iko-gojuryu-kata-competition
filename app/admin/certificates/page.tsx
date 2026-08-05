@@ -4,6 +4,7 @@ import { saveCertificateSettings, publishWinnersNow, saveCertificateDate } from 
 import { AdminShell, Card, adminBtn, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice, formatDate } from "@/components/ui";
 import CertificateUploadField from "@/components/CertificateUploadField";
+import DateField from "@/components/DateField";
 import { winnersRevealDate, winnersRevealDateFor } from "@/lib/winners";
 import type { Competition } from "@/lib/types";
 
@@ -211,11 +212,11 @@ export default async function AdminCertificates({
                         <label htmlFor={`certificate_date_${c.id}`} className={adminLabel}>
                           Certificate date
                         </label>
-                        <input
+                        <DateField
                           id={`certificate_date_${c.id}`}
                           name="certificate_date"
-                          type="date"
-                          defaultValue={c.certificate_date ?? c.event_date ?? ""}
+                          required={false}
+                          defaultValueISO={c.certificate_date ?? c.event_date ?? ""}
                           className={adminInput}
                         />
                       </div>

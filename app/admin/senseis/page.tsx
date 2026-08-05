@@ -16,6 +16,7 @@ import AccountLinkCell from "@/components/AccountLinkCell";
 import InvitationCodeForm from "@/components/InvitationCodeForm";
 import InvitationCodeList from "@/components/InvitationCodeList";
 import InvitationCodeRunField from "@/components/InvitationCodeRunField";
+import DateField from "@/components/DateField";
 import TierSlotsField from "@/components/TierSlotsField";
 import { tierEntriesLabel } from "@/lib/tier-entries";
 import { NoCommaInput } from "@/components/NoCommaAddressField";
@@ -259,11 +260,11 @@ export default async function AdminSenseis({
                   <div className="mt-3 grid gap-4 sm:grid-cols-3">
                     <div>
                       <label htmlFor="pic_valid_from" className={adminLabel}>Valid from *</label>
-                      <input id="pic_valid_from" name="pic_valid_from" type="date" className={adminInput} />
+                      <DateField id="pic_valid_from" name="pic_valid_from" className={adminInput} />
                     </div>
                     <div>
                       <label htmlFor="pic_valid_until" className={adminLabel}>Valid until *</label>
-                      <input id="pic_valid_until" name="pic_valid_until" type="date" className={adminInput} />
+                      <DateField id="pic_valid_until" name="pic_valid_until" className={adminInput} />
                     </div>
                     <div>
                       <label htmlFor="pic_sign_in_limit" className={adminLabel}>Sign-in limit *</label>

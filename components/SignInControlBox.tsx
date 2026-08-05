@@ -4,6 +4,7 @@ import { useState } from "react";
 import { updateSignInControl } from "@/app/actions/admin";
 import { adminInput, adminLabel, adminBtnSecondary } from "@/components/admin-styles";
 import { shortTierName } from "@/lib/invitation-codes";
+import DateField from "@/components/DateField";
 import type { Competition } from "@/lib/types";
 
 /** Admin/Organizer-only control over a registrant's sign-in quota — how
@@ -95,11 +96,11 @@ export default function SignInControlBox({
               </div>
               <div>
                 <label htmlFor={`sif-${userId}`} className={adminLabel}>Valid from</label>
-                <input id={`sif-${userId}`} name="sign_in_valid_from" type="date" defaultValue={signInValidFrom ?? ""} className={adminInput} />
+                <DateField id={`sif-${userId}`} name="sign_in_valid_from" required={false} defaultValueISO={signInValidFrom ?? ""} className={adminInput} />
               </div>
               <div>
                 <label htmlFor={`siu-${userId}`} className={adminLabel}>Valid until</label>
-                <input id={`siu-${userId}`} name="sign_in_valid_until" type="date" defaultValue={signInValidUntil ?? ""} className={adminInput} />
+                <DateField id={`siu-${userId}`} name="sign_in_valid_until" required={false} defaultValueISO={signInValidUntil ?? ""} className={adminInput} />
               </div>
               <label className="flex items-center gap-1.5 text-xs text-neutral-600 sm:col-span-2">
                 <input type="checkbox" name="reset_count" className="h-3.5 w-3.5" />

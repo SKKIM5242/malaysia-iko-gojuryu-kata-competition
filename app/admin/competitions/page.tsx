@@ -10,6 +10,7 @@ import KataGroupDragZone from "@/components/KataGroupDragZone";
 import SubcategoryDragZone from "@/components/SubcategoryDragZone";
 import ScrollToAnchor from "@/components/ScrollToAnchor";
 import CategoryActionButton from "@/components/CategoryActionButton";
+import DateField from "@/components/DateField";
 import { kataBaseOf } from "@/lib/division";
 import { groupByFamily, adjacentKataOf } from "@/lib/kata-families";
 import {
@@ -178,24 +179,24 @@ export default async function AdminCompetitions({
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
                     <label htmlFor="event_date" className={adminLabel}>Event date</label>
-                    <input id="event_date" name="event_date" type="date" defaultValue={editing?.event_date ?? ""} className={adminInput} />
+                    <DateField id="event_date" name="event_date" required={false} defaultValueISO={editing?.event_date ?? ""} className={adminInput} />
                   </div>
                   <div>
                     <label htmlFor="registration_deadline" className={adminLabel}>Registration deadline</label>
-                    <input id="registration_deadline" name="registration_deadline" type="date" defaultValue={editing?.registration_deadline ?? ""} className={adminInput} />
+                    <DateField id="registration_deadline" name="registration_deadline" required={false} defaultValueISO={editing?.registration_deadline ?? ""} className={adminInput} />
                   </div>
                   <div>
                     <label htmlFor="winners_announce_date" className={adminLabel}>
                       Winners announce date{" "}
                       <span className="font-normal text-neutral-400">(blank = deadline + 30 days rule)</span>
                     </label>
-                    <input id="winners_announce_date" name="winners_announce_date" type="date" defaultValue={editing?.winners_announce_date ?? ""} className={adminInput} />
+                    <DateField id="winners_announce_date" name="winners_announce_date" required={false} defaultValueISO={editing?.winners_announce_date ?? ""} className={adminInput} />
                   </div>
                   <div>
                     <label htmlFor="audience_signin_date" className={adminLabel}>
                       Audience recommended sign-in date
                     </label>
-                    <input id="audience_signin_date" name="audience_signin_date" type="date" defaultValue={editing?.audience_signin_date ?? ""} className={adminInput} />
+                    <DateField id="audience_signin_date" name="audience_signin_date" required={false} defaultValueISO={editing?.audience_signin_date ?? ""} className={adminInput} />
                   </div>
                   <p className="text-xs text-neutral-400 sm:col-span-2">
                     Event date → Registration deadline is the participants&apos; recording-submission
@@ -233,21 +234,21 @@ export default async function AdminCompetitions({
                   <div className="mt-2 grid gap-4 sm:grid-cols-3">
                     <div>
                       <label htmlFor="default_sign_in_valid_from" className={adminLabel}>Sign-in valid from</label>
-                      <input
+                      <DateField
                         id="default_sign_in_valid_from"
                         name="default_sign_in_valid_from"
-                        type="date"
-                        defaultValue={editing?.default_sign_in_valid_from ?? ""}
+                        required={false}
+                        defaultValueISO={editing?.default_sign_in_valid_from ?? ""}
                         className={adminInput}
                       />
                     </div>
                     <div>
                       <label htmlFor="default_sign_in_valid_until" className={adminLabel}>Sign-in valid until</label>
-                      <input
+                      <DateField
                         id="default_sign_in_valid_until"
                         name="default_sign_in_valid_until"
-                        type="date"
-                        defaultValue={editing?.default_sign_in_valid_until ?? ""}
+                        required={false}
+                        defaultValueISO={editing?.default_sign_in_valid_until ?? ""}
                         className={adminInput}
                       />
                     </div>

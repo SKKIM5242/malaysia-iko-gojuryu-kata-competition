@@ -18,6 +18,7 @@ import { shortTierName } from "@/lib/invitation-codes";
 import { PROFILE_ROLE_KEYS, PROFILE_ROLE_KEY_LABELS } from "@/lib/reference-data";
 import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
+import DateField from "@/components/DateField";
 
 export const dynamic = "force-dynamic";
 
@@ -204,11 +205,11 @@ export default async function AdminContent({
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
                     <label htmlFor="tier_event_date" className={adminLabel}>Event date</label>
-                    <input id="tier_event_date" name="event_date" type="date" className={adminInput} />
+                    <DateField id="tier_event_date" name="event_date" required={false} className={adminInput} />
                   </div>
                   <div>
                     <label htmlFor="tier_deadline" className={adminLabel}>Registration deadline</label>
-                    <input id="tier_deadline" name="registration_deadline" type="date" className={adminInput} />
+                    <DateField id="tier_deadline" name="registration_deadline" required={false} className={adminInput} />
                   </div>
                   <div>
                     <label htmlFor="tier_fee" className={adminLabel}>Fee (USD)</label>
@@ -542,10 +543,10 @@ export default async function AdminContent({
                         </label>
                       ),
                       valid_from: (
-                        <input form="signin-new" name="valid_from" type="date" className={cellInput} title="Valid from (optional override)" />
+                        <DateField form="signin-new" name="valid_from" required={false} className={cellInput} title="Valid from (optional override)" />
                       ),
                       valid_until: (
-                        <input form="signin-new" name="valid_until" type="date" className={cellInput} title="Valid until (optional override)" />
+                        <DateField form="signin-new" name="valid_until" required={false} className={cellInput} title="Valid until (optional override)" />
                       ),
                       notes: <input form="signin-new" name="notes" placeholder="Note (optional)" className={cellInput} />,
                       actions: <span className="text-xs text-neutral-400">New row — Save above</span>,
@@ -575,22 +576,22 @@ export default async function AdminContent({
                   </label>
                 ),
                 valid_from: (
-                  <input
+                  <DateField
                     form={`signin-${r.id}`}
                     name="valid_from"
-                    type="date"
-                    defaultValue={r.valid_from ?? ""}
+                    required={false}
+                    defaultValueISO={r.valid_from ?? ""}
                     disabled={!canManage}
                     className={cellInput}
                     title="Optional override — when set, wins over the dynamic tier-derived window"
                   />
                 ),
                 valid_until: (
-                  <input
+                  <DateField
                     form={`signin-${r.id}`}
                     name="valid_until"
-                    type="date"
-                    defaultValue={r.valid_until ?? ""}
+                    required={false}
+                    defaultValueISO={r.valid_until ?? ""}
                     disabled={!canManage}
                     className={cellInput}
                     title="Optional override — when set, wins over the dynamic tier-derived window"

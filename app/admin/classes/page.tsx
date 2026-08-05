@@ -14,6 +14,7 @@ import FilterableTable from "@/components/FilterableTable";
 import CsvUploadForm from "@/components/CsvUploadForm";
 import { NoCommaInput } from "@/components/NoCommaAddressField";
 import DateOfBirthField from "@/components/DateOfBirthField";
+import DateField from "@/components/DateField";
 import type { ClassEnrollment, ClassInvoice, FeePlan, Student } from "@/lib/types";
 import { WORLD_CURRENCIES } from "@/lib/reference-data";
 
@@ -210,7 +211,7 @@ export default async function AdminClasses({
                   </div>
                   <div>
                     <label htmlFor="join_date" className={adminLabel}>Join date</label>
-                    <input id="join_date" name="join_date" type="date" defaultValue={editingStudent?.join_date ?? ""} className={adminInput} />
+                    <DateField id="join_date" name="join_date" required={false} defaultValueISO={editingStudent?.join_date ?? ""} className={adminInput} />
                   </div>
                   <div>
                     <label htmlFor="email" className={adminLabel}>Email</label>
@@ -471,7 +472,7 @@ export default async function AdminClasses({
                 </div>
                 <div>
                   <label htmlFor="start_date" className={adminLabel}>First billing date</label>
-                  <input id="start_date" name="start_date" type="date" className={adminInput} />
+                  <DateField id="start_date" name="start_date" required={false} className={adminInput} />
                 </div>
                 <button type="submit" className={adminBtn}>Enroll</button>
                 <p className="text-xs text-neutral-400">
@@ -625,7 +626,7 @@ export default async function AdminClasses({
                     </div>
                     <div>
                       <label htmlFor="inv_due" className={adminLabel}>Due date</label>
-                      <input id="inv_due" name="due_date" type="date" className={adminInput} />
+                      <DateField id="inv_due" name="due_date" required={false} className={adminInput} />
                     </div>
                   </div>
                   <button type="submit" className={adminBtn}>Create invoice</button>

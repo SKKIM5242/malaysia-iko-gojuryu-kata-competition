@@ -28,6 +28,7 @@ import { NoCommaInput } from "@/components/NoCommaAddressField";
 import DateOfBirthField from "@/components/DateOfBirthField";
 
 import { REFERRAL_LABEL, REFERRAL_PLACEHOLDER, REFEREE_TITLE_OPTIONS } from "@/lib/reference-data";
+import DateField from "@/components/DateField";
 
 export const dynamic = "force-dynamic";
 
@@ -301,11 +302,11 @@ export default async function AdminReferees({
                   <div className="mt-3 grid gap-4 sm:grid-cols-3">
                     <div>
                       <label htmlFor="pic_valid_from" className={adminLabel}>Valid from *</label>
-                      <input id="pic_valid_from" name="pic_valid_from" type="date" className={adminInput} />
+                      <DateField id="pic_valid_from" name="pic_valid_from" className={adminInput} />
                     </div>
                     <div>
                       <label htmlFor="pic_valid_until" className={adminLabel}>Valid until *</label>
-                      <input id="pic_valid_until" name="pic_valid_until" type="date" className={adminInput} />
+                      <DateField id="pic_valid_until" name="pic_valid_until" className={adminInput} />
                     </div>
                     <div>
                       <label htmlFor="pic_sign_in_limit" className={adminLabel}>Sign-in limit *</label>

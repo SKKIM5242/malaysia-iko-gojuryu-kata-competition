@@ -4,6 +4,7 @@ import { useState } from "react";
 import { generateRecordInvitationCode } from "@/app/actions/admin";
 import { adminInput, adminLabel, adminBtn } from "@/components/admin-styles";
 import { shortTierName } from "@/lib/invitation-codes";
+import DateField from "@/components/DateField";
 import type { Competition } from "@/lib/types";
 
 /** Generate/regenerate a single-use invitation code bound to one existing
@@ -66,11 +67,11 @@ export default function GeneratePersonalCodeBox({
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
                   <label htmlFor={`pic_valid_from_${recordId}`} className={adminLabel}>Valid from *</label>
-                  <input id={`pic_valid_from_${recordId}`} name="pic_valid_from" type="date" required className={adminInput} />
+                  <DateField id={`pic_valid_from_${recordId}`} name="pic_valid_from" className={adminInput} />
                 </div>
                 <div>
                   <label htmlFor={`pic_valid_until_${recordId}`} className={adminLabel}>Valid until *</label>
-                  <input id={`pic_valid_until_${recordId}`} name="pic_valid_until" type="date" required className={adminInput} />
+                  <DateField id={`pic_valid_until_${recordId}`} name="pic_valid_until" className={adminInput} />
                 </div>
               </div>
               <div>

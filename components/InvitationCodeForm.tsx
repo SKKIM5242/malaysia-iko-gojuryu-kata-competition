@@ -4,6 +4,7 @@ import { useState } from "react";
 import { createInvitationCode, updateInvitationCode, generateSequentialInvitationCode } from "@/app/actions/admin";
 import { Card, adminBtn, adminBtnSecondary, adminInput, adminLabel } from "@/components/admin-styles";
 import { tierCombinations } from "@/lib/invitation-codes";
+import DateField from "@/components/DateField";
 
 export const ROLE_LABELS: Record<string, string> = {
   school: "School / Dojo / Club",
@@ -221,23 +222,19 @@ export default function InvitationCodeForm({
         <div className="grid gap-4 sm:grid-cols-3">
           <div>
             <label htmlFor={`${idPrefix}_valid_from`} className={adminLabel}>Valid from *</label>
-            <input
+            <DateField
               id={`${idPrefix}_valid_from`}
               name="valid_from"
-              type="date"
-              required
-              defaultValue={editing?.valid_from ?? ""}
+              defaultValueISO={editing?.valid_from ?? ""}
               className={adminInput}
             />
           </div>
           <div>
             <label htmlFor={`${idPrefix}_valid_until`} className={adminLabel}>Valid until *</label>
-            <input
+            <DateField
               id={`${idPrefix}_valid_until`}
               name="valid_until"
-              type="date"
-              required
-              defaultValue={editing?.valid_until ?? ""}
+              defaultValueISO={editing?.valid_until ?? ""}
               className={adminInput}
             />
           </div>
