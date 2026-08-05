@@ -8,6 +8,8 @@ import AdminVideoUploadForm from "@/components/AdminVideoUploadForm";
 import ColumnFilterDropdown from "@/components/ColumnFilterDropdown";
 import DualScrollBox from "@/components/DualScrollBox";
 import { useGridControls, isClosed, CLOSED_SIZE } from "@/lib/useGridControls";
+import { useTableInteractions } from "@/lib/useTableInteractions";
+import TableInteractionOverlays from "@/components/TableInteractionOverlays";
 import { updateRegistrationSlotStatus, linkRegistrationToAccount, unlinkRegistrationFromAccount, resendRegistrationConfirmation } from "@/app/actions/admin";
 
 export type SlotStatus = "active" | "unslotted" | "forfeited" | "given_up";
@@ -166,6 +168,17 @@ const EXTRA_COLUMNS: Array<{ key: string; label: string; width: number }> = [
   { key: "slotStatus", label: "Slot Status", width: 240 },
   { key: "resendEmail", label: "Confirmation Email", width: 150 },
 ];
+
+/** COLUMNS + EXTRA_COLUMNS as one reorderable list — "standard" columns
+ * are plain text (eligible for cell-select/copy), "extra" ones are rich
+ * JSX (reorderable like any column, but not cell-select/copy eligible). */
+type AnyColumn = { key: string; label: string; width: number; kind: "standard" | "extra" };
+const ALL_COLUMNS: AnyColumn[] = [
+  ...COLUMNS.map((c) => ({ key: c.key as string, label: c.label, width: c.width, kind: "standard" as const })),
+  ...EXTRA_COLUMNS.map((c) => ({ ...c, kind: "extra" as const })),
+];
+const COL_BY_KEY = new Map(ALL_COLUMNS.map((c) => [c.key, c]));
+const STANDARD_BY_KEY = new Map(COLUMNS.map((c) => [c.key as string, c]));
 
 
 function standardCell(
@@ -377,6 +390,7 @@ export default function ParticipantRecordsTable({
   const [selectedCols, setSelectedCols] = useState<Set<string>>(new Set());
   const resizingRef = useRef<{ key: string; startX: number; startWidth: number } | null>(null);
   const grid = useGridControls();
+  const t = useTableInteractions();
 
   const widthOf = useCallback((key: string, fallback: number) => colWidths[key] ?? fallback, [colWidths]);
 
@@ -440,14 +454,15 @@ export default function ParticipantRecordsTable({
     return (
       <th
         key={key}
+        data-col-order-key={key}
         className={`relative select-none whitespace-nowrap ${sticky ? `sticky left-0 z-10 border-r border-neutral-200` : ""} ${
           closed ? "bg-red-600 p-0" : `px-3 py-2.5 ${selected ? "bg-sky-100" : sticky ? "bg-neutral-50" : ""}`
         }`}
       >
         {!closed && (
           <span
-            onClick={() => toggleColSelect(key)}
-            title="Click to select/highlight this column"
+            onPointerDown={t.getColHeaderDownHandler(key, () => toggleColSelect(key))}
+            title="Click to select/highlight this column — drag to reorder"
             className="block cursor-pointer overflow-hidden text-ellipsis pr-2"
           >
             {label}
@@ -513,14 +528,27 @@ export default function ParticipantRecordsTable({
     [widthOf],
   );
 
+  const orderedColumns = t
+    .orderColumnKeys(ALL_COLUMNS.map((c) => c.key))
+    .map((k) => COL_BY_KEY.get(k))
+    .filter((c): c is AnyColumn => !!c);
+
+  const orderedRows = (() => {
+    const keys = t.orderRowKeys(filtered.map((r) => r.registrationId));
+    const byKey = new Map(filtered.map((r) => [r.registrationId, r]));
+    return keys.map((k) => byKey.get(k)).filter((r): r is ParticipantRecordRow => !!r);
+  })();
+
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-neutral-400">
           Showing {filtered.length} of {rows.length} successful registrations. Type in any column&apos;s filter
           box to narrow the list — filters combine (AND). Click a column&apos;s label (or a row&apos;s leading
-          cell) to select/highlight it. Drag a column&apos;s right edge (or a row&apos;s bottom edge) to resize
-          it, all the way to close it down to a red bar.
+          cell) to select/highlight it — drag either one past a neighbor to reorder it. Drag a column&apos;s
+          right edge (or a row&apos;s bottom edge) to resize it, all the way to close it down to a red bar.
+          Click a cell to select it, then drag its blue corner handle across other cells to copy its value
+          into them; right-click any cell to copy its value to the clipboard.
         </p>
         <DownloadCsvButton rows={csvRows} filename="participants" />
       </div>
@@ -549,26 +577,20 @@ export default function ParticipantRecordsTable({
           className="text-left text-sm"
           style={{
             tableLayout: "fixed",
-            width:
-              COLUMNS.reduce((sum, c) => sum + widthOf(c.key, c.width), 0) +
-              EXTRA_COLUMNS.reduce((sum, c) => sum + widthOf(c.key, c.width), 0),
+            width: orderedColumns.reduce((sum, c) => sum + widthOf(c.key, c.width), 0),
           }}
         >
           <colgroup>
-            {COLUMNS.map((c) => (
-              <col key={c.key} style={{ width: widthOf(c.key, c.width) }} />
-            ))}
-            {EXTRA_COLUMNS.map((c) => (
+            {orderedColumns.map((c) => (
               <col key={c.key} style={{ width: widthOf(c.key, c.width) }} />
             ))}
           </colgroup>
           <thead className="sticky top-0 z-20 border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
             <tr>
-              {COLUMNS.map((c, i) => renderHeaderCell(c.key, c.label, widthOf(c.key, c.width), i === 0))}
-              {EXTRA_COLUMNS.map((c) => renderHeaderCell(c.key, c.label, widthOf(c.key, c.width), false))}
+              {orderedColumns.map((c, i) => renderHeaderCell(c.key, c.label, widthOf(c.key, c.width), i === 0))}
             </tr>
             <tr className="border-t border-neutral-200 bg-white normal-case">
-              {COLUMNS.map((c, i) => {
+              {orderedColumns.map((c, i) => {
                 const closed = isClosed(widthOf(c.key, c.width), widthOf(c.key, c.width));
                 const selected = selectedCols.has(c.key);
                 const bg = closed ? "bg-red-600" : selected ? "bg-sky-50" : "bg-white";
@@ -579,46 +601,52 @@ export default function ParticipantRecordsTable({
                       i === 0 ? "sticky left-0 z-10 border-r border-neutral-200" : ""
                     }`}
                   >
-                    {!closed && (
+                    {!closed && c.kind === "standard" && (
                       <ColumnFilterDropdown
-                        values={uniqueValues[c.key] ?? []}
-                        selected={filters[c.key] ?? new Set()}
+                        values={uniqueValues[c.key as keyof ParticipantRecordRow] ?? []}
+                        selected={filters[c.key as keyof ParticipantRecordRow] ?? new Set()}
                         onChange={(next) => setFilters((f) => ({ ...f, [c.key]: next }))}
                       />
                     )}
                   </th>
                 );
               })}
-              {EXTRA_COLUMNS.map((c) => (
-                <th key={c.key} className="px-2 py-1.5" />
-              ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100">
-            {filtered.length === 0 ? (
+            {orderedRows.length === 0 ? (
               <tr>
-                <td colSpan={COLUMNS.length + EXTRA_COLUMNS.length} className="px-3 py-6 text-center text-neutral-400">
+                <td colSpan={orderedColumns.length} className="px-3 py-6 text-center text-neutral-400">
                   No records match these filters.
                 </td>
               </tr>
             ) : (
-              filtered.map((row) => {
+              orderedRows.map((row) => {
                 const rowHeight = grid.rowHeights[row.registrationId];
                 const rowClosed = rowHeight != null && rowHeight <= CLOSED_SIZE + 1;
                 const rowSelected = grid.selectedRows.has(row.registrationId);
                 return (
                   <tr
                     key={row.registrationId}
+                    data-row-order-key={row.registrationId}
                     className={`group hover:bg-neutral-50 ${!rowClosed && rowSelected ? "bg-sky-50" : ""} ${grid.rowSizeClass(row.registrationId)}`}
                     style={grid.rowSizeStyle(row.registrationId)}
                   >
-                    {COLUMNS.map((c, i) => {
+                    {orderedColumns.map((c, i) => {
                       const width = widthOf(c.key, c.width);
                       const colClosed = isClosed(width, width);
                       const colSelected = selectedCols.has(c.key);
                       const closed = colClosed || rowClosed;
-                      const { className, title, content } = standardCell(c, row);
                       const isHandle = i === 0;
+                      const isStandard = c.kind === "standard";
+                      const { className, title, content } = isStandard
+                        ? standardCell(STANDARD_BY_KEY.get(c.key)!, row)
+                        : { className: "", title: undefined, content: extraCell(c.key, row, isAdmin, canManageSlot, canLinkAccount, canResendEmail) };
+                      const cellText = isStandard ? String(row[c.key as keyof ParticipantRecordRow] ?? "") : "";
+                      const cellKey = `${row.registrationId}:${c.key}`;
+                      const isCellSelected = !isHandle && isStandard && t.isCellSelected(row.registrationId, c.key);
+                      const isFillPreview = !isHandle && isStandard && t.isFillPreview(row.registrationId, c.key);
+                      const displayContent = isStandard && !isHandle ? t.cellValue(row.registrationId, c.key, cellText) || content : content;
                       const highlighted = colSelected || rowSelected;
                       const cellBg = colClosed
                         ? "bg-red-600"
@@ -630,31 +658,47 @@ export default function ParticipantRecordsTable({
                       return (
                         <td
                           key={c.key}
+                          data-cell-row={row.registrationId}
+                          data-cell-col={c.key}
                           className={`${closed ? "p-0" : `truncate px-3 py-2 ${className}`} ${
-                            isHandle ? `relative sticky left-0 z-10 border-r border-neutral-200 ${!closed ? "cursor-pointer select-none" : ""}` : ""
-                          } ${cellBg}`}
-                          title={isHandle && !closed ? "Click to select/highlight this row" : !closed ? title : undefined}
-                          onClick={isHandle && !closed ? () => grid.toggleRowSelect(row.registrationId) : undefined}
+                            isHandle ? `relative sticky left-0 z-10 border-r border-neutral-200 ${!closed ? "cursor-pointer select-none" : ""}` : "relative"
+                          } ${cellBg} ${!closed && isCellSelected ? "ring-2 ring-inset ring-blue-500" : ""} ${
+                            !closed && isFillPreview ? "outline outline-2 -outline-offset-2 outline-blue-300" : ""
+                          }`}
+                          title={isHandle && !closed ? "Click to select/highlight this row — drag to reorder" : !closed ? title : undefined}
+                          onClick={
+                            isHandle
+                              ? undefined
+                              : !closed && isStandard
+                                ? () => t.selectCell(row.registrationId, c.key)
+                                : undefined
+                          }
+                          onContextMenu={
+                            !closed && isStandard ? t.getContextMenuHandler(String(displayContent ?? "")) : undefined
+                          }
+                          onPointerDown={
+                            isHandle && !closed ? t.getRowHandleDownHandler(row.registrationId, () => grid.toggleRowSelect(row.registrationId)) : undefined
+                          }
                         >
-                          {!closed && content}
+                          {!closed && displayContent}
                           {isHandle && (
                             <span
-                              onPointerDown={(e) => grid.handleRowResizeStart(e, row.registrationId, rowHeight ?? 36)}
+                              onPointerDown={(e) => {
+                                e.stopPropagation();
+                                grid.handleRowResizeStart(e, row.registrationId, rowHeight ?? 36);
+                              }}
                               onClick={(e) => e.stopPropagation()}
                               title={rowClosed ? "Drag to reopen this row" : "Drag to resize (or close) this row"}
                               className="absolute bottom-0 left-0 right-0 z-10 h-1 cursor-row-resize touch-none select-none hover:bg-red-300 active:bg-red-500"
                             />
                           )}
-                        </td>
-                      );
-                    })}
-                    {EXTRA_COLUMNS.map((c) => {
-                      const width = widthOf(c.key, c.width);
-                      const colClosed = isClosed(width, width);
-                      const closed = colClosed || rowClosed;
-                      return (
-                        <td key={c.key} className={closed ? `p-0 ${colClosed ? "bg-red-600" : ""}` : "px-3 py-2"}>
-                          {!closed && extraCell(c.key, row, isAdmin, canManageSlot, canLinkAccount, canResendEmail)}
+                          {!isHandle && !closed && isCellSelected && (
+                            <span
+                              onPointerDown={t.getFillHandleDownHandler(row.registrationId, c.key, String(displayContent ?? ""))}
+                              title="Drag to copy this value into other cells"
+                              className="absolute -bottom-1 -right-1 z-20 h-2.5 w-2.5 cursor-crosshair rounded-sm border border-white bg-blue-600"
+                            />
+                          )}
                         </td>
                       );
                     })}
@@ -665,6 +709,7 @@ export default function ParticipantRecordsTable({
           </tbody>
         </table>
       </DualScrollBox>
+      <TableInteractionOverlays t={t} />
     </div>
   );
 }

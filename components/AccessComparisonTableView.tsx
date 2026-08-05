@@ -4,6 +4,8 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import DownloadCsvButton from "@/components/DownloadCsvButton";
 import DualScrollBox from "@/components/DualScrollBox";
 import { useGridControls, isClosed, CLOSED_SIZE } from "@/lib/useGridControls";
+import { useTableInteractions } from "@/lib/useTableInteractions";
+import TableInteractionOverlays from "@/components/TableInteractionOverlays";
 import type { ComparisonRow } from "@/components/AccessComparisonTable";
 
 const COLUMNS: Array<{ key: string; label: string; width: number }> = [
@@ -31,6 +33,7 @@ export default function AccessComparisonTableView({ rows }: { rows: ComparisonRo
   const [selectedCols, setSelectedCols] = useState<Set<string>>(new Set());
   const resizingRef = useRef<{ key: string; startX: number; startWidth: number } | null>(null);
   const grid = useGridControls();
+  const t = useTableInteractions();
 
   const widthOf = useCallback((key: string, fallback: number) => colWidths[key] ?? fallback, [colWidths]);
 
@@ -94,6 +97,25 @@ export default function AccessComparisonTableView({ rows }: { rows: ComparisonRo
   );
 
   const rowKeyOf = (r: ComparisonRow) => r.id ?? r.what;
+  const colIndexByKey = useMemo(() => new Map(COLUMNS.map((c, i) => [c.key, i])), []);
+  const cellText = useCallback(
+    (r: ComparisonRow, key: string) => {
+      const i = colIndexByKey.get(key) ?? 0;
+      return i === 0 ? r.what : r.cells[i - 1];
+    },
+    [colIndexByKey],
+  );
+
+  const orderedColumns = t
+    .orderColumnKeys(COLUMNS.map((c) => c.key))
+    .map((k) => COLUMNS.find((c) => c.key === k))
+    .filter((c): c is (typeof COLUMNS)[number] => !!c);
+
+  const orderedRows = (() => {
+    const keys = t.orderRowKeys(rows.map(rowKeyOf));
+    const byKey = new Map(rows.map((r) => [rowKeyOf(r), r]));
+    return keys.map((k) => byKey.get(k)).filter((r): r is ComparisonRow => !!r);
+  })();
 
   const csvRows = useMemo(
     () =>
@@ -111,9 +133,11 @@ export default function AccessComparisonTableView({ rows }: { rows: ComparisonRo
     <>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-neutral-400">
-          Click a column&apos;s label (or a row&apos;s leading cell) to select/highlight it. Drag a
-          column&apos;s right edge (or a row&apos;s bottom edge) to resize it, all the way to close it
-          down to a red bar.
+          Click a column&apos;s label (or a row&apos;s leading cell) to select/highlight it — drag
+          either one past a neighbor to reorder it. Drag a column&apos;s right edge (or a row&apos;s
+          bottom edge) to resize it, all the way to close it down to a red bar. Click a cell to select
+          it, then drag its blue corner handle across other cells to copy its value into them;
+          right-click any cell to copy its value to the clipboard.
         </p>
         <DownloadCsvButton rows={csvRows} filename="access-comparison" />
       </div>
@@ -140,30 +164,31 @@ export default function AccessComparisonTableView({ rows }: { rows: ComparisonRo
       <DualScrollBox>
         <table
           className="text-left text-xs"
-          style={{ tableLayout: "fixed", width: COLUMNS.reduce((sum, c) => sum + widthOf(c.key, c.width), 0) }}
+          style={{ tableLayout: "fixed", width: orderedColumns.reduce((sum, c) => sum + widthOf(c.key, c.width), 0) }}
         >
           <colgroup>
-            {COLUMNS.map((c) => (
+            {orderedColumns.map((c) => (
               <col key={c.key} style={{ width: widthOf(c.key, c.width) }} />
             ))}
           </colgroup>
           <thead className="sticky top-0 z-20 border-b border-neutral-200 bg-neutral-50 uppercase tracking-wide text-neutral-500">
             <tr>
-              {COLUMNS.map((c, i) => {
+              {orderedColumns.map((c, i) => {
                 const width = widthOf(c.key, c.width);
                 const closed = isClosed(width, width);
                 const selected = selectedCols.has(c.key);
                 return (
                   <th
                     key={c.key}
+                    data-col-order-key={c.key}
                     className={`relative select-none whitespace-nowrap ${
                       i === 0 ? "sticky left-0 z-10 border-r border-neutral-200" : ""
                     } ${closed ? "bg-red-600 p-0" : `px-3 py-2 ${selected ? "bg-sky-100" : i === 0 ? "bg-neutral-50" : ""}`}`}
                   >
                     {!closed && (
                       <span
-                        onClick={() => toggleColSelect(c.key)}
-                        title="Click to select/highlight this column"
+                        onPointerDown={t.getColHeaderDownHandler(c.key, () => toggleColSelect(c.key))}
+                        title="Click to select/highlight this column — drag to reorder"
                         className="block cursor-pointer overflow-hidden text-ellipsis pr-2"
                       >
                         {c.label}
@@ -182,7 +207,7 @@ export default function AccessComparisonTableView({ rows }: { rows: ComparisonRo
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100">
-            {rows.map((r) => {
+            {orderedRows.map((r) => {
               const key = rowKeyOf(r);
               const rowHeight = grid.rowHeights[key];
               const rowClosed = rowHeight != null && rowHeight <= CLOSED_SIZE + 1;
@@ -190,14 +215,16 @@ export default function AccessComparisonTableView({ rows }: { rows: ComparisonRo
               return (
                 <tr
                   key={key}
+                  data-row-order-key={key}
                   className={`group align-top hover:bg-neutral-50 ${!rowClosed && rowSelected ? "bg-sky-50" : ""} ${grid.rowSizeClass(key)}`}
                   style={grid.rowSizeStyle(key)}
                 >
-                  {COLUMNS.map((c, i) => {
+                  {orderedColumns.map((c, i) => {
                     const width = widthOf(c.key, c.width);
                     const colClosed = isClosed(width, width);
                     const colSelected = selectedCols.has(c.key);
                     const closed = colClosed || rowClosed;
+                    const text = cellText(r, c.key);
                     if (i === 0) {
                       const cellBg = colClosed
                         ? "bg-red-600"
@@ -210,12 +237,15 @@ export default function AccessComparisonTableView({ rows }: { rows: ComparisonRo
                           className={`relative sticky left-0 z-10 border-r border-neutral-200 font-semibold text-neutral-800 ${
                             closed ? "p-0" : "cursor-pointer select-none whitespace-normal break-words px-3 py-2"
                           } ${cellBg}`}
-                          title={!closed ? "Click to select/highlight this row" : undefined}
-                          onClick={!closed ? () => grid.toggleRowSelect(key) : undefined}
+                          title={!closed ? "Click to select/highlight this row — drag to reorder" : undefined}
+                          onPointerDown={!closed ? t.getRowHandleDownHandler(key, () => grid.toggleRowSelect(key)) : undefined}
                         >
-                          {!closed && r.what}
+                          {!closed && text}
                           <span
-                            onPointerDown={(e) => grid.handleRowResizeStart(e, key, rowHeight ?? 36)}
+                            onPointerDown={(e) => {
+                              e.stopPropagation();
+                              grid.handleRowResizeStart(e, key, rowHeight ?? 36);
+                            }}
                             onClick={(e) => e.stopPropagation()}
                             title={rowClosed ? "Drag to reopen this row" : "Drag to resize (or close) this row"}
                             className="absolute bottom-0 left-0 right-0 z-10 h-1 cursor-row-resize touch-none select-none hover:bg-red-300 active:bg-red-500"
@@ -224,12 +254,28 @@ export default function AccessComparisonTableView({ rows }: { rows: ComparisonRo
                       );
                     }
                     const cellBg = colClosed ? "bg-red-600" : colSelected ? "bg-sky-50" : "";
+                    const isCellSelected = t.isCellSelected(key, c.key);
+                    const isFillPreview = t.isFillPreview(key, c.key);
+                    const displayText = t.cellValue(key, c.key, text);
                     return (
                       <td
                         key={c.key}
-                        className={`text-neutral-600 ${closed ? "p-0" : "whitespace-normal break-words px-3 py-2"} ${cellBg}`}
+                        data-cell-row={key}
+                        data-cell-col={c.key}
+                        className={`relative text-neutral-600 ${closed ? "p-0" : "whitespace-normal break-words px-3 py-2"} ${cellBg} ${
+                          !closed && isCellSelected ? "ring-2 ring-inset ring-blue-500" : ""
+                        } ${!closed && isFillPreview ? "outline outline-2 -outline-offset-2 outline-blue-300" : ""}`}
+                        onClick={!closed ? () => t.selectCell(key, c.key) : undefined}
+                        onContextMenu={!closed ? t.getContextMenuHandler(displayText) : undefined}
                       >
-                        {!closed && r.cells[i - 1]}
+                        {!closed && displayText}
+                        {!closed && isCellSelected && (
+                          <span
+                            onPointerDown={t.getFillHandleDownHandler(key, c.key, displayText)}
+                            title="Drag to copy this value into other cells"
+                            className="absolute -bottom-1 -right-1 z-20 h-2.5 w-2.5 cursor-crosshair rounded-sm border border-white bg-blue-600"
+                          />
+                        )}
                       </td>
                     );
                   })}
@@ -239,6 +285,7 @@ export default function AccessComparisonTableView({ rows }: { rows: ComparisonRo
           </tbody>
         </table>
       </DualScrollBox>
+      <TableInteractionOverlays t={t} />
     </>
   );
 }
