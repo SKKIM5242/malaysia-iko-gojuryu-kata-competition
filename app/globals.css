@@ -18,16 +18,30 @@ body {
   top: -9999px;
 }
 
-/* While the Kata recorder is in full screen, hide the site's own fixed
-   page chrome. The recorder's overlay is `fixed inset-0` with a z-index far
-   above the footer's, so in principle it already covers it — but the
-   footer kept showing through along the bottom edge on real devices
-   anyway, and "full screen" should mean the site's furniture is gone
-   regardless of which stacking or containing-block subtlety is behind
-   that. Hiding it outright is deterministic, where relying on the overlay
-   winning a paint-order argument is not. Restored the moment the class is
-   removed (see KataRecorder's fullscreen effect). */
-body.kata-recorder-fullscreen [data-mobile-footer],
-body:has([data-kata-fullscreen]) [data-mobile-footer] {
-  display: none !important;
+/* Everything on the page is hidden while the recorder is full screen, and
+   only the recorder itself is put back. visibility inherits, so marking the
+   overlay visible restores its whole subtree without naming any part of it,
+   and hiding by visibility (not display) changes no layout, so nothing
+   reflows on the way in or out.
+
+   This replaces trying to make the overlay out-rank the page. It was
+   already fixed inset-0 at z-index 999, with no ancestor transform or
+   filter to trap it, and it still had page content -- the footer, then the kata
+   cards and Start Recording buttons of the OTHER recorders on the account
+   page -- showing along the bottom edge on every device tested, portrait
+   and landscape. Rather than keep guessing which stacking rule was
+   winning, nothing else is painted at all. overflow:hidden additionally
+   stops the page scrolling behind the overlay and removes the scrollbars,
+   whose gutter is itself outside the area a fixed element covers. */
+body:has([data-kata-fullscreen]),
+body.kata-recorder-fullscreen {
+  overflow: hidden !important;
+}
+body:has([data-kata-fullscreen]) > *,
+body.kata-recorder-fullscreen > * {
+  visibility: hidden !important;
+}
+body:has([data-kata-fullscreen]) [data-kata-fullscreen],
+body.kata-recorder-fullscreen [data-kata-fullscreen] {
+  visibility: visible !important;
 }
