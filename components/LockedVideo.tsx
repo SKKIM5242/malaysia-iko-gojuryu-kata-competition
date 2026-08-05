@@ -19,8 +19,14 @@ const LockedVideo = forwardRef<
     autoPlay?: boolean;
     className?: string;
     onEnded?: () => void;
+    /** Fires once the browser knows the recording's real pixel dimensions
+     * — the only point at which its shape can be read. */
+    onLoadedMetadata?: React.ReactEventHandler<HTMLVideoElement>;
   }
->(function LockedVideo({ src, allowAdvancedControls = false, autoPlay = false, className, onEnded }, ref) {
+>(function LockedVideo(
+  { src, allowAdvancedControls = false, autoPlay = false, className, onEnded, onLoadedMetadata },
+  ref,
+) {
   return (
     // eslint-disable-next-line jsx-a11y/media-has-caption
     <video
@@ -31,6 +37,7 @@ const LockedVideo = forwardRef<
       playsInline
       preload="auto"
       onEnded={onEnded}
+      onLoadedMetadata={onLoadedMetadata}
       className={className ?? "h-full w-full bg-black object-contain"}
       controlsList={allowAdvancedControls ? "noplaybackrate" : "nodownload noplaybackrate noremoteplayback"}
       {...(allowAdvancedControls

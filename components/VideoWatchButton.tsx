@@ -28,6 +28,10 @@ export default function VideoWatchButton({
   allowAdvancedControls?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  // Null until the browser reports the recording's real dimensions. The
+  // window opens maximized on that first beat and reshapes to hug the
+  // video the moment its shape is known, rather than guessing at one.
+  const [aspect, setAspect] = useState<number | null>(null);
 
   if (!url) return null;
 
@@ -35,7 +39,13 @@ export default function VideoWatchButton({
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          // Cleared on every open so a window reopened for a DIFFERENT
+          // recording re-fits to that one, instead of keeping the shape
+          // the previous video happened to have.
+          setAspect(null);
+          setOpen(true);
+        }}
         className={
           className ??
           "shrink-0 rounded border border-neutral-300 px-3 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
@@ -50,9 +60,20 @@ export default function VideoWatchButton({
           initial="max"
           defaultWidth={760}
           defaultHeight={560}
+          fitAspect={aspect}
         >
           <div className="h-full bg-black">
-            <LockedVideo src={url} autoPlay allowAdvancedControls={allowAdvancedControls} />
+            <LockedVideo
+              src={url}
+              autoPlay
+              allowAdvancedControls={allowAdvancedControls}
+              onLoadedMetadata={(e) => {
+                const v = e.currentTarget;
+                if (v.videoWidth > 0 && v.videoHeight > 0) {
+                  setAspect(v.videoWidth / v.videoHeight);
+                }
+              }}
+            />
           </div>
         </FloatingWindow>
       )}

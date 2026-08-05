@@ -65,6 +65,7 @@ export default function FloatingWindow({
   defaultHeight = 520,
   headerExtra,
   boundsSignal,
+  fitAspect,
 }: {
   title: string;
   onClose: () => void;
@@ -75,6 +76,12 @@ export default function FloatingWindow({
   headerExtra?: ReactNode;
   /** Bump this number to re-apply `initial` placement (e.g. re-split). */
   boundsSignal?: number;
+  /** Width ÷ height of the content this window is holding. Set it once the
+   * real figure is known (a video only reports its shape after metadata
+   * loads) and the window reshapes so its CONTENT area matches, hugging
+   * what's inside instead of leaving it letterboxed in a mismatched box.
+   * Left undefined, placement is unchanged. */
+  fitAspect?: number | null;
 }) {
   const [bounds, setBounds] = useState<Bounds | null>(null);
   const [minimized, setMinimized] = useState(false);
@@ -84,6 +91,7 @@ export default function FloatingWindow({
   const dragRef = useRef<{ startX: number; startY: number; orig: Bounds } | null>(null);
   const resizeRef = useRef<{ edge: Edge; startX: number; startY: number; orig: Bounds } | null>(null);
   const winRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   const place = useCallback(() => {
     if (initial === "first-half") setBounds(halfBounds("first"));
@@ -96,6 +104,46 @@ export default function FloatingWindow({
   useEffect(() => {
     place();
   }, [place, boundsSignal]);
+
+  // Reshape so the CONTENT area matches fitAspect, as large as the screen
+  // allows. The title bar is measured rather than assumed -- the window's
+  // own height minus its content's -- because sizing the whole window to
+  // the aspect instead would leave the content short by exactly the height
+  // of that bar, which is the letterbox this exists to remove.
+  useEffect(() => {
+    if (!fitAspect || !Number.isFinite(fitAspect) || fitAspect <= 0) return;
+    const win = winRef.current;
+    const content = contentRef.current;
+    const chrome = win && content ? Math.max(0, win.offsetHeight - content.offsetHeight) : 40;
+    const maxW = window.innerWidth - 16;
+    const maxH = window.innerHeight - 16;
+    // Start from the widest the screen allows, then fall back to the
+    // tallest if that overflows -- whichever constraint binds first,
+    // exactly like fitting a picture inside a frame.
+    let w = maxW;
+    let h = w / fitAspect + chrome;
+    if (h > maxH) {
+      h = maxH;
+      w = (h - chrome) * fitAspect;
+    }
+    // A far lower floor than the 280 the drag-resize handles enforce. That
+    // floor keeps a MANUALLY resized window usable; applied here it would
+    // pad the window wider than the recording needs and put back exactly
+    // the black this is removing -- a 9:16 recording on a landscape phone
+    // wants a ~180px-wide window, and forcing 280 leaves a third of the
+    // content box black again. The window stays draggable and closable at
+    // this width; the title simply truncates.
+    w = Math.max(120, Math.min(w, maxW));
+    h = Math.max(120, Math.min(h, maxH));
+    setMaximized(false);
+    setMinimized(false);
+    setBounds({
+      x: (window.innerWidth - w) / 2,
+      y: Math.max(8, (window.innerHeight - h) / 2),
+      w,
+      h,
+    });
+  }, [fitAspect]);
 
   const bringToFront = () => setZ(++zCounter);
 
@@ -227,7 +275,11 @@ export default function FloatingWindow({
           </button>
         </div>
       </div>
-      {!minimized && <div className="min-h-0 flex-1 overflow-auto">{children}</div>}
+      {!minimized && (
+        <div ref={contentRef} className="min-h-0 flex-1 overflow-auto">
+          {children}
+        </div>
+      )}
       {!maximized &&
         !minimized &&
         EDGES.map((edge) => (
