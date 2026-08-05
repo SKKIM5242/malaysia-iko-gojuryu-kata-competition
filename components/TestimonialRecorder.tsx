@@ -325,6 +325,7 @@ export default function TestimonialRecorder() {
     return (
       <p className="mt-3 rounded-md border border-green-300 bg-green-50 px-4 py-3 text-sm font-semibold text-green-800">
         ✅ Thank you — your testimonial has been submitted. Your certificate download is now unlocked.
+        {chosen === "video" && " Since you recorded video, it also plays back automatically as your voice testimonial."}
       </p>
     );
   }

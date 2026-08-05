@@ -72,9 +72,15 @@ export default async function TestimonialsPage() {
                   {competitionName && <p className="text-xs text-neutral-500">{competitionName}</p>}
                   {categoryName && <p className="text-xs text-neutral-400">{categoryName}</p>}
                   <p className="mt-1 text-xs font-semibold text-neutral-400">{TESTIMONIAL_KIND_LABEL[t.kind]}</p>
-                  <div className="mt-3">
+                  <div className="mt-3 space-y-2">
                     {t.kind === "video" && t.media_path && (
-                      <video src={mediaUrl(t.media_path)} controls playsInline className="w-full rounded-md bg-black" />
+                      <>
+                        <video src={mediaUrl(t.media_path)} controls playsInline className="w-full rounded-md bg-black" />
+                        <div>
+                          <p className="text-[11px] font-semibold text-neutral-400">🎙️ Voice Testimonial (auto, from this video)</p>
+                          <audio src={mediaUrl(t.media_path)} controls className="w-full" />
+                        </div>
+                      </>
                     )}
                     {t.kind === "voice" && t.media_path && <audio src={mediaUrl(t.media_path)} controls className="w-full" />}
                     {t.kind === "message" && t.message && (

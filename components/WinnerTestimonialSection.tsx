@@ -63,7 +63,13 @@ export default async function WinnerTestimonialSection({ registrationId }: { reg
               ✅ Submitted — {TESTIMONIAL_KIND_LABEL[testimonial.kind as "video" | "voice" | "message"]}
             </p>
             {testimonial.kind === "video" && mediaUrl && (
-              <video src={mediaUrl} controls playsInline className="w-full max-w-md rounded-md bg-black" />
+              <div className="space-y-2">
+                <video src={mediaUrl} controls playsInline className="w-full max-w-md rounded-md bg-black" />
+                <div>
+                  <p className="text-[11px] font-semibold text-neutral-400">🎙️ Voice Testimonial (auto, from this video)</p>
+                  <audio src={mediaUrl} controls className="w-full max-w-md" />
+                </div>
+              </div>
             )}
             {testimonial.kind === "voice" && mediaUrl && <audio src={mediaUrl} controls className="w-full max-w-md" />}
             {testimonial.kind === "message" && testimonial.message && (

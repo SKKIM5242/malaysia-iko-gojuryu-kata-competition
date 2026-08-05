@@ -1,10 +1,15 @@
 import { createClient } from "@/lib/supabase/server";
 import { winnersRevealed } from "@/lib/winners";
 import { computeCategoryRankings } from "@/lib/winners-ranking";
+import ProtectedCertificateViewer from "@/components/ProtectedCertificateViewer";
 
 interface CertLink {
   label: string;
   href: string;
+  /** Participation certificates are view-only — no download link, opened
+   * in a hardened in-app viewer instead of a new tab (see
+   * ProtectedCertificateViewer.tsx). Every other kind keeps View + Download. */
+  viewOnly?: boolean;
 }
 
 type CompetitionRow = { name: string; registration_deadline: string | null; winners_announce_date: string | null };
@@ -24,9 +29,10 @@ async function participantLinks(
 
   const rankings = await computeCategoryRankings(supabase, reg.competition_id as string);
   const isWinner = [...rankings.values()].flat().some((e) => e.registrationId === registrationId);
-  const participationLink = {
+  const participationLink: CertLink = {
     label: `Certificate of Participation — ${competition.name}`,
     href: `/api/certificates/participant/${registrationId}`,
+    viewOnly: true,
   };
   if (!isWinner) return [participationLink];
 
@@ -161,20 +167,26 @@ export default async function CertificatesSection({
           <div key={l.href} className="rounded-md border border-neutral-200 p-3">
             <p className="mb-2 text-sm font-semibold text-neutral-700">{l.label}</p>
             <div className="flex flex-wrap gap-2">
-              <a
-                href={viewHref(l.href)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50"
-              >
-                👁 View
-              </a>
-              <a
-                href={l.href}
-                className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-neutral-700"
-              >
-                ⬇ Download
-              </a>
+              {l.viewOnly ? (
+                <ProtectedCertificateViewer viewHref={viewHref(l.href)} label={l.label} />
+              ) : (
+                <>
+                  <a
+                    href={viewHref(l.href)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50"
+                  >
+                    👁 View
+                  </a>
+                  <a
+                    href={l.href}
+                    className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-neutral-700"
+                  >
+                    ⬇ Download
+                  </a>
+                </>
+              )}
             </div>
           </div>
         ))}
