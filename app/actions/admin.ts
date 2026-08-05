@@ -1938,6 +1938,7 @@ export async function saveReferee(formData: FormData) {
     date_of_birth: String(formData.get("date_of_birth") ?? "") || null,
     gender: String(formData.get("gender") ?? "") || null,
     karate_rank: String(formData.get("karate_rank") ?? "").trim() || null,
+    judge_title: String(formData.get("judge_title") ?? "").trim() || null,
     judging_experience_count: formData.get("judging_experience_count")
       ? Number(formData.get("judging_experience_count"))
       : null,
@@ -1962,6 +1963,9 @@ export async function saveReferee(formData: FormData) {
   }
   if (!values.date_of_birth || !values.gender || !values.karate_rank || values.judging_experience_count == null) {
     backTo(returnTo, { error: "Date of birth, gender, karate rank, and judging experience are required." });
+  }
+  if (!values.judge_title) {
+    backTo(returnTo, { error: "Role is required." });
   }
   if (!values.school || !values.email || !values.phone) {
     backTo(returnTo, { error: "School/organization, email, and mobile phone are required." });
@@ -4310,8 +4314,8 @@ export async function bulkUploadSenseis(_prev: CsvUploadResult, formData: FormDa
 }
 
 const REFEREE_CSV_COLUMNS = [
-  "full_name", "ic_passport", "date_of_birth", "gender", "karate_rank", "judging_experience_count",
-  "school", "email", "phone", "home_address", "city_town", "home_country",
+  "full_name", "school", "ic_passport", "date_of_birth", "gender", "karate_rank", "judge_title",
+  "judging_experience_count", "email", "phone", "home_address", "city_town", "home_country",
   "bank_name", "bank_account_no", "bank_account_name",
 ] as const;
 
@@ -4342,12 +4346,13 @@ export async function bulkUploadReferees(_prev: CsvUploadResult, formData: FormD
     if (dobRaw && !dob) { failures.push({ row: rowNo, name: full_name, error: "Invalid date of birth (use DD/MM/YYYY)" }); continue; }
     const record = {
       full_name: get(r, "full_name"),
+      school: get(r, "school") || null,
       ic_passport: get(r, "ic_passport"),
       date_of_birth: dob,
       gender: get(r, "gender") || null,
       karate_rank: get(r, "karate_rank") || null,
+      judge_title: get(r, "judge_title") || null,
       judging_experience_count: experienceRaw ? Number(experienceRaw) : null,
-      school: get(r, "school") || null,
       email: get(r, "email") || null,
       phone: get(r, "phone") || null,
       home_address: get(r, "home_address") || null,
@@ -4357,8 +4362,8 @@ export async function bulkUploadReferees(_prev: CsvUploadResult, formData: FormD
       bank_account_no: normalizeIban(get(r, "bank_account_no")) || null,
       bank_account_name: get(r, "bank_account_name") || null,
     };
-    if (!record.full_name || !record.ic_passport) {
-      failures.push({ row: rowNo, name: full_name, error: "Name and IC/passport are required" });
+    if (!record.full_name || !record.school || !record.ic_passport || !record.judge_title) {
+      failures.push({ row: rowNo, name: full_name, error: "Name, school/organization, IC/passport, and Role are required" });
       continue;
     }
     const { data, error } = await supabase.from("referees").insert(record).select("id").single();

@@ -29,10 +29,12 @@ export async function registerReferee(
 ): Promise<CommunityState> {
   const { values, fieldErrors } = req(formData, [
     ["full_name", "Full name"],
+    ["school", "School / organization"],
     ["ic_passport", "IC / passport"],
     ["date_of_birth", "Date of birth"],
     ["gender", "Gender"],
     ["karate_rank", "Karate rank"],
+    ["judge_title", "Role"],
     ["judging_experience_count", "Number of times judging"],
     ["email", "Email"],
     ["phone", "Mobile / WhatsApp"],
@@ -55,7 +57,6 @@ export async function registerReferee(
       fieldErrors: { judging_experience_count: "Enter a whole number (0 if none)" },
     };
   }
-  const school = String(formData.get("school") ?? "").trim();
   const invitation_code = String(formData.get("invitation_code") ?? "").trim();
   const referral_source = String(formData.get("referral_source") ?? "").trim();
 
@@ -137,8 +138,9 @@ export async function registerReferee(
     date_of_birth: values.date_of_birth,
     gender: values.gender,
     karate_rank: values.karate_rank,
+    judge_title: values.judge_title,
     judging_experience_count: judgingCount,
-    school: school || null,
+    school: values.school,
     email: values.email,
     phone: values.phone,
     home_address: values.home_address,

@@ -125,6 +125,25 @@ export const SUPPORT_TITLE_OPTIONS = [
   "Staff",
 ] as const;
 
+/** Judging-level title for a Referee/Judge account (referees.judge_title) --
+ * shown in a dropdown under the karate rank field on both the admin and
+ * public registration forms. Order and the deliberately skipped "4" match
+ * the organizer's own numbered list exactly -- not a typo to fix. */
+export const REFEREE_TITLE_OPTIONS = [
+  "Chief Referee",
+  "Chief Judge",
+  "Chief Referee & Judge",
+  "Mastery Referee",
+  "Mastery Judge",
+  "Advance Judge",
+  "Elementary & Intermediate Judge",
+  "Judge",
+  "Referee",
+  "All level Judge",
+  "All level Referee",
+  "Team Kata Judge",
+] as const;
+
 /** Human label for a role key, for the Sign-in Access Matrix picker. */
 export const PROFILE_ROLE_KEY_LABELS: Record<ProfileRoleKey, string> = {
   participant: "Participant",

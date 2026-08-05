@@ -17,7 +17,7 @@ import DateOfBirthField from "@/components/DateOfBirthField";
 import DobAgeField from "@/components/DobAgeField";
 import {
   EDUCATION_LEVELS, SPOKEN_LANGUAGES, REFERRAL_LABEL, REFERRAL_PLACEHOLDER,
-  SUPPORT_REGIONS, WORLD_COUNTRIES,
+  SUPPORT_REGIONS, WORLD_COUNTRIES, REFEREE_TITLE_OPTIONS,
 } from "@/lib/reference-data";
 import type { Competition } from "@/lib/types";
 import TierSlotsField from "@/components/TierSlotsField";
@@ -88,6 +88,11 @@ export function RefereeForm({
           <input id="full_name" name="full_name" required className={inputCls} />
           <Err m={e.full_name} />
         </div>
+        <div className="sm:col-span-2">
+          <label htmlFor="school" className={labelCls}>School / organization *</label>
+          <input id="school" name="school" required className={inputCls} />
+          <Err m={e.school} />
+        </div>
         <div>
           <label htmlFor="ic_passport" className={labelCls}>IC / Passport *</label>
           <input id="ic_passport" name="ic_passport" required className={inputCls} />
@@ -113,15 +118,21 @@ export function RefereeForm({
           <Err m={e.karate_rank} />
         </div>
         <div>
+          <label htmlFor="judge_title" className={labelCls}>Role *</label>
+          <select id="judge_title" name="judge_title" required defaultValue="" className={inputCls}>
+            <option value="" disabled>Select role</option>
+            {REFEREE_TITLE_OPTIONS.map((t) => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+          <Err m={e.judge_title} />
+        </div>
+        <div>
           <label htmlFor="judging_experience_count" className={labelCls}>
             No. of times taking part in judging Kata competition *
           </label>
           <input id="judging_experience_count" name="judging_experience_count" type="number" min="0" step="1" required className={inputCls} placeholder="e.g. 5 (0 if none)" />
           <Err m={e.judging_experience_count} />
-        </div>
-        <div>
-          <label htmlFor="school" className={labelCls}>School / organization</label>
-          <input id="school" name="school" className={inputCls} />
         </div>
         <div>
           <label htmlFor="certificate" className={labelCls}>Latest rank certificate *</label>

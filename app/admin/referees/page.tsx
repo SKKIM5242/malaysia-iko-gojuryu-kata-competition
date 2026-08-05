@@ -27,13 +27,14 @@ import { REFEREE_DEPOSIT_USD } from "@/lib/payments";
 import { NoCommaInput } from "@/components/NoCommaAddressField";
 import DateOfBirthField from "@/components/DateOfBirthField";
 
-import { REFERRAL_LABEL, REFERRAL_PLACEHOLDER } from "@/lib/reference-data";
+import { REFERRAL_LABEL, REFERRAL_PLACEHOLDER, REFEREE_TITLE_OPTIONS } from "@/lib/reference-data";
 
 export const dynamic = "force-dynamic";
 
 interface Referee {
   id: string; full_name: string; ic_passport: string; date_of_birth: string | null;
-  gender: string | null; karate_rank: string | null; judging_experience_count: number | null;
+  gender: string | null; karate_rank: string | null; judge_title: string | null;
+  judging_experience_count: number | null;
   school: string | null;
   email: string | null; phone: string | null; home_address: string | null;
   city_town: string | null; postcode: string | null; home_country: string | null;
@@ -158,6 +159,10 @@ export default async function AdminReferees({
                 <label htmlFor="full_name" className={adminLabel}>Full name *</label>
                 <input id="full_name" name="full_name" required defaultValue={editing?.full_name ?? ""} className={adminInput} />
               </div>
+              <div>
+                <label htmlFor="school" className={adminLabel}>School / organization *</label>
+                <input id="school" name="school" required defaultValue={editing?.school ?? ""} className={adminInput} />
+              </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label htmlFor="ic_passport" className={adminLabel}>IC / Passport *</label>
@@ -180,6 +185,15 @@ export default async function AdminReferees({
                   <input id="karate_rank" name="karate_rank" required defaultValue={editing?.karate_rank ?? ""} className={adminInput} placeholder="e.g. Godan" />
                 </div>
                 <div>
+                  <label htmlFor="judge_title" className={adminLabel}>Role *</label>
+                  <select id="judge_title" name="judge_title" required defaultValue={editing?.judge_title ?? ""} className={adminInput}>
+                    <option value="" disabled>— Select —</option>
+                    {REFEREE_TITLE_OPTIONS.map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
                   <label htmlFor="judging_experience_count" className={adminLabel}>
                     No. of times judging Kata competition *
                   </label>
@@ -190,10 +204,6 @@ export default async function AdminReferees({
                     required
                     currentUrl={editing?.certificate_path ? certUrls.get(editing.certificate_path) : undefined}
                   />
-                </div>
-                <div>
-                  <label htmlFor="school" className={adminLabel}>School / organization *</label>
-                  <input id="school" name="school" required defaultValue={editing?.school ?? ""} className={adminInput} />
                 </div>
                 <div>
                   <label htmlFor="email" className={adminLabel}>Email *</label>
@@ -377,6 +387,7 @@ export default async function AdminReferees({
                 { key: "date_of_birth", label: "DOB" },
                 { key: "gender", label: "Gender" },
                 { key: "karate_rank", label: "Rank" },
+                { key: "judge_title", label: "Role" },
                 { key: "judging_experience_count", label: "Judging Experience" },
                 { key: "school", label: "School" },
                 { key: "location", label: "Location" },
@@ -399,6 +410,7 @@ export default async function AdminReferees({
                 { key: "date_of_birth", label: "DOB" },
                 { key: "gender", label: "Gender" },
                 { key: "karate_rank", label: "Rank" },
+                { key: "judge_title", label: "Role" },
                 { key: "judging_experience_count", label: "Judging Experience" },
                 { key: "school", label: "School" },
                 { key: "home_address", label: "Home Address" },
@@ -423,6 +435,7 @@ export default async function AdminReferees({
                 date_of_birth: formatDOB(r.date_of_birth),
                 gender: r.gender ?? "",
                 karate_rank: r.karate_rank ?? "",
+                judge_title: r.judge_title ?? "",
                 judging_experience_count: String(r.judging_experience_count ?? 0),
                 school: r.school ?? "",
                 location: [r.home_address, r.city_town, r.postcode, r.home_country].filter(Boolean).join(", "),
