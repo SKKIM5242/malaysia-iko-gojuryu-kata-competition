@@ -11,7 +11,8 @@ import {
   bulkUploadCommissionPayouts, bulkUploadWinnerPayouts, bulkUploadOtherPayouts,
 } from "@/app/actions/admin";
 import { AdminShell } from "@/components/admin";
-import { EmptyState, SetupNotice } from "@/components/ui";
+import { EmptyState, SetupNotice, formatDate } from "@/components/ui";
+import TestimonialStatusCell from "@/components/TestimonialStatusCell";
 import FilterableTable from "@/components/FilterableTable";
 import CertificateUploadField from "@/components/CertificateUploadField";
 import CsvUploadForm from "@/components/CsvUploadForm";
@@ -225,11 +226,25 @@ export default async function AdminCommissions({
   // video signed URLs elsewhere in the admin panel.
   const supabase = await createClient();
   // Reward payout is held until the winner has given a testimonial (see
-  // components/WinnerTestimonialSection.tsx) — this is just the set of
-  // registrations that already have, so the Payout column below can swap
-  // the Paid/Unpaid buttons for a plain "Awaiting testimonial" note.
-  const { data: testimonialRows } = await supabase.from("winner_testimonials").select("registration_id");
-  const testimonialRegIds = new Set((testimonialRows ?? []).map((t) => t.registration_id as string));
+  // components/WinnerTestimonialSection.tsx) — also drives the Testimonial /
+  // Testimonial Date columns below, always computed live on every page load
+  // (never a stale, once-a-day snapshot), so a testimonial given a minute
+  // ago already shows here.
+  const { data: testimonialRows } = await supabase
+    .from("winner_testimonials")
+    .select("registration_id, kind, media_path, message, created_at");
+  const testimonialByRegId = new Map(
+    (testimonialRows ?? []).map((t) => [
+      t.registration_id as string,
+      {
+        kind: t.kind as "video" | "voice" | "message",
+        mediaUrl: t.media_path ? supabase.storage.from("testimonials").getPublicUrl(t.media_path as string).data.publicUrl : null,
+        message: t.message as string | null,
+        createdAt: t.created_at as string,
+      },
+    ]),
+  );
+  const testimonialRegIds = new Set(testimonialByRegId.keys());
   const receiptPaths = [
     ...rows.map((r) => r.receiptPath),
     ...rewardRows.map((r) => r.receiptPath),
@@ -434,6 +449,8 @@ export default async function AdminCommissions({
             { key: "score", label: "Score" },
             { key: "reward_amount", label: "Reward" },
             { key: "bank", label: "Bank" },
+            { key: "testimonial", label: "Testimonial" },
+            { key: "testimonial_date", label: "Testimonial Date" },
             { key: "payout", label: "Payout" },
             { key: "receipt", label: "Receipt", width: 220 },
           ]}
@@ -447,11 +464,15 @@ export default async function AdminCommissions({
             { key: "bank_name", label: "Bank Name" },
             { key: "bank_account_no", label: "International Bank Account No. (IBAN)" },
             { key: "bank_account_name", label: "Bank Account Holder Name" },
+            { key: "testimonial_status", label: "Testimonial" },
+            { key: "testimonial_date", label: "Testimonial Date" },
             { key: "payout_status", label: "Payout Status" },
             { key: "receipt_status", label: "Receipt Uploaded" },
             { key: "registration_id", label: "registration_id" },
           ]}
-          rows={rewardRows.map((r: WinnerRewardRow) => ({
+          rows={rewardRows.map((r: WinnerRewardRow) => {
+            const testimonial = testimonialByRegId.get(r.registrationId) ?? null;
+            return {
             key: r.registrationId,
             registration_id: r.registrationId,
             competition: r.competitionName,
@@ -465,6 +486,9 @@ export default async function AdminCommissions({
             bank_name: r.bankName ?? "",
             bank_account_no: r.bankAccountNo ?? "",
             bank_account_name: r.bankAccountName ?? "",
+            testimonial: <TestimonialStatusCell testimonial={testimonial} />,
+            testimonial_status: testimonial ? "Done" : "Pending",
+            testimonial_date: testimonial ? formatDate(testimonial.createdAt.slice(0, 10)) : "—",
             payout_status: r.payoutStatus,
             payout: testimonialRegIds.has(r.registrationId) ? (
               <RewardPayoutButtons registrationId={r.registrationId} current={r.payoutStatus} />
@@ -481,7 +505,8 @@ export default async function AdminCommissions({
                 idPrefix={`receipt-winner-${r.registrationId}`}
               />
             ),
-          }))}
+            };
+          })}
         />
       )}
 

@@ -6,7 +6,11 @@ import { EmptyState, NoTranslate, SetupNotice, formatDate } from "@/components/u
 import { groupByKata } from "@/lib/division";
 import { computeCategoryRankings } from "@/lib/winners-ranking";
 import { winnersRevealDate, winnersRevealDateFor } from "@/lib/winners";
+import TestimonialStatusCell from "@/components/TestimonialStatusCell";
+import type { TestimonialKind } from "@/lib/testimonials";
 import type { Competition } from "@/lib/types";
+
+type TestimonialInfo = { kind: TestimonialKind; mediaUrl: string | null; message: string | null };
 
 export const dynamic = "force-dynamic";
 
@@ -16,10 +20,12 @@ async function CompetitionPreview({
   competition,
   supabase,
   canManage,
+  testimonialByRegId,
 }: {
   competition: Competition;
   supabase: Awaited<ReturnType<typeof createClient>>;
   canManage: boolean;
+  testimonialByRegId: Map<string, TestimonialInfo>;
 }) {
   if (!competition.registration_deadline) {
     return (
@@ -108,6 +114,7 @@ async function CompetitionPreview({
                             </span>
                             <span className="flex items-center gap-2">
                               <span className="font-semibold text-neutral-700">{w.finalScore.toFixed(2)}</span>
+                              <TestimonialStatusCell testimonial={testimonialByRegId.get(w.registrationId) ?? null} />
                               {playbackUrls.get(w.storagePath) && (
                                 <a
                                   href={playbackUrls.get(w.storagePath)}
@@ -164,6 +171,20 @@ export default async function AdminWinners({
     .order("registration_fee_usd", { ascending: true, nullsFirst: true });
   const competitions = (competitionsData as Competition[]) ?? [];
 
+  const { data: testimonialRows } = await supabase
+    .from("winner_testimonials")
+    .select("registration_id, kind, media_path, message");
+  const testimonialByRegId = new Map<string, TestimonialInfo>(
+    (testimonialRows ?? []).map((t) => [
+      t.registration_id as string,
+      {
+        kind: t.kind as TestimonialKind,
+        mediaUrl: t.media_path ? supabase.storage.from("testimonials").getPublicUrl(t.media_path as string).data.publicUrl : null,
+        message: t.message as string | null,
+      },
+    ]),
+  );
+
   return (
     <AdminShell title="Winners" active="/admin/winners" flash={{ ok: params.ok, error: params.error }}>
       <p className="mb-6 max-w-3xl text-sm text-neutral-500">
@@ -179,7 +200,7 @@ export default async function AdminWinners({
       ) : (
         <div className="space-y-8">
           {competitions.map((c) => (
-            <CompetitionPreview key={c.id} competition={c} supabase={supabase} canManage={canManage} />
+            <CompetitionPreview key={c.id} competition={c} supabase={supabase} canManage={canManage} testimonialByRegId={testimonialByRegId} />
           ))}
         </div>
       )}
