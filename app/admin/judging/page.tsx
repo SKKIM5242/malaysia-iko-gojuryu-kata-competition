@@ -3,12 +3,13 @@ import { createClient } from "@/lib/supabase/server";
 import { getAllCompetitions } from "@/lib/admin-data";
 import { schemaReady } from "@/lib/data";
 import {
-  assignRefereeToVideo, unassignRefereeFromVideo, setJudgesRequired, autoAssignReferees,
+  assignRefereeToVideo, setJudgesRequired, autoAssignReferees,
   resendRefereeNotification, seedAutoAssignCriteria, deleteAutoAssignCriterion,
 } from "@/app/actions/admin";
 import { AdminShell, Card, adminBtn, adminBtnSecondary, adminInput } from "@/components/admin";
 import { CategoryName, EmptyState, SetupNotice, formatDate } from "@/components/ui";
 import FullViewButton from "@/components/FullViewButton";
+import UnassignRefereeButton from "@/components/UnassignRefereeButton";
 import { ScoreSessionButton } from "@/components/RefereeScoring";
 import DownloadCsvButton from "@/components/DownloadCsvButton";
 import FilterableTable from "@/components/FilterableTable";
@@ -300,21 +301,17 @@ export default async function AdminJudging({
                     </form>
                   )}
                   {(isJudgingManager || (myRole === "referee" && uid === user?.id)) && (
-                    <form action={unassignRefereeFromVideo}>
-                      <input type="hidden" name="video_id" value={v.id} />
-                      <input type="hidden" name="referee_user_id" value={uid} />
-                      <input type="hidden" name="return_to" value="/admin/judging" />
-                      <button
-                        className="text-neutral-400 hover:text-red-600"
-                        title={
-                          isJudgingManager
-                            ? "Unassign"
-                            : "Unassign yourself — this also deletes your score, so you'll need to submit a fresh one if you re-assign"
-                        }
-                      >
-                        ✕
-                      </button>
-                    </form>
+                    <UnassignRefereeButton
+                      videoId={v.id}
+                      refereeUserId={uid}
+                      returnTo="/admin/judging"
+                      askForfeit={isJudgingManager && uid !== user?.id}
+                      title={
+                        isJudgingManager && uid !== user?.id
+                          ? "Unassign"
+                          : "Unassign yourself — this also deletes your score, so you'll need to submit a fresh one if you re-assign"
+                      }
+                    />
                   )}
                 </span>
               );

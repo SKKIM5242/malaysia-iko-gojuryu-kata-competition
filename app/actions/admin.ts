@@ -3603,13 +3603,23 @@ export async function unassignRefereeFromVideo(formData: FormData) {
   const videoId = String(formData.get("video_id") ?? "");
   const refereeUserId = String(formData.get("referee_user_id") ?? "");
   const returnTo = String(formData.get("return_to") ?? "/admin/judging");
+  // Present only when an Organizer/Admin/Staff unassigns a DIFFERENT
+  // referee (the popup on the Judging page) -- never on a referee
+  // removing themselves, which the RPC below already forbids from
+  // targeting anyone else.
+  const forfeitRaw = formData.get("forfeit");
   const { supabase, actorId } = await getActor();
   await requireJudgingManager(supabase, actorId, returnTo);
   const { error } = await supabase.rpc("unassign_referee", { p_video: videoId, p_referee: refereeUserId });
   if (error) backTo(returnTo, { error: "Could not remove referee." });
+  if (forfeitRaw != null && actorId !== refereeUserId) {
+    await supabase.rpc("increment_referee_unassigned_count", {
+      p_user_id: refereeUserId, p_forfeit: forfeitRaw === "true",
+    });
+  }
   await writeAudit(supabase, {
     table_name: "referee_assignments", record_id: videoId,
-    action: "referee_unassigned", new_value: { referee_user_id: refereeUserId }, actor_id: actorId,
+    action: "referee_unassigned", new_value: { referee_user_id: refereeUserId, forfeit: forfeitRaw }, actor_id: actorId,
   });
   await notifyVideoUnassignment(supabase, videoId, refereeUserId);
   backTo(returnTo, { ok: "Referee removed." });

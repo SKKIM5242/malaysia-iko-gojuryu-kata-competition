@@ -254,7 +254,9 @@ export default function FilterableTable({
                       <span
                         onClick={() => toggleColSelect(c.key)}
                         title="Click to select/highlight this column"
-                        className="block cursor-pointer overflow-hidden text-ellipsis pr-2"
+                        className={`block cursor-pointer pr-2 ${
+                          c.wrap ? "whitespace-normal break-words" : "overflow-hidden text-ellipsis"
+                        }`}
                       >
                         {c.label}
                       </span>

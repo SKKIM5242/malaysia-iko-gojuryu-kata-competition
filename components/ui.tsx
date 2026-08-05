@@ -310,14 +310,18 @@ export function formatDOB(d: string | null | undefined): string {
   return `${day}/${m}/${y}`;
 }
 
-/** Date + time (e.g. activity logs) — same DD/MM/YYYY date portion as
- * formatDate(), plus a short time. */
+const MONTH_ABBR = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+/** Date + time (e.g. activity logs) — DD/MMM/YYYY, plus a short time. */
 export function formatDateTime(d: string | null | undefined): string {
   if (!d) return "TBA";
   const date = new Date(d);
   if (Number.isNaN(date.getTime())) return d;
   const day = String(date.getDate()).padStart(2, "0");
-  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const month = MONTH_ABBR[date.getMonth()];
   const time = date.toLocaleTimeString("en-MY", { hour: "2-digit", minute: "2-digit" });
   return `${day}/${month}/${date.getFullYear()}, ${time}`;
 }

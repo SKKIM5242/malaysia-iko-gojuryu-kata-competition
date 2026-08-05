@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { writeAudit } from "@/lib/audit";
 import { getStripe, paymentsEnabled } from "@/lib/payments";
@@ -20,6 +21,11 @@ async function getActor() {
 }
 
 function backTo(tab: string, params: Record<string, string>) {
+  // Every mutation in this file ends by redirecting through here — this is
+  // the one place that has to revalidate, otherwise the target tab (and the
+  // Fee category labels on Students, which read fee_plans fresh on render)
+  // can keep showing what the Router Cache had before the change.
+  revalidatePath("/admin/classes");
   const q = new URLSearchParams({ tab, ...params }).toString();
   redirect(`/admin/classes?${q}`);
 }

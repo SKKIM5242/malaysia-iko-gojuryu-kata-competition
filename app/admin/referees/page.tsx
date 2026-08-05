@@ -39,6 +39,7 @@ interface Referee {
   email: string | null; phone: string | null; home_address: string | null;
   city_town: string | null; postcode: string | null; home_country: string | null;
   bank_name: string | null; bank_account_no: string | null; bank_account_name: string | null;
+  unassigned_forfeit_count: number; unassigned_not_forfeit_count: number;
   certificate_path: string | null; international_certificate_paths: string[] | null;
   invitation_code: string | null;
   referral_source: string | null;
@@ -381,27 +382,29 @@ export default async function AdminReferees({
               rowKey="id"
               downloadName="referees"
               columns={[
-                { key: "full_name", label: "Name" },
-                { key: "reference_id", label: "Reference ID" },
-                { key: "ic_passport", label: "IC / Passport" },
-                { key: "date_of_birth", label: "DOB" },
-                { key: "gender", label: "Gender" },
-                { key: "karate_rank", label: "Rank" },
-                { key: "judge_title", label: "Role" },
-                { key: "judging_experience_count", label: "Judging Experience" },
-                { key: "school", label: "School" },
-                { key: "location", label: "Location" },
-                { key: "email", label: "Email" },
-                { key: "phone", label: "Phone" },
-                { key: "bank", label: "Bank" },
-                { key: "certificates", label: "Certificates" },
-                { key: "invitation_code", label: "Invitation Code" },
-                { key: "referral_source", label: "Referral" },
-                { key: "deposit", label: "Deposit" },
-                { key: "approval", label: "Approval" },
-                { key: "account_link", label: "Account Link" },
-                ...(isAdminTier ? [{ key: "sign_in_control", label: "Sign-in Control" }] : []),
-                { key: "actions", label: "Actions" },
+                { key: "full_name", label: "Name", width: 130, wrap: true },
+                { key: "reference_id", label: "Reference ID", width: 100, wrap: true },
+                { key: "ic_passport", label: "IC / Passport", width: 110, wrap: true },
+                { key: "date_of_birth", label: "DOB", width: 85, wrap: true },
+                { key: "gender", label: "Gender", width: 70, wrap: true },
+                { key: "karate_rank", label: "Rank", width: 90, wrap: true },
+                { key: "judge_title", label: "Role", width: 110, wrap: true },
+                { key: "judging_experience_count", label: "Judging Experience", width: 90, wrap: true },
+                { key: "unassigned_forfeit_count", label: "Unassigned - Forfeit", width: 95, wrap: true },
+                { key: "unassigned_not_forfeit_count", label: "Unassigned Not Forfeit", width: 95, wrap: true },
+                { key: "school", label: "School", width: 120, wrap: true },
+                { key: "location", label: "Location", width: 150, wrap: true },
+                { key: "email", label: "Email", width: 140, wrap: true },
+                { key: "phone", label: "Phone", width: 100, wrap: true },
+                { key: "bank", label: "Bank", width: 120, wrap: true },
+                { key: "certificates", label: "Certificates", width: 100, wrap: true },
+                { key: "invitation_code", label: "Invitation Code", width: 100, wrap: true },
+                { key: "referral_source", label: "Referral", width: 120, wrap: true },
+                { key: "deposit", label: "Deposit", width: 110, wrap: true },
+                { key: "approval", label: "Approval", width: 110, wrap: true },
+                { key: "account_link", label: "Account Link", width: 120, wrap: true },
+                ...(isAdminTier ? [{ key: "sign_in_control", label: "Sign-in Control", width: 150, wrap: true }] : []),
+                { key: "actions", label: "Actions", width: 90, wrap: true },
               ]}
               csvColumns={[
                 { key: "full_name", label: "Name" },
@@ -412,6 +415,8 @@ export default async function AdminReferees({
                 { key: "karate_rank", label: "Rank" },
                 { key: "judge_title", label: "Role" },
                 { key: "judging_experience_count", label: "Judging Experience" },
+                { key: "unassigned_forfeit_count", label: "Unassigned - Forfeit" },
+                { key: "unassigned_not_forfeit_count", label: "Unassigned Not Forfeit" },
                 { key: "school", label: "School" },
                 { key: "home_address", label: "Home Address" },
                 { key: "city_town", label: "City / Town" },
@@ -437,6 +442,8 @@ export default async function AdminReferees({
                 karate_rank: r.karate_rank ?? "",
                 judge_title: r.judge_title ?? "",
                 judging_experience_count: String(r.judging_experience_count ?? 0),
+                unassigned_forfeit_count: String(r.unassigned_forfeit_count ?? 0),
+                unassigned_not_forfeit_count: String(r.unassigned_not_forfeit_count ?? 0),
                 school: r.school ?? "",
                 location: [r.home_address, r.city_town, r.postcode, r.home_country].filter(Boolean).join(", "),
                 bank: [r.bank_name, r.bank_account_no].filter(Boolean).join(" · "),
