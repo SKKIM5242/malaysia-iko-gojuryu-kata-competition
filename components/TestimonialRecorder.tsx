@@ -11,6 +11,7 @@ import {
   TESTIMONIAL_MAX_VIDEO_SECONDS,
   type TestimonialKind,
 } from "@/lib/testimonials";
+import { SCRIPT_LENGTH_LABEL, scriptsForBand, type ScriptLengthBand } from "@/lib/testimonial-scripts";
 
 type Phase = "idle" | "live" | "recording" | "review" | "uploading";
 
@@ -18,6 +19,58 @@ function mmss(totalSeconds: number): string {
   const m = Math.floor(totalSeconds / 60);
   const s = Math.floor(totalSeconds % 60);
   return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+/** Sample scripts to read from during a practice take — cue cards, not
+ * word-for-word text (see lib/testimonial-scripts.ts for why). Video only:
+ * voice/message testimonials have no length target to practice against. */
+function ScriptPicker() {
+  const [band, setBand] = useState<ScriptLengthBand | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const bands: ScriptLengthBand[] = ["3min", "5min", "10min"];
+
+  return (
+    <div className="mb-3 rounded-md border border-neutral-200 bg-white p-3">
+      <p className="text-xs font-semibold text-neutral-600">📝 Sample scripts to practice with — pick a length:</p>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {bands.map((b) => (
+          <button
+            key={b}
+            type="button"
+            onClick={() => setBand(band === b ? null : b)}
+            className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+              band === b ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-300 bg-white text-neutral-600"
+            }`}
+          >
+            {SCRIPT_LENGTH_LABEL[b]}
+          </button>
+        ))}
+      </div>
+      {band && (
+        <ul className="mt-2 max-h-64 space-y-1 overflow-y-auto">
+          {scriptsForBand(band).map((script) => (
+            <li key={script.id} className="rounded border border-neutral-200">
+              <button
+                type="button"
+                onClick={() => setOpenId(openId === script.id ? null : script.id)}
+                className="flex w-full items-center justify-between gap-2 px-2 py-1.5 text-left text-xs font-semibold text-neutral-700 hover:bg-neutral-50"
+              >
+                {script.title}
+                <span className="text-neutral-400">{openId === script.id ? "▲" : "▼"}</span>
+              </button>
+              {openId === script.id && (
+                <ol className="list-decimal space-y-1 px-6 pb-2 text-xs text-neutral-600">
+                  {script.prompts.map((p, i) => (
+                    <li key={i}>{p}</li>
+                  ))}
+                </ol>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 /** Video and voice testimonials share the same record/review/retake flow —
@@ -31,12 +84,14 @@ function MediaTestimonialPanel({ kind, onDone }: { kind: "video" | "voice"; onDo
   const [seconds, setSeconds] = useState(0);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isFileUpload, setIsFileUpload] = useState(false);
   const streamRef = useRef<MediaStream | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const recordedBlobRef = useRef<Blob | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const isVideo = kind === "video";
   const minSeconds = isVideo ? TESTIMONIAL_MIN_VIDEO_SECONDS : 0;
@@ -106,7 +161,21 @@ function MediaTestimonialPanel({ kind, onDone }: { kind: "video" | "voice"; onDo
     if (blobUrl) URL.revokeObjectURL(blobUrl);
     setBlobUrl(null);
     recordedBlobRef.current = null;
-    setPhase("live");
+    setIsFileUpload(false);
+    // A file-picked take has no live camera stream to fall back to —
+    // send those back to "idle" so they can pick a file or turn the
+    // camera on again, instead of showing a dead live-preview phase.
+    setPhase(streamRef.current ? "live" : "idle");
+  }
+
+  function handleFilePicked(file: File) {
+    setError(null);
+    if (blobUrl) URL.revokeObjectURL(blobUrl);
+    recordedBlobRef.current = file;
+    setBlobUrl(URL.createObjectURL(file));
+    setIsFileUpload(true);
+    setSeconds(0);
+    setPhase("review");
   }
 
   async function useThisTake() {
@@ -190,9 +259,33 @@ function MediaTestimonialPanel({ kind, onDone }: { kind: "video" | "voice"; onDo
       </p>
 
       {phase === "idle" && (
-        <button type="button" onClick={startLive} className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-semibold text-white hover:bg-neutral-700">
-          {isVideo ? "📷 Turn on camera" : "🎙️ Turn on microphone"}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={startLive} className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-semibold text-white hover:bg-neutral-700">
+            {isVideo ? "📷 Record now" : "🎙️ Turn on microphone"}
+          </button>
+          {isVideo && (
+            <>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="rounded-md border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-50"
+              >
+                📁 Choose file
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="video/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleFilePicked(file);
+                  e.target.value = "";
+                }}
+              />
+            </>
+          )}
+        </div>
       )}
 
       {isVideo && (phase === "live" || phase === "recording") && (
@@ -227,7 +320,19 @@ function MediaTestimonialPanel({ kind, onDone }: { kind: "video" | "voice"; onDo
       {phase === "review" && blobUrl && (
         <div>
           {isVideo ? (
-            <video src={blobUrl} controls playsInline className="mb-3 w-full max-w-md rounded-md bg-black" />
+            <video
+              src={blobUrl}
+              controls
+              playsInline
+              onLoadedMetadata={(e) => {
+                // Only a file picked from disk needs its length read this
+                // way — a live recording's `seconds` already comes from
+                // the interval timer, which is reliable; a freshly
+                // recorded webm blob's `.duration` metadata often isn't.
+                if (isFileUpload) setSeconds(Math.round(e.currentTarget.duration) || 0);
+              }}
+              className="mb-3 w-full max-w-md rounded-md bg-black"
+            />
           ) : (
             <audio src={blobUrl} controls className="mb-3 w-full max-w-md" />
           )}
@@ -346,7 +451,12 @@ export default function TestimonialRecorder() {
           </button>
         ))}
       </div>
-      {chosen === "video" && <MediaTestimonialPanel kind="video" onDone={handleDone} />}
+      {chosen === "video" && (
+        <div className="mt-3">
+          <ScriptPicker />
+          <MediaTestimonialPanel kind="video" onDone={handleDone} />
+        </div>
+      )}
       {chosen === "voice" && <MediaTestimonialPanel kind="voice" onDone={handleDone} />}
       {chosen === "message" && <MessageTestimonialPanel onDone={handleDone} />}
     </div>
