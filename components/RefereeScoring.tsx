@@ -93,7 +93,7 @@ export function RubricTable({
               <td colSpan={2} className={`${totalPad} text-right`}>Total Score</td>
               <td className={`${totalPad} text-neutral-400`}>0–{TOTAL_MAX}</td>
               <td className={`${totalPad} ${disqualifying || overMax ? "text-red-700" : "text-neutral-900"}`}>
-                {total.toFixed(1)}
+                {total.toFixed(2)}
               </td>
             </tr>
           </tbody>
@@ -489,7 +489,7 @@ function ScoreRow({ item }: { item: ScoringItem }) {
         <div className="flex items-center gap-2">
           {item.existingScore != null && (
             <span className="rounded-full bg-neutral-900 px-2.5 py-1 text-xs font-semibold text-white">
-              Total {item.existingScore.toFixed(1)}
+              Total {item.existingScore.toFixed(2)}
             </span>
           )}
           <button

@@ -107,7 +107,7 @@ async function CompetitionPreview({
                               {MEDALS[w.rank - 1]} {w.participantName}
                             </span>
                             <span className="flex items-center gap-2">
-                              <span className="font-semibold text-neutral-700">{w.finalScore.toFixed(1)}</span>
+                              <span className="font-semibold text-neutral-700">{w.finalScore.toFixed(2)}</span>
                               {playbackUrls.get(w.storagePath) && (
                                 <a
                                   href={playbackUrls.get(w.storagePath)}

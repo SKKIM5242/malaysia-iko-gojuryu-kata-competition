@@ -64,7 +64,7 @@ function StatusDot({ entry, judgesRequired }: { entry: ArenaEntry; judgesRequire
   return (
     <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-green-300 bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-800">
       <span aria-hidden className="h-2.5 w-2.5 rounded-full bg-green-600" />
-      Score {entry.finalScore != null ? entry.finalScore.toFixed(1) : "—"}
+      Score {entry.finalScore != null ? entry.finalScore.toFixed(2) : "—"}
     </span>
   );
 }
@@ -113,7 +113,7 @@ function RecordingCard({
               >
                 {js.judgeName}
                 <span className={js.score != null ? "text-green-700" : "text-amber-600"}>
-                  {js.score != null ? js.score.toFixed(1) : "pending"}
+                  {js.score != null ? js.score.toFixed(2) : "pending"}
                 </span>
               </span>
             ))

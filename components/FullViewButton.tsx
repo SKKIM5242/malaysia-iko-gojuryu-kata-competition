@@ -153,7 +153,7 @@ export default function FullViewButton({
               {override && (
                 <>
                   <p className="mt-1 text-xs font-semibold text-purple-700">
-                    Admin/Organizer override — {override.judgeName}: Score {override.total!.toFixed(1)}
+                    Admin/Organizer override — {override.judgeName}: Score {override.total!.toFixed(2)}
                   </p>
                   {override.total === 0 && (
                     <DisqualificationReason

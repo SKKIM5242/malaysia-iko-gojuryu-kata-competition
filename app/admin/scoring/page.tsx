@@ -138,7 +138,7 @@ export default async function AdminScoring({
                       <div className="flex items-center gap-2">
                         {myScore != null && (
                           <span className="rounded-full bg-neutral-900 px-2.5 py-1 text-xs font-semibold text-white">
-                            Your Total Average Score {myScore.toFixed(1)}
+                            Your Total Average Score {myScore.toFixed(2)}
                           </span>
                         )}
                         <ScoreSessionButton

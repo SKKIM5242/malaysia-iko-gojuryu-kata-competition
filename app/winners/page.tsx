@@ -182,14 +182,14 @@ async function CompetitionWinners({
                                     {w.judges.map((j, i) => (
                                       <span key={i}>
                                         {i > 0 && ", "}
-                                        {j.total != null ? j.total.toFixed(1) : "—"}
+                                        {j.total != null ? j.total.toFixed(2) : "—"}
                                       </span>
                                     ))}
                                   </span>
                                 )}
                               </span>
                               <span className="flex items-center gap-2">
-                                <span className="font-semibold text-neutral-700">{w.finalScore.toFixed(1)}</span>
+                                <span className="font-semibold text-neutral-700">{w.finalScore.toFixed(2)}</span>
                                 <FullViewButton
                                   url={w.playbackUrl}
                                   participantName={w.participantName}
@@ -198,7 +198,7 @@ async function CompetitionWinners({
                                   judges={w.judges}
                                   judgesRequired={competition.judges_required}
                                   queuePosition={null}
-                                  averageText={`Final score ${w.finalScore.toFixed(1)}`}
+                                  averageText={`Final score ${w.finalScore.toFixed(2)}`}
                                   disqualified={false}
                                 />
                               </span>

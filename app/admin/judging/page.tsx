@@ -232,7 +232,7 @@ export default async function AdminJudging({
               queuePosition={queuePosition}
               averageText={
                 final != null
-                  ? `Average ${final.toFixed(1)} (${submittedScores.length}/${allScorers.length} scored${trimmed ? ", high/low dropped" : ""})`
+                  ? `Average ${final.toFixed(2)} (${submittedScores.length}/${allScorers.length} scored${trimmed ? ", high/low dropped" : ""})`
                   : null
               }
               disqualified={dq}
@@ -281,7 +281,7 @@ export default async function AdminJudging({
                       />
                     ) : (
                       <span className={score === 0 ? "font-bold text-red-700" : "text-green-700"}>
-                        Total {score.toFixed(1)}
+                        Total {score.toFixed(2)}
                       </span>
                     )
                   ) : (
@@ -338,7 +338,7 @@ export default async function AdminJudging({
                     />
                   ) : (
                     <span className={score === 0 ? "font-bold text-red-700" : "text-purple-700"}>
-                      Total {score.toFixed(1)}
+                      Total {score.toFixed(2)}
                     </span>
                   )
                 ) : (
@@ -349,7 +349,7 @@ export default async function AdminJudging({
           })}
           {final != null && (
             <span className="rounded-full bg-neutral-900 px-2.5 py-1 text-xs font-semibold text-white">
-              Average {final.toFixed(1)} ({submittedScores.length}/{allScorers.length} scored
+              Average {final.toFixed(2)} ({submittedScores.length}/{allScorers.length} scored
               {trimmed ? ", high/low dropped" : ""})
             </span>
           )}

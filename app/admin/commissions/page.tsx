@@ -452,7 +452,7 @@ export default async function AdminCommissions({
             category: r.categoryName,
             rank: `${MEDALS[r.rank - 1] ?? ""} ${r.rank}`,
             name: r.participantName,
-            score: r.finalScore.toFixed(1),
+            score: r.finalScore.toFixed(2),
             reward_amount: `$${r.rewardAmountUsd.toFixed(2)}`,
             reward_amount_csv: r.rewardAmountUsd.toFixed(2),
             bank: [r.bankName, r.bankAccountNo, r.bankAccountName].filter(Boolean).join(" · ") || "—",

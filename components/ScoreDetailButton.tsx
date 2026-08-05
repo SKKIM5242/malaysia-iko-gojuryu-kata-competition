@@ -36,7 +36,7 @@ export default function ScoreDetailButton({
         className={total === 0 ? "font-bold text-red-700 underline underline-offset-2" : "text-green-700 underline underline-offset-2"}
         title="View detailed score breakdown (view only)"
       >
-        Total {total.toFixed(1)}
+        Total {total.toFixed(2)}
       </button>
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setOpen(false)}>
