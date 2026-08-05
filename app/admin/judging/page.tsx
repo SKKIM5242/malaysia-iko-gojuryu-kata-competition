@@ -88,7 +88,9 @@ export default async function AdminJudging({
         .order("created_at", { ascending: false }),
       supabase
         .from("referees")
-        .select("id, full_name, karate_rank, email, phone, home_country, user_id")
+        .select(
+          "id, full_name, karate_rank, email, phone, home_country, user_id, unassigned_forfeit_count, unassigned_not_forfeit_count",
+        )
         .eq("status", "approved")
         .order("full_name"),
       supabase.from("profiles").select("user_id, full_name, email, country").eq("role", "referee").eq("approved", true),
@@ -457,6 +459,8 @@ export default async function AdminJudging({
               { key: "country", label: "Country", width: 130 },
               { key: "assigned", label: "Assigned", width: 130 },
               { key: "scored", label: "Scored", width: 160 },
+              { key: "unassigned_forfeit_count", label: "Unassigned - Forfeit", width: 95, wrap: true },
+              { key: "unassigned_not_forfeit_count", label: "Unassigned Not Forfeit", width: 95, wrap: true },
             ]}
             csvColumns={[
               { key: "referee", label: "Referee" },
@@ -466,6 +470,8 @@ export default async function AdminJudging({
               { key: "country", label: "Country" },
               { key: "assigned", label: "Assigned" },
               { key: "scored_text", label: "Scored" },
+              { key: "unassigned_forfeit_count", label: "Unassigned - Forfeit" },
+              { key: "unassigned_not_forfeit_count", label: "Unassigned Not Forfeit" },
             ]}
             rows={directoryList.map((r) => {
               const assignedCount = r.user_id
@@ -504,6 +510,8 @@ export default async function AdminJudging({
                     String(scoredCount)
                   ),
                 scored_text: String(scoredCount),
+                unassigned_forfeit_count: String(r.unassigned_forfeit_count ?? 0),
+                unassigned_not_forfeit_count: String(r.unassigned_not_forfeit_count ?? 0),
               };
             })}
           />
