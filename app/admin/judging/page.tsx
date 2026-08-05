@@ -446,14 +446,14 @@ export default async function AdminJudging({
             rowKey="id"
             downloadName="referee-workload"
             columns={[
-              { key: "referee", label: "Referee", width: 200 },
-              { key: "rank", label: "Rank", width: 100 },
-              { key: "email", label: "Email", width: 220 },
-              { key: "phone", label: "Mobile Phone", width: 150 },
-              { key: "telegram", label: "Telegram", width: 130 },
-              { key: "country", label: "Country", width: 130 },
-              { key: "assigned", label: "Assigned", width: 130 },
-              { key: "scored", label: "Scored", width: 160 },
+              { key: "referee", label: "Referee", width: 140, wrap: true },
+              { key: "rank", label: "Rank", width: 90, wrap: true },
+              { key: "email", label: "Email", width: 160, wrap: true },
+              { key: "phone", label: "Mobile Phone", width: 110, wrap: true },
+              { key: "telegram", label: "Telegram", width: 110, wrap: true },
+              { key: "country", label: "Country", width: 100, wrap: true },
+              { key: "assigned", label: "Assigned", width: 90, wrap: true },
+              { key: "scored", label: "Scored", width: 110, wrap: true },
               { key: "unassigned_forfeit_count", label: "Unassigned - Forfeit", width: 95, wrap: true },
               { key: "unassigned_not_forfeit_count", label: "Unassigned Not Forfeit", width: 95, wrap: true },
             ]}

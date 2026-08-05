@@ -122,6 +122,27 @@ export default async function AdminReferees({
       : { data: [] };
   const loginByUserId = new Map((refereeLogins ?? []).map((p) => [p.user_id as string, p]));
 
+  // Same Assigned/Scored counts shown on the Judging page's Referee
+  // Workload table, populated here too so this table doesn't need a
+  // separate visit to Judging just to see workload at a glance.
+  const [{ data: assignmentsData }, { data: scoresData }] =
+    refereeUserIds.length > 0
+      ? await Promise.all([
+          supabase.from("referee_assignments").select("referee_user_id").in("referee_user_id", refereeUserIds),
+          supabase.from("video_scores").select("referee_user_id").in("referee_user_id", refereeUserIds),
+        ])
+      : [{ data: [] }, { data: [] }];
+  const assignedCountByUserId = new Map<string, number>();
+  for (const a of assignmentsData ?? []) {
+    const uid = a.referee_user_id as string;
+    assignedCountByUserId.set(uid, (assignedCountByUserId.get(uid) ?? 0) + 1);
+  }
+  const scoredCountByUserId = new Map<string, number>();
+  for (const s of scoresData ?? []) {
+    const uid = s.referee_user_id as string;
+    scoredCountByUserId.set(uid, (scoredCountByUserId.get(uid) ?? 0) + 1);
+  }
+
   const { data: termsData } = await supabase.from("auto_assign_terms").select("*").order("position");
   const autoAssignTerms = termsData ?? [];
   const editingTerm = params.editterm ? autoAssignTerms.find((t) => t.id === params.editterm) : undefined;
@@ -391,6 +412,8 @@ export default async function AdminReferees({
                 { key: "karate_rank", label: "Rank", width: 90, wrap: true },
                 { key: "judge_title", label: "Role", width: 110, wrap: true },
                 { key: "judging_experience_count", label: "Judging Experience", width: 90, wrap: true },
+                { key: "assigned", label: "Assigned", width: 90, wrap: true },
+                { key: "scored", label: "Scored", width: 110, wrap: true },
                 { key: "unassigned_forfeit_count", label: "Unassigned - Forfeit", width: 95, wrap: true },
                 { key: "unassigned_not_forfeit_count", label: "Unassigned Not Forfeit", width: 95, wrap: true },
                 { key: "school", label: "School", width: 120, wrap: true },
@@ -416,6 +439,8 @@ export default async function AdminReferees({
                 { key: "karate_rank", label: "Rank" },
                 { key: "judge_title", label: "Role" },
                 { key: "judging_experience_count", label: "Judging Experience" },
+                { key: "assigned", label: "Assigned" },
+                { key: "scored_text", label: "Scored" },
                 { key: "unassigned_forfeit_count", label: "Unassigned - Forfeit" },
                 { key: "unassigned_not_forfeit_count", label: "Unassigned Not Forfeit" },
                 { key: "school", label: "School" },
@@ -443,6 +468,19 @@ export default async function AdminReferees({
                 karate_rank: r.karate_rank ?? "",
                 judge_title: r.judge_title ?? "",
                 judging_experience_count: String(r.judging_experience_count ?? 0),
+                assigned: r.user_id ? String(assignedCountByUserId.get(r.user_id) ?? 0) : "No login yet",
+                scored: (() => {
+                  const assignedN = r.user_id ? (assignedCountByUserId.get(r.user_id) ?? 0) : 0;
+                  const scoredN = r.user_id ? (scoredCountByUserId.get(r.user_id) ?? 0) : 0;
+                  return r.user_id && assignedN > scoredN ? (
+                    <>
+                      {scoredN} <span className="ml-1.5 text-xs text-amber-600">({assignedN - scoredN} pending)</span>
+                    </>
+                  ) : (
+                    String(scoredN)
+                  );
+                })(),
+                scored_text: r.user_id ? String(scoredCountByUserId.get(r.user_id) ?? 0) : "0",
                 unassigned_forfeit_count: String(r.unassigned_forfeit_count ?? 0),
                 unassigned_not_forfeit_count: String(r.unassigned_not_forfeit_count ?? 0),
                 school: r.school ?? "",

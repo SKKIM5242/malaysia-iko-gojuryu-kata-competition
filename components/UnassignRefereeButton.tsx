@@ -74,7 +74,7 @@ export default function UnassignRefereeButton({
                 </button>
               </UnassignForm>
               <UnassignForm videoId={videoId} refereeUserId={refereeUserId} returnTo={returnTo} forfeit="false">
-                <button className="w-full rounded-md border border-neutral-300 px-4 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-50">
+                <button className="w-full rounded-md bg-green-700 px-4 py-2 text-sm font-semibold text-white hover:bg-green-600">
                   Not a forfeited count
                 </button>
               </UnassignForm>
