@@ -28,11 +28,22 @@ async function participantLinks(
     label: `Certificate of Participation — ${competition.name}`,
     href: `/api/certificates/participant/${registrationId}`,
   };
+  if (!isWinner) return [participationLink];
+
   // Winners get both — the achievement certificate on top of, not instead
   // of, the same participation certificate every other paid entrant gets.
-  return isWinner
-    ? [{ label: `Winner Certificate — ${competition.name}`, href: `/api/certificates/winner/${registrationId}` }, participationLink]
-    : [participationLink];
+  // The Winner Certificate itself, though, is held back until a testimonial
+  // has been given (see WinnerTestimonialSection.tsx and the matching
+  // server-side check in app/api/certificates/[kind]/[id]/route.tsx).
+  const { count: testimonialCount } = await supabase
+    .from("winner_testimonials")
+    .select("id", { count: "exact", head: true })
+    .eq("registration_id", registrationId);
+  const winnerLink =
+    (testimonialCount ?? 0) > 0
+      ? { label: `Winner Certificate — ${competition.name}`, href: `/api/certificates/winner/${registrationId}` }
+      : null;
+  return winnerLink ? [winnerLink, participationLink] : [participationLink];
 }
 
 async function refereeLinks(supabase: Awaited<ReturnType<typeof createClient>>, userId: string): Promise<CertLink[]> {

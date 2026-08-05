@@ -10,6 +10,7 @@ import KataRecorder from "@/components/KataRecorder";
 import VideoWatchButton from "@/components/VideoWatchButton";
 import RefereeScoring, { type ScoringItem } from "@/components/RefereeScoring";
 import CertificatesSection from "@/components/CertificatesSection";
+import WinnerTestimonialSection from "@/components/WinnerTestimonialSection";
 import IssueReportForm from "@/components/IssueReportForm";
 import { getAllTelegramLinks, getTelegramBotConnectUrl } from "@/lib/telegram";
 import { isWithinSignInQuota } from "@/lib/sign-in-quota";
@@ -444,6 +445,7 @@ export default async function AccountPage({
             schoolId={profile.school_id}
             isSupport={profile.role === "customer_support"}
           />
+          <WinnerTestimonialSection registrationId={profile.registration_id} />
           <div className="mt-4">{SignOutButton}</div>
         </main>
         <SiteFooter />
@@ -596,6 +598,7 @@ export default async function AccountPage({
             schoolId={profile.school_id}
             isSupport={false}
           />
+          <WinnerTestimonialSection registrationId={profile.registration_id} />
           <div className="mt-4">{SignOutButton}</div>
         </main>
         <SiteFooter />
@@ -648,6 +651,7 @@ export default async function AccountPage({
             schoolId={profile.school_id}
             isSupport={false}
           />
+          <WinnerTestimonialSection registrationId={profile.registration_id} />
           <div className="mt-4">{SignOutButton}</div>
         </main>
         <SiteFooter />
@@ -717,6 +721,7 @@ export default async function AccountPage({
             schoolId={profile.school_id}
             isSupport={false}
           />
+          <WinnerTestimonialSection registrationId={profile.registration_id} />
           <div className="mt-4">{SignOutButton}</div>
         </main>
         <SiteFooter />
@@ -923,6 +928,7 @@ export default async function AccountPage({
           schoolId={profile.school_id}
           isSupport={false}
         />
+        <WinnerTestimonialSection registrationId={profile.registration_id} />
         <div className="mt-6">{SignOutButton}</div>
       </main>
       <SiteFooter />

@@ -178,6 +178,18 @@ export async function GET(request: Request, { params }: { params: Promise<{ kind
         }
       }
       if (!rank) return new Response("This registration did not place in the Top 3.", { status: 404 });
+
+      if (!isManager) {
+        const { count: testimonialCount } = await supabase
+          .from("winner_testimonials")
+          .select("id", { count: "exact", head: true })
+          .eq("registration_id", registrationId);
+        if ((testimonialCount ?? 0) === 0) {
+          return new Response("Submit your testimonial on My Account before downloading your Winner Certificate.", {
+            status: 403,
+          });
+        }
+      }
     }
 
     const image = await renderCertificatePng({

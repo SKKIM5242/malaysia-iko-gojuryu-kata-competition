@@ -224,6 +224,12 @@ export default async function AdminCommissions({
   // bucket — one batched call per table, same pattern as certificate/kata
   // video signed URLs elsewhere in the admin panel.
   const supabase = await createClient();
+  // Reward payout is held until the winner has given a testimonial (see
+  // components/WinnerTestimonialSection.tsx) — this is just the set of
+  // registrations that already have, so the Payout column below can swap
+  // the Paid/Unpaid buttons for a plain "Awaiting testimonial" note.
+  const { data: testimonialRows } = await supabase.from("winner_testimonials").select("registration_id");
+  const testimonialRegIds = new Set((testimonialRows ?? []).map((t) => t.registration_id as string));
   const receiptPaths = [
     ...rows.map((r) => r.receiptPath),
     ...rewardRows.map((r) => r.receiptPath),
@@ -460,7 +466,13 @@ export default async function AdminCommissions({
             bank_account_no: r.bankAccountNo ?? "",
             bank_account_name: r.bankAccountName ?? "",
             payout_status: r.payoutStatus,
-            payout: <RewardPayoutButtons registrationId={r.registrationId} current={r.payoutStatus} />,
+            payout: testimonialRegIds.has(r.registrationId) ? (
+              <RewardPayoutButtons registrationId={r.registrationId} current={r.payoutStatus} />
+            ) : (
+              <span className="text-xs font-semibold text-amber-700" title="Payout is held until this winner submits a testimonial on My Account">
+                ⏸ Awaiting testimonial
+              </span>
+            ),
             receipt_status: r.receiptPath ? "Yes" : "No",
             receipt: (
               <WinnerReceiptCell

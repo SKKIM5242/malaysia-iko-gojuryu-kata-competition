@@ -9,6 +9,8 @@ import { writeAudit } from "@/lib/audit";
 import { getStripe, paymentsEnabled } from "@/lib/payments";
 import { notifyParticipantScored } from "@/lib/notify";
 import { isWithinSignInQuota } from "@/lib/sign-in-quota";
+import { computeCategoryRankings } from "@/lib/winners-ranking";
+import type { TestimonialKind } from "@/lib/testimonials";
 
 export interface AccountActionState {
   ok: boolean;
@@ -424,6 +426,76 @@ export async function submitKataVideo(
     actor_id: user.id,
   });
   revalidatePath("/account");
+  return { ok: true };
+}
+
+/** A Top-3 winner's testimonial — video/voice (already uploaded client-side
+ * to the `testimonials` bucket, this just registers the resulting path) or
+ * a typed message. One per registration (table has a unique constraint);
+ * submitting again fails rather than silently overwriting the first one.
+ * Unlocks the Winner Certificate download (see CertificatesSection.tsx and
+ * the certificate API route) and clears the reward payout hold (see
+ * app/admin/commissions/page.tsx). */
+export async function submitTestimonial(
+  _prev: AccountActionState,
+  formData: FormData,
+): Promise<AccountActionState> {
+  const kind = String(formData.get("kind") ?? "");
+  if (!["video", "voice", "message"].includes(kind)) {
+    return { ok: false, error: "Invalid testimonial type." };
+  }
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sign in first." };
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("registration_id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (!profile?.registration_id) return { ok: false, error: "Link your registration first." };
+
+  const { data: reg } = await supabase
+    .from("registrations")
+    .select("competition_id")
+    .eq("id", profile.registration_id)
+    .maybeSingle();
+  if (!reg) return { ok: false, error: "Registration not found." };
+
+  // Same Top-3 check the certificate route and reward payout list use —
+  // a testimonial only ever applies to a registration that actually won.
+  const rankings = await computeCategoryRankings(supabase, reg.competition_id as string);
+  const isWinner = [...rankings.values()].flat().some((e) => e.registrationId === profile.registration_id);
+  if (!isWinner) return { ok: false, error: "Testimonials are only for Top 3 winners." };
+
+  let media_path: string | null = null;
+  let message: string | null = null;
+  if (kind === "message") {
+    message = String(formData.get("message") ?? "").trim();
+    if (!message) return { ok: false, error: "Type your testimonial message." };
+  } else {
+    media_path = String(formData.get("path") ?? "");
+    if (!media_path.startsWith(`${user.id}/`)) return { ok: false, error: "Invalid recording reference." };
+  }
+
+  const { error } = await supabase.from("winner_testimonials").insert({
+    registration_id: profile.registration_id,
+    kind,
+    media_path,
+    message,
+  });
+  if (error) return { ok: false, error: "Could not save — you may have already submitted a testimonial." };
+  await writeAudit(supabase, {
+    table_name: "winner_testimonials",
+    record_id: profile.registration_id,
+    action: "testimonial_submitted",
+    new_value: { kind: kind as TestimonialKind },
+    actor_id: user.id,
+  });
+  revalidatePath("/account");
+  revalidatePath("/testimonials");
   return { ok: true };
 }
 
