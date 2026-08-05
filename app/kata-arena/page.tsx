@@ -10,6 +10,7 @@ import { winnersRevealed } from "@/lib/winners";
 import AuthForms from "@/components/AuthForms";
 import ClaimForm from "@/components/ClaimForm";
 import VideoWatchButton from "@/components/VideoWatchButton";
+import DeleteRecordingControls from "@/components/DeleteRecordingControls";
 import SignInQuotaLine from "@/components/SignInQuotaLine";
 import { isWithinSignInQuota } from "@/lib/sign-in-quota";
 import SubscriptionBlocked from "@/components/SubscriptionBlocked";
@@ -98,7 +99,15 @@ function RecordingCard({
         </div>
         <div className="flex items-center gap-2">
           <StatusDot entry={entry} judgesRequired={judgesRequired} />
-          <VideoWatchButton url={entry.playbackUrl} deletable={ownDelete} />
+          <VideoWatchButton url={entry.playbackUrl} />
+          {ownDelete && entry.playbackUrl && (
+            <DeleteRecordingControls
+              registrationId={ownDelete.registrationId}
+              attemptsUsed={ownDelete.attemptsUsed}
+              maxAttempts={ownDelete.maxAttempts}
+              hasPendingPurchase={ownDelete.hasPendingPurchase}
+            />
+          )}
         </div>
       </div>
       {showJudgeScores && (

@@ -8,6 +8,7 @@ import AuthForms from "@/components/AuthForms";
 import ClaimForm from "@/components/ClaimForm";
 import KataRecorder from "@/components/KataRecorder";
 import VideoWatchButton from "@/components/VideoWatchButton";
+import DeleteRecordingControls from "@/components/DeleteRecordingControls";
 import RefereeScoring, { type ScoringItem } from "@/components/RefereeScoring";
 import CertificatesSection from "@/components/CertificatesSection";
 import WinnerTestimonialSection from "@/components/WinnerTestimonialSection";
@@ -206,17 +207,17 @@ function PersonalRecordingSection({
           <div className="rounded-lg border border-green-300 bg-green-50 p-6">
             <p className="font-bold text-green-900">✅ Your kata recording is submitted</p>
             {ctx.ownVideoUrl ? (
-              <div className="mt-3">
+              <div className="mt-3 flex flex-wrap items-center gap-3">
                 <VideoWatchButton
                   url={ctx.ownVideoUrl}
                   label="Watch your recording"
                   className="rounded-md bg-neutral-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-neutral-700"
-                  deletable={{
-                    registrationId: profile.registration_id!,
-                    attemptsUsed: profile.record_attempts,
-                    maxAttempts: ctx.maxAttempts,
-                    hasPendingPurchase: ctx.hasPendingPurchase,
-                  }}
+                />
+                <DeleteRecordingControls
+                  registrationId={profile.registration_id!}
+                  attemptsUsed={profile.record_attempts}
+                  maxAttempts={ctx.maxAttempts}
+                  hasPendingPurchase={ctx.hasPendingPurchase}
                 />
               </div>
             ) : (
@@ -843,17 +844,17 @@ export default async function AccountPage({
             <div className="rounded-lg border border-green-300 bg-green-50 p-6">
               <p className="font-bold text-green-900">✅ Your kata recording is submitted</p>
               {ownVideoUrl ? (
-                <div className="mt-3">
+                <div className="mt-3 flex flex-wrap items-center gap-3">
                   <VideoWatchButton
                     url={ownVideoUrl}
                     label="Watch your recording"
                     className="rounded-md bg-neutral-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-neutral-700"
-                    deletable={{
-                      registrationId: profile.registration_id,
-                      attemptsUsed: profile.record_attempts,
-                      maxAttempts,
-                      hasPendingPurchase,
-                    }}
+                  />
+                  <DeleteRecordingControls
+                    registrationId={profile.registration_id}
+                    attemptsUsed={profile.record_attempts}
+                    maxAttempts={maxAttempts}
+                    hasPendingPurchase={hasPendingPurchase}
                   />
                 </div>
               ) : (
