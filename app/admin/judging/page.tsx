@@ -70,9 +70,6 @@ export default async function AdminJudging({
   // signed-in Referee/Judge gets the Judging page with full access.
   // Participant Support stays view only (not a referee).
   const canScoreAnyVideo = ["admin", "organizer", "staff", "referee"].includes(myRole ?? "");
-  // The browser video player's three-dot menu (download / picture-in-picture)
-  // is exposed to Admin/Organizer only, per the organizer's instruction.
-  const allowAdvancedControls = ["admin", "organizer", "staff"].includes(myRole ?? "");
 
   const [
     competitions, { data: videos }, { data: directory }, { data: refereeProfiles }, { data: staffProfiles },
@@ -238,7 +235,6 @@ export default async function AdminJudging({
                   : null
               }
               disqualified={dq}
-              allowAdvancedControls={allowAdvancedControls}
             />
             <ScoreSessionButton
               item={{
@@ -252,7 +248,6 @@ export default async function AdminJudging({
                 existingScore: myScore ?? null,
               }}
               canScore={canScoreAnyVideo || (user != null && assigned.includes(user.id))}
-              allowAdvancedControls={allowAdvancedControls}
               label="Watch recording"
             />
           </div>

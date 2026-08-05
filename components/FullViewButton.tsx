@@ -44,8 +44,7 @@ export interface FullViewJudge {
  * and the rest of the judging information at the bottom. Same window
  * controls as Watch Recording (drag anywhere, resize from the border,
  * minimize / maximize / snap-half / close top right); nothing here is
- * editable. The video three-dot menu stays Admin/Organizer-only via
- * `allowAdvancedControls`.
+ * editable, including the video itself — see LockedVideo.
  */
 export default function FullViewButton({
   url,
@@ -57,7 +56,6 @@ export default function FullViewButton({
   queuePosition,
   averageText,
   disqualified,
-  allowAdvancedControls = false,
 }: {
   url: string | null;
   participantName: string;
@@ -68,7 +66,6 @@ export default function FullViewButton({
   queuePosition: number | null;
   averageText: string | null;
   disqualified: boolean;
-  allowAdvancedControls?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   if (!url) return null;
@@ -93,7 +90,7 @@ export default function FullViewButton({
         >
           <div className="flex min-h-full flex-col">
             <div className="h-[45vh] shrink-0 bg-black">
-              <LockedVideo src={url} autoPlay allowAdvancedControls={allowAdvancedControls} />
+              <LockedVideo src={url} autoPlay />
             </div>
             <div className="grid gap-4 border-t border-neutral-200 p-4 md:grid-cols-3">
               {judges.length === 0 ? (

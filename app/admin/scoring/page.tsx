@@ -152,7 +152,6 @@ export default async function AdminScoring({
                             existingScore: myScore ?? null,
                           }}
                           canScore
-                          allowAdvancedControls
                           label={myScore != null ? "Update score" : "Score this recording"}
                         />
                       </div>

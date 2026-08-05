@@ -7,8 +7,8 @@ import LockedVideo from "@/components/LockedVideo";
 /** Opens the recording in a floating window (movable by dragging anywhere,
  * resizable from every border line, minimize / maximize / snap-to-half /
  * close buttons at the top right) — used on Kata Arena, Judging, and the
- * admin Participant Records table. The browser's three-dot video menu is
- * Admin/Organizer only via `allowAdvancedControls`.
+ * admin Participant Records table. Nothing about the video is editable,
+ * including its own controls — see LockedVideo.
  *
  * The window holds nothing but the recording. The deletion counter and
  * Delete button used to sit in a strip along the bottom here; they now
@@ -20,12 +20,10 @@ export default function VideoWatchButton({
   url,
   label = "Watch",
   className,
-  allowAdvancedControls = false,
 }: {
   url: string | null;
   label?: string;
   className?: string;
-  allowAdvancedControls?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   // Null until the browser reports the recording's real dimensions. The
@@ -95,7 +93,6 @@ export default function VideoWatchButton({
               ref={videoRef}
               src={url}
               autoPlay
-              allowAdvancedControls={allowAdvancedControls}
               onLoadedMetadata={(e) => {
                 const v = e.currentTarget;
                 if (v.videoWidth > 0 && v.videoHeight > 0) {

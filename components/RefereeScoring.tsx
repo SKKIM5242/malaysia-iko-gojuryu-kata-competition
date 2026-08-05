@@ -130,11 +130,9 @@ export function RubricTable({
 export function ScoreSession({
   item,
   onExit,
-  allowAdvancedControls = false,
 }: {
   item: ScoringItem;
   onExit: () => void;
-  allowAdvancedControls?: boolean;
 }) {
   const [sheet, setSheet] = useState<1 | 2 | null>(null);
   const [scoreOpen, setScoreOpen] = useState(true);
@@ -402,7 +400,6 @@ export function ScoreSession({
             <LockedVideo
               src={item.playbackUrl}
               autoPlay
-              allowAdvancedControls={allowAdvancedControls}
               onEnded={() => setScoreOpen(true)}
             />
           ) : (
@@ -441,12 +438,10 @@ export function ScoreSession({
 export function ScoreSessionButton({
   item,
   canScore,
-  allowAdvancedControls = false,
   label = "Watch recording",
 }: {
   item: ScoringItem;
   canScore: boolean;
-  allowAdvancedControls?: boolean;
   label?: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -462,11 +457,11 @@ export function ScoreSessionButton({
       </button>
       {open &&
         (canScore ? (
-          <ScoreSession item={item} onExit={() => setOpen(false)} allowAdvancedControls={allowAdvancedControls} />
+          <ScoreSession item={item} onExit={() => setOpen(false)} />
         ) : (
           <FloatingWindow title={`Watch Recording — ${item.participantName}`} onClose={() => setOpen(false)} initial="max">
             <div className="flex h-full flex-col bg-black">
-              <LockedVideo src={item.playbackUrl} autoPlay allowAdvancedControls={allowAdvancedControls} />
+              <LockedVideo src={item.playbackUrl} autoPlay />
             </div>
           </FloatingWindow>
         ))}
