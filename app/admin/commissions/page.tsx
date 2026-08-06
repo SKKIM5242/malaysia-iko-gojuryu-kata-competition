@@ -17,6 +17,7 @@ import FilterableTable from "@/components/FilterableTable";
 import CertificateUploadField from "@/components/CertificateUploadField";
 import CsvUploadForm from "@/components/CsvUploadForm";
 import ProfitLossSection from "@/components/ProfitLossSection";
+import StripeSetupPanel from "@/components/StripeSetupPanel";
 import { getAllCompetitions } from "@/lib/admin-data";
 import { shortTierName } from "@/lib/invitation-codes";
 
@@ -676,6 +677,19 @@ export default async function AdminCommissions({
         the latest data.
       </p>
       <ProfitLossSection rows={profitLossRows} />
+
+      <StripeSetupPanel
+        secretKeyConfigured={Boolean(process.env.STRIPE_SECRET_KEY)}
+        secretKeyMode={
+          process.env.STRIPE_SECRET_KEY?.startsWith("sk_live_")
+            ? "live"
+            : process.env.STRIPE_SECRET_KEY?.startsWith("sk_test_")
+              ? "test"
+              : null
+        }
+        webhookSecretConfigured={Boolean(process.env.STRIPE_WEBHOOK_SECRET)}
+        webhookUrl={`${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/api/stripe/webhook`}
+      />
     </AdminShell>
   );
 }

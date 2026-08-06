@@ -561,6 +561,45 @@ export async function deleteTestimonial(formData: FormData) {
   backTo(returnTo, { ok: "Testimonial removed. The winner and organizer team have been notified." });
 }
 
+export interface StripeConnectionResult {
+  ok: boolean;
+  message: string;
+  /** Reported by Stripe itself (not derived from the key's own prefix) —
+   * a second, independent confirmation of test vs live mode. */
+  livemode?: boolean;
+}
+
+/** "Test connection" button on the Commissions page's Stripe Setup panel —
+ * confirms the STRIPE_SECRET_KEY currently set in Vercel's environment
+ * variables actually authenticates, via a read-only balance lookup. Never
+ * touches, stores, or displays the key itself — keys stay in Vercel env
+ * vars by design (see StripeSetupPanel.tsx for why this app doesn't offer
+ * a form to type them into instead). */
+export async function testStripeConnection(): Promise<StripeConnectionResult> {
+  const { supabase, actorId } = await getActor();
+  const role = await getActorRole(supabase, actorId);
+  if (!["admin", "organizer", "staff"].includes(role ?? "")) {
+    return { ok: false, message: "Only Admin/Organizer/Staff can test the Stripe connection." };
+  }
+  if (!paymentsEnabled()) {
+    return { ok: false, message: "STRIPE_SECRET_KEY (or SUPABASE_SERVICE_ROLE_KEY) is not set in Vercel yet." };
+  }
+  try {
+    const balance = await getStripe().balance.retrieve();
+    const currencies = [...new Set(balance.available.map((b) => b.currency.toUpperCase()))].join(", ") || "none";
+    return {
+      ok: true,
+      message: `Connected — ${balance.livemode ? "LIVE" : "TEST"} mode, balance currencies: ${currencies}.`,
+      livemode: balance.livemode,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      message: err instanceof Error ? `Stripe rejected the key: ${err.message}` : "Could not reach Stripe.",
+    };
+  }
+}
+
 /** Every paid participant's name + email for a competition — the audience
  * for notifyCertificatesPublished (see lib/notify.ts), shared by
  * publishWinnersNow above and the automatic reveal in
