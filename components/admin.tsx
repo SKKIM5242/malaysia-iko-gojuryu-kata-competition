@@ -74,31 +74,31 @@ export async function AdminShell({
   return (
     <div className="min-h-screen bg-neutral-100">
       <header className="border-b border-neutral-800 bg-neutral-950 text-white">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-3">
-          <Link href="/admin" className="flex items-center gap-2 font-bold">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-3 lg:py-1.5">
+          <Link href="/admin" className="flex items-center gap-2 font-bold lg:gap-1.5">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/logo.jpg"
               alt="Malaysia IKO Goju-ryu Karate-do crest"
-              className="h-8 w-8 rounded-md bg-white p-0.5"
+              className="h-8 w-8 rounded-md bg-white p-0.5 lg:h-6 lg:w-6"
             />
             Admin Panel
           </Link>
-          <div className="flex items-center gap-3 text-sm">
+          <div className="flex items-center gap-3 text-sm lg:gap-2">
             <Link href="/" className="text-neutral-400 hover:text-white">← Public site</Link>
             <form action={signOut}>
-              <button className="rounded border border-neutral-700 px-3 py-1 text-neutral-300 hover:bg-neutral-800">
+              <button className="rounded border border-neutral-700 px-3 py-1 text-neutral-300 hover:bg-neutral-800 lg:px-2 lg:py-0.5">
                 Log out
               </button>
             </form>
           </div>
         </div>
-        <nav className="mx-auto flex max-w-6xl flex-wrap gap-1 overflow-x-auto px-4 pb-2 text-sm">
+        <nav className="mx-auto flex max-w-6xl flex-wrap gap-1 overflow-x-auto px-4 pb-2 text-sm lg:gap-x-0.5 lg:gap-y-0 lg:pb-1.5 lg:text-[15px] lg:leading-none">
           {nav.map(([label, href]) => (
             <Link
               key={href}
               href={href}
-              className={`rounded px-3 py-1.5 whitespace-nowrap ${
+              className={`rounded px-3 py-1.5 whitespace-nowrap lg:px-2 lg:py-0.5 ${
                 active === href ? "bg-red-700 font-semibold" : "text-neutral-300 hover:bg-neutral-800"
               }`}
             >
@@ -107,11 +107,11 @@ export async function AdminShell({
           ))}
         </nav>
       </header>
-      <main className="mx-auto max-w-6xl px-4 py-8">
+      <main className="mx-auto max-w-6xl px-4 py-8 lg:py-4">
         <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
         <ClickAnchorCapture />
         <FlashToast ok={flash?.ok} error={flash?.error} />
-        <div className="mt-6">{children}</div>
+        <div className="mt-6 lg:mt-3">{children}</div>
       </main>
     </div>
   );
