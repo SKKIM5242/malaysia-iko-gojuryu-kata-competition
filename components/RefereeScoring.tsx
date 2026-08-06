@@ -1,18 +1,24 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { submitScore } from "@/app/actions/account";
 import { CategoryName } from "@/components/ui";
 import FloatingWindow from "@/components/FloatingWindow";
 import LockedVideo from "@/components/LockedVideo";
 import ReasonPicker from "@/components/ReasonPicker";
+import { useTableInteractions } from "@/lib/useTableInteractions";
+import TableInteractionOverlays from "@/components/TableInteractionOverlays";
 import {
   SHEET1_CRITERIA,
   SHEET2_CRITERIA,
   TOTAL_MAX,
   OTHER_DISQUALIFICATION_REASON,
+  DEDUCTION_OPTIONS,
   splitCapped,
   splitSheet1,
+  scoreAfterDeductions,
+  needsDoubleReview,
+  emptyDeductions,
   type RubricCriterion,
 } from "@/lib/scoring-rubric";
 import { splitCategoryName } from "@/lib/division";
@@ -27,18 +33,35 @@ export interface ScoringItem {
   existingScore: number | null;
 }
 
+const RESIZE_MIN = 44;
+
 /** The official rubric table, matching the two sheets of "SCORE TABLE 2
  * WITH FORMULA - Referee or Judges to choose one to use only.xlsx": No. /
- * Criteria / Score range / score column, ending in the Total Score (0–10)
- * row and the sheet's "Disqualify = 0" rule. Pass `rubric` to render
- * Score Sheet 1's 10 rows (0–1 each) instead of the default 7-row Score
- * Sheet 2. `readOnly` renders values only (admin detail views). */
+ * Criteria / [5 "Reduce Score System" deduction columns] / Score range /
+ * score column, ending in the Total Score (0–10) row and the sheet's
+ * "Disqualify = 0" rule. Pass `rubric` to render Score Sheet 1's 10 rows
+ * (0–1 each) instead of the default 7-row Score Sheet 2. `readOnly`
+ * renders values only (admin detail views) — there, the 5 deduction
+ * columns start collapsed and only expand on click/touch, since a review
+ * popup rarely needs them and screen space is tight (especially Full
+ * View's 3-judges-side-by-side layout).
+ *
+ * The editable table also gets the same column/row drag-reorder, column
+ * resize, and cell-select + copy/fill-copy functions as every other admin
+ * table in the app — reordering is display-only (each row/column keeps
+ * its real data via a stable key), so it can never corrupt what actually
+ * gets submitted. Deliberately NOT included: resizing/closing a column or
+ * row down to nothing — fine on a data-browsing admin table, but a judge
+ * accidentally hiding their own Score input mid-session is a real
+ * problem, not just a cosmetic one. */
 export function RubricTable({
   values,
   onChange,
   readOnly,
   rubric = SHEET2_CRITERIA,
   dense,
+  deductions,
+  onDeductionToggle,
 }: {
   values: number[];
   onChange?: (i: number, raw: string) => void;
@@ -47,6 +70,11 @@ export function RubricTable({
   /** Shrinks row height (~40%) for space-constrained read-only views like
    * Full View's 3-judge-tables-side-by-side layout. */
   dense?: boolean;
+  /** One boolean[] of DEDUCTION_OPTIONS.length per criterion row — which
+   * "Reduce Score System" boxes are ticked. Optional so old scores
+   * (submitted before this existed) still render fine with nothing ticked. */
+  deductions?: (boolean[] | null | undefined)[] | null;
+  onDeductionToggle?: (row: number, col: number) => void;
 }) {
   const total = useMemo(() => Math.round(values.reduce((a, b) => a + b, 0) * 10) / 10, [values]);
   const disqualifying = total === 0;
@@ -54,43 +82,293 @@ export function RubricTable({
   const cellPad = dense ? "px-2 py-0.5" : "px-2 py-1.5";
   const totalPad = dense ? "px-2 py-1" : "px-2 py-2";
   const textSize = dense ? "text-xs" : "text-sm";
+  const rowKey = useCallback((c: RubricCriterion) => c.label, []);
+
+  // Read-only: the 5 deduction columns start collapsed (a single "Show
+  // deductions" toggle column) and expand on click/touch.
+  const [dedExpanded, setDedExpanded] = useState(false);
+
+  // Editable-only Excel-like functions. Always call the hooks (rules of
+  // hooks) but only wire them up when !readOnly.
+  const t = useTableInteractions({
+    onFill: onChange
+      ? (value, targets) => {
+          for (const target of targets) {
+            if (target.col !== "your_score") continue;
+            const i = rubric.findIndex((c) => c.label === target.row);
+            if (i === -1) continue;
+            onChange(i, value);
+          }
+        }
+      : undefined,
+  });
+  const [colWidths, setColWidths] = useState<Record<string, number>>({});
+  const resizingRef = useRef<{ key: string; startX: number; startWidth: number } | null>(null);
+  const widthOf = useCallback((key: string, fallback: number) => colWidths[key] ?? fallback, [colWidths]);
+  const handleResizeMove = useCallback((e: PointerEvent) => {
+    const r = resizingRef.current;
+    if (!r) return;
+    const next = Math.max(RESIZE_MIN, r.startWidth + (e.clientX - r.startX));
+    setColWidths((prev) => ({ ...prev, [r.key]: next }));
+  }, []);
+  const handleResizeUp = useCallback(() => {
+    resizingRef.current = null;
+    window.removeEventListener("pointermove", handleResizeMove);
+    window.removeEventListener("pointerup", handleResizeUp);
+  }, [handleResizeMove]);
+  const handleResizeStart = useCallback(
+    (e: React.PointerEvent, key: string, fallback: number) => {
+      e.preventDefault();
+      e.stopPropagation();
+      resizingRef.current = { key, startX: e.clientX, startWidth: widthOf(key, fallback) };
+      window.addEventListener("pointermove", handleResizeMove);
+      window.addEventListener("pointerup", handleResizeUp);
+    },
+    [widthOf, handleResizeMove, handleResizeUp],
+  );
+
+  const baseColumns = [
+    { key: "no", label: "No.", width: 40 },
+    { key: "criteria", label: "Criteria", width: 220 },
+    ...DEDUCTION_OPTIONS.map((opt, i) => ({ key: `ded${i}`, label: opt.label, width: 64, amount: opt.amount })),
+    { key: "score_range", label: "Score", width: 70 },
+    { key: "your_score", label: readOnly ? "Points" : "Your score", width: 100 },
+  ];
+  const orderedColumns = readOnly ? baseColumns : t.orderColumnKeys(baseColumns.map((c) => c.key)).map((k) => baseColumns.find((c) => c.key === k)!).filter(Boolean);
+  const orderedRows = readOnly ? rubric : t.orderRowKeys(rubric.map(rowKey)).map((k) => rubric.find((c) => rowKey(c) === k)).filter((c): c is RubricCriterion => !!c);
+
+  function headerCell(c: (typeof baseColumns)[number]) {
+    if (c.key === "criteria") return "Criteria";
+    if (c.key === "score_range") return "Score";
+    if (c.key === "your_score") return c.label;
+    if (c.key === "no") return "No.";
+    return (
+      <span className="block text-center leading-tight">
+        <span className="block">{c.label}</span>
+        <span className="block text-[9px] font-normal normal-case text-red-500">-{(c as { amount: number }).amount}</span>
+      </span>
+    );
+  }
+
+  function cellContent(c: RubricCriterion, i: number, colKey: string) {
+    const rk = rowKey(c);
+    const dedIndex = colKey.startsWith("ded") ? Number(colKey.slice(3)) : -1;
+    if (dedIndex >= 0) {
+      const checked = deductions?.[i]?.[dedIndex] ?? false;
+      return (
+        <input
+          type="checkbox"
+          checked={checked}
+          disabled={readOnly}
+          onChange={() => onDeductionToggle?.(i, dedIndex)}
+          className="h-4 w-4 rounded border-neutral-300 accent-red-700 disabled:opacity-70"
+          aria-label={`${c.label} — ${DEDUCTION_OPTIONS[dedIndex].label} ${DEDUCTION_OPTIONS[dedIndex].amount}`}
+        />
+      );
+    }
+    if (colKey === "no") return <span className="text-neutral-400">{i + 1}.</span>;
+    if (colKey === "criteria") {
+      return (
+        <span className="flex items-center gap-1">
+          {c.label}
+          {needsDoubleReview(c.max) && (
+            <span
+              title="This row's deductions subtract from 2.5, not its 0–3 range — please double-check this row."
+              className="text-amber-600"
+            >
+              ⚠
+            </span>
+          )}
+        </span>
+      );
+    }
+    if (colKey === "score_range") return <span className="text-neutral-400">0–{c.max}</span>;
+    // your_score
+    if (readOnly) {
+      return <span className="font-semibold text-neutral-800">{(values[i] ?? 0).toFixed(2)}</span>;
+    }
+    return (
+      <input
+        type="number"
+        min={0}
+        max={c.max}
+        step={0.01}
+        value={values[i]}
+        onChange={(e) => onChange?.(i, e.target.value)}
+        onFocus={() => t.selectCell(rk, "your_score")}
+        onContextMenu={t.getContextMenuHandler(String(values[i] ?? 0))}
+        className="w-20 rounded-md border border-neutral-300 px-2 py-1 text-sm"
+      />
+    );
+  }
+
+  if (readOnly) {
+    const visibleCols = dedExpanded
+      ? baseColumns
+      : [baseColumns[0], baseColumns[1], { key: "ded_toggle", label: "Deductions", width: 90 }, baseColumns[baseColumns.length - 2], baseColumns[baseColumns.length - 1]];
+    return (
+      <>
+        <div className="overflow-x-auto rounded-md border border-neutral-200">
+          <table className={`w-full min-w-[420px] text-left ${textSize}`}>
+            <thead className="border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
+              <tr>
+                {visibleCols.map((c) =>
+                  c.key === "ded_toggle" ? (
+                    <th key={c.key} className={cellPad}>
+                      <button
+                        type="button"
+                        onClick={() => setDedExpanded(true)}
+                        className="rounded border border-neutral-300 bg-white px-1.5 py-0.5 text-[10px] font-semibold normal-case text-neutral-600 hover:bg-neutral-50"
+                        title="Click or touch to show the 5 deduction columns"
+                      >
+                        ▸ Show
+                      </button>
+                    </th>
+                  ) : (
+                    <th key={c.key} className={cellPad}>{headerCell(c)}</th>
+                  ),
+                )}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-neutral-100">
+              {rubric.map((c, i) => (
+                <tr key={c.label} className={needsDoubleReview(c.max) ? "bg-yellow-50" : ""}>
+                  {visibleCols.map((col) =>
+                    col.key === "ded_toggle" ? (
+                      <td key={col.key} className={`${cellPad} text-center text-neutral-400`}>
+                        {(deductions?.[i] ?? []).filter(Boolean).length || "—"}
+                      </td>
+                    ) : (
+                      <td key={col.key} className={cellPad}>{cellContent(c, i, col.key)}</td>
+                    ),
+                  )}
+                </tr>
+              ))}
+              <tr className="bg-neutral-50 font-semibold">
+                <td colSpan={2} className={`${totalPad} text-right`}>Total Score</td>
+                {dedExpanded && <td colSpan={5} className={totalPad} />}
+                {!dedExpanded && <td className={totalPad} />}
+                <td className={`${totalPad} text-neutral-400`}>0–{TOTAL_MAX}</td>
+                <td className={`${totalPad} ${disqualifying || overMax ? "text-red-700" : "text-neutral-900"}`}>
+                  {total.toFixed(2)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        {dedExpanded && needsDoubleReview(SHEET2_CRITERIA[5].max) && rubric.length === SHEET2_CRITERIA.length && (
+          <p className="mt-1 text-[11px] text-amber-700">
+            ⚠ Rows 6–7&apos;s deductions subtract from 2.5, not their 0–3 range — double-check those rows.
+          </p>
+        )}
+        {overMax && (
+          <p className="mt-2 text-xs font-semibold text-red-700">
+            Total Score cannot exceed {TOTAL_MAX} — lower one or more rows before submitting.
+          </p>
+        )}
+        {disqualifying && (
+          <p className="mt-2 text-xs font-semibold text-red-700">
+            0 = Disqualified — this participant will not be announced as a winner, regardless of the
+            other judges&apos; scores.
+          </p>
+        )}
+      </>
+    );
+  }
+
   return (
     <>
+      <p className="mb-1 text-[11px] text-neutral-400">
+        Drag a column&apos;s label or a row&apos;s No. past a neighbor to reorder it; drag a
+        column&apos;s right edge to resize it. Click Your Score to select it, then drag its blue
+        corner handle to copy that value into other rows; right-click a value to copy it to the
+        clipboard.
+      </p>
       <div className="overflow-x-auto rounded-md border border-neutral-200">
-        <table className={`w-full min-w-[420px] text-left ${textSize}`}>
-          <thead className="border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
+        <table
+          className={`text-left ${textSize}`}
+          style={{ tableLayout: "fixed", width: orderedColumns.reduce((sum, c) => sum + widthOf(c.key, c.width), 0) }}
+        >
+          <colgroup>
+            {orderedColumns.map((c) => (
+              <col key={c.key} style={{ width: widthOf(c.key, c.width) }} />
+            ))}
+          </colgroup>
+          <thead className="border-b border-neutral-200 bg-neutral-50 text-[10px] uppercase tracking-wide text-neutral-500">
             <tr>
-              <th className={cellPad}>No.</th>
-              <th className={cellPad}>Criteria</th>
-              <th className={cellPad}>Score</th>
-              <th className={cellPad}>{readOnly ? "Points" : "Your score"}</th>
+              {orderedColumns.map((c) => (
+                <th key={c.key} data-col-order-key={c.key} className={`relative ${cellPad}`}>
+                  <span
+                    onPointerDown={t.getColHeaderDownHandler(c.key, () => {})}
+                    className="block cursor-pointer select-none pr-1"
+                    title="Drag to reorder"
+                  >
+                    {headerCell(c)}
+                  </span>
+                  <span
+                    onPointerDown={(e) => handleResizeStart(e, c.key, c.width)}
+                    title="Drag to resize"
+                    className="absolute right-0 top-0 z-10 h-full w-1.5 cursor-col-resize touch-none select-none hover:bg-red-300 active:bg-red-500"
+                  />
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100">
-            {rubric.map((c, i) => (
-              <tr key={c.label}>
-                <td className={`${cellPad} text-neutral-400`}>{i + 1}.</td>
-                <td className={cellPad}>{c.label}</td>
-                <td className={`${cellPad} text-neutral-400`}>0–{c.max}</td>
-                <td className={cellPad}>
-                  {readOnly ? (
-                    <span className="font-semibold text-neutral-800">{(values[i] ?? 0).toFixed(2)}</span>
-                  ) : (
-                    <input
-                      type="number"
-                      min={0}
-                      max={c.max}
-                      step={0.01}
-                      value={values[i]}
-                      onChange={(e) => onChange?.(i, e.target.value)}
-                      className="w-20 rounded-md border border-neutral-300 px-2 py-1 text-sm"
-                    />
-                  )}
-                </td>
-              </tr>
-            ))}
+            {orderedRows.map((c) => {
+              const i = rubric.indexOf(c);
+              const rk = rowKey(c);
+              return (
+                <tr key={rk} data-row-order-key={rk} className={needsDoubleReview(c.max) ? "bg-yellow-50" : ""}>
+                  {orderedColumns.map((col, colIdx) => {
+                    const isHandle = colIdx === 0;
+                    const isTextCell = col.key === "criteria" || col.key === "score_range";
+                    const cellKey = `${rk}:${col.key}`;
+                    const isCellSelected = isTextCell && t.isCellSelected(rk, col.key);
+                    const isFillPreview = isTextCell && t.isFillPreview(rk, col.key);
+                    const isScoreSelected = col.key === "your_score" && t.isCellSelected(rk, "your_score");
+                    return (
+                      <td
+                        key={col.key}
+                        data-cell-row={rk}
+                        data-cell-col={col.key}
+                        onPointerDown={isHandle ? t.getRowHandleDownHandler(rk, () => {}) : undefined}
+                        onClick={isTextCell ? () => t.selectCell(rk, col.key) : undefined}
+                        onContextMenu={
+                          isTextCell
+                            ? t.getContextMenuHandler(col.key === "criteria" ? c.label : `0–${c.max}`)
+                            : undefined
+                        }
+                        className={`relative ${cellPad} ${isHandle ? "cursor-pointer select-none" : ""} ${
+                          col.key === "criteria" ? "whitespace-normal break-words" : ""
+                        } ${isCellSelected || isScoreSelected ? "ring-2 ring-inset ring-blue-500" : ""} ${
+                          isFillPreview ? "outline outline-2 -outline-offset-2 outline-blue-300" : ""
+                        }`}
+                      >
+                        {cellContent(c, i, col.key)}
+                        {isCellSelected && (
+                          <span
+                            onPointerDown={t.getFillHandleDownHandler(rk, col.key, col.key === "criteria" ? c.label : `0–${c.max}`)}
+                            title="Drag to copy this value into other cells"
+                            className="absolute -bottom-1 -right-1 z-20 h-2.5 w-2.5 cursor-crosshair rounded-sm border border-white bg-blue-600"
+                          />
+                        )}
+                        {isScoreSelected && (
+                          <span
+                            onPointerDown={t.getFillHandleDownHandler(rk, "your_score", String(values[i] ?? 0))}
+                            title="Drag to copy this score into other rows"
+                            className="absolute -bottom-1 -right-1 z-20 h-2.5 w-2.5 cursor-crosshair rounded-sm border border-white bg-blue-600"
+                          />
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
             <tr className="bg-neutral-50 font-semibold">
               <td colSpan={2} className={`${totalPad} text-right`}>Total Score</td>
+              <td colSpan={5} className={totalPad} />
               <td className={`${totalPad} text-neutral-400`}>0–{TOTAL_MAX}</td>
               <td className={`${totalPad} ${disqualifying || overMax ? "text-red-700" : "text-neutral-900"}`}>
                 {total.toFixed(2)}
@@ -99,6 +377,7 @@ export function RubricTable({
           </tbody>
         </table>
       </div>
+      <TableInteractionOverlays t={t} />
       {overMax && (
         <p className="mt-2 text-xs font-semibold text-red-700">
           Total Score cannot exceed {TOTAL_MAX} — lower one or more rows before submitting.
@@ -140,6 +419,11 @@ export function ScoreSession({
   const [pending, setPending] = useState(false);
   const [sheet1Values, setSheet1Values] = useState<number[]>(() => splitSheet1(item.existingScore));
   const [sheet2Values, setSheet2Values] = useState<number[]>(() => splitCapped(item.existingScore));
+  // "Reduce Score System" deduction checkboxes — always start unticked,
+  // same as sheet1Values/sheet2Values starting from an even-split estimate
+  // rather than restoring a previous session's exact per-row entries.
+  const [sheet1Deductions, setSheet1Deductions] = useState<boolean[][]>(() => emptyDeductions(SHEET1_CRITERIA));
+  const [sheet2Deductions, setSheet2Deductions] = useState<boolean[][]>(() => emptyDeductions(SHEET2_CRITERIA));
   const [sheet1QuickTotal, setSheet1QuickTotal] = useState<string>(
     item.existingScore != null ? String(item.existingScore) : "",
   );
@@ -198,6 +482,30 @@ export function ScoreSession({
       const t = Math.max(0, Math.min(TOTAL_MAX, Number(raw) || 0));
       setSheet2Values(splitCapped(t));
     }
+    setSaved(false);
+  }
+
+  /** Toggling a deduction box recomputes that row's score from its base
+   * (1, or 2.5 for Sheet 1's uniform rows / Sheet 2's rows 1–5; 2.5 for
+   * Sheet 2's rows 6–7) minus every ticked box on that row — same
+   * resync-the-Total behavior as hand-adjusting a row directly. */
+  function toggleSheet1Deduction(row: number, col: number) {
+    const nextDeductions = sheet1Deductions.map((r, i) => (i === row ? r.map((v, j) => (j === col ? !v : v)) : r));
+    setSheet1Deductions(nextDeductions);
+    const newRowScore = scoreAfterDeductions(SHEET1_CRITERIA[row].max, nextDeductions[row]);
+    const nextValues = sheet1Values.map((x, idx) => (idx === row ? newRowScore : x));
+    setSheet1Values(nextValues);
+    setSheet1QuickTotal(String(Math.round(nextValues.reduce((a, b) => a + b, 0) * 10) / 10));
+    setSaved(false);
+  }
+
+  function toggleSheet2Deduction(row: number, col: number) {
+    const nextDeductions = sheet2Deductions.map((r, i) => (i === row ? r.map((v, j) => (j === col ? !v : v)) : r));
+    setSheet2Deductions(nextDeductions);
+    const newRowScore = scoreAfterDeductions(SHEET2_CRITERIA[row].max, nextDeductions[row]);
+    const nextValues = sheet2Values.map((x, idx) => (idx === row ? newRowScore : x));
+    setSheet2Values(nextValues);
+    setQuickTotal(String(Math.round(nextValues.reduce((a, b) => a + b, 0) * 10) / 10));
     setSaved(false);
   }
 
@@ -296,6 +604,11 @@ export function ScoreSession({
       {submittedCriteria.map((v, i) => (
         <input key={i} type="hidden" name="criteria" value={v} />
       ))}
+      <input
+        type="hidden"
+        name="deductions"
+        value={JSON.stringify(sheet === 1 ? sheet1Deductions : sheet2Deductions)}
+      />
       {sheet === 1 ? (
         <>
           <div className="mb-3 rounded-md border-2 border-red-200 bg-red-50 p-3">
@@ -321,7 +634,13 @@ export function ScoreSession({
             </p>
             {sheet1Total === 0 && sheet1QuickTotal !== "" && disqualificationReasonBox}
           </div>
-          <RubricTable rubric={SHEET1_CRITERIA} values={sheet1Values} onChange={setSheet1Criterion} />
+          <RubricTable
+            rubric={SHEET1_CRITERIA}
+            values={sheet1Values}
+            onChange={setSheet1Criterion}
+            deductions={sheet1Deductions}
+            onDeductionToggle={toggleSheet1Deduction}
+          />
         </>
       ) : (
         <>
@@ -348,7 +667,12 @@ export function ScoreSession({
             </p>
             {sheet2Total === 0 && quickTotal !== "" && disqualificationReasonBox}
           </div>
-          <RubricTable values={sheet2Values} onChange={setSheet2Criterion} />
+          <RubricTable
+            values={sheet2Values}
+            onChange={setSheet2Criterion}
+            deductions={sheet2Deductions}
+            onDeductionToggle={toggleSheet2Deduction}
+          />
         </>
       )}
       <p className="mt-2 text-xs text-neutral-400">

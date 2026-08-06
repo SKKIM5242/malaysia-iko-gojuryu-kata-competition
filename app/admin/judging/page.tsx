@@ -96,7 +96,9 @@ export default async function AdminJudging({
       // is how Full View tells an override apart from a genuine judge's score.
       supabase.from("profiles").select("user_id, full_name, email").in("role", ["admin", "organizer", "staff"]),
       supabase.from("referee_assignments").select("video_id, referee_user_id"),
-      supabase.from("video_scores").select("video_id, referee_user_id, score, criteria, disqualification_reason"),
+      supabase
+        .from("video_scores")
+        .select("video_id, referee_user_id, score, criteria, deductions, disqualification_reason"),
       supabase.from("auto_assign_criteria").select("*").order("position"),
     ]);
   const criteriaRows = criteria ?? [];
@@ -142,10 +144,12 @@ export default async function AdminJudging({
   }
   const scoreByKey = new Map<string, number>();
   const criteriaByKey = new Map<string, number[] | null>();
+  const deductionsByKey = new Map<string, boolean[][] | null>();
   const reasonByKey = new Map<string, string | null>();
   for (const s of scores ?? []) {
     scoreByKey.set(`${s.video_id}:${s.referee_user_id}`, Number(s.score));
     criteriaByKey.set(`${s.video_id}:${s.referee_user_id}`, (s.criteria as number[] | null) ?? null);
+    deductionsByKey.set(`${s.video_id}:${s.referee_user_id}`, (s.deductions as boolean[][] | null) ?? null);
     reasonByKey.set(`${s.video_id}:${s.referee_user_id}`, (s.disqualification_reason as string | null) ?? null);
   }
 
@@ -224,6 +228,7 @@ export default async function AdminJudging({
                 country: refereeCountry.get(uid) ?? null,
                 total: scoreByKey.get(`${v.id}:${uid}`) ?? null,
                 criteria: criteriaByKey.get(`${v.id}:${uid}`) ?? null,
+                deductions: deductionsByKey.get(`${v.id}:${uid}`) ?? null,
                 reason: reasonByKey.get(`${v.id}:${uid}`) ?? null,
                 isOverride: staffName.has(uid),
               }))}
@@ -274,6 +279,7 @@ export default async function AdminJudging({
                         judgeName={judgeName}
                         total={score}
                         criteria={criteriaByKey.get(`${v.id}:${uid}`) ?? null}
+                        deductions={deductionsByKey.get(`${v.id}:${uid}`) ?? null}
                         reason={reasonByKey.get(`${v.id}:${uid}`) ?? null}
                       />
                     ) : (
@@ -331,6 +337,7 @@ export default async function AdminJudging({
                       judgeName={judgeName}
                       total={score}
                       criteria={criteriaByKey.get(`${v.id}:${uid}`) ?? null}
+                      deductions={deductionsByKey.get(`${v.id}:${uid}`) ?? null}
                       reason={reason ?? null}
                     />
                   ) : (

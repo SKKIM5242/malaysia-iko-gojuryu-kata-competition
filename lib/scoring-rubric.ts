@@ -108,3 +108,56 @@ export function splitCapped(total: number | null): number[] {
   const perRow67 = round2((t - perRow15 * 5) / 2);
   return [perRow15, perRow15, perRow15, perRow15, perRow15, perRow67, perRow67];
 }
+
+/** "Reduce Score System due to error(s)" — 5 per-criterion deduction
+ * checkboxes, organizer's exact labels/amounts, more than one may be
+ * ticked on the same row (they stack). */
+export interface DeductionOption {
+  label: string;
+  amount: number;
+}
+
+export const DEDUCTION_OPTIONS: DeductionOption[] = [
+  { label: "Minor", amount: 0.05 },
+  { label: "Minor", amount: 0.1 },
+  { label: "3rd", amount: 0.2 },
+  { label: "2nd", amount: 0.3 },
+  { label: "1st", amount: 0.5 },
+];
+
+/** The mark a criterion row starts from before deductions are subtracted.
+ * Every row is out of its own `max` (1, or 3 for Sheet 2's rows 6–7), but
+ * per the organizer's rule the two 0–3 rows deduct against 2.5, not 3 —
+ * matching splitCapped()'s own "2.5 each at a perfect 10" rule above, and
+ * why those two rows get flagged for a judge to double-check (see
+ * NEEDS_DOUBLE_REVIEW below). */
+export function deductionBase(max: number): number {
+  return max === 3 ? 2.5 : 1;
+}
+
+/** True for a criterion whose deduction base (2.5) doesn't match its own
+ * displayed 0–3 range — Score Sheet 2's "Spirit or feeling in kata" and
+ * "Execution of techniques (sharpness)" rows. Flagged in the UI (yellow
+ * highlight, "double review" prompt) since that mismatch is easy to miss. */
+export function needsDoubleReview(max: number): boolean {
+  return max === 3;
+}
+
+function sumDeductions(checked: boolean[] | null | undefined): number {
+  if (!checked) return 0;
+  return DEDUCTION_OPTIONS.reduce((sum, opt, i) => sum + (checked[i] ? opt.amount : 0), 0);
+}
+
+/** A row's score once its checked deduction boxes are subtracted from its
+ * base — floored at 0, kept to 2 decimal places (matching every other
+ * per-row value in this file). */
+export function scoreAfterDeductions(max: number, checked: boolean[] | null | undefined): number {
+  const deducted = deductionBase(max) - sumDeductions(checked);
+  return Math.max(0, Math.round(deducted * 100) / 100);
+}
+
+/** A fresh, all-unchecked deduction grid for a rubric — one boolean[] of
+ * DEDUCTION_OPTIONS.length per criterion row. */
+export function emptyDeductions(rubric: RubricCriterion[]): boolean[][] {
+  return rubric.map(() => DEDUCTION_OPTIONS.map(() => false));
+}

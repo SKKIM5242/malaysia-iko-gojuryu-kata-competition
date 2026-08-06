@@ -577,6 +577,21 @@ export async function submitScore(formData: FormData) {
   // /admin/judging.
   const criteriaRaw = formData.getAll("criteria");
   const criteria = criteriaRaw.length > 0 ? criteriaRaw.map((v) => Number(v)) : null;
+  // Optional per-row "Reduce Score System" deduction checkboxes (parallel
+  // shape to `criteria` — one boolean[] per row) — absent for the
+  // Admin/Organizer plain single-number override, and tolerant of malformed
+  // input since it only ever originates from RefereeScoring.tsx's own
+  // JSON.stringify.
+  const deductionsRaw = String(formData.get("deductions") ?? "").trim();
+  let deductions: boolean[][] | null = null;
+  if (deductionsRaw) {
+    try {
+      const parsed = JSON.parse(deductionsRaw);
+      if (Array.isArray(parsed)) deductions = parsed;
+    } catch {
+      deductions = null;
+    }
+  }
   // A Total Score of 0 disqualifies the entry — a reason is mandatory
   // (dropdown from the organizer's official list, or free text), enforced
   // here as well as client-side in RefereeScoring.tsx's submitBlocked.
@@ -606,7 +621,7 @@ export async function submitScore(formData: FormData) {
   const { error } = await supabase
     .from("video_scores")
     .upsert(
-      { video_id: videoId, referee_user_id: user.id, score, criteria, disqualification_reason },
+      { video_id: videoId, referee_user_id: user.id, score, criteria, deductions, disqualification_reason },
       { onConflict: "video_id,referee_user_id" },
     );
   if (!error) {

@@ -55,7 +55,10 @@ async function computeWinners(
       ? supabase.from("referee_assignments").select("video_id, referee_user_id").in("video_id", videoIds)
       : Promise.resolve({ data: [] }),
     videoIds.length > 0
-      ? supabase.from("video_scores").select("video_id, referee_user_id, score, criteria").in("video_id", videoIds)
+      ? supabase
+          .from("video_scores")
+          .select("video_id, referee_user_id, score, criteria, deductions")
+          .in("video_id", videoIds)
       : Promise.resolve({ data: [] }),
     supabase.from("referees").select("user_id, full_name, home_country").eq("status", "approved"),
     supabase.from("profiles").select("user_id, full_name, email, country").eq("role", "referee").eq("approved", true),
@@ -79,9 +82,11 @@ async function computeWinners(
   }
   const scoreByKey = new Map<string, number>();
   const criteriaByKey = new Map<string, number[] | null>();
+  const deductionsByKey = new Map<string, boolean[][] | null>();
   for (const s of scores ?? []) {
     scoreByKey.set(`${s.video_id}:${s.referee_user_id}`, Number(s.score));
     criteriaByKey.set(`${s.video_id}:${s.referee_user_id}`, (s.criteria as number[] | null) ?? null);
+    deductionsByKey.set(`${s.video_id}:${s.referee_user_id}`, (s.deductions as boolean[][] | null) ?? null);
   }
 
   // Testimonials for every Top-3 registration in this competition — the
@@ -124,6 +129,7 @@ async function computeWinners(
           country: refereeCountry.get(uid) ?? null,
           total: scoreByKey.get(`${e.videoId}:${uid}`) ?? null,
           criteria: criteriaByKey.get(`${e.videoId}:${uid}`) ?? null,
+          deductions: deductionsByKey.get(`${e.videoId}:${uid}`) ?? null,
           reason: null,
           isOverride: false,
         })),

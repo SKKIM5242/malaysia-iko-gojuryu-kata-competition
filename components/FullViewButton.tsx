@@ -30,6 +30,9 @@ export interface FullViewJudge {
   country: string | null;
   total: number | null;
   criteria: number[] | null;
+  /** Per-row "Reduce Score System" deduction checkboxes, parallel shape to
+   * `criteria` — one boolean[] per row. */
+  deductions?: boolean[][] | null;
   /** This judge's own disqualification reason, if their score was 0. */
   reason: string | null;
   /** True when this "judge" slot is really an Admin/Organizer/Staff
@@ -117,7 +120,13 @@ export default function FullViewButton({
                               Even split of the total — per-row detail wasn&apos;t recorded for this score.
                             </p>
                           )}
-                          <RubricTable values={values} rubric={rubricFor(values)} readOnly dense />
+                          <RubricTable
+                            values={values}
+                            rubric={rubricFor(values)}
+                            readOnly
+                            dense
+                            deductions={j.deductions}
+                          />
                           {j.total === 0 && (
                             <DisqualificationReason
                               label="Disqualification reason:"
