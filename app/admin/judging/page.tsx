@@ -240,6 +240,7 @@ export default async function AdminJudging({
                   : null
               }
               disqualified={dq}
+              canToggleDeductions={canScoreAnyVideo}
             />
             <ScoreSessionButton
               item={{
@@ -281,6 +282,7 @@ export default async function AdminJudging({
                         criteria={criteriaByKey.get(`${v.id}:${uid}`) ?? null}
                         deductions={deductionsByKey.get(`${v.id}:${uid}`) ?? null}
                         reason={reasonByKey.get(`${v.id}:${uid}`) ?? null}
+                        canToggleDeductions={canScoreAnyVideo}
                       />
                     ) : (
                       <span className={score === 0 ? "font-bold text-red-700" : "text-green-700"}>
@@ -339,6 +341,7 @@ export default async function AdminJudging({
                       criteria={criteriaByKey.get(`${v.id}:${uid}`) ?? null}
                       deductions={deductionsByKey.get(`${v.id}:${uid}`) ?? null}
                       reason={reason ?? null}
+                      canToggleDeductions={canScoreAnyVideo}
                     />
                   ) : (
                     <span className={score === 0 ? "font-bold text-red-700" : "text-purple-700"}>

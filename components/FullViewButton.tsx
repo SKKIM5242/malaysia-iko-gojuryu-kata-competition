@@ -59,6 +59,7 @@ export default function FullViewButton({
   queuePosition,
   averageText,
   disqualified,
+  canToggleDeductions,
 }: {
   url: string | null;
   participantName: string;
@@ -69,6 +70,9 @@ export default function FullViewButton({
   queuePosition: number | null;
   averageText: string | null;
   disqualified: boolean;
+  /** Admin/Super Admin/Organizer/Referee-Judge only — gates the Show/Hide
+   * toggle for the 5 deduction columns inside RubricTable. */
+  canToggleDeductions?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   if (!url) return null;
@@ -126,6 +130,7 @@ export default function FullViewButton({
                             readOnly
                             dense
                             deductions={j.deductions}
+                            canToggleDeductions={canToggleDeductions}
                           />
                           {j.total === 0 && (
                             <DisqualificationReason

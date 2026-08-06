@@ -17,12 +17,16 @@ export default function ScoreDetailButton({
   criteria,
   reason,
   deductions,
+  canToggleDeductions,
 }: {
   judgeName: string;
   total: number;
   criteria: number[] | null;
   reason?: string | null;
   deductions?: boolean[][] | null;
+  /** Admin/Super Admin/Organizer/Referee-Judge only — gates the Show/Hide
+   * toggle for the 5 deduction columns inside RubricTable. */
+  canToggleDeductions?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const isEstimated =
@@ -66,7 +70,13 @@ export default function ScoreDetailButton({
                 <strong>Disqualification reason:</strong> {reason || "Not recorded (submitted before this was required)."}
               </p>
             )}
-            <RubricTable values={values} rubric={rubricFor(values)} readOnly deductions={deductions} />
+            <RubricTable
+              values={values}
+              rubric={rubricFor(values)}
+              readOnly
+              deductions={deductions}
+              canToggleDeductions={canToggleDeductions}
+            />
           </div>
         </div>
       )}

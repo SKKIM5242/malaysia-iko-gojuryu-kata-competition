@@ -143,7 +143,10 @@ export function needsDoubleReview(max: number): boolean {
   return max === 3;
 }
 
-function sumDeductions(checked: boolean[] | null | undefined): number {
+/** The raw sum of a row's checked deduction amounts, before flooring at 0
+ * — used both for scoreAfterDeductions and for displaying the collapsed
+ * "-0.25"-style total in the read-only Deductions column. */
+export function sumDeductions(checked: boolean[] | null | undefined): number {
   if (!checked) return 0;
   return DEDUCTION_OPTIONS.reduce((sum, opt, i) => sum + (checked[i] ? opt.amount : 0), 0);
 }

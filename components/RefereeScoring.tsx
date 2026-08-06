@@ -17,6 +17,7 @@ import {
   splitCapped,
   splitSheet1,
   scoreAfterDeductions,
+  sumDeductions,
   needsDoubleReview,
   emptyDeductions,
   type RubricCriterion,
@@ -62,6 +63,7 @@ export function RubricTable({
   dense,
   deductions,
   onDeductionToggle,
+  canToggleDeductions,
 }: {
   values: number[];
   onChange?: (i: number, raw: string) => void;
@@ -75,6 +77,15 @@ export function RubricTable({
    * (submitted before this existed) still render fine with nothing ticked. */
   deductions?: (boolean[] | null | undefined)[] | null;
   onDeductionToggle?: (row: number, col: number) => void;
+  /** Read-only views only: gates the Show/Hide toggle for the 5 real
+   * deduction columns, and the row-6/7 double-review note — per the
+   * organizer's explicit instruction, Admin/Super Admin/Organizer/
+   * Referee-Judge only, everyone else (including public /winners
+   * visitors) still sees the collapsed per-row deduction total but never
+   * gets a way to expand it. Ignored when !readOnly, since the editable
+   * live-scoring table is only ever reached by an already-authorized
+   * scorer. */
+  canToggleDeductions?: boolean;
 }) {
   const total = useMemo(() => Math.round(values.reduce((a, b) => a + b, 0) * 10) / 10, [values]);
   const disqualifying = total === 0;
@@ -138,7 +149,26 @@ export function RubricTable({
   const orderedRows = readOnly ? rubric : t.orderRowKeys(rubric.map(rowKey)).map((k) => rubric.find((c) => rowKey(c) === k)).filter((c): c is RubricCriterion => !!c);
 
   function headerCell(c: (typeof baseColumns)[number]) {
-    if (c.key === "criteria") return "Criteria";
+    if (c.key === "criteria") {
+      return (
+        <span className="flex flex-col items-start gap-1">
+          <span>Criteria</span>
+          {readOnly && canToggleDeductions && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setDedExpanded((v) => !v);
+              }}
+              className="rounded border border-neutral-300 bg-white px-1.5 py-0.5 text-[9px] font-semibold normal-case text-neutral-600 hover:bg-neutral-50"
+              title={dedExpanded ? "Click or touch to hide the 5 deduction columns" : "Click or touch to show the 5 deduction columns"}
+            >
+              {dedExpanded ? "✕ Hide deductions" : "▸ Show deductions"}
+            </button>
+          )}
+        </span>
+      );
+    }
     if (c.key === "score_range") return "Score";
     if (c.key === "your_score") return c.label;
     if (c.key === "no") return "No.";
@@ -168,15 +198,13 @@ export function RubricTable({
     }
     if (colKey === "no") return <span className="text-neutral-400">{i + 1}.</span>;
     if (colKey === "criteria") {
+      const showDoubleReview = needsDoubleReview(c.max) && (!readOnly || canToggleDeductions);
       return (
-        <span className="flex items-center gap-1">
-          {c.label}
-          {needsDoubleReview(c.max) && (
-            <span
-              title="This row's deductions subtract from 2.5, not its 0–3 range — please double-check this row."
-              className="text-amber-600"
-            >
-              ⚠
+        <span className="flex flex-col">
+          <span>{c.label}</span>
+          {showDoubleReview && (
+            <span className="mt-0.5 block text-[10px] font-normal normal-case text-amber-700">
+              ⚠ Subtracts from 2.5, not 0–{c.max} — double-check this row.
             </span>
           )}
         </span>
@@ -203,7 +231,8 @@ export function RubricTable({
   }
 
   if (readOnly) {
-    const visibleCols = dedExpanded
+    const canExpand = dedExpanded && canToggleDeductions;
+    const visibleCols = canExpand
       ? baseColumns
       : [baseColumns[0], baseColumns[1], { key: "ded_toggle", label: "Deductions", width: 90 }, baseColumns[baseColumns.length - 2], baseColumns[baseColumns.length - 1]];
     return (
@@ -214,16 +243,7 @@ export function RubricTable({
               <tr>
                 {visibleCols.map((c) =>
                   c.key === "ded_toggle" ? (
-                    <th key={c.key} className={cellPad}>
-                      <button
-                        type="button"
-                        onClick={() => setDedExpanded(true)}
-                        className="rounded border border-neutral-300 bg-white px-1.5 py-0.5 text-[10px] font-semibold normal-case text-neutral-600 hover:bg-neutral-50"
-                        title="Click or touch to show the 5 deduction columns"
-                      >
-                        ▸ Show
-                      </button>
-                    </th>
+                    <th key={c.key} className={cellPad}>Deductions</th>
                   ) : (
                     <th key={c.key} className={cellPad}>{headerCell(c)}</th>
                   ),
@@ -232,22 +252,29 @@ export function RubricTable({
             </thead>
             <tbody className="divide-y divide-neutral-100">
               {rubric.map((c, i) => (
-                <tr key={c.label} className={needsDoubleReview(c.max) ? "bg-yellow-50" : ""}>
+                <tr key={c.label} className={needsDoubleReview(c.max) && canToggleDeductions ? "bg-yellow-50" : ""}>
                   {visibleCols.map((col) =>
                     col.key === "ded_toggle" ? (
-                      <td key={col.key} className={`${cellPad} text-center text-neutral-400`}>
-                        {(deductions?.[i] ?? []).filter(Boolean).length || "—"}
+                      <td key={col.key} className={`${cellPad} text-center`}>
+                        {(() => {
+                          const sum = sumDeductions(deductions?.[i]);
+                          return sum > 0 ? (
+                            <span className="font-semibold text-red-700">-{sum.toFixed(2)}</span>
+                          ) : (
+                            <span className="text-neutral-400">—</span>
+                          );
+                        })()}
                       </td>
                     ) : (
-                      <td key={col.key} className={cellPad}>{cellContent(c, i, col.key)}</td>
+                      <td key={col.key} className={`${cellPad} ${col.key === "criteria" ? "whitespace-normal break-words" : ""}`}>
+                        {cellContent(c, i, col.key)}
+                      </td>
                     ),
                   )}
                 </tr>
               ))}
               <tr className="bg-neutral-50 font-semibold">
-                <td colSpan={2} className={`${totalPad} text-right`}>Total Score</td>
-                {dedExpanded && <td colSpan={5} className={totalPad} />}
-                {!dedExpanded && <td className={totalPad} />}
+                <td colSpan={visibleCols.length - 2} className={`${totalPad} text-right`}>Total Score</td>
                 <td className={`${totalPad} text-neutral-400`}>0–{TOTAL_MAX}</td>
                 <td className={`${totalPad} ${disqualifying || overMax ? "text-red-700" : "text-neutral-900"}`}>
                   {total.toFixed(2)}
@@ -256,11 +283,6 @@ export function RubricTable({
             </tbody>
           </table>
         </div>
-        {dedExpanded && needsDoubleReview(SHEET2_CRITERIA[5].max) && rubric.length === SHEET2_CRITERIA.length && (
-          <p className="mt-1 text-[11px] text-amber-700">
-            ⚠ Rows 6–7&apos;s deductions subtract from 2.5, not their 0–3 range — double-check those rows.
-          </p>
-        )}
         {overMax && (
           <p className="mt-2 text-xs font-semibold text-red-700">
             Total Score cannot exceed {TOTAL_MAX} — lower one or more rows before submitting.
@@ -367,8 +389,7 @@ export function RubricTable({
               );
             })}
             <tr className="bg-neutral-50 font-semibold">
-              <td colSpan={2} className={`${totalPad} text-right`}>Total Score</td>
-              <td colSpan={5} className={totalPad} />
+              <td colSpan={orderedColumns.length - 2} className={`${totalPad} text-right`}>Total Score</td>
               <td className={`${totalPad} text-neutral-400`}>0–{TOTAL_MAX}</td>
               <td className={`${totalPad} ${disqualifying || overMax ? "text-red-700" : "text-neutral-900"}`}>
                 {total.toFixed(2)}

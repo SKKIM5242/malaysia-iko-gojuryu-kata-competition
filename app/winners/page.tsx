@@ -145,11 +145,16 @@ async function CompetitionWinners({
   supabase,
   myRegistrationId,
   isManager,
+  canToggleDeductions,
 }: {
   competition: Competition;
   supabase: Awaited<ReturnType<typeof createClient>>;
   myRegistrationId: string | null;
   isManager: boolean;
+  /** Admin/Super Admin/Organizer/Referee-Judge only (a superset of
+   * isManager, which excludes Referee/Judge) — gates the Show/Hide toggle
+   * for the 5 "Reduce Score System" deduction columns in Full View. */
+  canToggleDeductions: boolean;
 }) {
   if (!competition.registration_deadline) {
     return (
@@ -236,6 +241,7 @@ async function CompetitionWinners({
                                   queuePosition={null}
                                   averageText={`Final score ${w.finalScore.toFixed(2)}`}
                                   disqualified={false}
+                                  canToggleDeductions={canToggleDeductions}
                                 />
                               </span>
                             </div>
@@ -330,6 +336,13 @@ export default async function WinnersPage() {
   // testimonial (see deleteTestimonial in app/actions/admin.ts, which
   // enforces the same tier server-side regardless of what this hides).
   const isManager = ["admin", "organizer", "staff"].includes((myProfile?.role as string | null) ?? "");
+  // Admin/Super Admin/Organizer/Referee-Judge only, per the organizer's
+  // explicit instruction — everyone else (including a signed-out public
+  // visitor) still sees the collapsed per-row deduction total in Full View,
+  // but never gets a way to expand it into the 5 individual checkboxes.
+  const canToggleDeductions = ["admin", "organizer", "staff", "referee"].includes(
+    (myProfile?.role as string | null) ?? "",
+  );
 
   return (
     <>
@@ -350,7 +363,14 @@ export default async function WinnersPage() {
         ) : (
           <div className="space-y-12">
             {competitions.map((c) => (
-              <CompetitionWinners key={c.id} competition={c} supabase={supabase} myRegistrationId={myRegistrationId} isManager={isManager} />
+              <CompetitionWinners
+                key={c.id}
+                competition={c}
+                supabase={supabase}
+                myRegistrationId={myRegistrationId}
+                isManager={isManager}
+                canToggleDeductions={canToggleDeductions}
+              />
             ))}
           </div>
         )}
