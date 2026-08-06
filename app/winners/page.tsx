@@ -89,15 +89,20 @@ async function computeWinners(
   const winningRegIds = winningEntries.map((e) => e.registrationId);
   const { data: testimonialRows } =
     winningRegIds.length > 0
-      ? await supabase.from("winner_testimonials").select("registration_id, kind, media_path, message").in("registration_id", winningRegIds)
+      ? await supabase
+          .from("winner_testimonials")
+          .select("id, registration_id, kind, media_path, message, deleted_at")
+          .in("registration_id", winningRegIds)
       : { data: [] };
   const testimonialByRegId = new Map<string, WinnerTestimonialInfo>(
     (testimonialRows ?? []).map((t) => [
       t.registration_id as string,
       {
+        id: t.id as string,
         kind: t.kind as WinnerTestimonialInfo["kind"],
         mediaUrl: t.media_path ? supabase.storage.from("testimonials").getPublicUrl(t.media_path as string).data.publicUrl : null,
         message: t.message as string | null,
+        deleted: t.deleted_at != null,
       },
     ]),
   );
@@ -132,10 +137,12 @@ async function CompetitionWinners({
   competition,
   supabase,
   myRegistrationId,
+  isManager,
 }: {
   competition: Competition;
   supabase: Awaited<ReturnType<typeof createClient>>;
   myRegistrationId: string | null;
+  isManager: boolean;
 }) {
   if (!competition.registration_deadline) {
     return (
@@ -227,6 +234,7 @@ async function CompetitionWinners({
                             </div>
                             <WinnerTestimonialInline
                               isOwner={w.registrationId === myRegistrationId}
+                              isManager={isManager}
                               testimonial={w.testimonial}
                             />
                             {w.registrationId === myRegistrationId && (
@@ -308,9 +316,13 @@ export default async function WinnersPage() {
     data: { user },
   } = await supabase.auth.getUser();
   const { data: myProfile } = user
-    ? await supabase.from("profiles").select("registration_id").eq("user_id", user.id).maybeSingle()
+    ? await supabase.from("profiles").select("registration_id, role").eq("user_id", user.id).maybeSingle()
     : { data: null };
   const myRegistrationId = (myProfile?.registration_id as string | null) ?? null;
+  // Only Admin/Organizer/Staff ever see the ✕ delete button on a
+  // testimonial (see deleteTestimonial in app/actions/admin.ts, which
+  // enforces the same tier server-side regardless of what this hides).
+  const isManager = ["admin", "organizer", "staff"].includes((myProfile?.role as string | null) ?? "");
 
   return (
     <>
@@ -331,7 +343,7 @@ export default async function WinnersPage() {
         ) : (
           <div className="space-y-12">
             {competitions.map((c) => (
-              <CompetitionWinners key={c.id} competition={c} supabase={supabase} myRegistrationId={myRegistrationId} />
+              <CompetitionWinners key={c.id} competition={c} supabase={supabase} myRegistrationId={myRegistrationId} isManager={isManager} />
             ))}
           </div>
         )}

@@ -225,6 +225,16 @@ export default async function AdminCommissions({
   // bucket — one batched call per table, same pattern as certificate/kata
   // video signed URLs elsewhere in the admin panel.
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { data: myProfile } = user
+    ? await supabase.from("profiles").select("role").eq("user_id", user.id).maybeSingle()
+    : { data: null };
+  // Only Admin/Organizer/Staff see the ✕ to remove a testimonial (see
+  // deleteTestimonial in app/actions/admin.ts, which enforces the same
+  // tier server-side regardless of what this hides).
+  const canDeleteTestimonial = ["admin", "organizer", "staff"].includes((myProfile?.role as string | null) ?? "");
   // Reward payout is held until the winner has given a testimonial (see
   // components/WinnerTestimonialInline.tsx on /winners) — also drives the Testimonial /
   // Testimonial Date columns below, always computed live on every page load
@@ -232,15 +242,17 @@ export default async function AdminCommissions({
   // ago already shows here.
   const { data: testimonialRows } = await supabase
     .from("winner_testimonials")
-    .select("registration_id, kind, media_path, message, created_at");
+    .select("id, registration_id, kind, media_path, message, created_at, deleted_at");
   const testimonialByRegId = new Map(
     (testimonialRows ?? []).map((t) => [
       t.registration_id as string,
       {
+        id: t.id as string,
         kind: t.kind as "video" | "voice" | "message",
         mediaUrl: t.media_path ? supabase.storage.from("testimonials").getPublicUrl(t.media_path as string).data.publicUrl : null,
         message: t.message as string | null,
         createdAt: t.created_at as string,
+        deleted: t.deleted_at != null,
       },
     ]),
   );
@@ -486,7 +498,9 @@ export default async function AdminCommissions({
             bank_name: r.bankName ?? "",
             bank_account_no: r.bankAccountNo ?? "",
             bank_account_name: r.bankAccountName ?? "",
-            testimonial: <TestimonialStatusCell testimonial={testimonial} />,
+            testimonial: (
+              <TestimonialStatusCell testimonial={testimonial} canDelete={canDeleteTestimonial} returnTo="/admin/commissions" />
+            ),
             testimonial_status: testimonial ? "Done" : "Pending",
             testimonial_date: testimonial ? formatDate(testimonial.createdAt.slice(0, 10)) : "—",
             payout_status: r.payoutStatus,

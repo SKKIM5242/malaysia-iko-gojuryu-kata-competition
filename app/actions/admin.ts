@@ -20,7 +20,7 @@ import {
   notifyCertificatesPublished, notifyInvitationCodeIssued, notifyStatusChanged,
   notifyOrganizersBulkPaymentConfirmed, notifyOrganizersBulkTallyDone, notifySenseiBulkPaymentConfirmed,
   notifySenseiBulkCsvConfirmed, notifyOrganizersDirectoryBulkUpload, sendAdminTelegramDM,
-  notifyParticipantEmailChanged,
+  notifyParticipantEmailChanged, notifyTestimonialDeleted,
 } from "@/lib/notify";
 import { applySubscriptionRenewalTerms } from "@/lib/finalize";
 import type { PaymentStatus, Category } from "@/lib/types";
@@ -482,6 +482,83 @@ export async function saveCertificateDate(formData: FormData) {
   });
 
   backTo(returnTo, { ok: `Certificate date saved for “${before!.name}”.` });
+}
+
+/** Admin/Organizer/Staff removes an inappropriate winner testimonial — the
+ * ✕ button on /winners (and the admin Rewards/Winners preview tables) only
+ * they can see. This is a soft delete: media_path/message are cleared so
+ * nothing plays back, but the row itself (and its unique registration_id
+ * constraint) stays, on purpose — the Winner Certificate and reward payout
+ * gates only check "does a row exist," so they stay unlocked, and a second
+ * insert for the same registration is blocked, so the winner can't submit
+ * a replacement. Notifies the winner and every Admin/Organizer/Staff
+ * account by email + Telegram DM (see notifyTestimonialDeleted). */
+export async function deleteTestimonial(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const reason = String(formData.get("reason") ?? "").trim() || null;
+  const returnTo = String(formData.get("return_to") ?? "") || "/winners";
+  const { supabase, actorId } = await getActor();
+  await requireCompetitionManager(supabase, actorId, returnTo);
+
+  const admin = createAdminClient();
+  const { data: beforeRaw } = await admin
+    .from("winner_testimonials")
+    .select(
+      "id, registration_id, kind, media_path, message, deleted_at, " +
+        "registration:registrations(competition:competitions(name), participant:participants(full_name, email))",
+    )
+    .eq("id", id)
+    .maybeSingle();
+  const before = beforeRaw as unknown as {
+    id: string;
+    registration_id: string;
+    kind: string;
+    media_path: string | null;
+    message: string | null;
+    deleted_at: string | null;
+    registration: {
+      competition: { name: string } | null;
+      participant: { full_name: string; email: string | null } | null;
+    } | null;
+  } | null;
+  if (!before || before.deleted_at) {
+    backTo(returnTo, { error: "Testimonial not found or already removed." });
+  }
+
+  if (before!.media_path) {
+    await admin.storage.from("testimonials").remove([before!.media_path]);
+  }
+
+  const { error } = await admin
+    .from("winner_testimonials")
+    .update({ deleted_at: new Date().toISOString(), deleted_by: actorId, delete_reason: reason, media_path: null, message: null })
+    .eq("id", id);
+  if (error) backTo(returnTo, { error: "Could not remove testimonial." });
+
+  await writeAudit(supabase, {
+    table_name: "winner_testimonials", record_id: id,
+    action: "testimonial_deleted_by_organizer", old_value: before, new_value: { reason }, actor_id: actorId,
+  });
+
+  const registration = before!.registration;
+  const { data: winnerProfile } = await admin
+    .from("profiles")
+    .select("telegram_chat_id")
+    .eq("registration_id", before!.registration_id)
+    .maybeSingle();
+
+  await notifyTestimonialDeleted({
+    winnerEmail: registration?.participant?.email ?? null,
+    winnerName: registration?.participant?.full_name ?? "Winner",
+    winnerTelegramChatId: (winnerProfile?.telegram_chat_id as string | null) ?? null,
+    competitionName: registration?.competition?.name ?? "the competition",
+    reason,
+  });
+
+  revalidatePath("/winners");
+  revalidatePath("/admin/winners");
+  revalidatePath("/admin/commissions");
+  backTo(returnTo, { ok: "Testimonial removed. The winner and organizer team have been notified." });
 }
 
 /** Every paid participant's name + email for a competition — the audience

@@ -10,7 +10,7 @@ import TestimonialStatusCell from "@/components/TestimonialStatusCell";
 import type { TestimonialKind } from "@/lib/testimonials";
 import type { Competition } from "@/lib/types";
 
-type TestimonialInfo = { kind: TestimonialKind; mediaUrl: string | null; message: string | null };
+type TestimonialInfo = { id: string; kind: TestimonialKind; mediaUrl: string | null; message: string | null; deleted: boolean };
 
 export const dynamic = "force-dynamic";
 
@@ -114,7 +114,11 @@ async function CompetitionPreview({
                             </span>
                             <span className="flex items-center gap-2">
                               <span className="font-semibold text-neutral-700">{w.finalScore.toFixed(2)}</span>
-                              <TestimonialStatusCell testimonial={testimonialByRegId.get(w.registrationId) ?? null} />
+                              <TestimonialStatusCell
+                                testimonial={testimonialByRegId.get(w.registrationId) ?? null}
+                                canDelete={canManage}
+                                returnTo="/admin/winners"
+                              />
                               {playbackUrls.get(w.storagePath) && (
                                 <a
                                   href={playbackUrls.get(w.storagePath)}
@@ -173,14 +177,16 @@ export default async function AdminWinners({
 
   const { data: testimonialRows } = await supabase
     .from("winner_testimonials")
-    .select("registration_id, kind, media_path, message");
+    .select("id, registration_id, kind, media_path, message, deleted_at");
   const testimonialByRegId = new Map<string, TestimonialInfo>(
     (testimonialRows ?? []).map((t) => [
       t.registration_id as string,
       {
+        id: t.id as string,
         kind: t.kind as TestimonialKind,
         mediaUrl: t.media_path ? supabase.storage.from("testimonials").getPublicUrl(t.media_path as string).data.publicUrl : null,
         message: t.message as string | null,
+        deleted: t.deleted_at != null,
       },
     ]),
   );

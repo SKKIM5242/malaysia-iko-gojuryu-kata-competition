@@ -811,6 +811,63 @@ export async function notifyStaffIssueReport(input: {
   );
 }
 
+interface TestimonialDeletedNotice {
+  winnerEmail: string | null;
+  winnerName: string;
+  winnerTelegramChatId: string | null;
+  competitionName: string;
+  /** Free-text the organizer typed in the removal popup — falls back to a
+   * generic line when left blank. */
+  reason: string | null;
+}
+
+/** Fires when Admin/Organizer/Staff removes a winner's testimonial for
+ * being inappropriate (see deleteTestimonial in app/actions/admin.ts).
+ * Tells the winner directly -- their certificate/payout stay unlocked and
+ * they can't submit a replacement (the row itself is only emptied, never
+ * deleted, so the unique-per-registration constraint still blocks a second
+ * insert) -- and every Admin/Organizer/Staff account, so the removal is
+ * visible to the whole team, not just whoever clicked it. */
+export async function notifyTestimonialDeleted(notice: TestimonialDeletedNotice): Promise<void> {
+  const reasonLine = notice.reason ? `Reason given: ${notice.reason}` : "It did not meet our community guidelines.";
+
+  const winnerEmailText = [
+    `Hi ${notice.winnerName},`,
+    "",
+    `Your testimonial for ${notice.competitionName} has been removed by the organizer.`,
+    reasonLine,
+    "",
+    "This does not affect your Winner Certificate download or your reward payout — both remain unlocked.",
+    "You will not be able to submit another testimonial for this competition.",
+    "",
+    "— Malaysia Open Virtual Karate-do Kata Competition",
+  ].join("\n");
+  const winnerTelegramText = [
+    `Your testimonial for ${notice.competitionName} has been removed by the organizer.`,
+    reasonLine,
+    "Your certificate and reward payout are not affected. You can't submit another testimonial for this competition.",
+  ].join("\n");
+
+  const { data } = await createAdminClient()
+    .from("profiles")
+    .select("email, full_name, telegram_chat_id")
+    .in("role", ["admin", "organizer", "staff"])
+    .eq("approved", true);
+  const staffRecipients = data ?? [];
+  const staffText = `${notice.winnerName}'s testimonial for ${notice.competitionName} was removed. ${reasonLine}`;
+
+  await Promise.allSettled([
+    notice.winnerEmail
+      ? sendEmail(notice.winnerEmail, `Your testimonial for ${notice.competitionName} was removed`, winnerEmailText)
+      : Promise.resolve(),
+    sendDirectTelegramDM(notice.winnerTelegramChatId, winnerTelegramText),
+    ...staffRecipients.flatMap((r) => [
+      r.email ? sendEmail(r.email as string, `Testimonial removed — ${notice.competitionName}`, staffText) : Promise.resolve(),
+      sendDirectTelegramDM((r.telegram_chat_id as string | null) ?? null, staffText),
+    ]),
+  ]);
+}
+
 /** Posts a staff-composed message into a Telegram GROUP chat, for the
  * issue-report triage table's "notify the group" button. Distinct from
  * sendAdminTelegramDM only in intent — same Bot API call, but the chat id
