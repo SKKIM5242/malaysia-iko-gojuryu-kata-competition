@@ -1,6 +1,7 @@
 import { TESTIMONIAL_KIND_LABEL, TESTIMONIAL_GATE_NOTE, TESTIMONIAL_VIDEO_GUIDANCE_NOTE, type TestimonialKind } from "@/lib/testimonials";
 import TestimonialRecorder from "@/components/TestimonialRecorder";
 import TestimonialDeleteButton from "@/components/TestimonialDeleteButton";
+import LockedVideo from "@/components/LockedVideo";
 
 export interface WinnerTestimonialInfo {
   id: string;
@@ -64,7 +65,7 @@ export default function WinnerTestimonialInline({
         </div>
         {testimonial.kind === "video" && testimonial.mediaUrl && (
           <div className="space-y-1.5">
-            <video src={testimonial.mediaUrl} controls playsInline className="w-full max-w-xs rounded bg-black" />
+            <LockedVideo src={testimonial.mediaUrl} className="w-full max-w-xs rounded bg-black" />
             <div>
               <p className="text-[11px] font-semibold text-neutral-400">🎙️ Voice Testimonial (auto, from this video)</p>
               <audio src={testimonial.mediaUrl} controls className="w-full max-w-xs" />

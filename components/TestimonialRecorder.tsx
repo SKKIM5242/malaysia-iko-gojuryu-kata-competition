@@ -12,6 +12,7 @@ import {
   type TestimonialKind,
 } from "@/lib/testimonials";
 import { SCRIPT_LENGTH_LABEL, scriptsForBand, type ScriptLengthBand } from "@/lib/testimonial-scripts";
+import LockedVideo from "@/components/LockedVideo";
 
 type Phase = "idle" | "live" | "recording" | "review" | "uploading";
 
@@ -291,7 +292,7 @@ function MediaTestimonialPanel({ kind, onDone }: { kind: "video" | "voice"; onDo
       {phase === "review" && blobUrl && (
         <div>
           {isVideo ? (
-            <video src={blobUrl} controls playsInline className="mb-3 w-full max-w-md rounded-md bg-black" />
+            <LockedVideo src={blobUrl} className="mb-3 w-full max-w-md rounded-md bg-black" />
           ) : (
             <audio src={blobUrl} controls className="mb-3 w-full max-w-md" />
           )}
@@ -475,10 +476,8 @@ function UploadTestimonialPanel({ onDone }: { onDone: (kind: TestimonialKind) =>
       ) : (
         <div>
           {kind === "video" ? (
-            <video
+            <LockedVideo
               src={blobUrl}
-              controls
-              playsInline
               onLoadedMetadata={(e) => setSeconds(Math.round(e.currentTarget.duration) || 0)}
               className="mb-3 w-full max-w-md rounded-md bg-black"
             />

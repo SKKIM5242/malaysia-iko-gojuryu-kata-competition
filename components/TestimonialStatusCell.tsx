@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { TESTIMONIAL_KIND_LABEL, type TestimonialKind } from "@/lib/testimonials";
 import TestimonialDeleteButton from "@/components/TestimonialDeleteButton";
+import LockedVideo from "@/components/LockedVideo";
 
 /** "Testimonial" column cell on the admin Rewards / Winners pages — a
  * clickable "✅ Done" that opens the actual testimonial in a modal (with a
@@ -53,7 +54,7 @@ export default function TestimonialStatusCell({
               </div>
             </div>
             {testimonial.kind === "video" && testimonial.mediaUrl && (
-              <video src={testimonial.mediaUrl} controls playsInline className="w-full rounded-md bg-black" />
+              <LockedVideo src={testimonial.mediaUrl} className="w-full rounded-md bg-black" />
             )}
             {testimonial.kind === "voice" && testimonial.mediaUrl && <audio src={testimonial.mediaUrl} controls className="w-full" />}
             {testimonial.kind === "message" && testimonial.message && (
