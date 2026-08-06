@@ -1,4 +1,4 @@
-import { SiteFooter, SiteHeader } from "@/components/ui";
+import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { RefereeForm } from "@/components/CommunityForms";
 import { getTelegramLink } from "@/lib/telegram";
 import { getOpenCompetitions } from "@/lib/data";

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { SiteFooter, SiteHeader } from "@/components/ui";
+import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { verifyEmailToken } from "@/app/actions/email-verification";
 
 export const dynamic = "force-dynamic";

@@ -8,7 +8,8 @@ import { kataBaseOf } from "@/lib/division";
 import KataGroupDragZone from "@/components/KataGroupDragZone";
 import SubcategoryDragZone from "@/components/SubcategoryDragZone";
 import CategoryActionButton from "@/components/CategoryActionButton";
-import { NoTranslate, SetupNotice, SiteFooter, SiteHeader } from "@/components/ui";
+import { NoTranslate, SetupNotice } from "@/components/ui";
+import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import AuthForms from "@/components/AuthForms";
 import type { Category } from "@/lib/types";
 

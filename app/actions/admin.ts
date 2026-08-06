@@ -1367,6 +1367,118 @@ export async function saveCertificateSettings(formData: FormData) {
   backTo(returnTo, { ok: "Certificate settings saved." });
 }
 
+// ── Site appearance ──────────────────────────────────────────────────────────
+
+const TEXT_ALIGN_VALUES = ["left", "center", "right"] as const;
+function readAlign(formData: FormData, field: string, fallback: string): string {
+  const v = String(formData.get(field) ?? "");
+  return (TEXT_ALIGN_VALUES as readonly string[]).includes(v) ? v : fallback;
+}
+function readNumber(formData: FormData, field: string, fallback: number): number {
+  const v = Number(formData.get(field));
+  return Number.isFinite(v) ? v : fallback;
+}
+
+/** Site-wide header/footer branding — logo, title/subtitle, main menu, and
+ * footer text plus every style knob for each, stored once in the
+ * site_appearance singleton row and read by SiteHeader/SiteFooter on every
+ * public page. Leaving the logo field blank on re-save keeps whatever was
+ * uploaded before, same as certificate signature/stamp uploads. */
+export async function saveSiteAppearance(formData: FormData) {
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/competitions";
+  const { supabase, actorId } = await getActor();
+  await requireCompetitionManager(supabase, actorId, returnTo);
+
+  const logoPath = await uploadBrandingIfPresent(supabase, formData, "logo", "logo", returnTo);
+
+  const buttonLabels = formData.getAll("button_label").map((v) => String(v).trim());
+  const buttonUrls = formData.getAll("button_url").map((v) => String(v).trim());
+  const buttons = buttonLabels
+    .map((label, i) => ({ id: crypto.randomUUID(), label, url: buttonUrls[i] ?? "" }))
+    .filter((b) => b.label && b.url);
+
+  const update: Record<string, unknown> = {
+    title_text: String(formData.get("title_text") ?? "").trim() || null,
+    title_align: readAlign(formData, "title_align", "left"),
+    title_line_height: readNumber(formData, "title_line_height", 1.2),
+    title_color: String(formData.get("title_color") ?? "#ffffff").trim() || "#ffffff",
+    title_font_size: readNumber(formData, "title_font_size", 16),
+    title_font_family: String(formData.get("title_font_family") ?? "sans").trim() || "sans",
+    title_bold: formData.get("title_bold") === "on",
+
+    subtitle_text: String(formData.get("subtitle_text") ?? "").trim() || null,
+    subtitle_align: readAlign(formData, "subtitle_align", "left"),
+    subtitle_line_height: readNumber(formData, "subtitle_line_height", 1.2),
+    subtitle_color: String(formData.get("subtitle_color") ?? "#ffffff").trim() || "#ffffff",
+    subtitle_font_size: readNumber(formData, "subtitle_font_size", 12),
+    subtitle_font_family: String(formData.get("subtitle_font_family") ?? "sans").trim() || "sans",
+    subtitle_bold: formData.get("subtitle_bold") === "on",
+
+    menu_color: String(formData.get("menu_color") ?? "#ffffff").trim() || "#ffffff",
+    menu_font_size: readNumber(formData, "menu_font_size", 14),
+    menu_bold: formData.get("menu_bold") === "on",
+    menu_font_family: String(formData.get("menu_font_family") ?? "sans").trim() || "sans",
+    menu_align: readAlign(formData, "menu_align", "right"),
+    menu_line_height: readNumber(formData, "menu_line_height", 1.2),
+
+    footer_text: String(formData.get("footer_text") ?? "").trim() || null,
+    footer_align: readAlign(formData, "footer_align", "center"),
+    footer_line_height: readNumber(formData, "footer_line_height", 1.2),
+    footer_color: String(formData.get("footer_color") ?? "#ffffff").trim() || "#ffffff",
+    footer_font_size: readNumber(formData, "footer_font_size", 13),
+    footer_font_family: String(formData.get("footer_font_family") ?? "sans").trim() || "sans",
+    footer_bold: formData.get("footer_bold") === "on",
+
+    buttons,
+    updated_at: new Date().toISOString(),
+  };
+  if (logoPath) update.logo_path = logoPath;
+
+  const { error } = await supabase.from("site_appearance").update(update).eq("id", true);
+  if (error) backTo(returnTo, { error: "Could not save site appearance settings." });
+
+  await writeAudit(supabase, {
+    table_name: "site_appearance", record_id: null, action: "site_appearance_updated",
+    new_value: update, actor_id: actorId,
+  });
+  revalidatePath("/");
+  revalidatePath("/admin/competitions");
+  backTo(returnTo, { ok: "Site appearance saved." });
+}
+
+/** Clears every field back to the table's own defaults — logo, title,
+ * subtitle, and footer text all reset to null (falls back to the site's
+ * hardcoded copy), every style knob back to its default, and every custom
+ * button removed. Does not delete the row itself (id=true always exists). */
+export async function resetSiteAppearance(formData: FormData) {
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/competitions";
+  const { supabase, actorId } = await getActor();
+  await requireCompetitionManager(supabase, actorId, returnTo);
+
+  const update = {
+    logo_path: null,
+    title_text: null, title_align: "left", title_line_height: 1.2,
+    title_color: "#ffffff", title_font_size: 16, title_font_family: "sans", title_bold: true,
+    subtitle_text: null, subtitle_align: "left", subtitle_line_height: 1.2,
+    subtitle_color: "#ffffff", subtitle_font_size: 12, subtitle_font_family: "sans", subtitle_bold: true,
+    menu_color: "#ffffff", menu_font_size: 14, menu_bold: false, menu_font_family: "sans",
+    menu_align: "right", menu_line_height: 1.2,
+    footer_text: null, footer_align: "center", footer_line_height: 1.2,
+    footer_color: "#ffffff", footer_font_size: 13, footer_font_family: "sans", footer_bold: true,
+    buttons: [],
+    updated_at: new Date().toISOString(),
+  };
+  const { error } = await supabase.from("site_appearance").update(update).eq("id", true);
+  if (error) backTo(returnTo, { error: "Could not reset site appearance settings." });
+
+  await writeAudit(supabase, {
+    table_name: "site_appearance", record_id: null, action: "site_appearance_reset", actor_id: actorId,
+  });
+  revalidatePath("/");
+  revalidatePath("/admin/competitions");
+  backTo(returnTo, { ok: "Site appearance reset to defaults." });
+}
+
 // ── Announcements ────────────────────────────────────────────────────────────
 
 export async function saveAnnouncement(formData: FormData) {

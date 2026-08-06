@@ -11,12 +11,11 @@ import {
   NoTranslate,
   SectionTitle,
   SetupNotice,
-  SiteFooter,
-  SiteHeader,
   formatDate,
   formatUSD,
   protectKataNames,
 } from "@/components/ui";
+import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { Markdown } from "@/lib/markdown";
 import { kataBases } from "@/lib/division";
 import { groupByFamily, adjacentKataOf } from "@/lib/kata-families";

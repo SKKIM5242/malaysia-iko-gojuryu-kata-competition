@@ -1,5 +1,6 @@
 import { getOpenCompetitions, schemaReady } from "@/lib/data";
-import { SetupNotice, SiteFooter, SiteHeader } from "@/components/ui";
+import { SetupNotice } from "@/components/ui";
+import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { SchoolForm } from "@/components/DirectoryForms";
 import { getTelegramLink } from "@/lib/telegram";
 

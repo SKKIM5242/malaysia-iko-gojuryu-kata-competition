@@ -2,7 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { paymentsEnabled } from "@/lib/payments";
 import { finalizeStripeSession } from "@/lib/finalize";
-import { SiteFooter, SiteHeader, TelegramJoinButton } from "@/components/ui";
+import { TelegramJoinButton } from "@/components/ui";
+import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { getTelegramLink } from "@/lib/telegram";
 
 export const dynamic = "force-dynamic";

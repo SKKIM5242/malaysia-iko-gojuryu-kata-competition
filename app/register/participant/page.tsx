@@ -7,7 +7,8 @@ import {
   schemaReady,
 } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
-import { EmptyState, SetupNotice, SiteFooter, SiteHeader, formatDate, formatUSD } from "@/components/ui";
+import { EmptyState, SetupNotice, formatDate, formatUSD } from "@/components/ui";
+import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import RegisterForm from "@/components/RegisterForm";
 import { paymentsEnabled } from "@/lib/payments";
 import type { Category } from "@/lib/types";

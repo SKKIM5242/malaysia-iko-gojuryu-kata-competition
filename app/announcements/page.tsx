@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getPublishedAnnouncements, schemaReady } from "@/lib/data";
-import { EmptyState, SetupNotice, SiteFooter, SiteHeader, formatDate } from "@/components/ui";
+import { EmptyState, SetupNotice, formatDate } from "@/components/ui";
+import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 
 export const dynamic = "force-dynamic";
 

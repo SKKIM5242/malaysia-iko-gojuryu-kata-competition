@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getAnnouncement, schemaReady } from "@/lib/data";
-import { SetupNotice, SiteFooter, SiteHeader, formatDate } from "@/components/ui";
+import { SetupNotice, formatDate } from "@/components/ui";
+import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { Markdown } from "@/lib/markdown";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { accessMatrixRowsFromDb } from "@/lib/access-matrix";

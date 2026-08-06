@@ -7,7 +7,8 @@ import {
   finalizeInvoiceSession,
   finalizeSubscriptionRenewalSession,
 } from "@/lib/finalize";
-import { SiteFooter, SiteHeader, TelegramJoinButton } from "@/components/ui";
+import { TelegramJoinButton } from "@/components/ui";
+import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { getTelegramLink } from "@/lib/telegram";
 
 export const dynamic = "force-dynamic";

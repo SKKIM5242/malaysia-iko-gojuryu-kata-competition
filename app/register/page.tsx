@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { SiteFooter, SiteHeader, formatDate } from "@/components/ui";
+import { formatDate } from "@/components/ui";
+import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import AccessComparisonTable from "@/components/AccessComparisonTable";
 import { getOpenCompetitions, schemaReady } from "@/lib/data";
 import { winnersRevealDateFor } from "@/lib/winners";

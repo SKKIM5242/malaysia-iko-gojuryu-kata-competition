@@ -6,7 +6,8 @@ import {
   getSchools,
   schemaReady,
 } from "@/lib/data";
-import { EmptyState, SetupNotice, SiteFooter, SiteHeader, formatUSD } from "@/components/ui";
+import { EmptyState, SetupNotice, formatUSD } from "@/components/ui";
+import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { kataBases } from "@/lib/division";
 import ParticipantsTable from "@/components/ParticipantsTable";
 import { shortTierName } from "@/lib/invitation-codes";

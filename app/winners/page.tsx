@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCategories, schemaReady } from "@/lib/data";
-import { EmptyState, NoTranslate, SectionTitle, SetupNotice, SiteFooter, SiteHeader, formatDate } from "@/components/ui";
+import { EmptyState, NoTranslate, SectionTitle, SetupNotice, formatDate } from "@/components/ui";
+import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { groupByKata } from "@/lib/division";
 import { computeCategoryRankings } from "@/lib/winners-ranking";
 import { winnersRevealDate, winnersRevealDateFor } from "@/lib/winners";

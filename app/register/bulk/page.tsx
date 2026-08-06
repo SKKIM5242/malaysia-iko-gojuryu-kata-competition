@@ -6,7 +6,8 @@ import {
   isCompetitionOpen,
   schemaReady,
 } from "@/lib/data";
-import { EmptyState, SetupNotice, SiteFooter, SiteHeader } from "@/components/ui";
+import { EmptyState, SetupNotice } from "@/components/ui";
+import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import BulkRegisterForm from "@/components/BulkRegisterForm";
 import CsvBulkForm from "@/components/CsvBulkForm";
 import BulkUploadGate from "@/components/BulkUploadGate";

@@ -17,6 +17,8 @@ import {
   WATERMARK_FONT_OPTIONS, WATERMARK_DIRECTION_OPTIONS,
   DEFAULT_WATERMARK_TEXT, DEFAULT_WATERMARK_FONT_FAMILY, DEFAULT_WATERMARK_COLOR,
 } from "@/lib/watermark";
+import { getSiteAppearance } from "@/lib/site-appearance-server";
+import SiteAppearanceForm from "@/components/SiteAppearanceForm";
 import type { Category } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -149,6 +151,7 @@ export default async function AdminCompetitions({
     return `${base}${sep}opencomp=${categoryModalCompetition.id}${kataParam}`;
   })();
   const editing = params.edit ? competitions.find((c) => c.id === params.edit) : undefined;
+  const { settings: siteAppearance, logoUrl: siteLogoUrl } = await getSiteAppearance();
 
   return (
     <AdminShell
@@ -788,6 +791,16 @@ export default async function AdminCompetitions({
               </div>
             </form>
           </div>
+        </div>
+      )}
+      {canManageCompetition && (
+        <div className="mt-10 border-t border-neutral-200 pt-8">
+          <h2 className="mb-1 text-lg font-bold">Site Appearance</h2>
+          <p className="mb-3 max-w-3xl text-sm text-neutral-500">
+            Controls the public site&apos;s logo, header title/subtitle, main menu, and footer —
+            text and style — on every page. Saving here updates the whole site immediately.
+          </p>
+          <SiteAppearanceForm settings={siteAppearance} logoUrl={siteLogoUrl} />
         </div>
       )}
     </AdminShell>

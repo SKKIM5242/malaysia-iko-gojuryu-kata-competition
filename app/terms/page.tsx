@@ -1,4 +1,4 @@
-import { SiteFooter, SiteHeader } from "@/components/ui";
+import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 
 export const metadata = { title: "Terms & Conditions" };
 

@@ -1,4 +1,4 @@
-import { SiteFooter, SiteHeader } from "@/components/ui";
+import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { AudienceForm } from "@/components/CommunityForms";
 import { getTelegramLink } from "@/lib/telegram";
 
