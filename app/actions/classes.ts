@@ -39,7 +39,7 @@ export async function saveStudent(formData: FormData) {
     ic_passport: String(formData.get("ic_passport") ?? "").trim() || null,
     date_of_birth: String(formData.get("date_of_birth") ?? "") || null,
     gender: String(formData.get("gender") ?? "") || null,
-    category: formData.get("category") === "adult" ? "adult" : "student",
+    fee_plan_id: String(formData.get("fee_plan_id") ?? "").trim() || null,
     email: String(formData.get("email") ?? "").trim() || null,
     phone: String(formData.get("phone") ?? "").trim() || null,
     home_address: String(formData.get("home_address") ?? "").trim() || null,
@@ -50,6 +50,7 @@ export async function saveStudent(formData: FormData) {
     notes: String(formData.get("notes") ?? "").trim() || null,
   };
   if (!values.full_name) backTo("students", { error: "Student name is required." });
+  if (!values.fee_plan_id) backTo("students", { error: "Fee category is required." });
   const { supabase, actorId } = await getActor();
   if (id) {
     const { error } = await supabase.from("students").update(values).eq("id", id);
@@ -81,7 +82,7 @@ export async function deleteStudent(formData: FormData) {
 }
 
 const STUDENT_CSV_COLUMNS = [
-  "full_name", "ic_passport", "date_of_birth", "gender", "category",
+  "full_name", "ic_passport", "date_of_birth", "gender", "fee_category",
   "email", "phone", "home_address", "city_town", "home_country", "join_date", "notes",
 ] as const;
 
@@ -104,6 +105,11 @@ export async function bulkUploadStudents(_prev: CsvUploadResult, formData: FormD
     return { done: false, error: "Only Admin or Organizer accounts can bulk-upload records." };
   }
 
+  // fee_category in the CSV is the plan's name, human-readable — resolved
+  // to an id here rather than asking for a raw UUID in a spreadsheet.
+  const { data: activePlanRows } = await supabase.from("fee_plans").select("id, name").eq("active", true);
+  const planIdByName = new Map((activePlanRows ?? []).map((p) => [(p.name as string).trim().toLowerCase(), p.id as string]));
+
   const failures: Array<{ row: number; name: string; error: string }> = [];
   let succeeded = 0;
 
@@ -118,12 +124,18 @@ export async function bulkUploadStudents(_prev: CsvUploadResult, formData: FormD
     const joinDateRaw = get(r, "join_date");
     const joinDate = joinDateRaw ? parseDDMMYYYY(joinDateRaw) : null;
     if (joinDateRaw && !joinDate) { failures.push({ row: rowNo, name: full_name, error: "Invalid join date (use DD/MM/YYYY)" }); continue; }
+    const feeCategoryRaw = get(r, "fee_category").trim();
+    const fee_plan_id = planIdByName.get(feeCategoryRaw.toLowerCase());
+    if (!feeCategoryRaw || !fee_plan_id) {
+      failures.push({ row: rowNo, name: full_name, error: `Fee category "${feeCategoryRaw}" doesn't match an active fee plan name` });
+      continue;
+    }
     const record = {
       full_name: get(r, "full_name"),
       ic_passport: get(r, "ic_passport") || null,
       date_of_birth: dob,
       gender: get(r, "gender") || null,
-      category: get(r, "category").toLowerCase() === "adult" ? "adult" : "student",
+      fee_plan_id,
       email: get(r, "email") || null,
       phone: get(r, "phone") || null,
       home_address: get(r, "home_address") || null,

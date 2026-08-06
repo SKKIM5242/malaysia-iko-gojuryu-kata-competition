@@ -97,7 +97,7 @@ export default async function AdminClasses({
   if (tab === "enrollments") {
     const { data } = await supabase
       .from("class_enrollments")
-      .select("*, student:students(id, full_name, category), fee_plan:fee_plans(id, name, kind, amount_myr, currency, billing_interval)")
+      .select("*, student:students(id, full_name), fee_plan:fee_plans(id, name, kind, amount_myr, currency, billing_interval)")
       .order("created_at", { ascending: false });
     enrollments = (data as unknown as ClassEnrollment[]) ?? [];
   }
@@ -116,13 +116,7 @@ export default async function AdminClasses({
   }
 
   const activePlans = plans.filter((p) => p.active);
-  const plansForAudience = (audience: "student" | "adult") =>
-    activePlans.filter((p) => p.audience === audience || p.audience === "all");
-  const categoryOptionLabel = (audience: "student" | "adult", fallback: string) => {
-    const matches = plansForAudience(audience);
-    if (matches.length === 0) return `${fallback} (no active fee plan yet — add one under Fee plans)`;
-    return `${fallback} — ${matches.map((p) => `${p.name} (${fmtMoney(p.amount_myr, p.currency)}/${(INTERVAL_LABEL[p.billing_interval] ?? p.billing_interval).toLowerCase()})`).join(", ")}`;
-  };
+  const feePlanNameById = new Map(plans.map((p) => [p.id, p.name]));
 
   const editingStudent = tab === "students" && params.edit ? students.find((s) => s.id === params.edit) : undefined;
   const editingPlan = tab === "plans" && params.edit ? plans.find((p) => p.id === params.edit) : undefined;
@@ -176,14 +170,24 @@ export default async function AdminClasses({
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <label htmlFor="category" className={adminLabel}>Fee category *</label>
-                    <select id="category" name="category" defaultValue={editingStudent?.category ?? "student"} className={adminInput}>
-                      <option value="student">{categoryOptionLabel("student", "Student")}</option>
-                      <option value="adult">{categoryOptionLabel("adult", "Adult")}</option>
+                    <label htmlFor="student_fee_plan_id" className={adminLabel}>Fee category *</label>
+                    <select
+                      id="student_fee_plan_id"
+                      name="fee_plan_id"
+                      required
+                      defaultValue={editingStudent?.fee_plan_id ?? ""}
+                      className={adminInput}
+                    >
+                      <option value="" disabled>— Select —</option>
+                      {activePlans.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} ({fmtMoney(p.amount_myr, p.currency)}/{(INTERVAL_LABEL[p.billing_interval] ?? p.billing_interval).toLowerCase()})
+                        </option>
+                      ))}
                     </select>
                     <p className="mt-1 text-xs text-neutral-400">
-                      Matching plan(s) shown automatically from the Fee plans tab — edit a plan&apos;s
-                      Audience there to change which category it lists under.
+                      Every active plan from the Fee plans tab below — add or edit plans there to change what&apos;s
+                      offered here.
                     </p>
                   </div>
                   <div>
@@ -262,14 +266,14 @@ export default async function AdminClasses({
                 downloadName="students"
                 columns={[
                   { key: "name", label: "Name" },
-                  { key: "category", label: "Category" },
+                  { key: "fee_category", label: "Fee Category" },
                   { key: "status", label: "Status" },
                   { key: "contact", label: "Contact" },
                   { key: "actions", label: "Actions" },
                 ]}
                 csvColumns={[
                   { key: "name", label: "Name" },
-                  { key: "category", label: "Category" },
+                  { key: "fee_category", label: "Fee Category" },
                   { key: "status_text", label: "Status" },
                   { key: "email", label: "Email" },
                   { key: "phone", label: "Phone" },
@@ -277,7 +281,7 @@ export default async function AdminClasses({
                 rows={students.map((s) => ({
                   id: s.id,
                   name: s.full_name,
-                  category: s.category,
+                  fee_category: (s.fee_plan_id && feePlanNameById.get(s.fee_plan_id)) || "—",
                   status: (
                     <span className={s.status === "active" ? "font-semibold text-green-700" : "text-neutral-400"}>
                       {s.status}
@@ -454,7 +458,9 @@ export default async function AdminClasses({
                   <select id="student_id" name="student_id" required defaultValue="" className={adminInput}>
                     <option value="" disabled>Select student</option>
                     {students.filter((s) => s.status === "active").map((s) => (
-                      <option key={s.id} value={s.id}>{s.full_name} ({s.category})</option>
+                      <option key={s.id} value={s.id}>
+                        {s.full_name} ({(s.fee_plan_id && feePlanNameById.get(s.fee_plan_id)) || "no fee category"})
+                      </option>
                     ))}
                   </select>
                 </div>

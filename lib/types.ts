@@ -205,7 +205,7 @@ export interface Student {
   ic_passport: string | null;
   date_of_birth: string | null;
   gender: string | null;
-  category: "student" | "adult";
+  fee_plan_id: string | null;
   email: string | null;
   phone: string | null;
   home_address: string | null;
@@ -243,7 +243,7 @@ export interface ClassEnrollment {
   next_billing_date: string;
   status: "active" | "paused" | "cancelled";
   created_at: string;
-  student?: Pick<Student, "id" | "full_name" | "category"> | null;
+  student?: Pick<Student, "id" | "full_name"> | null;
   fee_plan?: Pick<FeePlan, "id" | "name" | "kind" | "amount_myr" | "currency" | "billing_interval"> | null;
 }
 
