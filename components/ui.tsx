@@ -106,7 +106,6 @@ export function SiteHeader() {
           <Link href="/" className="rounded px-1.5 py-px hover:bg-neutral-800 sm:px-3 sm:py-1.5">Home</Link>
           <Link href="/participants" className="rounded px-1.5 py-px hover:bg-neutral-800 sm:px-3 sm:py-1.5">Participants</Link>
           <Link href="/winners" className="rounded px-1.5 py-px hover:bg-neutral-800 sm:px-3 sm:py-1.5">Winners</Link>
-          <Link href="/testimonials" className="rounded px-1.5 py-px hover:bg-neutral-800 sm:px-3 sm:py-1.5">Testimonials</Link>
           <Link href="/kata-arena" className="rounded px-1.5 py-px hover:bg-neutral-800 sm:px-3 sm:py-1.5">Kata Arena</Link>
           <Link href="/announcements" className="rounded px-1.5 py-px hover:bg-neutral-800 sm:px-3 sm:py-1.5">Announcements</Link>
           <Link

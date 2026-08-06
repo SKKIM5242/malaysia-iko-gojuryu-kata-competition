@@ -21,9 +21,10 @@ function mmss(totalSeconds: number): string {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-/** Sample scripts to read from during a practice take — cue cards, not
- * word-for-word text (see lib/testimonial-scripts.ts for why). Video only:
- * voice/message testimonials have no length target to practice against. */
+/** Sample scripts to read from — cue cards, not word-for-word text (see
+ * lib/testimonial-scripts.ts for why). Shown for Video/Voice/Message, the
+ * three "make it yourself" paths — not for Choose file, since there's
+ * nothing left to prepare once you already have a finished recording. */
 function ScriptPicker() {
   const [band, setBand] = useState<ScriptLengthBand | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -94,14 +95,12 @@ function MediaTestimonialPanel({ kind, onDone }: { kind: "video" | "voice"; onDo
   const [seconds, setSeconds] = useState(0);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isFileUpload, setIsFileUpload] = useState(false);
   const streamRef = useRef<MediaStream | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const recordedBlobRef = useRef<Blob | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const isVideo = kind === "video";
   const minSeconds = isVideo ? TESTIMONIAL_MIN_VIDEO_SECONDS : 0;
@@ -171,21 +170,7 @@ function MediaTestimonialPanel({ kind, onDone }: { kind: "video" | "voice"; onDo
     if (blobUrl) URL.revokeObjectURL(blobUrl);
     setBlobUrl(null);
     recordedBlobRef.current = null;
-    setIsFileUpload(false);
-    // A file-picked take has no live camera stream to fall back to —
-    // send those back to "idle" so they can pick a file or turn the
-    // camera on again, instead of showing a dead live-preview phase.
-    setPhase(streamRef.current ? "live" : "idle");
-  }
-
-  function handleFilePicked(file: File) {
-    setError(null);
-    if (blobUrl) URL.revokeObjectURL(blobUrl);
-    recordedBlobRef.current = file;
-    setBlobUrl(URL.createObjectURL(file));
-    setIsFileUpload(true);
-    setSeconds(0);
-    setPhase("review");
+    setPhase("live");
   }
 
   async function useThisTake() {
@@ -269,33 +254,9 @@ function MediaTestimonialPanel({ kind, onDone }: { kind: "video" | "voice"; onDo
       </p>
 
       {phase === "idle" && (
-        <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={startLive} className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-semibold text-white hover:bg-neutral-700">
-            {isVideo ? "📷 Record now" : "🎙️ Turn on microphone"}
-          </button>
-          {isVideo && (
-            <>
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="rounded-md border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-50"
-              >
-                📁 Choose file
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="video/*"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleFilePicked(file);
-                  e.target.value = "";
-                }}
-              />
-            </>
-          )}
-        </div>
+        <button type="button" onClick={startLive} className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-semibold text-white hover:bg-neutral-700">
+          {isVideo ? "📷 Record now" : "🎙️ Turn on microphone"}
+        </button>
       )}
 
       {isVideo && (phase === "live" || phase === "recording") && (
@@ -330,19 +291,7 @@ function MediaTestimonialPanel({ kind, onDone }: { kind: "video" | "voice"; onDo
       {phase === "review" && blobUrl && (
         <div>
           {isVideo ? (
-            <video
-              src={blobUrl}
-              controls
-              playsInline
-              onLoadedMetadata={(e) => {
-                // Only a file picked from disk needs its length read this
-                // way — a live recording's `seconds` already comes from
-                // the interval timer, which is reliable; a freshly
-                // recorded webm blob's `.duration` metadata often isn't.
-                if (isFileUpload) setSeconds(Math.round(e.currentTarget.duration) || 0);
-              }}
-              className="mb-3 w-full max-w-md rounded-md bg-black"
-            />
+            <video src={blobUrl} controls playsInline className="mb-3 w-full max-w-md rounded-md bg-black" />
           ) : (
             <audio src={blobUrl} controls className="mb-3 w-full max-w-md" />
           )}
@@ -423,15 +372,166 @@ function MessageTestimonialPanel({ onDone }: { onDone: () => void }) {
   );
 }
 
-/** The 3-button chooser a Top-3 winner sees on /account until they've
- * submitted one testimonial — see WinnerTestimonialSection.tsx for the
- * gate note text and the "already submitted" replay shown afterward. */
+/** Already have a recording or a file saved elsewhere (not made live in the
+ * browser)? Pick it directly — video or audio, auto-detected from the file
+ * itself. No practice-take step, since there's nothing to rehearse: pick a
+ * different file if this isn't the one. */
+function UploadTestimonialPanel({ onDone }: { onDone: (kind: TestimonialKind) => void }) {
+  const [kind, setKind] = useState<"video" | "voice" | null>(null);
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [seconds, setSeconds] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<File | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => () => { if (blobUrl) URL.revokeObjectURL(blobUrl); }, [blobUrl]);
+
+  function pick(file: File) {
+    setError(null);
+    const detected = file.type.startsWith("video/") ? "video" : file.type.startsWith("audio/") ? "voice" : null;
+    if (!detected) {
+      setError("Please choose a video or audio file.");
+      return;
+    }
+    if (blobUrl) URL.revokeObjectURL(blobUrl);
+    fileRef.current = file;
+    setKind(detected);
+    setBlobUrl(URL.createObjectURL(file));
+    setSeconds(0);
+  }
+
+  function chooseDifferent() {
+    if (blobUrl) URL.revokeObjectURL(blobUrl);
+    fileRef.current = null;
+    setKind(null);
+    setBlobUrl(null);
+    setError(null);
+  }
+
+  const tooShort = kind === "video" && seconds > 0 && seconds < TESTIMONIAL_MIN_VIDEO_SECONDS;
+
+  async function submit() {
+    const file = fileRef.current;
+    if (!file || !kind) return;
+    setUploading(true);
+    setError(null);
+    try {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        setError("Your session expired — please sign in again.");
+        setUploading(false);
+        return;
+      }
+      const path = `${user.id}/${crypto.randomUUID()}.${extensionForMimeType(file.type)}`;
+      const { error: upErr } = await supabase.storage.from("testimonials").upload(path, file, { contentType: file.type });
+      if (upErr) {
+        setError("Upload failed — please check your connection and try again.");
+        setUploading(false);
+        return;
+      }
+      const fd = new FormData();
+      fd.set("kind", kind);
+      fd.set("path", path);
+      const result = await submitTestimonial({ ok: false }, fd);
+      if (!result.ok) {
+        setError(result.error ?? "Could not submit your testimonial.");
+        setUploading(false);
+        return;
+      }
+      onDone(kind);
+    } catch {
+      setError("Something went wrong uploading your testimonial. Please try again.");
+      setUploading(false);
+    }
+  }
+
+  return (
+    <div className="mt-3 rounded-md border border-neutral-200 bg-neutral-50 p-4">
+      {!blobUrl ? (
+        <>
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-semibold text-white hover:bg-neutral-700"
+          >
+            📁 Choose a video or audio file
+          </button>
+          <input
+            ref={inputRef}
+            type="file"
+            accept="video/*,audio/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) pick(file);
+              e.target.value = "";
+            }}
+          />
+        </>
+      ) : (
+        <div>
+          {kind === "video" ? (
+            <video
+              src={blobUrl}
+              controls
+              playsInline
+              onLoadedMetadata={(e) => setSeconds(Math.round(e.currentTarget.duration) || 0)}
+              className="mb-3 w-full max-w-md rounded-md bg-black"
+            />
+          ) : (
+            <audio src={blobUrl} controls className="mb-3 w-full max-w-md" />
+          )}
+          <p className="mb-2 text-xs text-neutral-500">
+            Detected as: {kind === "video" ? "🎥 Video" : "🎙️ Voice"}
+            {seconds > 0 ? ` — Length: ${mmss(seconds)}` : ""}
+          </p>
+          {tooShort && (
+            <p className="mb-2 text-xs font-semibold text-red-700">
+              Video testimonials need at least {mmss(TESTIMONIAL_MIN_VIDEO_SECONDS)}. Please choose a longer file.
+            </p>
+          )}
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={chooseDifferent}
+              className="rounded-md border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-50"
+            >
+              🔁 Choose a different file
+            </button>
+            <button
+              type="button"
+              onClick={submit}
+              disabled={uploading || tooShort}
+              className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-semibold text-white hover:bg-neutral-700 disabled:opacity-40"
+            >
+              {uploading ? "Uploading…" : "✅ Submit this testimonial"}
+            </button>
+          </div>
+        </div>
+      )}
+      {error && <p className="mt-2 text-sm font-semibold text-red-700">{error}</p>}
+    </div>
+  );
+}
+
+type ChooserOption = TestimonialKind | "upload";
+
+/** The 4-button chooser a Top-3 winner sees, whether on /winners (own row)
+ * or, going forward, wherever else it's embedded — see
+ * components/WinnerTestimonialInline.tsx for the gate notes and the
+ * "already submitted" replay shown once one exists. */
 export default function TestimonialRecorder() {
   const router = useRouter();
-  const [chosen, setChosen] = useState<TestimonialKind | null>(null);
+  const [chosen, setChosen] = useState<ChooserOption | null>(null);
   const [done, setDone] = useState(false);
+  const [submittedKind, setSubmittedKind] = useState<TestimonialKind | null>(null);
 
-  function handleDone() {
+  function handleDone(kind: TestimonialKind) {
+    setSubmittedKind(kind);
     setDone(true);
     router.refresh();
   }
@@ -440,7 +540,7 @@ export default function TestimonialRecorder() {
     return (
       <p className="mt-3 rounded-md border border-green-300 bg-green-50 px-4 py-3 text-sm font-semibold text-green-800">
         ✅ Thank you — your testimonial has been submitted. Your certificate download is now unlocked.
-        {chosen === "video" && " Since you recorded video, it also plays back automatically as your voice testimonial."}
+        {submittedKind === "video" && " Since it's video, it also plays back automatically as your voice testimonial."}
       </p>
     );
   }
@@ -448,7 +548,7 @@ export default function TestimonialRecorder() {
   return (
     <div>
       <div className="flex flex-wrap gap-2">
-        {(Object.keys(TESTIMONIAL_KIND_LABEL) as TestimonialKind[]).map((k) => (
+        {(["video", "voice", "message"] as TestimonialKind[]).map((k) => (
           <button
             key={k}
             type="button"
@@ -460,15 +560,35 @@ export default function TestimonialRecorder() {
             {TESTIMONIAL_KIND_LABEL[k]}
           </button>
         ))}
+        <button
+          type="button"
+          onClick={() => setChosen("upload")}
+          className={`rounded-md border px-4 py-2 text-sm font-semibold ${
+            chosen === "upload" ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50"
+          }`}
+        >
+          📁 Choose file
+        </button>
       </div>
       {chosen === "video" && (
         <div className="mt-3">
           <ScriptPicker />
-          <MediaTestimonialPanel kind="video" onDone={handleDone} />
+          <MediaTestimonialPanel kind="video" onDone={() => handleDone("video")} />
         </div>
       )}
-      {chosen === "voice" && <MediaTestimonialPanel kind="voice" onDone={handleDone} />}
-      {chosen === "message" && <MessageTestimonialPanel onDone={handleDone} />}
+      {chosen === "voice" && (
+        <div className="mt-3">
+          <ScriptPicker />
+          <MediaTestimonialPanel kind="voice" onDone={() => handleDone("voice")} />
+        </div>
+      )}
+      {chosen === "message" && (
+        <div className="mt-3">
+          <ScriptPicker />
+          <MessageTestimonialPanel onDone={() => handleDone("message")} />
+        </div>
+      )}
+      {chosen === "upload" && <UploadTestimonialPanel onDone={handleDone} />}
     </div>
   );
 }

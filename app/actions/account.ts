@@ -495,7 +495,7 @@ export async function submitTestimonial(
     actor_id: user.id,
   });
   revalidatePath("/account");
-  revalidatePath("/testimonials");
+  revalidatePath("/winners");
   return { ok: true };
 }
 

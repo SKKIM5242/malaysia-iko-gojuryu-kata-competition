@@ -226,7 +226,7 @@ export default async function AdminCommissions({
   // video signed URLs elsewhere in the admin panel.
   const supabase = await createClient();
   // Reward payout is held until the winner has given a testimonial (see
-  // components/WinnerTestimonialSection.tsx) — also drives the Testimonial /
+  // components/WinnerTestimonialInline.tsx on /winners) — also drives the Testimonial /
   // Testimonial Date columns below, always computed live on every page load
   // (never a stale, once-a-day snapshot), so a testimonial given a minute
   // ago already shows here.

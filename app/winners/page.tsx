@@ -5,6 +5,7 @@ import { groupByKata } from "@/lib/division";
 import { computeCategoryRankings } from "@/lib/winners-ranking";
 import { winnersRevealDate, winnersRevealDateFor } from "@/lib/winners";
 import FullViewButton, { type FullViewJudge } from "@/components/FullViewButton";
+import WinnerTestimonialInline, { type WinnerTestimonialInfo } from "@/components/WinnerTestimonialInline";
 import type { Competition } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +21,7 @@ interface WinnerEntry {
   finalScore: number;
   playbackUrl: string | null;
   judges: FullViewJudge[];
+  testimonial: WinnerTestimonialInfo | null;
 }
 
 async function computeWinners(
@@ -81,6 +83,25 @@ async function computeWinners(
     criteriaByKey.set(`${s.video_id}:${s.referee_user_id}`, (s.criteria as number[] | null) ?? null);
   }
 
+  // Testimonials for every Top-3 registration in this competition — the
+  // merge point of what used to be the separate /testimonials page (now
+  // retired, see next.config.ts redirects).
+  const winningRegIds = winningEntries.map((e) => e.registrationId);
+  const { data: testimonialRows } =
+    winningRegIds.length > 0
+      ? await supabase.from("winner_testimonials").select("registration_id, kind, media_path, message").in("registration_id", winningRegIds)
+      : { data: [] };
+  const testimonialByRegId = new Map<string, WinnerTestimonialInfo>(
+    (testimonialRows ?? []).map((t) => [
+      t.registration_id as string,
+      {
+        kind: t.kind as WinnerTestimonialInfo["kind"],
+        mediaUrl: t.media_path ? supabase.storage.from("testimonials").getPublicUrl(t.media_path as string).data.publicUrl : null,
+        message: t.message as string | null,
+      },
+    ]),
+  );
+
   const result = new Map<string, WinnerEntry[]>();
   for (const [catId, entries] of rankings) {
     result.set(
@@ -100,6 +121,7 @@ async function computeWinners(
           reason: null,
           isOverride: false,
         })),
+        testimonial: testimonialByRegId.get(e.registrationId) ?? null,
       })),
     );
   }
@@ -203,6 +225,10 @@ async function CompetitionWinners({
                                 />
                               </span>
                             </div>
+                            <WinnerTestimonialInline
+                              isOwner={w.registrationId === myRegistrationId}
+                              testimonial={w.testimonial}
+                            />
                             {w.registrationId === myRegistrationId && (
                               <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5">
                                 <span className="text-xs font-semibold text-amber-800">🎓 That&apos;s you:</span>

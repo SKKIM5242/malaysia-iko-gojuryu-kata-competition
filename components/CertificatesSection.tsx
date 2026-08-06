@@ -39,8 +39,8 @@ async function participantLinks(
   // Winners get both — the achievement certificate on top of, not instead
   // of, the same participation certificate every other paid entrant gets.
   // The Winner Certificate itself, though, is held back until a testimonial
-  // has been given (see WinnerTestimonialSection.tsx and the matching
-  // server-side check in app/api/certificates/[kind]/[id]/route.tsx).
+  // has been given (see WinnerTestimonialInline.tsx on /winners and the
+  // matching server-side check in app/api/certificates/[kind]/[id]/route.tsx).
   const { count: testimonialCount } = await supabase
     .from("winner_testimonials")
     .select("id", { count: "exact", head: true })
