@@ -31,7 +31,17 @@ function ScriptPicker() {
 
   return (
     <div className="mb-3 rounded-md border border-neutral-200 bg-white p-3">
-      <p className="text-xs font-semibold text-neutral-600">📝 Sample scripts to practice with — pick a length:</p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs font-semibold text-neutral-600">📝 Sample scripts to practice with — pick a length:</p>
+        <a
+          href="/winner-testimonial-sample-scripts.pdf"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="whitespace-nowrap text-xs font-semibold text-red-700 underline underline-offset-2 hover:text-red-800"
+        >
+          ⬇ Download all 40 as PDF
+        </a>
+      </div>
       <div className="mt-2 flex flex-wrap gap-1.5">
         {bands.map((b) => (
           <button

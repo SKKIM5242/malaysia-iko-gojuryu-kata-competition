@@ -55,8 +55,20 @@ export default async function TestimonialsPage() {
       <SiteHeader />
       <main className="mx-auto max-w-4xl px-4 py-10">
         <SectionTitle>Winner Testimonials</SectionTitle>
-        <p className="mb-6 text-sm text-neutral-500">
+        <p className="mb-2 text-sm text-neutral-500">
           What our Top 3 winners had to say — in their own words, voice, or video.
+        </p>
+        <p className="mb-6 text-xs text-neutral-400">
+          Recording your own?{" "}
+          <a
+            href="/winner-testimonial-sample-scripts.pdf"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-semibold text-red-700 underline underline-offset-2"
+          >
+            Download 40 sample scripts (PDF)
+          </a>{" "}
+          to practice with — also available from My Account when you record.
         </p>
         {testimonials.length === 0 ? (
           <EmptyState>No testimonials yet.</EmptyState>
