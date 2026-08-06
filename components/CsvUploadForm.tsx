@@ -2,8 +2,16 @@
 
 import { useActionState } from "react";
 import type { CsvUploadResult } from "@/lib/csv-bulk";
+import { useTableInteractions } from "@/lib/useTableInteractions";
+import TableInteractionOverlays from "@/components/TableInteractionOverlays";
 
 const initial: CsvUploadResult = { done: false };
+
+const FAILURE_COLS = [
+  { key: "row", label: "Row" },
+  { key: "name", label: "Name" },
+  { key: "error", label: "Problem" },
+] as const;
 
 export default function CsvUploadForm({
   action,
@@ -22,6 +30,18 @@ export default function CsvUploadForm({
   resultVerb?: string;
 }) {
   const [state, formAction, pending] = useActionState(action, initial);
+  const t = useTableInteractions();
+  const orderedCols = t
+    .orderColumnKeys(FAILURE_COLS.map((c) => c.key))
+    .map((k) => FAILURE_COLS.find((c) => c.key === k))
+    .filter((c): c is (typeof FAILURE_COLS)[number] => !!c);
+  const orderedFailures = state.failures
+    ? (() => {
+        const keys = t.orderRowKeys(state.failures.map((f) => String(f.row)));
+        const byKey = new Map(state.failures.map((f) => [String(f.row), f]));
+        return keys.map((k) => byKey.get(k)).filter((f): f is NonNullable<typeof f> => !!f);
+      })()
+    : [];
 
   return (
     <div className="rounded-md border border-neutral-200 bg-neutral-50 p-4">
@@ -48,17 +68,46 @@ export default function CsvUploadForm({
               <table className="w-full min-w-[420px] text-left text-xs">
                 <thead className="border-b border-neutral-200 bg-neutral-50 uppercase tracking-wide text-neutral-500">
                   <tr>
-                    <th className="px-2 py-1.5">Row</th>
-                    <th className="px-2 py-1.5">Name</th>
-                    <th className="px-2 py-1.5">Problem</th>
+                    {orderedCols.map((c) => (
+                      <th key={c.key} data-col-order-key={c.key} className="px-2 py-1.5">
+                        <span onPointerDown={t.getColHeaderDownHandler(c.key, () => {})} title="Drag to reorder" className="block cursor-pointer select-none">
+                          {c.label}
+                        </span>
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100">
-                  {state.failures.map((f) => (
-                    <tr key={f.row}>
-                      <td className="px-2 py-1.5 text-neutral-400">{f.row}</td>
-                      <td className="px-2 py-1.5 font-medium">{f.name}</td>
-                      <td className="px-2 py-1.5 text-red-600">{f.error}</td>
+                  {orderedFailures.map((f) => (
+                    <tr key={f.row} data-row-order-key={String(f.row)}>
+                      {orderedCols.map((c, i) => {
+                        const text = String(f[c.key]);
+                        const isCellSelected = t.isCellSelected(String(f.row), c.key);
+                        const isFillPreview = t.isFillPreview(String(f.row), c.key);
+                        const displayText = t.cellValue(String(f.row), c.key, text);
+                        return (
+                          <td
+                            key={c.key}
+                            data-cell-row={String(f.row)}
+                            data-cell-col={c.key}
+                            onPointerDown={i === 0 ? t.getRowHandleDownHandler(String(f.row), () => {}) : undefined}
+                            onClick={i !== 0 ? () => t.selectCell(String(f.row), c.key) : undefined}
+                            onContextMenu={t.getContextMenuHandler(displayText)}
+                            className={`relative px-2 py-1.5 ${i === 0 ? "cursor-pointer select-none text-neutral-400" : i === 1 ? "font-medium" : "text-red-600"} ${
+                              isCellSelected ? "ring-2 ring-inset ring-blue-500" : ""
+                            } ${isFillPreview ? "outline outline-2 -outline-offset-2 outline-blue-300" : ""}`}
+                          >
+                            {displayText}
+                            {isCellSelected && (
+                              <span
+                                onPointerDown={t.getFillHandleDownHandler(String(f.row), c.key, displayText)}
+                                title="Drag to copy this value into other cells"
+                                className="absolute -bottom-1 -right-1 z-20 h-2.5 w-2.5 cursor-crosshair rounded-sm border border-white bg-blue-600"
+                              />
+                            )}
+                          </td>
+                        );
+                      })}
                     </tr>
                   ))}
                 </tbody>
@@ -68,6 +117,7 @@ export default function CsvUploadForm({
                   Showing first {state.failures.length} of {state.failed} failures.
                 </p>
               )}
+              <TableInteractionOverlays t={t} />
             </div>
           )}
         </div>
