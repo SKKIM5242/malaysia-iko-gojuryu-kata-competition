@@ -2,10 +2,16 @@ import { createClient } from "@/lib/supabase/server";
 import { winnersRevealed } from "@/lib/winners";
 import { computeCategoryRankings } from "@/lib/winners-ranking";
 import ProtectedCertificateViewer from "@/components/ProtectedCertificateViewer";
+import TestimonialSamplesButton from "@/components/TestimonialSamplesButton";
 
 interface CertLink {
   label: string;
   href: string;
+  /** Winner Certificate only, before a testimonial has been given — shown
+   * as a locked notice (with a way to preview sample testimonials) instead
+   * of being silently omitted, so it's clear why the download isn't there
+   * yet rather than looking like it's just missing. */
+  locked?: boolean;
 }
 
 type CompetitionRow = { name: string; registration_deadline: string | null; winners_announce_date: string | null };
@@ -40,11 +46,11 @@ async function participantLinks(
     .from("winner_testimonials")
     .select("id", { count: "exact", head: true })
     .eq("registration_id", registrationId);
-  const winnerLink =
+  const winnerLink: CertLink =
     (testimonialCount ?? 0) > 0
       ? { label: `Winner Certificate — ${competition.name}`, href: `/api/certificates/winner/${registrationId}` }
-      : null;
-  return winnerLink ? [winnerLink, participationLink] : [participationLink];
+      : { label: `Winner Certificate — ${competition.name}`, href: "", locked: true };
+  return [winnerLink, participationLink];
 }
 
 async function refereeLinks(supabase: Awaited<ReturnType<typeof createClient>>, userId: string): Promise<CertLink[]> {
@@ -158,14 +164,27 @@ export default async function CertificatesSection({
     <div className="mt-6">
       <h2 className="mb-3 text-lg font-bold">Your Certificate</h2>
       <div className="space-y-3 rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
-        {links.map((l) => (
-          <div key={l.href} className="rounded-md border border-neutral-200 p-3">
-            <p className="mb-2 text-sm font-semibold text-neutral-700">{l.label}</p>
-            <div className="flex flex-wrap gap-2">
-              <ProtectedCertificateViewer viewHref={viewHref(l.href)} label={l.label} />
+        {links.map((l) =>
+          l.locked ? (
+            <div key={l.label} className="rounded-md border border-amber-200 bg-amber-50 p-3">
+              <p className="mb-1 text-sm font-semibold text-amber-900">{l.label}</p>
+              <p className="text-xs text-amber-800">
+                🔒 Give your testimonial to unlock this download — go to the Winners page and find your win to submit
+                one.
+              </p>
+              <div className="mt-2">
+                <TestimonialSamplesButton className="rounded-md border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100" />
+              </div>
             </div>
-          </div>
-        ))}
+          ) : (
+            <div key={l.href} className="rounded-md border border-neutral-200 p-3">
+              <p className="mb-2 text-sm font-semibold text-neutral-700">{l.label}</p>
+              <div className="flex flex-wrap gap-2">
+                <ProtectedCertificateViewer viewHref={viewHref(l.href)} label={l.label} />
+              </div>
+            </div>
+          ),
+        )}
       </div>
     </div>
   );

@@ -256,10 +256,16 @@ async function CompetitionWinners({
                                 <span className="text-xs font-semibold text-amber-800">🎓 That&apos;s you:</span>
                                 <span className="flex flex-wrap items-center gap-1.5">
                                   <span className="text-xs text-amber-800">Winner Certificate</span>
-                                  <ProtectedCertificateViewer
-                                    viewHref={`/api/certificates/winner/${w.registrationId}?view=1`}
-                                    label="Winner Certificate"
-                                  />
+                                  {w.testimonial ? (
+                                    <ProtectedCertificateViewer
+                                      viewHref={`/api/certificates/winner/${w.registrationId}?view=1`}
+                                      label="Winner Certificate"
+                                    />
+                                  ) : (
+                                    <span className="text-[11px] font-semibold text-amber-700">
+                                      🔒 Give your testimonial below to unlock
+                                    </span>
+                                  )}
                                 </span>
                                 <span className="flex flex-wrap items-center gap-1.5">
                                   <span className="text-xs text-amber-800">Certificate of Participation</span>
