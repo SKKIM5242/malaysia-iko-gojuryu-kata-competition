@@ -1,7 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { winnersRevealed } from "@/lib/winners";
 import { computeCategoryRankings } from "@/lib/winners-ranking";
-import ProtectedCertificateViewer from "@/components/ProtectedCertificateViewer";
 import TestimonialSamplesButton from "@/components/TestimonialSamplesButton";
 
 interface CertLink {
@@ -180,7 +179,20 @@ export default async function CertificatesSection({
             <div key={l.href} className="rounded-md border border-neutral-200 p-3">
               <p className="mb-2 text-sm font-semibold text-neutral-700">{l.label}</p>
               <div className="flex flex-wrap gap-2">
-                <ProtectedCertificateViewer viewHref={viewHref(l.href)} label={l.label} />
+                <a
+                  href={viewHref(l.href)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50"
+                >
+                  👁 View
+                </a>
+                <a
+                  href={l.href}
+                  className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-neutral-700"
+                >
+                  ⬇ Download
+                </a>
               </div>
             </div>
           ),
