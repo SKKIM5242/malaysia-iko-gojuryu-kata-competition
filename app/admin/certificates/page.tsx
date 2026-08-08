@@ -219,10 +219,11 @@ export default async function AdminCertificates({
                           Certificate date
                         </label>
                         <DateField
+                          key={`${c.id}-${c.certificate_date ?? ""}-${c.winners_announce_date ?? ""}-${c.event_date ?? ""}`}
                           id={`certificate_date_${c.id}`}
                           name="certificate_date"
                           required={false}
-                          defaultValueISO={c.certificate_date ?? c.event_date ?? ""}
+                          defaultValueISO={c.certificate_date ?? c.winners_announce_date ?? c.event_date ?? ""}
                           className={adminInput}
                         />
                       </div>

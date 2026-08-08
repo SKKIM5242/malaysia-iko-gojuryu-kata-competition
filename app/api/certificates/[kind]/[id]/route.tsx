@@ -199,7 +199,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ kind
       categoryName: categoryLabel,
       kataName,
       rank,
-      dateLabel: formatDate(competition.certificate_date ?? competition.event_date),
+      dateLabel: formatDate(competition.certificate_date ?? competition.winners_announce_date ?? competition.event_date),
       ...settings,
     });
     // Every real (non-sample) certificate is protected — never a forced
@@ -252,7 +252,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ kind
       categoryName: null,
       kataName: null,
       rank: null,
-      dateLabel: formatDate((comp.certificate_date ?? comp.event_date) as string | null),
+      dateLabel: formatDate((comp.certificate_date ?? comp.winners_announce_date ?? comp.event_date) as string | null),
       ...settings,
     });
     return pngResponse(image, "referee-certificate.png", true);
@@ -303,7 +303,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ kind
       categoryName: null,
       kataName: null,
       rank: null,
-      dateLabel: formatDate((comp.certificate_date ?? comp.event_date) as string | null),
+      dateLabel: formatDate((comp.certificate_date ?? comp.winners_announce_date ?? comp.event_date) as string | null),
       ...settings,
     });
     return pngResponse(image, `${kind}-certificate.png`, true);
@@ -344,7 +344,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ kind
       categoryName: null,
       kataName: null,
       rank: null,
-      dateLabel: formatDate((comp.certificate_date ?? comp.event_date) as string | null),
+      dateLabel: formatDate((comp.certificate_date ?? comp.winners_announce_date ?? comp.event_date) as string | null),
       ...settings,
     });
     return pngResponse(image, "support-certificate.png", true);
