@@ -185,6 +185,7 @@ export async function registerReferee(
       "",
       "Once signed in (and approved), you can view every event on Kata Arena, with every judge's individual score — your own scoring responsibility is limited to the recordings assigned to you.",
       "Next: once every registration under this email is done, create your sign-in account (or sign in if you already have one) using the Kata Arena log in link below.",
+      "Once signed in, open My Account and tap \"Connect Telegram for assignment notifications\" — you'll be pinged there the moment you're assigned a new recording to judge.",
     ],
   });
   return { ok: true, referenceId };
