@@ -39,3 +39,14 @@ export function winnersRevealed(registrationDeadline: string | null, overrideDat
   if (!date) return false;
   return new Date() >= date;
 }
+
+/** 30 calendar days after winners were revealed — the window during which a
+ * winner may edit/retake/re-amend their own testimonial, unlimited times
+ * (see editTestimonial in app/actions/account.ts). Plain calendar days, no
+ * working-day rounding — unlike winnersRevealDate, this is a fixed deadline,
+ * not an announcement date that should dodge a weekend. */
+export function testimonialEditDeadline(revealDate: Date): Date {
+  const d = new Date(revealDate);
+  d.setUTCDate(d.getUTCDate() + 30);
+  return d;
+}

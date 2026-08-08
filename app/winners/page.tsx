@@ -4,7 +4,7 @@ import { EmptyState, NoTranslate, SectionTitle, SetupNotice, formatDate } from "
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { groupByKata } from "@/lib/division";
 import { computeCategoryRankings } from "@/lib/winners-ranking";
-import { winnersRevealDate, winnersRevealDateFor } from "@/lib/winners";
+import { winnersRevealDate, winnersRevealDateFor, testimonialEditDeadline } from "@/lib/winners";
 import FullViewButton, { type FullViewJudge } from "@/components/FullViewButton";
 import WinnerTestimonialInline, { type WinnerTestimonialInfo } from "@/components/WinnerTestimonialInline";
 import type { Competition } from "@/lib/types";
@@ -185,6 +185,7 @@ async function CompetitionWinners({
   const categoryNameById = new Map(categories.map((c) => [c.id, c.name]));
   const winnersByCategory = await computeWinners(supabase, competition.id, categoryNameById);
   const withWinners = categories.filter((cat) => (winnersByCategory.get(cat.id) ?? []).length > 0);
+  const editDeadlineISO = testimonialEditDeadline(revealDate).toISOString();
 
   return (
     <section>
@@ -249,6 +250,7 @@ async function CompetitionWinners({
                               isOwner={w.registrationId === myRegistrationId}
                               isManager={isManager}
                               testimonial={w.testimonial}
+                              editDeadlineISO={editDeadlineISO}
                             />
                             {w.registrationId === myRegistrationId && (
                               <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5">

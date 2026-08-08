@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { submitTestimonial } from "@/app/actions/account";
+import { submitTestimonial, editTestimonial } from "@/app/actions/account";
 import { pickVideoMimeType, pickAudioMimeType, extensionForMimeType } from "@/lib/media-recording";
 import {
   TESTIMONIAL_KIND_LABEL,
@@ -90,7 +90,15 @@ function ScriptPicker() {
  * audio) differ. A "Practice take" never uploads — it's local-only
  * rehearsal, per the organizer's "pre-recorded then time adjustment"
  * instruction — only "Actual recording" submits. */
-function MediaTestimonialPanel({ kind, onDone }: { kind: "video" | "voice"; onDone: () => void }) {
+function MediaTestimonialPanel({
+  kind,
+  mode,
+  onDone,
+}: {
+  kind: "video" | "voice";
+  mode: "submit" | "edit";
+  onDone: () => void;
+}) {
   const [takeType, setTakeType] = useState<"practice" | "actual">("practice");
   const [phase, setPhase] = useState<Phase>("idle");
   const [seconds, setSeconds] = useState(0);
@@ -208,7 +216,8 @@ function MediaTestimonialPanel({ kind, onDone }: { kind: "video" | "voice"; onDo
       const fd = new FormData();
       fd.set("kind", kind);
       fd.set("path", path);
-      const result = await submitTestimonial({ ok: false }, fd);
+      const action = mode === "edit" ? editTestimonial : submitTestimonial;
+      const result = await action({ ok: false }, fd);
       if (!result.ok) {
         setError(result.error ?? "Could not submit your testimonial.");
         setPhase("review");
@@ -326,7 +335,7 @@ function MediaTestimonialPanel({ kind, onDone }: { kind: "video" | "voice"; onDo
   );
 }
 
-function MessageTestimonialPanel({ onDone }: { onDone: () => void }) {
+function MessageTestimonialPanel({ mode, onDone }: { mode: "submit" | "edit"; onDone: () => void }) {
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -341,7 +350,8 @@ function MessageTestimonialPanel({ onDone }: { onDone: () => void }) {
     const fd = new FormData();
     fd.set("kind", "message");
     fd.set("message", message.trim());
-    const result = await submitTestimonial({ ok: false }, fd);
+    const action = mode === "edit" ? editTestimonial : submitTestimonial;
+    const result = await action({ ok: false }, fd);
     setPending(false);
     if (!result.ok) {
       setError(result.error ?? "Could not submit your testimonial.");
@@ -377,7 +387,13 @@ function MessageTestimonialPanel({ onDone }: { onDone: () => void }) {
  * browser)? Pick it directly — video or audio, auto-detected from the file
  * itself. No practice-take step, since there's nothing to rehearse: pick a
  * different file if this isn't the one. */
-function UploadTestimonialPanel({ onDone }: { onDone: (kind: TestimonialKind) => void }) {
+function UploadTestimonialPanel({
+  mode,
+  onDone,
+}: {
+  mode: "submit" | "edit";
+  onDone: (kind: TestimonialKind) => void;
+}) {
   const [kind, setKind] = useState<"video" | "voice" | null>(null);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [seconds, setSeconds] = useState(0);
@@ -437,7 +453,8 @@ function UploadTestimonialPanel({ onDone }: { onDone: (kind: TestimonialKind) =>
       const fd = new FormData();
       fd.set("kind", kind);
       fd.set("path", path);
-      const result = await submitTestimonial({ ok: false }, fd);
+      const action = mode === "edit" ? editTestimonial : submitTestimonial;
+      const result = await action({ ok: false }, fd);
       if (!result.ok) {
         setError(result.error ?? "Could not submit your testimonial.");
         setUploading(false);
@@ -523,16 +540,33 @@ type ChooserOption = TestimonialKind | "upload";
  * or, going forward, wherever else it's embedded — see
  * components/WinnerTestimonialInline.tsx for the gate notes and the
  * "already submitted" replay shown once one exists. */
-export default function TestimonialRecorder() {
+export default function TestimonialRecorder({
+  mode = "submit",
+  onSaved,
+}: {
+  /** "edit" re-records/re-types an already-submitted testimonial (calls
+   * editTestimonial, an UPDATE) instead of the default first-time "submit"
+   * (calls submitTestimonial, an INSERT) — see WinnerTestimonialInline.tsx,
+   * which shows this in "edit" mode inside its own Edit/Retake toggle. */
+  mode?: "submit" | "edit";
+  /** "edit" mode only — called once the update succeeds, so the parent can
+   * collapse back to the read-only view instead of showing the "thank you"
+   * screen below (which only makes sense for a first submission). */
+  onSaved?: () => void;
+}) {
   const router = useRouter();
   const [chosen, setChosen] = useState<ChooserOption | null>(null);
   const [done, setDone] = useState(false);
   const [submittedKind, setSubmittedKind] = useState<TestimonialKind | null>(null);
 
   function handleDone(kind: TestimonialKind) {
+    router.refresh();
+    if (mode === "edit") {
+      onSaved?.();
+      return;
+    }
     setSubmittedKind(kind);
     setDone(true);
-    router.refresh();
   }
 
   if (done) {
@@ -572,22 +606,22 @@ export default function TestimonialRecorder() {
       {chosen === "video" && (
         <div className="mt-3">
           <ScriptPicker />
-          <MediaTestimonialPanel kind="video" onDone={() => handleDone("video")} />
+          <MediaTestimonialPanel kind="video" mode={mode} onDone={() => handleDone("video")} />
         </div>
       )}
       {chosen === "voice" && (
         <div className="mt-3">
           <ScriptPicker />
-          <MediaTestimonialPanel kind="voice" onDone={() => handleDone("voice")} />
+          <MediaTestimonialPanel kind="voice" mode={mode} onDone={() => handleDone("voice")} />
         </div>
       )}
       {chosen === "message" && (
         <div className="mt-3">
           <ScriptPicker />
-          <MessageTestimonialPanel onDone={() => handleDone("message")} />
+          <MessageTestimonialPanel mode={mode} onDone={() => handleDone("message")} />
         </div>
       )}
-      {chosen === "upload" && <UploadTestimonialPanel onDone={handleDone} />}
+      {chosen === "upload" && <UploadTestimonialPanel mode={mode} onDone={handleDone} />}
     </div>
   );
 }

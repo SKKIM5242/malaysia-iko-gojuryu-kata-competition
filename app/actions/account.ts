@@ -10,6 +10,7 @@ import { getStripe, paymentsEnabled } from "@/lib/payments";
 import { notifyParticipantScored } from "@/lib/notify";
 import { isWithinSignInQuota } from "@/lib/sign-in-quota";
 import { computeCategoryRankings } from "@/lib/winners-ranking";
+import { winnersRevealDate, winnersRevealDateFor, testimonialEditDeadline } from "@/lib/winners";
 import type { TestimonialKind } from "@/lib/testimonials";
 
 export interface AccountActionState {
@@ -491,6 +492,102 @@ export async function submitTestimonial(
     table_name: "winner_testimonials",
     record_id: profile.registration_id,
     action: "testimonial_submitted",
+    new_value: { kind: kind as TestimonialKind },
+    actor_id: user.id,
+  });
+  revalidatePath("/account");
+  revalidatePath("/winners");
+  return { ok: true };
+}
+
+/** Edit/retake/re-amend a Top-3 winner's OWN testimonial — unlimited times,
+ * but only within 30 calendar days of winners being revealed for this
+ * competition (see testimonialEditDeadline in lib/winners.ts). Re-runs the
+ * same auth/ownership/Top-3 checks as submitTestimonial, then UPDATEs
+ * (rather than INSERTs) the existing row via the service-role client:
+ * there's deliberately no owner-UPDATE RLS policy on winner_testimonials
+ * (see migration 0111) — only an organizer's soft-delete was meant to touch
+ * someone else's row, so this action enforces the owner/deadline/not-deleted
+ * checks itself before reaching for the same privileged client deleteTestimonial
+ * uses. A prior admin soft-delete blocks editing, same as it blocks a fresh
+ * submission. */
+export async function editTestimonial(
+  _prev: AccountActionState,
+  formData: FormData,
+): Promise<AccountActionState> {
+  const kind = String(formData.get("kind") ?? "");
+  if (!["video", "voice", "message"].includes(kind)) {
+    return { ok: false, error: "Invalid testimonial type." };
+  }
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sign in first." };
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("registration_id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (!profile?.registration_id) return { ok: false, error: "Link your registration first." };
+
+  const { data: reg } = await supabase
+    .from("registrations")
+    .select("competition_id, competition:competitions(registration_deadline, winners_announce_date)")
+    .eq("id", profile.registration_id)
+    .maybeSingle();
+  if (!reg) return { ok: false, error: "Registration not found." };
+
+  const rankings = await computeCategoryRankings(supabase, reg.competition_id as string);
+  const isWinner = [...rankings.values()].flat().some((e) => e.registrationId === profile.registration_id);
+  if (!isWinner) return { ok: false, error: "Testimonials are only for Top 3 winners." };
+
+  const competition = reg.competition as unknown as {
+    registration_deadline: string | null;
+    winners_announce_date: string | null;
+  } | null;
+  const revealDate = competition
+    ? (winnersRevealDateFor(competition.registration_deadline, competition.winners_announce_date) ??
+        (competition.registration_deadline ? winnersRevealDate(competition.registration_deadline) : null))
+    : null;
+  if (!revealDate || new Date() > testimonialEditDeadline(revealDate)) {
+    return { ok: false, error: "The 30-day window to edit your testimonial has closed." };
+  }
+
+  const { data: existing } = await supabase
+    .from("winner_testimonials")
+    .select("id, media_path, deleted_at")
+    .eq("registration_id", profile.registration_id)
+    .maybeSingle();
+  if (!existing) return { ok: false, error: "Submit your first testimonial before editing." };
+  if (existing.deleted_at) {
+    return { ok: false, error: "This testimonial was removed by the organizer — you can't resubmit." };
+  }
+
+  let media_path: string | null = null;
+  let message: string | null = null;
+  if (kind === "message") {
+    message = String(formData.get("message") ?? "").trim();
+    if (!message) return { ok: false, error: "Type your testimonial message." };
+  } else {
+    media_path = String(formData.get("path") ?? "");
+    if (!media_path.startsWith(`${user.id}/`)) return { ok: false, error: "Invalid recording reference." };
+  }
+
+  const admin = createAdminClient();
+  const oldMediaPath = existing.media_path as string | null;
+  const { error } = await admin.from("winner_testimonials").update({ kind, media_path, message }).eq("id", existing.id);
+  if (error) return { ok: false, error: "Could not save your changes — please try again." };
+
+  if (oldMediaPath && oldMediaPath !== media_path) {
+    await admin.storage.from("testimonials").remove([oldMediaPath]);
+  }
+
+  await writeAudit(supabase, {
+    table_name: "winner_testimonials",
+    record_id: profile.registration_id,
+    action: "testimonial_edited",
     new_value: { kind: kind as TestimonialKind },
     actor_id: user.id,
   });
