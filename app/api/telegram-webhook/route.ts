@@ -24,9 +24,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "invalid secret" }, { status: 401 });
   }
 
+  let rawBody: unknown;
   let update: TelegramUpdate;
   try {
-    update = (await request.json()) as TelegramUpdate;
+    rawBody = await request.json();
+    update = rawBody as TelegramUpdate;
   } catch {
     return NextResponse.json({ error: "invalid payload" }, { status: 400 });
   }
@@ -41,7 +43,10 @@ export async function POST(request: Request) {
   if (chatType === "group" || chatType === "supergroup") {
     console.log(`[telegram-webhook] group message — chat_id=${chatId} title="${update.message?.chat.title}"`);
   } else {
-    console.log(`[telegram-webhook] private message — chat_id=${chatId} text=${JSON.stringify(text)}`);
+    // Logs the full raw update while diagnosing why some private "Connect
+    // Telegram" attempts weren't producing a plain message.text — remove
+    // once that's resolved.
+    console.log(`[telegram-webhook] private update raw=${JSON.stringify(rawBody)}`);
   }
   const match = /^\/start\s+([0-9a-f-]{36})$/i.exec(text);
   if (match && chatId) {
