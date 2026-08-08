@@ -202,10 +202,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ kind
       dateLabel: formatDate(competition.certificate_date ?? competition.event_date),
       ...settings,
     });
-    // Participation certificates are view-only — never a forced download,
-    // regardless of how the URL is hit (see ProtectedCertificateViewer.tsx,
-    // which never links the "?view=1" URL as a plain downloadable href).
-    return pngResponse(image, `${kind}-certificate.png`, kind === "participant" ? true : inline);
+    return pngResponse(image, `${kind}-certificate.png`, inline);
   }
 
   if (kind === "referee") {

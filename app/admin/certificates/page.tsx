@@ -183,24 +183,30 @@ export default async function AdminCertificates({
                             : "No registration deadline set yet."}
                         </p>
                       </div>
-                      {revealed ? (
-                        <span className="rounded-full border border-green-300 bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-800">
-                          Certificates live
-                        </span>
-                      ) : (
-                        revealDate && (
+                      <div className="flex items-center gap-2">
+                        {revealed && (
+                          <span className="rounded-full border border-green-300 bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-800">
+                            Certificates live
+                          </span>
+                        )}
+                        {revealDate && (
                           <form action={publishWinnersNow}>
                             <input type="hidden" name="competition_id" value={c.id} />
                             <input type="hidden" name="return_to" value="/admin/certificates" />
                             <button
-                              className={adminBtn}
-                              title="Publishes this tier's winners and certificates right now, instead of waiting for the scheduled date"
+                              disabled={revealed}
+                              className={revealed ? `${adminBtn} cursor-not-allowed opacity-40` : adminBtn}
+                              title={
+                                revealed
+                                  ? "Already published — certificates are live for this tier"
+                                  : "Publishes this tier's winners and certificates right now, instead of waiting for the scheduled date"
+                              }
                             >
                               Publish all Certificates
                             </button>
                           </form>
-                        )
-                      )}
+                        )}
+                      </div>
                     </div>
                     <form
                       action={saveCertificateDate}
