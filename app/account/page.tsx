@@ -424,6 +424,28 @@ export default async function AccountPage({
                 </p>
                 <TelegramFullAccessLinks links={staffTelegramLinks} />
               </div>
+              {(() => {
+                const connectUrl = getTelegramBotConnectUrl(user.id);
+                if (profile.telegram_chat_id) {
+                  return (
+                    <p className="mt-3 text-sm font-semibold text-green-700">
+                      ✅ Telegram connected — you&apos;ll be notified here for issue reports, testimonial
+                      removals, and other admin alerts.
+                    </p>
+                  );
+                }
+                if (!connectUrl) return null;
+                return (
+                  <a
+                    href={connectUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-3 inline-flex items-center gap-2 rounded-md border border-[#229ED9]/30 bg-[#229ED9]/5 px-4 py-2.5 text-sm font-semibold text-[#1c7fb5] hover:bg-[#229ED9]/10"
+                  >
+                    Connect Telegram for admin alerts
+                  </a>
+                );
+              })()}
             </div>
           ) : (
             <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-6">
