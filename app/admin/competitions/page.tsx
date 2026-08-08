@@ -169,7 +169,7 @@ export default async function AdminCompetitions({
           <div>
             <h2 className="mb-3 text-lg font-bold">{editing ? "Edit Competition" : "Create Competition"}</h2>
             <Card>
-              <form action={saveCompetition} className="space-y-4">
+              <form key={editing?.id ?? "create"} action={saveCompetition} className="space-y-4">
                 {editing && <input type="hidden" name="id" value={editing.id} />}
                 <div>
                   <label htmlFor="name" className={adminLabel}>Name *</label>
@@ -413,8 +413,8 @@ export default async function AdminCompetitions({
                   className="rounded-lg border border-neutral-200 bg-white shadow-sm"
                   open={editing?.id === c.id || categoryModalCompetition?.id === c.id || params.opencomp === c.id}
                 >
-                  <summary className="flex cursor-pointer flex-wrap items-start justify-between gap-2 px-4 py-3 hover:bg-neutral-50">
-                    <div>
+                  <summary className="flex cursor-pointer items-start justify-between gap-2 px-4 py-3 hover:bg-neutral-50">
+                    <div className="min-w-0 flex-1">
                       <p className="font-bold text-neutral-900">
                         <span className="mr-1 inline-block align-middle text-[2em] leading-none">▾</span>
                         {c.name}
@@ -437,7 +437,7 @@ export default async function AdminCompetitions({
                     {canManageCompetition && (
                       <Link
                         href={`/admin/competitions?edit=${c.id}`}
-                        className="rounded border border-neutral-300 px-3 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
+                        className="shrink-0 rounded border border-neutral-300 px-3 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
                       >
                         Edit
                       </Link>
