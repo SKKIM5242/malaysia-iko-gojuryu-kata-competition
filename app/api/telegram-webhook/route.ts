@@ -40,6 +40,8 @@ export async function POST(request: Request) {
   const chatType = update.message?.chat.type;
   if (chatType === "group" || chatType === "supergroup") {
     console.log(`[telegram-webhook] group message — chat_id=${chatId} title="${update.message?.chat.title}"`);
+  } else {
+    console.log(`[telegram-webhook] private message — chat_id=${chatId} text=${JSON.stringify(text)}`);
   }
   const match = /^\/start\s+([0-9a-f-]{36})$/i.exec(text);
   if (match && chatId) {
