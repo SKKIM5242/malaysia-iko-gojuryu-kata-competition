@@ -20,6 +20,23 @@ function appUrl(): string {
   return process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 }
 
+/** Vercel sets VERCEL_ENV="preview" for the staging deployment (and any
+ * other Preview build) automatically -- a real production build gets
+ * "production". Staging reuses the same real Telegram bot as production
+ * (a bot can only have one webhook), so every outbound message from here
+ * needs a clear notice, or a real person could easily mistake a message
+ * sent while someone's just testing on staging for a genuine production
+ * notification. Exported so app/api/telegram-webhook/route.ts's own
+ * direct fetch call (the auto-reply after Connect Telegram) can reuse it
+ * too, since that path doesn't go through any function in this file. */
+export function isStagingEnv(): boolean {
+  return process.env.VERCEL_ENV === "preview";
+}
+
+export function withStagingNotice(text: string): string {
+  return isStagingEnv() ? `🧪 Testing Environment — No action needed\n\n${text}` : text;
+}
+
 /** Sends one email via Resend, in plain text by default. Pass `html` for
  * the rare email (currently just the registration confirmation) that needs
  * inline styling Resend's plain `text` field can't carry — every email
@@ -404,7 +421,7 @@ async function postAnnouncementToGroup(
       body: JSON.stringify({
         chat_id: chatId,
         ...(threadId ? { message_thread_id: Number(threadId) } : {}),
-        text: `📢 ${title}${body ? `\n\n${body}` : ""}`,
+        text: withStagingNotice(`📢 ${title}${body ? `\n\n${body}` : ""}`),
       }),
     });
   } catch {
@@ -1032,7 +1049,7 @@ export async function sendAdminTelegramDM(chatId: string, text: string): Promise
     const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: chatId, text }),
+      body: JSON.stringify({ chat_id: chatId, text: withStagingNotice(text) }),
     });
     if (!res.ok) {
       const body = await res.text().catch(() => "");
@@ -1051,7 +1068,7 @@ async function sendDirectTelegramDM(chatId: string | null, text: string): Promis
     await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: chatId, text }),
+      body: JSON.stringify({ chat_id: chatId, text: withStagingNotice(text) }),
     });
   } catch {
     // Best-effort

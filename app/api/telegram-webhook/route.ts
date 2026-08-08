@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { withStagingNotice } from "@/lib/notify";
 
 export const dynamic = "force-dynamic";
 
@@ -62,7 +63,9 @@ export async function POST(request: Request) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             chat_id: chatId,
-            text: "✅ Telegram connected — you'll get a message here whenever the organizer assigns you a new kata recording to judge.",
+            text: withStagingNotice(
+              "✅ Telegram connected — you'll get a message here whenever the organizer assigns you a new kata recording to judge.",
+            ),
           }),
         });
       } catch {
