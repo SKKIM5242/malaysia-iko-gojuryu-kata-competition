@@ -7,6 +7,7 @@ import { computeCategoryRankings } from "@/lib/winners-ranking";
 import { winnersRevealDate, winnersRevealDateFor } from "@/lib/winners";
 import FullViewButton, { type FullViewJudge } from "@/components/FullViewButton";
 import WinnerTestimonialInline, { type WinnerTestimonialInfo } from "@/components/WinnerTestimonialInline";
+import ProtectedCertificateViewer from "@/components/ProtectedCertificateViewer";
 import type { Competition } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -255,37 +256,17 @@ async function CompetitionWinners({
                                 <span className="text-xs font-semibold text-amber-800">🎓 That&apos;s you:</span>
                                 <span className="flex flex-wrap items-center gap-1.5">
                                   <span className="text-xs text-amber-800">Winner Certificate</span>
-                                  <a
-                                    href={`/api/certificates/winner/${w.registrationId}?view=1`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="rounded border border-amber-300 px-2 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-100"
-                                  >
-                                    👁 View
-                                  </a>
-                                  <a
-                                    href={`/api/certificates/winner/${w.registrationId}`}
-                                    className="rounded bg-amber-800 px-2 py-1 text-xs font-semibold text-white hover:bg-amber-700"
-                                  >
-                                    ⬇ Download
-                                  </a>
+                                  <ProtectedCertificateViewer
+                                    viewHref={`/api/certificates/winner/${w.registrationId}?view=1`}
+                                    label="Winner Certificate"
+                                  />
                                 </span>
                                 <span className="flex flex-wrap items-center gap-1.5">
                                   <span className="text-xs text-amber-800">Certificate of Participation</span>
-                                  <a
-                                    href={`/api/certificates/participant/${w.registrationId}?view=1`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="rounded border border-amber-300 px-2 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-100"
-                                  >
-                                    👁 View
-                                  </a>
-                                  <a
-                                    href={`/api/certificates/participant/${w.registrationId}`}
-                                    className="rounded bg-amber-800 px-2 py-1 text-xs font-semibold text-white hover:bg-amber-700"
-                                  >
-                                    ⬇ Download
-                                  </a>
+                                  <ProtectedCertificateViewer
+                                    viewHref={`/api/certificates/participant/${w.registrationId}?view=1`}
+                                    label="Certificate of Participation"
+                                  />
                                 </span>
                               </div>
                             )}

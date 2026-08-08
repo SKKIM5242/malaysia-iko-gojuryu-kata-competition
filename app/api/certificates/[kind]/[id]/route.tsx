@@ -202,7 +202,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ kind
       dateLabel: formatDate(competition.certificate_date ?? competition.event_date),
       ...settings,
     });
-    return pngResponse(image, `${kind}-certificate.png`, inline);
+    // Every real (non-sample) certificate is protected — never a forced
+    // download, regardless of how the URL is hit (see
+    // components/CertificatesSection.tsx, which never links a plain
+    // downloadable href for any kind).
+    return pngResponse(image, `${kind}-certificate.png`, true);
   }
 
   if (kind === "referee") {
@@ -251,7 +255,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ kind
       dateLabel: formatDate((comp.certificate_date ?? comp.event_date) as string | null),
       ...settings,
     });
-    return pngResponse(image, "referee-certificate.png", inline);
+    return pngResponse(image, "referee-certificate.png", true);
   }
 
   if (kind === "sensei" || kind === "school") {
@@ -302,7 +306,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ kind
       dateLabel: formatDate((comp.certificate_date ?? comp.event_date) as string | null),
       ...settings,
     });
-    return pngResponse(image, `${kind}-certificate.png`, inline);
+    return pngResponse(image, `${kind}-certificate.png`, true);
   }
 
   if (kind === "support") {
@@ -343,7 +347,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ kind
       dateLabel: formatDate((comp.certificate_date ?? comp.event_date) as string | null),
       ...settings,
     });
-    return pngResponse(image, "support-certificate.png", inline);
+    return pngResponse(image, "support-certificate.png", true);
   }
 
   return new Response("This certificate type isn't available yet.", { status: 501 });
