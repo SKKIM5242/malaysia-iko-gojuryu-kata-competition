@@ -405,6 +405,7 @@ export async function submitRegistration(
       "",
       "Once signed in, you can record & submit your own registered event(s) — and every event once Winners are announced.",
       "Next: once every registration under this email is done, create your sign-in account (or sign in if you already have one) using the Kata Arena log in link below.",
+      "Once signed in, open My Account and tap \"Connect Telegram for judging alerts\" — you'll be pinged there once every judge has scored your recording.",
     ],
   });
 
