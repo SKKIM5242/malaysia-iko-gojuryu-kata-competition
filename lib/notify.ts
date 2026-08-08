@@ -525,6 +525,106 @@ export async function notifyWinnersAnnounced(competitionName: string): Promise<v
 export interface CertificateEmailRecipient {
   email: string | null;
   name: string;
+  telegramChatId: string | null;
+}
+
+/** Every person eligible for a certificate on this competition — paid
+ * participants, referees who judged at least one of its videos, and every
+ * sensei/school with at least one paid student in it — each carrying their
+ * own connected telegram_chat_id (via participants.user_id / referees.
+ * user_id / senseis.user_id / schools.user_id, all resolved against
+ * profiles.user_id) so notifyCertificatesPublished can DM them directly in
+ * addition to the batch email, mirroring exactly who the certificate route
+ * (app/api/certificates/[kind]/[id]/route.tsx) would actually issue a
+ * certificate to. Shared by publishWinnersNow (app/actions/admin.ts) and
+ * the daily cron (app/api/cron/judging-timeline) so both triggers notify
+ * the same full set of people, not just participants. */
+export async function competitionCertificateRecipients(
+  competitionId: string,
+): Promise<CertificateEmailRecipient[]> {
+  const admin = createAdminClient();
+  const recipients: CertificateEmailRecipient[] = [];
+
+  async function chatIdsFor(userIds: string[]): Promise<Map<string, string | null>> {
+    if (userIds.length === 0) return new Map();
+    const { data } = await admin.from("profiles").select("user_id, telegram_chat_id").in("user_id", userIds);
+    return new Map((data ?? []).map((p) => [p.user_id as string, p.telegram_chat_id as string | null]));
+  }
+
+  // Participants — paid registrations in this competition.
+  const { data: regs } = await admin
+    .from("registrations")
+    .select("participant:participants(id, full_name, email, user_id)")
+    .eq("competition_id", competitionId)
+    .eq("payment_status", "paid");
+  type ParticipantRow = { id: string; full_name: string; email: string | null; user_id: string | null };
+  const participantRows = ((regs ?? []) as unknown as Array<{ participant: ParticipantRow | null }>)
+    .map((r) => r.participant)
+    .filter((p): p is ParticipantRow => !!p);
+  const participantChatIds = await chatIdsFor(
+    participantRows.map((p) => p.user_id).filter((v): v is string => !!v),
+  );
+  for (const p of participantRows) {
+    recipients.push({
+      name: p.full_name,
+      email: p.email,
+      telegramChatId: p.user_id ? (participantChatIds.get(p.user_id) ?? null) : null,
+    });
+  }
+
+  // Referees — judged at least one video belonging to this competition.
+  const { data: compRegs } = await admin.from("registrations").select("id").eq("competition_id", competitionId);
+  const compRegIds = (compRegs ?? []).map((r) => r.id as string);
+  let refereeUserIds: string[] = [];
+  if (compRegIds.length > 0) {
+    const { data: videos } = await admin.from("kata_videos").select("id, registration_id").in("registration_id", compRegIds);
+    const videoIds = (videos ?? []).map((v) => v.id as string);
+    if (videoIds.length > 0) {
+      const { data: assignments } = await admin.from("referee_assignments").select("referee_user_id").in("video_id", videoIds);
+      refereeUserIds = [...new Set((assignments ?? []).map((a) => a.referee_user_id as string))];
+    }
+  }
+  if (refereeUserIds.length > 0) {
+    const { data: refRows } = await admin.from("referees").select("user_id, full_name, email").in("user_id", refereeUserIds);
+    const refereeChatIds = await chatIdsFor(refereeUserIds);
+    for (const r of refRows ?? []) {
+      recipients.push({
+        name: r.full_name as string,
+        email: (r.email as string | null) ?? null,
+        telegramChatId: refereeChatIds.get(r.user_id as string) ?? null,
+      });
+    }
+  }
+
+  // Sensei & School — at least one paid student registered in this competition.
+  for (const [table, linkField] of [["senseis", "sensei_id"], ["schools", "school_id"]] as const) {
+    const { data: paidRegs } = await admin
+      .from("registrations")
+      .select(`participant:participants(${linkField})`)
+      .eq("competition_id", competitionId)
+      .eq("payment_status", "paid");
+    const recordIds = [
+      ...new Set(
+        ((paidRegs ?? []) as unknown as Array<{ participant: Record<string, string | null> | null }>)
+          .map((r) => r.participant?.[linkField])
+          .filter((v): v is string => !!v),
+      ),
+    ];
+    if (recordIds.length === 0) continue;
+    const { data: records } = await admin.from(table).select("id, name, email, user_id").in("id", recordIds);
+    const recordChatIds = await chatIdsFor(
+      (records ?? []).map((rec) => rec.user_id as string | null).filter((v): v is string => !!v),
+    );
+    for (const rec of records ?? []) {
+      recipients.push({
+        name: rec.name as string,
+        email: (rec.email as string | null) ?? null,
+        telegramChatId: rec.user_id ? (recordChatIds.get(rec.user_id as string) ?? null) : null,
+      });
+    }
+  }
+
+  return recipients;
 }
 
 /** Same Resend Batch API pattern as sendConfirmationEmailBatch — one email
@@ -568,11 +668,30 @@ async function sendCertificatesAvailableEmailBatch(
   }
 }
 
+/** One DM per recipient who's connected Telegram — same best-effort,
+ * Promise.allSettled pattern as everywhere else in this file; a dead chat
+ * id or missing token never blocks the others. */
+async function sendCertificatesAvailableTelegramDMs(
+  recipients: CertificateEmailRecipient[],
+  competitionName: string,
+): Promise<void> {
+  const text =
+    `🎓 Certificates for ${competitionName} are now available — sign in to view and download yours: ${appUrl()}/account`;
+  await Promise.allSettled(
+    recipients
+      .filter((r) => r.telegramChatId)
+      .map((r) => sendDirectTelegramDM(r.telegramChatId, text)),
+  );
+}
+
 /** Fires once per competition, the moment its certificates become viewable
  * — either the manual "Publish All Certificates" button (publishWinnersNow
  * in app/actions/admin.ts) or the automatic deadline+30-days cron. Posts
- * once to the Participant group's Announcements topic and emails every
- * paid participant individually; the call site guards this with
+ * once to the Participant group's Announcements topic, emails every
+ * recipient (participants, referees, senseis, schools — anyone actually
+ * eligible for a certificate on this competition, see
+ * competitionCertificateRecipients above), and DMs whichever of them have
+ * connected Telegram. The call site guards this with
  * competitions.certificates_notified_at so it never double-sends
  * regardless of which path reveals winners first. */
 export async function notifyCertificatesPublished(
@@ -586,6 +705,7 @@ export async function notifyCertificatesPublished(
       `Certificates for ${competitionName} are ready — sign in to your account to view and download yours.`,
     ),
     sendCertificatesAvailableEmailBatch(recipients, competitionName),
+    sendCertificatesAvailableTelegramDMs(recipients, competitionName),
   ]);
 }
 

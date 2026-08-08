@@ -17,7 +17,7 @@ import {
 import { getStripe, paymentsEnabled, REFEREE_DEPOSIT_USD, AUDIENCE_FEE_USD } from "@/lib/payments";
 import {
   notifyRefereeAssignment, notifyRefereeUnassigned, sendConfirmationEmail, notifyAnnouncementPublished,
-  notifyCertificatesPublished, notifyInvitationCodeIssued, notifyStatusChanged,
+  notifyCertificatesPublished, competitionCertificateRecipients, notifyInvitationCodeIssued, notifyStatusChanged,
   notifyOrganizersBulkPaymentConfirmed, notifyOrganizersBulkTallyDone, notifySenseiBulkPaymentConfirmed,
   notifySenseiBulkCsvConfirmed, notifyOrganizersDirectoryBulkUpload, sendAdminTelegramDM,
   notifyParticipantEmailChanged, notifyTestimonialDeleted,
@@ -436,7 +436,7 @@ export async function publishWinnersNow(formData: FormData) {
   // the same competition is now revealed.
   if (!before!.certificates_notified_at) {
     try {
-      await notifyCertificatesPublished(before!.name, await paidParticipantRecipients(supabase, competitionId));
+      await notifyCertificatesPublished(before!.name, await competitionCertificateRecipients(competitionId));
       await supabase
         .from("competitions")
         .update({ certificates_notified_at: new Date().toISOString() })
@@ -598,24 +598,6 @@ export async function testStripeConnection(): Promise<StripeConnectionResult> {
       message: err instanceof Error ? `Stripe rejected the key: ${err.message}` : "Could not reach Stripe.",
     };
   }
-}
-
-/** Every paid participant's name + email for a competition — the audience
- * for notifyCertificatesPublished (see lib/notify.ts), shared by
- * publishWinnersNow above and the automatic reveal in
- * app/api/cron/judging-timeline/route.ts. */
-async function paidParticipantRecipients(
-  supabase: Awaited<ReturnType<typeof createClient>> | ReturnType<typeof createAdminClient>,
-  competitionId: string,
-) {
-  const { data: regs } = await supabase
-    .from("registrations")
-    .select("participant:participants(full_name, email)")
-    .eq("competition_id", competitionId)
-    .eq("payment_status", "paid");
-  return ((regs ?? []) as unknown as Array<{ participant: { full_name: string; email: string | null } | null }>)
-    .filter((r) => r.participant)
-    .map((r) => ({ name: r.participant!.full_name, email: r.participant!.email }));
 }
 
 // ── Categories ───────────────────────────────────────────────────────────────

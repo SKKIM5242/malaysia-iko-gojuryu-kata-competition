@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { writeAudit } from "@/lib/audit";
 import {
   notifyRefereeAssignment, notifyRefereeUnassigned, notifyWinnersAnnounced, notifyCertificatesPublished,
-  notifyParticipantTelegramWelcome,
+  notifyParticipantTelegramWelcome, competitionCertificateRecipients,
 } from "@/lib/notify";
 import { winnersRevealed } from "@/lib/winners";
 
@@ -255,16 +255,7 @@ async function handle(request: Request) {
     // already sent it for this competition.
     if (!comp.certificates_notified_at) {
       try {
-        const { data: regs } = await admin
-          .from("registrations")
-          .select("participant:participants(full_name, email)")
-          .eq("competition_id", comp.id)
-          .eq("payment_status", "paid");
-        const recipients = (
-          (regs ?? []) as unknown as Array<{ participant: { full_name: string; email: string | null } | null }>
-        )
-          .filter((r) => r.participant)
-          .map((r) => ({ name: r.participant!.full_name, email: r.participant!.email }));
+        const recipients = await competitionCertificateRecipients(comp.id);
         await notifyCertificatesPublished(comp.name, recipients);
         await admin.from("competitions").update({ certificates_notified_at: new Date().toISOString() }).eq("id", comp.id);
         await writeAudit(admin, {
