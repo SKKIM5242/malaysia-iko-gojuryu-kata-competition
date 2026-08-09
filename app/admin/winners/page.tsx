@@ -1,6 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCategories, schemaReady } from "@/lib/data";
-import { publishWinnersNow } from "@/app/actions/admin";
 import { AdminShell, adminBtn } from "@/components/admin";
 import { EmptyState, NoTranslate, SetupNotice, formatDate } from "@/components/ui";
 import { groupByKata } from "@/lib/division";
@@ -8,6 +7,7 @@ import { computeCategoryRankings } from "@/lib/winners-ranking";
 import { winnersRevealDate, winnersRevealDateFor } from "@/lib/winners";
 import TestimonialStatusCell from "@/components/TestimonialStatusCell";
 import CertificatePreviewButton from "@/components/CertificatePreviewButton";
+import PublishWinnersButton from "@/components/PublishWinnersButton";
 import type { TestimonialKind } from "@/lib/testimonials";
 import type { Competition } from "@/lib/types";
 
@@ -71,16 +71,7 @@ async function CompetitionPreview({
           </span>
         )}
         {!revealed && canManage && (
-          <form action={publishWinnersNow}>
-            <input type="hidden" name="competition_id" value={competition.id} />
-            <input type="hidden" name="return_to" value="/admin/winners" />
-            <button
-              className={adminBtn}
-              title="Publish this tier's winners right now — unlocks the public Winners page and every eligible certificate immediately, instead of waiting for the automatic reveal date"
-            >
-              Publish winners now
-            </button>
-          </form>
+          <PublishWinnersButton competitionId={competition.id} returnTo="/admin/winners" className={adminBtn} />
         )}
       </div>
       <p className="mb-4 text-sm text-neutral-500">
