@@ -396,9 +396,10 @@ export default async function WinnersPage() {
         <p className="mb-6 rounded-md border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
           Winners are only able to view or download their certificate after submitting their testimonial. The View
           &amp; Download buttons will become actionable as soon as possible once the testimonial has been submitted.
-          Thank you for your co-operation — you can expect your winner reward to be credited to your bank account
-          within a month. A big congratulations to all the winners, from the organizer, the support team, and the
-          referee/judge panel!
+          Thank you for your co-operation — you can expect your winner reward to be credited to your bank account a
+          month later after the winners announcement date (note: your reward payout will be delayed if your
+          testimonial is delayed or not submitted at all). A big congratulations to all the winners, from the
+          organizer, the support team, and the referee/judge panel! Thank you for participating in this competition.
         </p>
         {!myRegistrationId && (
           <p className="mb-6 rounded-md border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600">

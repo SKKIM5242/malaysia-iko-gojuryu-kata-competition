@@ -7,6 +7,7 @@ import { groupByKata } from "@/lib/division";
 import { computeCategoryRankings } from "@/lib/winners-ranking";
 import { winnersRevealDate, winnersRevealDateFor } from "@/lib/winners";
 import TestimonialStatusCell from "@/components/TestimonialStatusCell";
+import CertificatePreviewButton from "@/components/CertificatePreviewButton";
 import type { TestimonialKind } from "@/lib/testimonials";
 import type { Competition } from "@/lib/types";
 
@@ -110,9 +111,15 @@ async function CompetitionPreview({
                         {winners.map((w) => (
                           <li key={w.rank} className="flex items-center justify-between gap-2 text-sm">
                             <span>
-                              {MEDALS[w.rank - 1]} {w.participantName}
+                              <span className="mr-1 align-middle text-[1.75rem] leading-none">{MEDALS[w.rank - 1]}</span>
+                              {w.participantName}
                             </span>
                             <span className="flex items-center gap-2">
+                              <CertificatePreviewButton
+                                registrationId={w.registrationId}
+                                participantName={w.participantName}
+                                unlocked={testimonialByRegId.has(w.registrationId)}
+                              />
                               <span className="font-semibold text-neutral-700">{w.finalScore.toFixed(2)}</span>
                               <TestimonialStatusCell
                                 testimonial={testimonialByRegId.get(w.registrationId) ?? null}

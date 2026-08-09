@@ -90,7 +90,7 @@ export function RubricTable({
   const total = useMemo(() => Math.round(values.reduce((a, b) => a + b, 0) * 10) / 10, [values]);
   const disqualifying = total === 0;
   const overMax = total > TOTAL_MAX;
-  const cellPad = dense ? "px-2 py-0.5" : "px-2 py-1.5";
+  const cellPad = dense ? "px-1 py-0.5" : "px-2 py-1.5";
   const totalPad = dense ? "px-2 py-1" : "px-2 py-2";
   const textSize = dense ? "text-xs" : "text-sm";
   const rowKey = useCallback((c: RubricCriterion) => c.label, []);
@@ -153,7 +153,7 @@ export function RubricTable({
       return (
         <span className="flex flex-col items-start gap-1">
           <span>Criteria</span>
-          {readOnly && canToggleDeductions && (
+          {readOnly && !dense && canToggleDeductions && (
             <button
               type="button"
               onClick={(e) => {
@@ -231,14 +231,33 @@ export function RubricTable({
   }
 
   if (readOnly) {
-    const canExpand = dedExpanded && canToggleDeductions;
-    const visibleCols = canExpand
-      ? baseColumns
-      : [baseColumns[0], baseColumns[1], { key: "ded_toggle", label: "Deductions", width: 90 }, baseColumns[baseColumns.length - 2], baseColumns[baseColumns.length - 1]];
+    // Full View's 3-judges-side-by-side layout (dense) has no room for the
+    // Deductions column at all, even collapsed to its 1-column summary —
+    // dropped outright there rather than forced to scroll (dense is only
+    // ever passed from FullViewButton, never from the wider ScoreDetailButton
+    // view, which keeps its collapse/expand toggle as before).
+    const canExpand = !dense && dedExpanded && canToggleDeductions;
+    const visibleCols = dense
+      ? [baseColumns[0], baseColumns[1], baseColumns[baseColumns.length - 2], baseColumns[baseColumns.length - 1]]
+      : canExpand
+        ? baseColumns
+        : [baseColumns[0], baseColumns[1], { key: "ded_toggle", label: "Deductions", width: 90 }, baseColumns[baseColumns.length - 2], baseColumns[baseColumns.length - 1]];
     return (
       <>
         <div className="overflow-x-auto rounded-md border border-neutral-200">
-          <table className={`w-full min-w-[420px] text-left ${textSize}`}>
+          <table className={`w-full ${dense ? "table-fixed" : "min-w-[420px]"} text-left ${textSize}`}>
+            {dense && (
+              // table-fixed + explicit % widths so the table always fits its
+              // Full View column (no forced min-width) instead of scrolling
+              // — Criteria gets the most room and is the only cell that
+              // wraps; the others (No./Score/Points) are short enough not to.
+              <colgroup>
+                <col style={{ width: "10%" }} />
+                <col style={{ width: "48%" }} />
+                <col style={{ width: "16%" }} />
+                <col style={{ width: "26%" }} />
+              </colgroup>
+            )}
             <thead className="border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
               <tr>
                 {visibleCols.map((c) =>
