@@ -56,9 +56,11 @@ export default function GeneratePersonalCodeBox({
               <input type="hidden" name="id" value={recordId} />
               <input type="hidden" name="return_to" value={returnTo} />
               <div>
-                <label htmlFor={`pic_competition_id_${recordId}`} className={adminLabel}>Competition Tier *</label>
-                <select id={`pic_competition_id_${recordId}`} name="pic_competition_id" required defaultValue="" className={adminInput}>
-                  <option value="" disabled>Select competition tier</option>
+                <label htmlFor={`pic_competition_id_${recordId}`} className={adminLabel}>
+                  Competition Tier <span className="font-normal text-neutral-400">(optional)</span>
+                </label>
+                <select id={`pic_competition_id_${recordId}`} name="pic_competition_id" defaultValue="" className={adminInput}>
+                  <option value="">Select competition tier</option>
                   {competitions.map((c) => (
                     <option key={c.id} value={c.id}>{shortTierName(c.name)}</option>
                   ))}
@@ -66,17 +68,23 @@ export default function GeneratePersonalCodeBox({
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <label htmlFor={`pic_valid_from_${recordId}`} className={adminLabel}>Valid from *</label>
-                  <DateField id={`pic_valid_from_${recordId}`} name="pic_valid_from" className={adminInput} />
+                  <label htmlFor={`pic_valid_from_${recordId}`} className={adminLabel}>
+                    Valid from <span className="font-normal text-neutral-400">(optional)</span>
+                  </label>
+                  <DateField id={`pic_valid_from_${recordId}`} name="pic_valid_from" required={false} className={adminInput} />
                 </div>
                 <div>
-                  <label htmlFor={`pic_valid_until_${recordId}`} className={adminLabel}>Valid until *</label>
-                  <DateField id={`pic_valid_until_${recordId}`} name="pic_valid_until" className={adminInput} />
+                  <label htmlFor={`pic_valid_until_${recordId}`} className={adminLabel}>
+                    Valid until <span className="font-normal text-neutral-400">(optional)</span>
+                  </label>
+                  <DateField id={`pic_valid_until_${recordId}`} name="pic_valid_until" required={false} className={adminInput} />
                 </div>
               </div>
               <div>
-                <label htmlFor={`pic_sign_in_limit_${recordId}`} className={adminLabel}>Sign-in limit *</label>
-                <input id={`pic_sign_in_limit_${recordId}`} name="pic_sign_in_limit" type="number" min="1" required className={adminInput} />
+                <label htmlFor={`pic_sign_in_limit_${recordId}`} className={adminLabel}>
+                  Sign-in limit <span className="font-normal text-neutral-400">(optional — blank means unlimited)</span>
+                </label>
+                <input id={`pic_sign_in_limit_${recordId}`} name="pic_sign_in_limit" type="number" min="1" className={adminInput} />
               </div>
               <button type="submit" className={adminBtn}>
                 {invitationCode ? "Regenerate personal code" : "Generate personal code"}
@@ -84,7 +92,7 @@ export default function GeneratePersonalCodeBox({
               <p className="text-xs text-neutral-400">
                 {invitationCode
                   ? `Current code: "${invitationCode}" — bound to ${email ?? "this record's email"}, single use in create account.`
-                  : `Single-use, bound only to ${email ?? "this record's email"} — for creating that one login, not a shared code. Sign-in access after account creation depends on the Valid from/until window and Sign-in limit above, whichever is reached first.`}
+                  : `Single-use, bound only to ${email ?? "this record's email"} — for creating that one login, not a shared code. Any of the three fields above left blank means no restriction on that front — sign-in access after account creation depends on whichever of the Valid from/until window and Sign-in limit you did set, whichever is reached first.`}
               </p>
             </form>
           </div>

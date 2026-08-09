@@ -36,9 +36,13 @@ export function shortTierName(competitionName: string): string {
 }
 
 /** Everything except the running number. Multiple tiers (a code covering a
- * combination) join their tokens with "-", e.g. IKO-SCHOOL-TIER-USD10-USD100-2026-. */
+ * combination) join their tokens with "-", e.g. IKO-SCHOOL-TIER-USD10-USD100-2026-.
+ * An empty list (no tier picked — e.g. a personal code generated with
+ * Competition Tier left blank) drops the "TIER-" segment entirely rather
+ * than leaving a dangling separator, e.g. IKO-SCHOOL-2026-. */
 export function codePrefix(role: string, feesUsd: number[]): string {
   const roleToken = CODE_ROLE_TOKEN[role] ?? role.toUpperCase();
+  if (feesUsd.length === 0) return `IKO-${roleToken}-2026-`;
   const tierTokens = feesUsd.map(tierToken).join("-");
   return `IKO-${roleToken}-TIER-${tierTokens}-2026-`;
 }

@@ -3615,14 +3615,16 @@ function draftRecordFields(role: string, formData: FormData): Record<string, unk
  * is additive to createInvitationCode's generic shared codes above, not a
  * replacement for them.
  *
- * Competition Tier / Valid from / Valid until / Sign-in limit are required
- * here (validated server-side, not via HTML `required`, since this button
- * shares its form with Save changes via `formAction` + `formNoValidate` —
- * the other fields on that form must NOT block this submission). max_uses
- * stays fixed at 1: the code is single-use for creating the login itself;
- * ongoing sign-in access after that is governed entirely by Valid from/
- * until and Sign-in limit, copied onto the resulting profile at signup
- * (see handle_new_user). */
+ * Competition Tier / Valid from / Valid until / Sign-in limit are all
+ * optional — left blank, each just means no restriction on that front
+ * (handle_new_user's redemption check already treats a null valid_from/
+ * valid_until as unrestricted; a null sign_in_limit means unlimited, same
+ * as the rest of the site's quota logic). Only genuinely invalid input
+ * (a sign-in limit under 1) is rejected. max_uses stays fixed at 1: the
+ * code is single-use for creating the login itself; ongoing sign-in access
+ * after that is governed entirely by whichever of Valid from/until and
+ * Sign-in limit were actually set, copied onto the resulting profile at
+ * signup (see handle_new_user). */
 export async function generateRecordInvitationCode(formData: FormData) {
   const role = String(formData.get("role") ?? "");
   const id = String(formData.get("id") ?? "");
@@ -3634,10 +3636,8 @@ export async function generateRecordInvitationCode(formData: FormData) {
   const validFrom = String(formData.get("pic_valid_from") ?? "").trim();
   const validUntil = String(formData.get("pic_valid_until") ?? "").trim();
   const signInLimitRaw = String(formData.get("pic_sign_in_limit") ?? "").trim();
-  if (!competitionId || !validFrom || !validUntil || !signInLimitRaw || Number(signInLimitRaw) < 1) {
-    backTo(returnTo, {
-      error: "Competition Tier, Valid from, Valid until, and Sign-in limit are all required to generate a personal code.",
-    });
+  if (signInLimitRaw && Number(signInLimitRaw) < 1) {
+    backTo(returnTo, { error: "Sign-in limit must be at least 1 — or leave it blank for unlimited." });
   }
 
   const { supabase, actorId } = await getActor();
@@ -3655,12 +3655,12 @@ export async function generateRecordInvitationCode(formData: FormData) {
   // sequence as the "Run" button on the general Create Code form (see
   // generateSequentialInvitationCode above) — a personal code is still just
   // one more code sharing that role+tier's counter, not a separate scheme.
-  const { data: picCompetition } = await supabase
-    .from("competitions")
-    .select("registration_fee_usd")
-    .eq("id", competitionId)
-    .maybeSingle();
-  const prefix = codePrefix(role, [Number(picCompetition?.registration_fee_usd ?? 0)]);
+  // No tier picked -> no TIER- segment at all (see codePrefix), sharing
+  // whatever counter every other tier-less code for this role uses.
+  const picCompetition = competitionId
+    ? (await supabase.from("competitions").select("registration_fee_usd").eq("id", competitionId).maybeSingle()).data
+    : null;
+  const prefix = codePrefix(role, picCompetition ? [Number(picCompetition.registration_fee_usd ?? 0)] : []);
   const { data: existingCodes } = await supabase
     .from("invitation_codes")
     .select("code")
@@ -3675,8 +3675,8 @@ export async function generateRecordInvitationCode(formData: FormData) {
     .from("invitation_codes")
     .insert({
       code, role, email: record!.email, max_uses: 1, generated_by, for_record_id: id,
-      competition_id: competitionId, valid_from: validFrom, valid_until: validUntil,
-      sign_in_limit: Number(signInLimitRaw),
+      competition_id: competitionId || null, valid_from: validFrom || null, valid_until: validUntil || null,
+      sign_in_limit: signInLimitRaw ? Number(signInLimitRaw) : null,
       note: `Personal code for ${role} record ${id.slice(0, 8).toUpperCase()}`,
     })
     .select("id")

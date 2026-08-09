@@ -239,9 +239,11 @@ export default async function AdminSchools({
                     Personal invitation code for this school
                   </p>
                   <div className="mt-2">
-                    <label htmlFor="pic_competition_id" className={adminLabel}>Competition Tier *</label>
+                    <label htmlFor="pic_competition_id" className={adminLabel}>
+                      Competition Tier <span className="font-normal text-neutral-400">(optional)</span>
+                    </label>
                     <select id="pic_competition_id" name="pic_competition_id" defaultValue="" className={adminInput}>
-                      <option value="" disabled>Select competition tier</option>
+                      <option value="">Select competition tier</option>
                       {competitions.map((c) => (
                         <option key={c.id} value={c.id}>{shortTierName(c.name)}</option>
                       ))}
@@ -249,15 +251,21 @@ export default async function AdminSchools({
                   </div>
                   <div className="mt-3 grid gap-4 sm:grid-cols-3">
                     <div>
-                      <label htmlFor="pic_valid_from" className={adminLabel}>Valid from *</label>
-                      <DateField id="pic_valid_from" name="pic_valid_from" className={adminInput} />
+                      <label htmlFor="pic_valid_from" className={adminLabel}>
+                        Valid from <span className="font-normal text-neutral-400">(optional)</span>
+                      </label>
+                      <DateField id="pic_valid_from" name="pic_valid_from" required={false} className={adminInput} />
                     </div>
                     <div>
-                      <label htmlFor="pic_valid_until" className={adminLabel}>Valid until *</label>
-                      <DateField id="pic_valid_until" name="pic_valid_until" className={adminInput} />
+                      <label htmlFor="pic_valid_until" className={adminLabel}>
+                        Valid until <span className="font-normal text-neutral-400">(optional)</span>
+                      </label>
+                      <DateField id="pic_valid_until" name="pic_valid_until" required={false} className={adminInput} />
                     </div>
                     <div>
-                      <label htmlFor="pic_sign_in_limit" className={adminLabel}>Sign-in limit *</label>
+                      <label htmlFor="pic_sign_in_limit" className={adminLabel}>
+                        Sign-in limit <span className="font-normal text-neutral-400">(optional)</span>
+                      </label>
                       <input id="pic_sign_in_limit" name="pic_sign_in_limit" type="number" min="1" className={adminInput} />
                     </div>
                   </div>
@@ -272,7 +280,7 @@ export default async function AdminSchools({
                   <p className="mt-2 text-xs text-neutral-400">
                     {editing.invitation_code
                       ? `Note: Current code: "${editing.invitation_code}" — bound to ${editing.email} address, single use in create account.`
-                      : `Single-use, bound only to ${editing.email || "this school's email"} — for creating that one login, not a shared code. Sign-in access after account creation depends on the Valid from/until window and Sign-in limit above, whichever is reached first.`}
+                      : `Single-use, bound only to ${editing.email || "this school's email"} — for creating that one login, not a shared code. Any of the three fields above left blank means no restriction on that front — sign-in access after account creation depends on whichever of the Valid from/until window and Sign-in limit you did set, whichever is reached first.`}
                   </p>
                 </div>
               )}
