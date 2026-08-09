@@ -11,21 +11,13 @@ const inputCls =
   "w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm focus:border-red-600 focus:outline-none focus:ring-1 focus:ring-red-600";
 const labelCls = "mb-1 block text-sm font-medium text-neutral-700";
 
-/** Every role can now self-signup through this form — Organizer, Customer
- * Support, and Admin require a valid invitation code (same as School/Sensei
- * below); without one, there's no self-signup path for those three, so a
- * link to the reviewed /register/staff application is shown instead.
- * School/Sensei directory records (with bank/contact details) are still
- * created separately on their own registration page — this is the *second*
- * step, signing in to view their own students' recordings, which needs a
- * personal invitation code generated from that existing directory record. */
-const CODE_OPTIONAL_ROLES = new Set(["referee", "audience"]);
-
-/** One account can now hold more than one role (ticked via checkboxes below)
- * — a person only ever needs a single login, since auth.users.email is
- * unique anyway. School/Sensei/Organizer/Participant Support/Admin still
- * need a valid invitation code (any one of them present triggers the code
- * field); Referee/Audience's code is optional, same as before. */
+/** Every role can now self-signup through this form. A code (from the
+ * organizer, or from the School/Sensei directory record for that second-
+ * step login) is never required to create the account itself — the server
+ * trigger (handle_new_user) inserts the profile either way, just leaving it
+ * unapproved without a matching code, same as Referee/Audience always
+ * worked. The field is optional everywhere it's shown, entering one just
+ * fast-tracks approval and any tier access it carries. */
 const ROLE_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "school", label: "School / Dojo / Club" },
   { value: "sensei", label: "Sensei / Shihan / Hanshi" },
@@ -36,7 +28,8 @@ const ROLE_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "organizer", label: "Organizer" },
   { value: "admin", label: "Admin" },
 ];
-const CODE_REQUIRED_ROLES = new Set(["school", "sensei", "organizer", "customer_support", "admin"]);
+/** Every role except Participant (which never needs one) shows the field. */
+const CODE_SHOWN_ROLES = new Set(["school", "sensei", "referee", "audience", "customer_support", "organizer", "admin"]);
 
 export default function AuthForms({ defaultMode = "signin" }: { defaultMode?: "signin" | "signup" }) {
   const router = useRouter();
@@ -103,8 +96,7 @@ export default function AuthForms({ defaultMode = "signin" }: { defaultMode?: "s
     }
   }
 
-  const requiresInviteCode = roles.some((r) => CODE_REQUIRED_ROLES.has(r));
-  const codeOptionalOnly = !requiresInviteCode && roles.some((r) => CODE_OPTIONAL_ROLES.has(r));
+  const showInviteCode = roles.some((r) => CODE_SHOWN_ROLES.has(r));
 
   return (
     <div className="mx-auto max-w-md">
@@ -205,15 +197,14 @@ export default function AuthForms({ defaultMode = "signin" }: { defaultMode?: "s
           </div>
         )}
         <>
-            {mode === "signup" && (requiresInviteCode || codeOptionalOnly) && (
+            {mode === "signup" && showInviteCode && (
               <div>
                 <label htmlFor="auth_invite" className={labelCls}>
-                  Invitation code {requiresInviteCode ? "*" : "(optional)"}
+                  Invitation code (optional)
                 </label>
                 <input
                   id="auth_invite"
                   name="invite_code"
-                  required={requiresInviteCode}
                   className={inputCls}
                   placeholder="e.g. SCHOOL-4F9A2B"
                 />
