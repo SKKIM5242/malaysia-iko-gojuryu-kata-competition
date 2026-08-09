@@ -207,7 +207,7 @@ export function SchoolForm({ telegramLink, tiers }: { telegramLink: string | nul
         </div>
         <div className="sm:col-span-2">
           <label htmlFor="home_address" className={labelCls}>
-            Home address *{" "}
+            School address *{" "}
             <span className="font-normal text-neutral-400">(no comma &quot;,&quot; allowed in the box)</span>
           </label>
           <NoCommaTextarea id="home_address" className={inputCls} />
@@ -363,6 +363,11 @@ export function SenseiForm({
             Used later to link your sign-in account to this sensei record.
           </p>
         </div>
+        <div className="sm:col-span-2">
+          <label htmlFor="certificate" className={labelCls}>Latest rank certificate *</label>
+          <CertificateUploadField id="certificate" name="certificate" required />
+          <FieldError message={err.certificate} />
+        </div>
         <div>
           <label htmlFor="gender" className={labelCls}>Sex *</label>
           <select id="gender" name="gender" required defaultValue="" className={inputCls}>
@@ -380,6 +385,9 @@ export function SenseiForm({
               <option key={s.id} value={s.id}>{s.name}{s.state ? ` — ${s.state}` : ""}</option>
             ))}
           </select>
+          <p className="mt-1 text-xs text-neutral-500">
+            School not in the list? <Link href="/register/school" className="underline">Register it first</Link>.
+          </p>
         </div>
         <div>
           <label htmlFor="sensei_email" className={labelCls}>Email address *</label>
@@ -412,15 +420,7 @@ export function SenseiForm({
           <input id="home_country" name="home_country" required defaultValue="Malaysia" className={inputCls} />
           <FieldError message={err.home_country} />
         </div>
-        <div className="sm:col-span-2">
-          <label htmlFor="certificate" className={labelCls}>Latest rank certificate *</label>
-          <CertificateUploadField id="certificate" name="certificate" required />
-          <FieldError message={err.certificate} />
-        </div>
       </div>
-      <p className="text-xs text-neutral-500">
-        School not in the list? <Link href="/register/school" className="underline">Register it first</Link>.
-      </p>
 
       <div className="rounded-md border border-neutral-200 bg-neutral-50 p-4">
         <p className="text-sm font-bold text-neutral-800">Bank details for commission payout *</p>
