@@ -7,6 +7,7 @@ import { SetupNotice, TelegramFullAccessLinks } from "@/components/ui";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import AuthForms from "@/components/AuthForms";
 import ClaimForm from "@/components/ClaimForm";
+import DirectoryClaimForm from "@/components/DirectoryClaimForm";
 import KataRecorder from "@/components/KataRecorder";
 import VideoWatchButton from "@/components/VideoWatchButton";
 import DeleteRecordingControls from "@/components/DeleteRecordingControls";
@@ -708,10 +709,15 @@ export default async function AccountPage({
           {record ? (
             <p className="mt-1 mb-4 text-sm text-neutral-500">Signed in as {record.name} ({label}).</p>
           ) : (
-            <p className="mt-1 mb-4 text-sm text-neutral-500">
-              Signed in as {profile.full_name ?? user.email}. Your account isn&apos;t linked to a{" "}
-              {label.toLowerCase()} record yet — contact the organizer.
-            </p>
+            <div className="mt-1 mb-4">
+              <p className="text-sm text-neutral-500">
+                Signed in as {profile.full_name ?? user.email}. Your account isn&apos;t linked to a{" "}
+                {label.toLowerCase()} record yet — link it below, or contact the organizer.
+              </p>
+              <div className="mt-4">
+                <DirectoryClaimForm kind={profile.role === "sensei" ? "sensei" : "school"} />
+              </div>
+            </div>
           )}
           {paid ? (
             <div className="mt-4 rounded-lg border border-green-300 bg-green-50 p-6">

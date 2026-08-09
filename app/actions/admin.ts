@@ -1706,6 +1706,7 @@ export async function saveSchool(formData: FormData) {
     contact_name: String(formData.get("contact_name") ?? "").trim() || null,
     contact_karate_title: String(formData.get("contact_karate_title") ?? "").trim() || null,
     contact_rank: String(formData.get("contact_rank") ?? "").trim() || null,
+    contact_ic_passport: String(formData.get("contact_ic_passport") ?? "").trim() || null,
     home_address: String(formData.get("home_address") ?? "").trim() || null,
     city_town: String(formData.get("city_town") ?? "").trim() || null,
     postcode: String(formData.get("postcode") ?? "").trim() || null,
@@ -1723,8 +1724,8 @@ export async function saveSchool(formData: FormData) {
     participating_tier_3_id: String(formData.get("participating_tier_3_id") ?? "").trim() || null,
   };
   if (!values.name) backTo(returnTo, { error: "School name is required." });
-  if (!values.contact_title || !values.contact_name || !values.contact_karate_title || !values.contact_rank) {
-    backTo(returnTo, { error: "Person in-charge's title, name, karate title, and rank are required." });
+  if (!values.contact_title || !values.contact_name || !values.contact_karate_title || !values.contact_rank || !values.contact_ic_passport) {
+    backTo(returnTo, { error: "Person in-charge's title, name, karate title, rank, and IC / Passport No. are required." });
   }
   if (!values.home_address || !values.city_town || !values.postcode || !values.home_country) {
     backTo(returnTo, { error: "Home address, city/town, postcode, and home country are required." });
@@ -4352,7 +4353,7 @@ export async function deleteStaffAccount(formData: FormData) {
 // failures instead of aborting the whole file on the first bad row.
 
 const SCHOOL_CSV_COLUMNS = [
-  "name", "state", "contact_title", "contact_name", "contact_karate_title", "contact_rank",
+  "name", "state", "contact_title", "contact_name", "contact_karate_title", "contact_rank", "contact_ic_passport",
   "home_address", "city_town", "postcode", "home_country", "email", "phone",
   "bank_name", "bank_account_no", "bank_account_name",
 ] as const;
@@ -4385,6 +4386,7 @@ export async function bulkUploadSchools(_prev: CsvUploadResult, formData: FormDa
       contact_name: get(r, "contact_name") || null,
       contact_karate_title: get(r, "contact_karate_title") || null,
       contact_rank: get(r, "contact_rank") || null,
+      contact_ic_passport: get(r, "contact_ic_passport") || null,
       home_address: get(r, "home_address") || null,
       city_town: get(r, "city_town") || null,
       postcode: get(r, "postcode") || null,
@@ -4396,8 +4398,8 @@ export async function bulkUploadSchools(_prev: CsvUploadResult, formData: FormDa
       bank_account_name: get(r, "bank_account_name") || null,
     };
     if (!record.name) { failures.push({ row: rowNo, name, error: "School name is required" }); continue; }
-    if (!record.contact_title || !record.contact_name || !record.contact_karate_title || !record.contact_rank) {
-      failures.push({ row: rowNo, name, error: "Person in-charge's title, name, karate title, and rank are required" });
+    if (!record.contact_title || !record.contact_name || !record.contact_karate_title || !record.contact_rank || !record.contact_ic_passport) {
+      failures.push({ row: rowNo, name, error: "Person in-charge's title, name, karate title, rank, and IC / Passport No. are required" });
       continue;
     }
     if (!record.home_address || !record.city_town || !record.postcode || !record.home_country) {

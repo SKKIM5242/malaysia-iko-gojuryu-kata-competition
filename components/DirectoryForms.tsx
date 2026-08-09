@@ -186,6 +186,13 @@ export function SchoolForm({ telegramLink, tiers }: { telegramLink: string | nul
             <label htmlFor="contact_rank" className={labelCls}>Rank in karate-do *</label>
             <input id="contact_rank" name="contact_rank" required className={inputCls} placeholder="e.g. Godan" />
           </div>
+          <div>
+            <label htmlFor="contact_ic_passport" className={labelCls}>IC / Passport No. *</label>
+            <input id="contact_ic_passport" name="contact_ic_passport" required className={inputCls} />
+            <p className="mt-1 text-xs text-neutral-400">
+              Used later to link your sign-in account to this school record.
+            </p>
+          </div>
         </div>
       </div>
 
@@ -323,6 +330,14 @@ export function SenseiForm({
           <label htmlFor="rank" className={labelCls}>Latest Rank *</label>
           <input id="rank" name="rank" required className={inputCls} placeholder="e.g. Godan" />
           <FieldError message={err.rank} />
+        </div>
+        <div>
+          <label htmlFor="ic_passport" className={labelCls}>IC / Passport No. *</label>
+          <input id="ic_passport" name="ic_passport" required className={inputCls} />
+          <FieldError message={err.ic_passport} />
+          <p className="mt-1 text-xs text-neutral-400">
+            Used later to link your sign-in account to this sensei record.
+          </p>
         </div>
         <div>
           <label htmlFor="gender" className={labelCls}>Sex *</label>

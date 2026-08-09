@@ -105,6 +105,7 @@ export async function registerSchool(
   const contact_name = String(formData.get("contact_name") ?? "").trim();
   const contact_karate_title = String(formData.get("contact_karate_title") ?? "").trim();
   const contact_rank = String(formData.get("contact_rank") ?? "").trim();
+  const contact_ic_passport = String(formData.get("contact_ic_passport") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
   const home_address = String(formData.get("home_address") ?? "").trim();
@@ -120,6 +121,7 @@ export async function registerSchool(
   if (!contact_name) return { ok: false, error: "Person in-charge's name is required." };
   if (!contact_karate_title) return { ok: false, error: "Person in-charge's karate title is required." };
   if (!contact_rank) return { ok: false, error: "Person in-charge's rank in karate-do is required." };
+  if (!contact_ic_passport) return { ok: false, error: "Person in-charge's IC / Passport No. is required." };
   if (!email) return { ok: false, error: "Email address is required." };
   if (!phone) return { ok: false, error: "Mobile phone is required." };
   if (!home_address) return { ok: false, error: "Home address is required." };
@@ -151,6 +153,7 @@ export async function registerSchool(
     contact_name,
     contact_karate_title,
     contact_rank,
+    contact_ic_passport,
     gender,
     email,
     phone,
@@ -204,6 +207,7 @@ export async function registerSensei(
 ): Promise<DirectoryState> {
   const name = String(formData.get("name") ?? "").trim();
   const rank = String(formData.get("rank") ?? "").trim();
+  const ic_passport = String(formData.get("ic_passport") ?? "").trim();
   const gender = String(formData.get("gender") ?? "").trim();
   const school_id = String(formData.get("school_id") ?? "").trim();
   const registered_by = ["self", "student", "other"].includes(String(formData.get("registered_by")))
@@ -223,6 +227,13 @@ export async function registerSensei(
       ok: false,
       error: "Please fix the highlighted fields.",
       fieldErrors: { rank: "Latest rank is required" },
+    };
+  }
+  if (!ic_passport) {
+    return {
+      ok: false,
+      error: "Please fix the highlighted fields.",
+      fieldErrors: { ic_passport: "IC / Passport No. is required" },
     };
   }
   if (!["male", "female"].includes(gender)) {
@@ -307,6 +318,7 @@ export async function registerSensei(
     id,
     name,
     rank,
+    ic_passport,
     gender,
     school_id,
     registered_by,

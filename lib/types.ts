@@ -65,6 +65,7 @@ export interface School {
   contact_name: string | null;
   contact_karate_title: string | null;
   contact_rank: string | null;
+  contact_ic_passport: string | null;
   gender: string | null;
   home_address: string | null;
   home_country: string | null;

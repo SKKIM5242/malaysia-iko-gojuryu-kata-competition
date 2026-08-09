@@ -172,6 +172,10 @@ export default async function AdminSchools({
                     <label htmlFor="contact_rank" className={adminLabel}>Rank in karate-do *</label>
                     <input id="contact_rank" name="contact_rank" required defaultValue={editing?.contact_rank ?? ""} className={adminInput} placeholder="e.g. Godan" />
                   </div>
+                  <div>
+                    <label htmlFor="contact_ic_passport" className={adminLabel}>IC / Passport No. *</label>
+                    <input id="contact_ic_passport" name="contact_ic_passport" required defaultValue={editing?.contact_ic_passport ?? ""} className={adminInput} />
+                  </div>
                 </div>
               </div>
 
@@ -342,6 +346,7 @@ export default async function AdminSchools({
                 { key: "contact_name", label: "Contact Name" },
                 { key: "contact_karate_title", label: "Contact Karate Title" },
                 { key: "contact_rank", label: "Contact Rank" },
+                { key: "contact_ic_passport", label: "Contact IC / Passport" },
                 { key: "home_address", label: "Home Address" },
                 { key: "city_town", label: "City / Town" },
                 { key: "postcode", label: "Postcode" },
@@ -361,13 +366,15 @@ export default async function AdminSchools({
                 name: s.name,
                 state: s.state ?? "",
                 person_in_charge: [s.contact_title, s.contact_name].filter(Boolean).join(" ") +
-                  (s.contact_karate_title ? ` (${s.contact_karate_title}${s.contact_rank ? ` — ${s.contact_rank}` : ""})` : ""),
+                  (s.contact_karate_title ? ` (${s.contact_karate_title}${s.contact_rank ? ` — ${s.contact_rank}` : ""})` : "") +
+                  (s.contact_ic_passport ? ` — IC/Passport: ${s.contact_ic_passport}` : ""),
                 location: [s.home_address, s.city_town, s.postcode, s.home_country].filter(Boolean).join(", "),
                 bank: [s.bank_name, s.bank_account_no, s.bank_account_name].filter(Boolean).join(" · "),
                 contact_title: s.contact_title ?? "",
                 contact_name: s.contact_name ?? "",
                 contact_karate_title: s.contact_karate_title ?? "",
                 contact_rank: s.contact_rank ?? "",
+                contact_ic_passport: s.contact_ic_passport ?? "",
                 home_address: s.home_address ?? "",
                 city_town: s.city_town ?? "",
                 postcode: s.postcode ?? "",

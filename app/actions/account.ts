@@ -47,6 +47,47 @@ export async function claimRegistration(
   return { ok: true };
 }
 
+/** Link a signed-in School/Sensei account to their paid directory record —
+ * same reference-ID + IC/Passport pattern as claimRegistration, just against
+ * the claim_school RPC. Reference is the school row's own id, first 8 hex
+ * characters (the same "reference_id" already shown in the admin table). */
+export async function claimSchool(
+  _prev: AccountActionState,
+  formData: FormData,
+): Promise<AccountActionState> {
+  const reference = String(formData.get("reference") ?? "").replace(/\s+/g, "").toLowerCase();
+  const ic = String(formData.get("ic_passport") ?? "").trim();
+  if (!/^[0-9a-f]{8}$/.test(reference)) {
+    return { ok: false, error: "Enter the 8-character reference ID from your school's registration." };
+  }
+  if (!ic) return { ok: false, error: "Enter the person in-charge's IC / Passport No." };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("claim_school", { p_ref: reference, p_ic: ic });
+  if (error) return { ok: false, error: "Could not verify — please try again." };
+  if (data !== "OK") return { ok: false, error: String(data) };
+  revalidatePath("/account");
+  return { ok: true };
+}
+
+/** Same as claimSchool, for a Sensei's own directory record. */
+export async function claimSensei(
+  _prev: AccountActionState,
+  formData: FormData,
+): Promise<AccountActionState> {
+  const reference = String(formData.get("reference") ?? "").replace(/\s+/g, "").toLowerCase();
+  const ic = String(formData.get("ic_passport") ?? "").trim();
+  if (!/^[0-9a-f]{8}$/.test(reference)) {
+    return { ok: false, error: "Enter the 8-character reference ID from your sensei registration." };
+  }
+  if (!ic) return { ok: false, error: "Enter the IC / Passport No. used at registration." };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("claim_sensei", { p_ref: reference, p_ic: ic });
+  if (error) return { ok: false, error: "Could not verify — please try again." };
+  if (data !== "OK") return { ok: false, error: String(data) };
+  revalidatePath("/account");
+  return { ok: true };
+}
+
 /** One-click version of claimRegistration for a registration already known
  * (server-side, via email match) to belong to this account — used by the
  * "Start Recording" button on a pending-recordings list, so the participant
