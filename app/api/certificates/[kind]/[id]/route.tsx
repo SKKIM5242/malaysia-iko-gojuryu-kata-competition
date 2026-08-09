@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { renderCertificatePng, type CertificateInput, type CertificateKind } from "@/lib/certificate-render";
 import { computeCategoryRankings } from "@/lib/winners-ranking";
 import { winnersRevealed } from "@/lib/winners";
@@ -98,13 +99,24 @@ export async function GET(request: Request, { params }: { params: Promise<{ kind
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return new Response("Sign in first.", { status: 401 });
 
-  const { data: myProfile } = await supabase
-    .from("profiles")
-    .select("role, registration_id, sensei_id, school_id")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  // The Winner Certificate small-preview window on the public /winners page
+  // (see CertificatePreviewButton) is viewable by anyone, signed in or not
+  // — same "open to public" treatment already given to the testimonial text
+  // itself. Every other kind, and downloading a winner certificate rather
+  // than just viewing it, still needs a real session (checked further down).
+  const isPublicWinnerView = kind === "winner" && inline && registrationId !== "sample";
+  if (!user && !isPublicWinnerView) return new Response("Sign in first.", { status: 401 });
+
+  const myProfile = user
+    ? (
+        await supabase
+          .from("profiles")
+          .select("role, registration_id, sensei_id, school_id")
+          .eq("user_id", user.id)
+          .maybeSingle()
+      ).data
+    : null;
   const isManager = ["admin", "organizer", "staff"].includes((myProfile?.role as string) ?? "");
   const settings = await certificateSettings(supabase);
 
@@ -151,8 +163,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ kind
       return new Response("Registration not found.", { status: 404 });
     }
 
-    const isOwner = myProfile?.registration_id === registrationId;
-    if (!isOwner && !isManager) return new Response("Not authorized for this certificate.", { status: 403 });
+    const isOwner = !!user && myProfile?.registration_id === registrationId;
+    if (!isOwner && !isManager && !isPublicWinnerView) {
+      return new Response(user ? "Not authorized for this certificate." : "Sign in first.", { status: user ? 403 : 401 });
+    }
     if (reg.payment_status !== "paid") return new Response("This registration is not paid.", { status: 403 });
 
     if (
@@ -168,7 +182,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ kind
 
     let rank: 1 | 2 | 3 | null = null;
     if (kind === "winner") {
-      const rankings = await computeCategoryRankings(supabase, reg.competition_id as string);
+      // The service-role client, not the session client: kata_videos and
+      // video_scores have no RLS policy for the anon role at all (only
+      // authenticated, and only once a competition's registration_deadline
+      // has passed) -- so a genuinely signed-out isPublicWinnerView request
+      // couldn't compute rankings otherwise. Safe here specifically because
+      // isOwner/isManager/isPublicWinnerView was already decided above --
+      // this only ever resolves a rank (1-3) for the one registration this
+      // request was already authorized to see.
+      const rankings = await computeCategoryRankings(createAdminClient(), reg.competition_id as string);
       outer: for (const entries of rankings.values()) {
         for (const e of entries) {
           if (e.registrationId === registrationId) {

@@ -6,6 +6,7 @@ import { groupByKata } from "@/lib/division";
 import { computeCategoryRankings } from "@/lib/winners-ranking";
 import { winnersRevealDate, winnersRevealDateFor, testimonialEditDeadline } from "@/lib/winners";
 import FullViewButton, { type FullViewJudge } from "@/components/FullViewButton";
+import CertificatePreviewButton from "@/components/CertificatePreviewButton";
 import WinnerTestimonialInline, { type WinnerTestimonialInfo } from "@/components/WinnerTestimonialInline";
 import type { Competition } from "@/lib/types";
 
@@ -145,12 +146,16 @@ async function CompetitionWinners({
   supabase,
   myRegistrationId,
   isManager,
+  canAssist,
   canToggleDeductions,
 }: {
   competition: Competition;
   supabase: Awaited<ReturnType<typeof createClient>>;
   myRegistrationId: string | null;
   isManager: boolean;
+  /** Signed in with any role except Audience — see WinnerTestimonialInline
+   * for what this widens (button visibility, not submission attribution). */
+  canAssist: boolean;
   /** Admin/Super Admin/Organizer/Referee-Judge only (a superset of
    * isManager, which excludes Referee/Judge) — gates the Show/Hide toggle
    * for the 5 "Reduce Score System" deduction columns in Full View. */
@@ -216,7 +221,8 @@ async function CompetitionWinners({
                             <div className="flex items-center justify-between gap-2">
                               <span>
                                 <span className="block">
-                                  {MEDALS[w.rank - 1]} {w.participantName}
+                                  <span className="mr-1 align-middle text-[1.75rem] leading-none">{MEDALS[w.rank - 1]}</span>
+                                  {w.participantName}
                                 </span>
                                 {w.judges.length > 0 && (
                                   <span className="mt-0.5 block text-xs text-neutral-400">
@@ -244,11 +250,17 @@ async function CompetitionWinners({
                                   disqualified={false}
                                   canToggleDeductions={canToggleDeductions}
                                 />
+                                <CertificatePreviewButton
+                                  registrationId={w.registrationId}
+                                  participantName={w.participantName}
+                                  unlocked={!!w.testimonial}
+                                />
                               </span>
                             </div>
                             <WinnerTestimonialInline
                               isOwner={w.registrationId === myRegistrationId}
                               isManager={isManager}
+                              canAssist={canAssist}
                               testimonial={w.testimonial}
                               editDeadlineISO={editDeadlineISO}
                             />
@@ -275,9 +287,28 @@ async function CompetitionWinners({
                                       </a>
                                     </>
                                   ) : (
-                                    <span className="text-[11px] font-semibold text-amber-700">
-                                      🔒 Give your testimonial below to unlock
-                                    </span>
+                                    <>
+                                      {/* Shown dim rather than omitted, same "deem not missing"
+                                          treatment used for the admin Publish-all-Certificates
+                                          button — the buttons exist, they just aren't clickable
+                                          yet, so it's clear this unlocks rather than looking
+                                          broken/absent. */}
+                                      <span
+                                        aria-disabled="true"
+                                        className="cursor-not-allowed rounded border border-amber-300 px-2 py-1 text-xs font-semibold text-amber-800 opacity-40"
+                                      >
+                                        👁 View
+                                      </span>
+                                      <span
+                                        aria-disabled="true"
+                                        className="cursor-not-allowed rounded bg-amber-800 px-2 py-1 text-xs font-semibold text-white opacity-40"
+                                      >
+                                        ⬇ Download
+                                      </span>
+                                      <span className="text-[11px] font-semibold text-amber-700">
+                                        🔒 Give your testimonial below to unlock
+                                      </span>
+                                    </>
                                   )}
                                 </span>
                                 <span className="flex flex-wrap items-center gap-1.5">
@@ -346,6 +377,9 @@ export default async function WinnersPage() {
   // testimonial (see deleteTestimonial in app/actions/admin.ts, which
   // enforces the same tier server-side regardless of what this hides).
   const isManager = ["admin", "organizer", "staff"].includes((myProfile?.role as string | null) ?? "");
+  // Everyone signed in except Audience — see WinnerTestimonialInline for
+  // what this widens.
+  const canAssist = !!user && (myProfile?.role as string | null) != null && myProfile?.role !== "audience";
   // Admin/Super Admin/Organizer/Referee-Judge only, per the organizer's
   // explicit instruction — everyone else (including a signed-out public
   // visitor) still sees the collapsed per-row deduction total in Full View,
@@ -359,6 +393,13 @@ export default async function WinnersPage() {
       <SiteHeader />
       <main className="mx-auto max-w-4xl px-4 py-10">
         <SectionTitle>Winners</SectionTitle>
+        <p className="mb-6 rounded-md border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
+          Winners are only able to view or download their certificate after submitting their testimonial. The View
+          &amp; Download buttons will become actionable as soon as possible once the testimonial has been submitted.
+          Thank you for your co-operation — you can expect your winner reward to be credited to your bank account
+          within a month. A big congratulations to all the winners, from the organizer, the support team, and the
+          referee/judge panel!
+        </p>
         {!myRegistrationId && (
           <p className="mb-6 rounded-md border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
             🏆 Placed in the Top 3?{" "}
@@ -379,6 +420,7 @@ export default async function WinnersPage() {
                 supabase={supabase}
                 myRegistrationId={myRegistrationId}
                 isManager={isManager}
+                canAssist={canAssist}
                 canToggleDeductions={canToggleDeductions}
               />
             ))}
