@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { requestNewSubscription, type AccountActionState } from "@/app/actions/account";
+import SignInQuotaLine from "@/components/SignInQuotaLine";
 
 const initial: AccountActionState = { ok: false };
 
@@ -17,6 +18,7 @@ export default function SubscriptionBlocked({
   reason,
   canRenew = true,
   signOutForm,
+  quota,
 }: {
   title: string;
   reason: string;
@@ -26,6 +28,13 @@ export default function SubscriptionBlocked({
    * something that was never going to unblock them. */
   canRenew?: boolean;
   signOutForm: React.ReactNode;
+  /** The account's actual entitlement numbers — shown even while blocked
+   * (e.g. "window hasn't opened yet") so the person can confirm their sign-
+   * in count and validity window are set up correctly, not just the one
+   * date mentioned in `reason`. Omit where the caller has no profile quota
+   * fields to show (there currently isn't such a caller, but keeps this
+   * component usable without them). */
+  quota?: { signInCount: number; signInLimit: number | null; validFrom: string | null; validUntil: string | null };
 }) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState(requestNewSubscription, initial);
@@ -42,6 +51,15 @@ export default function SubscriptionBlocked({
   return (
     <main className="mx-auto max-w-2xl px-4 py-10">
       <h1 className="text-2xl font-bold">{title}</h1>
+      {quota && (
+        <SignInQuotaLine
+          signInCount={quota.signInCount}
+          signInLimit={quota.signInLimit}
+          validFrom={quota.validFrom}
+          validUntil={quota.validUntil}
+          className="mt-2"
+        />
+      )}
       <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-6">
         <p className="font-semibold text-amber-900">{reason}</p>
         {canRenew && (

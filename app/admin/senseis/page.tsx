@@ -351,7 +351,9 @@ export default async function AdminSenseis({
                 { key: "location", label: "Location" },
                 { key: "email", label: "Email" },
                 { key: "phone", label: "Phone" },
-                { key: "bank", label: "Payout Bank" },
+                { key: "bank_name", label: "Bank Name" },
+                { key: "bank_account_no", label: "Account Number" },
+                { key: "bank_account_name", label: "Account Holder Name" },
                 { key: "school", label: "School" },
                 { key: "tier_entries", label: "Competition Tier (paid entries)" },
                 { key: "expected_fee", label: "Required Fee" },
@@ -404,7 +406,6 @@ export default async function AdminSenseis({
                     <span key="certificate" className="text-neutral-400">—</span>
                   ),
                 location: [s.home_address, s.city_town, s.postcode, s.home_country].filter(Boolean).join(", "),
-                bank: [s.bank_name, s.bank_account_no, s.bank_account_name].filter(Boolean).join(" · "),
                 home_address: s.home_address ?? "",
                 city_town: s.city_town ?? "",
                 postcode: s.postcode ?? "",

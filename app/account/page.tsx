@@ -373,7 +373,18 @@ export default async function AccountPage({
     return (
       <>
         <SiteHeader />
-        <SubscriptionBlocked title="My account" reason={quota.reason!} canRenew={quota.canRenew} signOutForm={SignOutButton} />
+        <SubscriptionBlocked
+          title="My account"
+          reason={quota.reason!}
+          canRenew={quota.canRenew}
+          signOutForm={SignOutButton}
+          quota={{
+            signInCount: profile.sign_in_count,
+            signInLimit: profile.sign_in_limit,
+            validFrom: profile.sign_in_valid_from,
+            validUntil: profile.sign_in_valid_until,
+          }}
+        />
         <SiteFooter />
       </>
     );

@@ -139,9 +139,9 @@ export function SchoolForm({ telegramLink, tiers }: { telegramLink: string | nul
         Registering here is <strong>not free</strong> — the one-time registration fee follows the
         competition tier you register under: <strong>USD 10 / USD 100 / USD 200 per tier</strong>,
         whether the school registers itself or someone registers on its behalf. The paid fee
-        unlocks unlimited sign-in to watch your own students&apos; kata recordings and judge
-        scores — and 10 or more participants qualifies you for a 10% share of their registration
-        fees.
+        unlocks unlimited sign-in to watch your own students&apos; kata recordings and judges
+        scores — and if you have 10 or more participants&apos; category events, you qualify for a
+        10% share of their registration fees.
       </div>
       <TierSelect tiers={tiers} idPrefix="school" />
       <div>
@@ -229,6 +229,30 @@ export function SchoolForm({ telegramLink, tiers }: { telegramLink: string | nul
           <input id="home_country" name="home_country" required defaultValue="Malaysia" className={inputCls} />
         </div>
       </div>
+
+      <div className="rounded-md border border-neutral-200 bg-neutral-50 p-4">
+        <p className="text-sm font-bold text-neutral-800">Bank details for commission payout *</p>
+        <p className="mt-1 text-xs text-neutral-500">
+          Note: for accounts outside Malaysia, provide the IBAN, SWIFT code/BIC, BBAN, or ACH
+          alphanumeric code. If you don&apos;t know the code, please call your bank to check — this
+          ensures smooth processing with no delay in receiving any commission.
+        </p>
+        <div className="mt-3 grid gap-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor="bank_name" className={labelCls}>Bank name *</label>
+            <input id="bank_name" name="bank_name" required className={inputCls} placeholder="e.g. Maybank" />
+          </div>
+          <div>
+            <label htmlFor="bank_account_no" className={labelCls}>Account No. / IBAN *</label>
+            <input id="bank_account_no" name="bank_account_no" required className={inputCls} />
+          </div>
+          <div className="sm:col-span-2">
+            <label htmlFor="bank_account_name" className={labelCls}>Bank account holder name *</label>
+            <input id="bank_account_name" name="bank_account_name" required className={inputCls} placeholder="As per bank records" />
+          </div>
+        </div>
+      </div>
+
       <div>
         <label htmlFor="referral_source" className={labelCls}>
           {REFERRAL_LABEL}{" "}
@@ -292,9 +316,9 @@ export function SenseiForm({
         Registering here is <strong>not free</strong> — the one-time registration fee follows the
         competition tier you register under: <strong>USD 10 / USD 100 / USD 200 per tier</strong>,
         whether the sensei registers themselves or someone registers on their behalf. The paid fee
-        unlocks unlimited sign-in to watch your own students&apos; kata recordings and judge
-        scores — and 10 or more participants qualifies you for a 10% share of their registration
-        fees.
+        unlocks unlimited sign-in to watch your own students&apos; kata recordings and judges
+        scores — and if you have 10 or more participants&apos; category events, you qualify for a
+        10% share of their registration fees.
       </div>
       <TierSelect tiers={tiers} idPrefix="sensei" />
       <TierSlotsField
@@ -397,6 +421,33 @@ export function SenseiForm({
       <p className="text-xs text-neutral-500">
         School not in the list? <Link href="/register/school" className="underline">Register it first</Link>.
       </p>
+
+      <div className="rounded-md border border-neutral-200 bg-neutral-50 p-4">
+        <p className="text-sm font-bold text-neutral-800">Bank details for commission payout *</p>
+        <p className="mt-1 text-xs text-neutral-500">
+          Note: for accounts outside Malaysia, provide the IBAN, SWIFT code/BIC, BBAN, or ACH
+          alphanumeric code. If you don&apos;t know the code, please call your bank to check — this
+          ensures smooth processing with no delay in receiving any commission.
+        </p>
+        <div className="mt-3 grid gap-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor="bank_name" className={labelCls}>Bank name *</label>
+            <input id="bank_name" name="bank_name" required className={inputCls} placeholder="e.g. Maybank" />
+            <FieldError message={err.bank_name} />
+          </div>
+          <div>
+            <label htmlFor="bank_account_no" className={labelCls}>Account No. / IBAN *</label>
+            <input id="bank_account_no" name="bank_account_no" required className={inputCls} />
+            <FieldError message={err.bank_account_no} />
+          </div>
+          <div className="sm:col-span-2">
+            <label htmlFor="bank_account_name" className={labelCls}>Bank account holder name *</label>
+            <input id="bank_account_name" name="bank_account_name" required className={inputCls} placeholder="As per bank records" />
+            <FieldError message={err.bank_account_name} />
+          </div>
+        </div>
+      </div>
+
       <div>
         <label htmlFor="referral_source" className={labelCls}>
           {REFERRAL_LABEL}{" "}

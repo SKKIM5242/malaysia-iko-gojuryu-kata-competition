@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { writeAudit } from "@/lib/audit";
 import { sendConfirmationEmail } from "@/lib/notify";
 import { getStripe, paymentsEnabled } from "@/lib/payments";
+import { normalizeIban } from "@/lib/bank";
 
 export interface DirectoryState {
   ok: boolean;
@@ -112,6 +113,9 @@ export async function registerSchool(
   const city_town = String(formData.get("city_town") ?? "").trim();
   const postcode = String(formData.get("postcode") ?? "").trim();
   const home_country = String(formData.get("home_country") ?? "").trim();
+  const bank_name = String(formData.get("bank_name") ?? "").trim();
+  const bank_account_no = normalizeIban(String(formData.get("bank_account_no") ?? ""));
+  const bank_account_name = String(formData.get("bank_account_name") ?? "").trim();
   const competition_id = String(formData.get("competition_id") ?? "").trim();
   const referral_source = String(formData.get("referral_source") ?? "").trim();
   if (!name) return { ok: false, error: "School / dojo name is required." };
@@ -128,6 +132,9 @@ export async function registerSchool(
   if (!city_town) return { ok: false, error: "City / Town is required." };
   if (!postcode) return { ok: false, error: "Postcode is required." };
   if (!home_country) return { ok: false, error: "Home country is required." };
+  if (!bank_name || !bank_account_no || !bank_account_name) {
+    return { ok: false, error: "Bank name, account number, and account holder name are required." };
+  }
   const gender = contact_title === "Mr." ? "male" : "female";
 
   const supabase = await createClient();
@@ -161,6 +168,9 @@ export async function registerSchool(
     city_town,
     postcode,
     home_country,
+    bank_name,
+    bank_account_no,
+    bank_account_name,
     referral_source: referral_source || null,
     registration_competition_id: tier.id,
     participating_tier_1_id: slots.tier1,
@@ -190,8 +200,8 @@ export async function registerSchool(
       "Next: register your Sensei / Coach, then register participants.",
       "",
       "Your paid tier registration fee unlocks unlimited sign-in to watch your own students' " +
-        "kata recordings and judge scores any time — 10 or more participants qualifies you " +
-        "for a 10% share of their registration fees.",
+        "kata recordings and judges scores any time — if you have 10 or more participants' " +
+        "category events, you qualify for a 10% share of their registration fees.",
       "",
       "Next: once every registration under this email is done, create your sign-in account " +
         "(or sign in if you already have one) using the Kata Arena log in link below.",
@@ -219,6 +229,9 @@ export async function registerSensei(
   const city_town = String(formData.get("city_town") ?? "").trim();
   const postcode = String(formData.get("postcode") ?? "").trim();
   const home_country = String(formData.get("home_country") ?? "").trim();
+  const bank_name = String(formData.get("bank_name") ?? "").trim();
+  const bank_account_no = normalizeIban(String(formData.get("bank_account_no") ?? ""));
+  const bank_account_name = String(formData.get("bank_account_name") ?? "").trim();
   const competition_id = String(formData.get("competition_id") ?? "").trim();
   const referral_source = String(formData.get("referral_source") ?? "").trim();
   if (!name) return { ok: false, error: "Sensei / coach name is required." };
@@ -272,6 +285,17 @@ export async function registerSensei(
       ok: false,
       error: "Please fix the highlighted fields.",
       fieldErrors: { home_country: "Home country is required" },
+    };
+  }
+  if (!bank_name || !bank_account_no || !bank_account_name) {
+    return {
+      ok: false,
+      error: "Please fix the highlighted fields.",
+      fieldErrors: {
+        ...(!bank_name ? { bank_name: "Bank name is required" } : {}),
+        ...(!bank_account_no ? { bank_account_no: "Account No. / IBAN is required" } : {}),
+        ...(!bank_account_name ? { bank_account_name: "Account holder name is required" } : {}),
+      },
     };
   }
 
@@ -329,6 +353,9 @@ export async function registerSensei(
     city_town,
     postcode,
     home_country,
+    bank_name,
+    bank_account_no,
+    bank_account_name,
     referral_source: referral_source || null,
     registration_competition_id: tier.id,
     participating_tier_1_id: slots.tier1,
@@ -358,8 +385,8 @@ export async function registerSensei(
       "Next: register participants or bulk-register your students.",
       "",
       "Your paid tier registration fee unlocks unlimited sign-in to watch your own students' " +
-        "kata recordings and judge scores any time — 10 or more participants qualifies you " +
-        "for a 10% share of their registration fees.",
+        "kata recordings and judges scores any time — if you have 10 or more participants' " +
+        "category events, you qualify for a 10% share of their registration fees.",
       "",
       "Next: once every registration under this email is done, create your sign-in account " +
         "(or sign in if you already have one) using the Kata Arena log in link below.",

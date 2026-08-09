@@ -338,7 +338,9 @@ export default async function AdminSchools({
                 { key: "location", label: "Location" },
                 { key: "email", label: "Email" },
                 { key: "phone", label: "Phone" },
-                { key: "bank", label: "Bank" },
+                { key: "bank_name", label: "Bank Name" },
+                { key: "bank_account_no", label: "Account Number" },
+                { key: "bank_account_name", label: "Account Holder Name" },
                 { key: "tier_entries", label: "Competition Tier (paid entries)" },
                 { key: "expected_fee", label: "Required Fee" },
                 { key: "payment", label: "Fee Status" },
@@ -377,7 +379,6 @@ export default async function AdminSchools({
                   (s.contact_karate_title ? ` (${s.contact_karate_title}${s.contact_rank ? ` — ${s.contact_rank}` : ""})` : "") +
                   (s.contact_ic_passport ? ` — IC/Passport: ${s.contact_ic_passport}` : ""),
                 location: [s.home_address, s.city_town, s.postcode, s.home_country].filter(Boolean).join(", "),
-                bank: [s.bank_name, s.bank_account_no, s.bank_account_name].filter(Boolean).join(" · "),
                 contact_title: s.contact_title ?? "",
                 contact_name: s.contact_name ?? "",
                 contact_karate_title: s.contact_karate_title ?? "",

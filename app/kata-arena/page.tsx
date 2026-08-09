@@ -320,7 +320,18 @@ export default async function KataArenaPage({
     return (
       <>
         <SiteHeader />
-        <SubscriptionBlocked title="Kata Arena" reason={quota.reason!} canRenew={quota.canRenew} signOutForm={signOutButtonForm} />
+        <SubscriptionBlocked
+          title="Kata Arena"
+          reason={quota.reason!}
+          canRenew={quota.canRenew}
+          signOutForm={signOutButtonForm}
+          quota={{
+            signInCount: profile.sign_in_count,
+            signInLimit: profile.sign_in_limit,
+            validFrom: profile.sign_in_valid_from,
+            validUntil: profile.sign_in_valid_until,
+          }}
+        />
         <SiteFooter />
       </>
     );
