@@ -67,7 +67,7 @@ async function getPendingRegistrations(
   const { data: regs } = await supabase
     .from("registrations")
     .select(
-      "id, category:categories(name, sort_order), competition:competitions(id, name, event_date, registration_deadline), participant:participants(full_name)",
+      "id, category:categories(name, sort_order), competition:competitions(id, name, event_date, registration_deadline, registration_fee_usd), participant:participants(full_name)",
     )
     .in("participant_id", participantIds)
     .eq("payment_status", "paid");
@@ -75,7 +75,13 @@ async function getPendingRegistrations(
     (regs as unknown as Array<{
       id: string;
       category: { name: string; sort_order: number } | null;
-      competition: { id: string; name: string; event_date: string | null; registration_deadline: string | null } | null;
+      competition: {
+        id: string;
+        name: string;
+        event_date: string | null;
+        registration_deadline: string | null;
+        registration_fee_usd: number | null;
+      } | null;
       participant: { full_name: string | null } | null;
     }>) ?? [];
   if (regList.length === 0) return [];
@@ -98,6 +104,7 @@ async function getPendingRegistrations(
       competitionName: r.competition?.name ? shortTierName(r.competition.name) : null,
       eventDate: r.competition?.event_date ?? null,
       registrationDeadline: r.competition?.registration_deadline ?? null,
+      registrationFeeUsd: r.competition?.registration_fee_usd ?? null,
       participantName: r.participant?.full_name ?? null,
     }));
 }

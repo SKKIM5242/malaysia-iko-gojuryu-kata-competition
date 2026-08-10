@@ -14,6 +14,10 @@ export interface PendingRegistration {
   competitionName: string | null;
   eventDate: string | null;
   registrationDeadline: string | null;
+  /** Drives the tier boxes' own display order (cheapest tier first) --
+   * several tiers can share the same eventDate, which alone isn't enough
+   * to tell them apart in a stable order. */
+  registrationFeeUsd: number | null;
   /** Whose kata this is — shown so a login linked to several participants
    * (e.g. a Sensei recording for several students) can tell them apart in
    * one flat list. */
@@ -38,6 +42,7 @@ interface TierGroup {
   competitionName: string | null;
   eventDate: string | null;
   registrationDeadline: string | null;
+  registrationFeeUsd: number | null;
   items: PendingRegistration[];
 }
 
@@ -56,6 +61,7 @@ function groupByTier(items: PendingRegistration[]): TierGroup[] {
         competitionName: item.competitionName,
         eventDate: item.eventDate,
         registrationDeadline: item.registrationDeadline,
+        registrationFeeUsd: item.registrationFeeUsd,
         items: [],
       };
       map.set(item.competitionId, group);
@@ -64,7 +70,11 @@ function groupByTier(items: PendingRegistration[]): TierGroup[] {
   }
   const groups = [...map.values()];
   for (const g of groups) g.items.sort((a, b) => a.categorySortOrder - b.categorySortOrder);
-  groups.sort((a, b) => (a.eventDate ?? "").localeCompare(b.eventDate ?? ""));
+  // Cheapest tier first (USD 10 -> USD 100 -> USD 200), matching every
+  // other tier listing in the app -- sorting by eventDate alone left tiers
+  // that share the same event date (the common case) in whatever order
+  // they happened to come back from the database instead.
+  groups.sort((a, b) => (a.registrationFeeUsd ?? Infinity) - (b.registrationFeeUsd ?? Infinity));
   return groups;
 }
 
