@@ -411,7 +411,18 @@ export default async function KataArenaPage({
             ? arena.filter((e) => e.schoolId != null && e.schoolId === profile.school_id)
             : profile.role === "sensei" && !revealed
               ? arena.filter((e) => e.senseiId != null && e.senseiId === profile.sensei_id)
-              : arena;
+              : // A Referee/Judge sees only their own submitted score per
+                // recording until winners are announced for this tier —
+                // full visibility of every judge's score (same as
+                // Admin/Organizer/Participant Support) opens up from that
+                // date forward, matching Full View's own gate (see
+                // FullViewButton usage in app/admin/judging/page.tsx).
+                profile.role === "referee" && !revealed
+                ? arena.map((e) => ({
+                    ...e,
+                    judgeScores: e.judgeScores.filter((js) => js.judgeUserId === user.id),
+                  }))
+                : arena;
         return { competition, arena: scoped, revealed };
       })
       .filter(({ arena, revealed }) => !["school", "sensei"].includes(profile.role) || revealed || arena.length > 0);

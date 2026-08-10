@@ -850,6 +850,30 @@ export async function submitScore(formData: FormData) {
     revalidatePath("/account");
     return;
   }
+
+  // A Referee/Judge may only score a recording formally assigned to them
+  // (referee_assignments) -- the real security boundary matching the
+  // Judging page's own UI restriction (see app/admin/judging/page.tsx).
+  // Admin/Organizer/Staff bypass this check entirely below.
+  const { data: scorerProfile } = await supabase.from("profiles").select("role").eq("user_id", user.id).maybeSingle();
+  const scorerRole = scorerProfile?.role ?? null;
+  const isJudgingManager = ["admin", "organizer", "staff"].includes(scorerRole ?? "");
+  if (!isJudgingManager) {
+    if (scorerRole !== "referee") {
+      revalidatePath("/account");
+      return;
+    }
+    const { data: assignment } = await supabase
+      .from("referee_assignments")
+      .select("video_id")
+      .eq("video_id", videoId)
+      .eq("referee_user_id", user.id)
+      .maybeSingle();
+    if (!assignment) {
+      revalidatePath("/account");
+      return;
+    }
+  }
   // Admin/Organizer/Staff full-access override: they may score any
   // recording, not just ones formally assigned to them. This intentionally
   // does NOT self-assign into referee_assignments — an override isn't a

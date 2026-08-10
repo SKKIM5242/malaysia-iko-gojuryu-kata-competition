@@ -18,6 +18,7 @@ import AutoAssignCriterionModal from "@/components/AutoAssignCriterionModal";
 import QuickScoreForm from "@/components/QuickScoreForm";
 import { finalScore, isDisqualified } from "@/lib/scoring";
 import { getTelegramLink } from "@/lib/telegram";
+import { winnersRevealed } from "@/lib/winners";
 
 export const dynamic = "force-dynamic";
 
@@ -65,11 +66,11 @@ export default async function AdminJudging({
   // Editing the Auto-Assign Criteria documentation table is Admin/Organizer
   // only, same tier as the Access Matrix / Access Comparison editors.
   const canEditCriteria = isJudgingManager;
-  // Kata video scoring: Admin, Organizer/Staff, AND Referee/Judge may score
-  // any recording from this page — per the organizer's instruction, every
-  // signed-in Referee/Judge gets the Judging page with full access.
-  // Participant Support stays view only (not a referee).
-  const canScoreAnyVideo = ["admin", "organizer", "staff", "referee"].includes(myRole ?? "");
+  // Kata video scoring: Admin/Organizer/Staff may score or override ANY
+  // recording. A Referee/Judge may only score a recording formally
+  // assigned to them (see the per-video `assigned.includes(user.id)` check
+  // in renderVideoCard) — enforced again server-side in submitScore
+  // (app/actions/account.ts) as the real security boundary.
 
   const [
     competitions, { data: videos }, { data: directory }, { data: refereeProfiles }, { data: staffProfiles },
@@ -188,7 +189,7 @@ export default async function AdminJudging({
     videosByCompetition.set(compId, list);
   }
 
-  function renderVideoCard(v: VideoRow, queuePosition: number | null, dq: boolean, judgesRequired: number) {
+  function renderVideoCard(v: VideoRow, queuePosition: number | null, dq: boolean, judgesRequired: number, revealed: boolean) {
     const assigned = assignedByVideo.get(v.id) ?? [];
     const overrides = overrideByVideo.get(v.id) ?? [];
     const allScorers = [...assigned, ...overrides];
@@ -201,6 +202,15 @@ export default async function AdminJudging({
     const final = finalScore(submittedScores);
     const trimmed = submittedScores.length >= 5;
     const playbackUrl = playbackUrls.get(v.id);
+    // A Referee/Judge may only score a recording they're formally assigned
+    // to (Admin/Organizer/Staff can always score/override any recording).
+    const canScoreThisVideo = isJudgingManager || (user != null && assigned.includes(user.id));
+    // A Referee/Judge sees every OTHER judge's individual score (and gets
+    // Full View) only once winners are announced for this competition —
+    // before that they see only their own score, same restriction Kata
+    // Arena applies (app/kata-arena/page.tsx). Admin/Organizer/Staff and
+    // every other role keep full visibility at all times.
+    const fullVisibility = isJudgingManager || myRole !== "referee" || revealed;
     return (
       <Card key={v.id}>
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -218,30 +228,39 @@ export default async function AdminJudging({
                 Queue #{queuePosition}
               </span>
             ) : null}
-            <FullViewButton
-              url={playbackUrl ?? null}
-              participantName={v.participant?.full_name ?? "Unknown participant"}
-              categoryName={v.registration?.category?.name ?? null}
-              competitionName={competitions.find((c) => c.id === v.registration?.competition_id)?.name ?? null}
-              judges={allScorers.map((uid) => ({
-                judgeName: staffName.get(uid) ?? refereeName.get(uid) ?? uid.slice(0, 8),
-                country: refereeCountry.get(uid) ?? null,
-                total: scoreByKey.get(`${v.id}:${uid}`) ?? null,
-                criteria: criteriaByKey.get(`${v.id}:${uid}`) ?? null,
-                deductions: deductionsByKey.get(`${v.id}:${uid}`) ?? null,
-                reason: reasonByKey.get(`${v.id}:${uid}`) ?? null,
-                isOverride: staffName.has(uid),
-              }))}
-              judgesRequired={judgesRequired}
-              queuePosition={queuePosition}
-              averageText={
-                final != null
-                  ? `Average ${final.toFixed(2)} (${submittedScores.length}/${allScorers.length} scored${trimmed ? ", high/low dropped" : ""})`
-                  : null
-              }
-              disqualified={dq}
-              canToggleDeductions={canScoreAnyVideo}
-            />
+            {fullVisibility ? (
+              <FullViewButton
+                url={playbackUrl ?? null}
+                participantName={v.participant?.full_name ?? "Unknown participant"}
+                categoryName={v.registration?.category?.name ?? null}
+                competitionName={competitions.find((c) => c.id === v.registration?.competition_id)?.name ?? null}
+                judges={allScorers.map((uid) => ({
+                  judgeName: staffName.get(uid) ?? refereeName.get(uid) ?? uid.slice(0, 8),
+                  country: refereeCountry.get(uid) ?? null,
+                  total: scoreByKey.get(`${v.id}:${uid}`) ?? null,
+                  criteria: criteriaByKey.get(`${v.id}:${uid}`) ?? null,
+                  deductions: deductionsByKey.get(`${v.id}:${uid}`) ?? null,
+                  reason: reasonByKey.get(`${v.id}:${uid}`) ?? null,
+                  isOverride: staffName.has(uid),
+                }))}
+                judgesRequired={judgesRequired}
+                queuePosition={queuePosition}
+                averageText={
+                  final != null
+                    ? `Average ${final.toFixed(2)} (${submittedScores.length}/${allScorers.length} scored${trimmed ? ", high/low dropped" : ""})`
+                    : null
+                }
+                disqualified={dq}
+                canToggleDeductions={fullVisibility}
+              />
+            ) : (
+              <span
+                className="shrink-0 rounded border border-neutral-200 bg-neutral-50 px-3 py-1 text-xs text-neutral-400"
+                title="Full View opens once winners are announced for this competition"
+              >
+                Full view (after winners)
+              </span>
+            )}
             <ScoreSessionButton
               item={{
                 videoId: v.id,
@@ -253,7 +272,7 @@ export default async function AdminJudging({
                 playbackUrl: playbackUrl ?? null,
                 existingScore: myScore ?? null,
               }}
-              canScore={canScoreAnyVideo || (user != null && assigned.includes(user.id))}
+              canScore={canScoreThisVideo}
               label="Watch recording"
             />
           </div>
@@ -275,18 +294,24 @@ export default async function AdminJudging({
                   {judgeName}
                   {country && <span className="font-normal text-neutral-400">({country})</span>}
                   {score != null ? (
-                    canScoreAnyVideo ? (
-                      <ScoreDetailButton
-                        judgeName={judgeName}
-                        total={score}
-                        criteria={criteriaByKey.get(`${v.id}:${uid}`) ?? null}
-                        deductions={deductionsByKey.get(`${v.id}:${uid}`) ?? null}
-                        reason={reasonByKey.get(`${v.id}:${uid}`) ?? null}
-                        canToggleDeductions={canScoreAnyVideo}
-                      />
+                    fullVisibility || uid === user?.id ? (
+                      isJudgingManager || uid === user?.id ? (
+                        <ScoreDetailButton
+                          judgeName={judgeName}
+                          total={score}
+                          criteria={criteriaByKey.get(`${v.id}:${uid}`) ?? null}
+                          deductions={deductionsByKey.get(`${v.id}:${uid}`) ?? null}
+                          reason={reasonByKey.get(`${v.id}:${uid}`) ?? null}
+                          canToggleDeductions={isJudgingManager || uid === user?.id}
+                        />
+                      ) : (
+                        <span className={score === 0 ? "font-bold text-red-700" : "text-green-700"}>
+                          Total {score.toFixed(2)}
+                        </span>
+                      )
                     ) : (
-                      <span className={score === 0 ? "font-bold text-red-700" : "text-green-700"}>
-                        Total {score.toFixed(2)}
+                      <span className="text-neutral-400" title="Individual scores open up once winners are announced">
+                        Scored
                       </span>
                     )
                   ) : (
@@ -334,18 +359,24 @@ export default async function AdminJudging({
               >
                 Override — {judgeName}
                 {score != null ? (
-                  canScoreAnyVideo ? (
-                    <ScoreDetailButton
-                      judgeName={judgeName}
-                      total={score}
-                      criteria={criteriaByKey.get(`${v.id}:${uid}`) ?? null}
-                      deductions={deductionsByKey.get(`${v.id}:${uid}`) ?? null}
-                      reason={reason ?? null}
-                      canToggleDeductions={canScoreAnyVideo}
-                    />
+                  fullVisibility ? (
+                    isJudgingManager ? (
+                      <ScoreDetailButton
+                        judgeName={judgeName}
+                        total={score}
+                        criteria={criteriaByKey.get(`${v.id}:${uid}`) ?? null}
+                        deductions={deductionsByKey.get(`${v.id}:${uid}`) ?? null}
+                        reason={reason ?? null}
+                        canToggleDeductions={isJudgingManager}
+                      />
+                    ) : (
+                      <span className={score === 0 ? "font-bold text-red-700" : "text-purple-700"}>
+                        Total {score.toFixed(2)}
+                      </span>
+                    )
                   ) : (
-                    <span className={score === 0 ? "font-bold text-red-700" : "text-purple-700"}>
-                      Total {score.toFixed(2)}
+                    <span className="text-neutral-400" title="Individual scores open up once winners are announced">
+                      Scored
                     </span>
                   )
                 ) : (
@@ -409,7 +440,7 @@ export default async function AdminJudging({
           </div>
         )}
 
-        {canScoreAnyVideo && (
+        {canScoreThisVideo && (
           <QuickScoreForm videoId={v.id} existingScore={myScore ?? null} existingReason={myReason} />
         )}
       </Card>
@@ -420,10 +451,12 @@ export default async function AdminJudging({
     <AdminShell title="Judging" active="/admin/judging" flash={{ ok: params.ok, error: params.error }}>
       <div className="mb-3 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
         Every score a Referee/Judge submits is <strong>final — no appeal is available</strong>. A
-        judge&apos;s individual score is visible to everyone as soon as they submit it; the
-        Average Score and standings stay hidden from the public until winners are announced.
-        Only Organizer or Chief Referee/Judge can override the score of any recording directly
-        below, regardless of assignment.
+        judge&apos;s individual score is visible to Admin/Organizer/Participant Support as soon
+        as it&apos;s submitted; a Referee/Judge sees only their own score on a recording until
+        that competition&apos;s winners are announced, after which Full View opens to show every
+        judge&apos;s score. The Average Score and standings stay hidden from the public until
+        winners are announced. Only Admin/Organizer/Staff can override the score of any recording
+        directly below, regardless of assignment.
       </div>
 
       <div className="mb-3 flex justify-end">
@@ -675,8 +708,9 @@ export default async function AdminJudging({
                     .filter((r) => !r.dq && r.final != null)
                     .sort((a, b) => (b.final ?? 0) - (a.final ?? 0))
                     .forEach((r, i) => queueByVideoId.set(r.v.id, i + 1));
+                  const revealed = winnersRevealed(c.registration_deadline, c.winners_announce_date);
                   return ranked.map(({ v, dq }) =>
-                    renderVideoCard(v, queueByVideoId.get(v.id) ?? null, dq, c.judges_required),
+                    renderVideoCard(v, queueByVideoId.get(v.id) ?? null, dq, c.judges_required, revealed),
                   );
                 })()}
               </div>

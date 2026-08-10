@@ -4,6 +4,7 @@ import { kataBaseOf } from "@/lib/division";
 
 export interface JudgeScoreEntry {
   judgeName: string;
+  judgeUserId: string;
   score: number | null;
 }
 
@@ -118,6 +119,7 @@ export async function loadKataArena(
         scoresSubmitted: videoScores.length,
         judgeScores: assigned.map((uid) => ({
           judgeName: refereeName.get(uid) ?? uid.slice(0, 8),
+          judgeUserId: uid,
           score: scoreByKey.get(`${v.id}:${uid}`) ?? null,
         })),
       };

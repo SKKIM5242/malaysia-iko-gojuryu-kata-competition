@@ -9,7 +9,7 @@ export default function TermsPage() {
       <main className="mx-auto max-w-3xl px-4 py-10">
         <h1 className="text-2xl font-bold tracking-tight">Kata Arena — Terms &amp; Conditions</h1>
         <p className="mt-1 text-sm text-neutral-500">
-          Malaysia Open Virtual Karate-do Kata Competition 2026 — organised by IKO GOJU-RYU
+          Malaysia Open Virtual Karate-do Kata Competition 2026 — organized by IKO GOJU-RYU
           KARATE-DO MALAYSIA SDN BHD.
         </p>
         <div className="mt-8 space-y-6 text-sm leading-relaxed text-neutral-700">
@@ -17,8 +17,9 @@ export default function TermsPage() {
             <h2 className="mb-1 font-bold text-neutral-900">1. Who This Applies To</h2>
             <p>
               These terms apply to anyone creating a Kata Arena account — Participants, Referees /
-              Judges, and Admin / Organizer / Participant Support staff — to submit, judge, or manage
-              kata recordings for this competition.
+              Judges, School / Sensei accounts, Audience, and Admin / Organizer / Participant
+              Support staff — to submit, judge, watch, or manage kata recordings for this
+              competition.
             </p>
           </section>
           <section>
@@ -41,11 +42,14 @@ export default function TermsPage() {
           <section>
             <h2 className="mb-1 font-bold text-neutral-900">4. Judging</h2>
             <p>
-              Each recording is scored by a panel of Referees / Judges assigned by the organizer
-              (typically 3, 5, or 7 per recording). Where 5 or more judges score a recording, the
-              highest and lowest scores are dropped and the remaining scores are averaged for the
-              final result. Referees may only view and score recordings assigned to them, and
-              scoring decisions are final.
+              Each recording is scored by a panel of Referees / Judges assigned by the organizer /
+              Chief Referee / Judge by clicking the Auto-assign referees button, which assigns
+              randomly according to the rules set (typically 3, 5, or 7 per recording). Where 5 or
+              more judges score a recording, the highest and lowest scores are dropped and the
+              remaining scores are averaged for the final result. Referees may only view and score
+              recordings assigned to them, and scoring decisions are final. Full View — seeing every
+              judge&apos;s individual score side by side — is only available to a Referee / Judge
+              from that competition&apos;s winner announcement date onward.
             </p>
           </section>
           <section>
@@ -55,9 +59,14 @@ export default function TermsPage() {
               it is submitted, listed by kata event in submission order. A recording shows a green
               status with its total score once every assigned judge has scored it, or a red
               &quot;Disqualified&quot; status if any one judge gave a Total Score of 0 — no score is
-              shown for a disqualified entry. Referees / Judges see only their own individual score
-              per recording; Admin / Organizer / Participant Support see every judge&apos;s individual
-              score. Official winners and standings are announced separately — see{" "}
+              shown for a disqualified entry. Until a competition&apos;s winners are announced, a
+              Referee / Judge sees only their own individual score per recording, and a School /
+              Sensei account sees only their own students&apos; recordings; Admin / Organizer /
+              Participant Support see every judge&apos;s individual score and every recording at all
+              times. From the winner announcement date onward, a Referee / Judge also sees every
+              judge&apos;s individual score (via Full View), and School / Sensei accounts see every
+              participant&apos;s recording. Official winners and standings are announced
+              separately — see{" "}
               <a href="/winners" className="font-semibold text-red-700 underline underline-offset-2">
                 Winners
               </a>
@@ -74,9 +83,10 @@ export default function TermsPage() {
           <section>
             <h2 className="mb-1 font-bold text-neutral-900">7. Conduct</h2>
             <p>
-              Accounts are personal and may not be shared. The organizer may suspend or remove any
-              account for abusive conduct, attempted score manipulation, or submission of
-              recordings that are not a genuine, unedited performance.
+              Accounts are personal and may be shared with school or own sensei &amp; may not be
+              shared to outsider. The organizer may suspend or remove any account for abusive
+              conduct, attempted score manipulation, or submission of recordings that are not a
+              genuine, unedited performance.
             </p>
           </section>
           <section>
