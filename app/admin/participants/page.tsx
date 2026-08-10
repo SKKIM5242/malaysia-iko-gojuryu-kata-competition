@@ -202,7 +202,7 @@ export default async function AdminParticipants({
                   <div>
                     <label htmlFor="bank_account_no" className={adminLabel}>International Bank Account No. (IBAN/SWIFT/BIC/ACH) *</label>
                     <IbanInput id="bank_account_no" name="bank_account_no" required defaultValue={editing?.bank?.bank_account_no ?? ""} className={adminInput} />
-                    <IbanConfirmCheckbox id="bank_account_no_confirmed" />
+                    <IbanConfirmCheckbox id="bank_account_no_confirmed" defaultChecked={!!editing?.bank?.bank_account_no} />
                   </div>
                   <div className="sm:col-span-2">
                     <label htmlFor="bank_account_name" className={adminLabel}>Bank account holder name *</label>

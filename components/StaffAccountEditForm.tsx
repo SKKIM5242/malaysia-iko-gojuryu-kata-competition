@@ -207,7 +207,7 @@ export default function StaffAccountEditForm({
             <div>
               <label htmlFor={`${idPrefix}_bank_account_no`} className={adminLabel}>International Bank Account No. (IBAN/SWIFT/BIC/ACH)</label>
               <IbanInput id={`${idPrefix}_bank_account_no`} name="bank_account_no" defaultValue={account.bank_account_no ?? ""} className={adminInput} />
-              <IbanConfirmCheckbox id={`${idPrefix}_bank_account_no_confirmed`} />
+              <IbanConfirmCheckbox id={`${idPrefix}_bank_account_no_confirmed`} defaultChecked={!!account.bank_account_no} />
             </div>
             <div className="sm:col-span-2">
               <label htmlFor={`${idPrefix}_bank_account_name`} className={adminLabel}>Bank account holder name</label>
