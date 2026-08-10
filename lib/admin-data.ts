@@ -192,9 +192,14 @@ export async function getParticipantRecords(): Promise<ParticipantRecord[]> {
 
   const regIds = regList.map((r) => r.id);
   const changedByIds = [...new Set(regList.map((r) => r.slot_status_changed_by).filter((id): id is string => !!id))];
-  const [{ data: videos }, { data: profiles }, { data: changedByProfiles }] = await Promise.all([
+  const [{ data: videos }, { data: profiles }, { data: attemptRows }, { data: changedByProfiles }] = await Promise.all([
     supabase.from("kata_videos").select("registration_id, storage_path, created_at").in("registration_id", regIds),
-    supabase.from("profiles").select("registration_id, record_attempts, bonus_record_attempts, email").in("registration_id", regIds),
+    supabase.from("profiles").select("registration_id, email").in("registration_id", regIds),
+    // Re-record budget is independent per linked registration (see
+    // migration 0118), not a shared per-login pool -- reading from profiles
+    // here would only ever show a registration that happens to be someone's
+    // PRIMARY link, and silently blank out every other linked participant.
+    supabase.from("profile_participants").select("registration_id, record_attempts, bonus_record_attempts").in("registration_id", regIds),
     changedByIds.length > 0
       ? supabase.from("profiles").select("user_id, full_name, email").in("user_id", changedByIds)
       : Promise.resolve({ data: [] }),
@@ -202,9 +207,9 @@ export async function getParticipantRecords(): Promise<ParticipantRecord[]> {
   const videoByReg = new Map(
     (videos ?? []).map((v) => [v.registration_id as string, { storagePath: v.storage_path as string, createdAt: v.created_at as string }]),
   );
-  const attemptsByReg = new Map((profiles ?? []).map((p) => [p.registration_id as string, p.record_attempts as number]));
+  const attemptsByReg = new Map((attemptRows ?? []).map((p) => [p.registration_id as string, p.record_attempts as number]));
   const maxAttemptsByReg = new Map(
-    (profiles ?? []).map((p) => [p.registration_id as string, 3 + (p.bonus_record_attempts as number ?? 0)]),
+    (attemptRows ?? []).map((p) => [p.registration_id as string, 3 + (p.bonus_record_attempts as number ?? 0)]),
   );
   const linkedEmailByReg = new Map(
     (profiles ?? []).map((p) => [p.registration_id as string, (p.email as string | null) ?? null]),

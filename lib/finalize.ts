@@ -118,20 +118,38 @@ export async function finalizeAttemptPurchaseSession(sessionId: string): Promise
   const admin = createAdminClient();
   const { data: purchase } = await admin
     .from("attempt_purchases")
-    .select("id, user_id, status")
+    .select("id, user_id, registration_id, status")
     .eq("id", purchaseId)
     .maybeSingle();
   if (!purchase) return { status: "error", message: "Purchase record not found." };
   if (purchase.status !== "paid") {
-    const { data: profile } = await admin
-      .from("profiles")
-      .select("bonus_record_attempts")
-      .eq("user_id", purchase.user_id)
-      .maybeSingle();
-    await admin
-      .from("profiles")
-      .update({ bonus_record_attempts: (profile?.bonus_record_attempts ?? 0) + 3 })
-      .eq("user_id", purchase.user_id);
+    // Credits the specific registration this purchase was for (see
+    // migration 0118) -- independent per linked participant, not a shared
+    // login-wide pool. Falls back to profiles for a pre-migration purchase
+    // that somehow still has no registration_id.
+    if (purchase.registration_id) {
+      const { data: link } = await admin
+        .from("profile_participants")
+        .select("bonus_record_attempts")
+        .eq("user_id", purchase.user_id)
+        .eq("registration_id", purchase.registration_id)
+        .maybeSingle();
+      await admin
+        .from("profile_participants")
+        .update({ bonus_record_attempts: (link?.bonus_record_attempts ?? 0) + 3 })
+        .eq("user_id", purchase.user_id)
+        .eq("registration_id", purchase.registration_id);
+    } else {
+      const { data: profile } = await admin
+        .from("profiles")
+        .select("bonus_record_attempts")
+        .eq("user_id", purchase.user_id)
+        .maybeSingle();
+      await admin
+        .from("profiles")
+        .update({ bonus_record_attempts: (profile?.bonus_record_attempts ?? 0) + 3 })
+        .eq("user_id", purchase.user_id);
+    }
     await admin
       .from("attempt_purchases")
       .update({ status: "paid", paid_at: new Date().toISOString() })

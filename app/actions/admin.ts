@@ -5501,7 +5501,7 @@ export async function markAttemptPurchasePaid(formData: FormData) {
   const { supabase, actorId } = await getActor();
   const { data: purchase } = await supabase
     .from("attempt_purchases")
-    .select("id, user_id, status")
+    .select("id, user_id, registration_id, status")
     .eq("id", id)
     .maybeSingle();
   if (!purchase || purchase.status !== "pending") {
@@ -5512,10 +5512,29 @@ export async function markAttemptPurchasePaid(formData: FormData) {
     .select("bonus_record_attempts, full_name, email")
     .eq("user_id", purchase!.user_id)
     .maybeSingle();
-  const { error: err1 } = await supabase
-    .from("profiles")
-    .update({ bonus_record_attempts: (profile?.bonus_record_attempts ?? 0) + 3 })
-    .eq("user_id", purchase!.user_id);
+  // Credits the specific registration this purchase was for (see migration
+  // 0118) -- independent per linked participant, not a shared login-wide
+  // pool. Falls back to profiles for a pre-migration purchase that somehow
+  // still has no registration_id.
+  let err1: { message: string } | null = null;
+  if (purchase!.registration_id) {
+    const { data: link } = await supabase
+      .from("profile_participants")
+      .select("bonus_record_attempts")
+      .eq("user_id", purchase!.user_id)
+      .eq("registration_id", purchase!.registration_id)
+      .maybeSingle();
+    ({ error: err1 } = await supabase
+      .from("profile_participants")
+      .update({ bonus_record_attempts: (link?.bonus_record_attempts ?? 0) + 3 })
+      .eq("user_id", purchase!.user_id)
+      .eq("registration_id", purchase!.registration_id));
+  } else {
+    ({ error: err1 } = await supabase
+      .from("profiles")
+      .update({ bonus_record_attempts: (profile?.bonus_record_attempts ?? 0) + 3 })
+      .eq("user_id", purchase!.user_id));
+  }
   const { error: err2 } = await supabase
     .from("attempt_purchases")
     .update({ status: "paid", paid_at: new Date().toISOString() })

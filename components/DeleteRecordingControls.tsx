@@ -81,7 +81,7 @@ export default function DeleteRecordingControls({
       {state.error && <p className="w-full text-xs font-semibold text-red-600">{state.error}</p>}
       {left <= 0 && (
         <div className="w-full">
-          <BuyExtraAttemptsButton hasPendingPurchase={hasPendingPurchase} />
+          <BuyExtraAttemptsButton registrationId={registrationId} hasPendingPurchase={hasPendingPurchase} />
         </div>
       )}
     </div>

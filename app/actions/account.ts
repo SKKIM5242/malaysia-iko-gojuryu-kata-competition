@@ -148,24 +148,24 @@ export async function deleteSubmittedVideo(
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("registration_id, record_attempts")
+    .select("registration_id")
     .eq("user_id", user.id)
     .maybeSingle();
   let owns = !!profile && profile.registration_id === registrationId;
-  if (!owns) {
-    const { data: link } = await supabase
-      .from("profile_participants")
-      .select("registration_id")
-      .eq("user_id", user.id)
-      .eq("registration_id", registrationId)
-      .maybeSingle();
-    owns = !!link;
-  }
+  const { data: link } = await supabase
+    .from("profile_participants")
+    .select("registration_id, record_attempts, bonus_record_attempts")
+    .eq("user_id", user.id)
+    .eq("registration_id", registrationId)
+    .maybeSingle();
+  if (link) owns = true;
   if (!profile || !owns) {
     return { ok: false, error: "This recording isn't linked to your account." };
   }
-  if ((profile.record_attempts ?? 0) >= 3) {
-    return { ok: false, error: "No delete attempts left — 3 of 3 used.", attemptsUsed: 3 };
+  const attemptsUsed = link?.record_attempts ?? 0;
+  const maxAttempts = 3 + (link?.bonus_record_attempts ?? 0);
+  if (attemptsUsed >= maxAttempts) {
+    return { ok: false, error: `No delete attempts left — ${maxAttempts} of ${maxAttempts} used.`, attemptsUsed: maxAttempts };
   }
 
   const { data: video } = await supabase
@@ -175,9 +175,9 @@ export async function deleteSubmittedVideo(
     .maybeSingle();
   if (!video) return { ok: false, error: "No recording found to delete." };
 
-  const { data: consumed } = await supabase.rpc("consume_delete_attempt");
+  const { data: consumed } = await supabase.rpc("consume_delete_attempt", { p_registration_id: registrationId });
   if (!consumed) {
-    return { ok: false, error: "No delete attempts left — 3 of 3 used.", attemptsUsed: 3 };
+    return { ok: false, error: `No delete attempts left — ${maxAttempts} of ${maxAttempts} used.`, attemptsUsed: maxAttempts };
   }
 
   const { error: delErr } = await supabase.from("kata_videos").delete().eq("id", video.id);
@@ -200,27 +200,33 @@ export async function deleteSubmittedVideo(
   revalidatePath("/kata-arena");
 
   const { data: updated } = await supabase
-    .from("profiles")
+    .from("profile_participants")
     .select("record_attempts")
     .eq("user_id", user.id)
+    .eq("registration_id", registrationId)
     .maybeSingle();
-  return { ok: true, attemptsUsed: updated?.record_attempts ?? 3 };
+  return { ok: true, attemptsUsed: updated?.record_attempts ?? maxAttempts };
 }
 
-/** Burn one of the 5 re-record chances. Returns the new count. */
-export async function useRecordAttempt(): Promise<number> {
+/** Burn one of this registration's own re-record chances. Returns the new
+ * count — independent per linked registration (see migration 0118), not
+ * shared across everything a login can record for. */
+export async function useRecordAttempt(registrationId: string): Promise<number> {
   const supabase = await createClient();
-  const { data } = await supabase.rpc("increment_record_attempts");
+  const { data } = await supabase.rpc("increment_record_attempts", { p_registration_id: registrationId });
   return typeof data === "number" ? data : 5;
 }
 
-/** Requests 3 more delete-and-re-record chances for USD 10 — creates a
- * pending request the organizer confirms manually (same pattern as every
- * other payment here, since there's no real payment gateway). Refuses a
- * second request while one is already pending. */
+/** Requests 3 more delete-and-re-record chances for USD 10, for ONE
+ * specific linked registration — creates a pending request the organizer
+ * confirms manually (same pattern as every other payment here, since
+ * there's no real payment gateway). Refuses a second request for the same
+ * registration while one is already pending. The registration_id is
+ * validated against profile_participants before being trusted, same
+ * pattern as submitKataVideo/submitTestimonial. */
 export async function requestExtraAttempts(
   _prev: AccountActionState,
-  _formData: FormData,
+  formData: FormData,
 ): Promise<AccountActionState> {
   const supabase = await createClient();
   const {
@@ -228,16 +234,30 @@ export async function requestExtraAttempts(
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Sign in first." };
 
+  const requestedRegistrationId = String(formData.get("registration_id") ?? "") || null;
+  let registrationId: string | null = null;
+  if (requestedRegistrationId) {
+    const { data: link } = await supabase
+      .from("profile_participants")
+      .select("registration_id")
+      .eq("user_id", user.id)
+      .eq("registration_id", requestedRegistrationId)
+      .maybeSingle();
+    registrationId = link?.registration_id ?? null;
+  }
+  if (!registrationId) return { ok: false, error: "That recording target isn't linked to your account." };
+
   const { data: existing } = await supabase
     .from("attempt_purchases")
     .select("id")
     .eq("user_id", user.id)
+    .eq("registration_id", registrationId)
     .eq("status", "pending")
     .maybeSingle();
   if (existing) return { ok: false, error: "You already have a purchase request awaiting confirmation." };
 
   const id = crypto.randomUUID();
-  const { error } = await supabase.from("attempt_purchases").insert({ id, user_id: user.id });
+  const { error } = await supabase.from("attempt_purchases").insert({ id, user_id: user.id, registration_id: registrationId });
   if (error) return { ok: false, error: "Could not submit the request — please try again." };
 
   if (paymentsEnabled()) {

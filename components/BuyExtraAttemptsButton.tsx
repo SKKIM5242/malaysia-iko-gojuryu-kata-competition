@@ -9,8 +9,16 @@ const initial: AccountActionState = { ok: false };
 /** Shown once a participant has used all their free delete-and-re-record
  * chances — lets them buy 3 more for USD 10 via a real Stripe Checkout
  * session (falls back to the manual bank-transfer/admin-confirms flow if
- * Stripe isn't configured, same as every other payment in this app). */
-export default function BuyExtraAttemptsButton({ hasPendingPurchase }: { hasPendingPurchase: boolean }) {
+ * Stripe isn't configured, same as every other payment in this app). Tops
+ * up THIS registration's own budget only (see migration 0118) — a login
+ * linked to several participants needs registrationId to say which one. */
+export default function BuyExtraAttemptsButton({
+  registrationId,
+  hasPendingPurchase,
+}: {
+  registrationId: string;
+  hasPendingPurchase: boolean;
+}) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState(requestExtraAttempts, initial);
 
@@ -31,6 +39,7 @@ export default function BuyExtraAttemptsButton({ hasPendingPurchase }: { hasPend
     <div>
       {state.error && <p className="mb-1 text-xs font-semibold text-red-600">{state.error}</p>}
       <form action={formAction}>
+        <input type="hidden" name="registration_id" value={registrationId} />
         <button
           type="submit"
           disabled={pending}

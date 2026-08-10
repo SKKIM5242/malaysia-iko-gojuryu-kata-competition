@@ -960,7 +960,7 @@ export default function KataRecorder({
 
   async function handleReRecord() {
     if (!canReRecord) return;
-    const newCount = await useRecordAttempt();
+    const newCount = await useRecordAttempt(registrationId);
     setAttempts(newCount);
     if (blobUrl) URL.revokeObjectURL(blobUrl);
     setBlobUrl(null);
@@ -1144,7 +1144,7 @@ export default function KataRecorder({
         </p>
         {attemptsLeft <= 0 && (
           <div className="pt-1">
-            <BuyExtraAttemptsButton hasPendingPurchase={hasPendingPurchase} />
+            <BuyExtraAttemptsButton registrationId={registrationId} hasPendingPurchase={hasPendingPurchase} />
           </div>
         )}
         <p className="border-t border-neutral-200 pt-2 text-xs text-neutral-500">
@@ -1331,7 +1331,7 @@ export default function KataRecorder({
                   needed. */}
               {attemptsLeft <= 0 && (
                 <div className="rounded-md bg-white/95 px-2 py-1.5 shadow">
-                  <BuyExtraAttemptsButton hasPendingPurchase={hasPendingPurchase} />
+                  <BuyExtraAttemptsButton registrationId={registrationId} hasPendingPurchase={hasPendingPurchase} />
                 </div>
               )}
             </div>

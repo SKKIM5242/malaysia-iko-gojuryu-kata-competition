@@ -109,6 +109,10 @@ interface RecordingContext {
   registrationId: string;
   existingVideo: { id: string; storage_path: string } | null;
   ownVideoUrl: string | null;
+  /** This registration's own free-attempts usage -- independent per linked
+   * registration (migration 0118), not shared across everything a login
+   * can record for. */
+  recordAttempts: number;
   maxAttempts: number;
   hasPendingPurchase: boolean;
   eventDate: string | null;
@@ -144,7 +148,7 @@ interface RecordingContext {
 async function getRecordingContext(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
-  profile: Pick<ProfileRow, "email" | "registration_id" | "bonus_record_attempts">,
+  profile: Pick<ProfileRow, "email" | "registration_id">,
   requestedRegistrationId?: string | null,
 ): Promise<RecordingContext> {
   let registrationId = profile.registration_id!;
@@ -158,11 +162,22 @@ async function getRecordingContext(
     if (link) registrationId = link.registration_id;
   }
   const pendingOthers = await getPendingRegistrations(supabase, profile.email);
-  const maxAttempts = 3 + (profile.bonus_record_attempts ?? 0);
+  // Re-record budget is independent per linked registration (see migration
+  // 0118) -- a login linked to several participants doesn't share one pool
+  // across them.
+  const { data: attemptsRow } = await supabase
+    .from("profile_participants")
+    .select("record_attempts, bonus_record_attempts")
+    .eq("user_id", userId)
+    .eq("registration_id", registrationId)
+    .maybeSingle();
+  const recordAttempts = attemptsRow?.record_attempts ?? 0;
+  const maxAttempts = 3 + (attemptsRow?.bonus_record_attempts ?? 0);
   const { data: pendingPurchase } = await supabase
     .from("attempt_purchases")
     .select("id")
     .eq("user_id", userId)
+    .eq("registration_id", registrationId)
     .eq("status", "pending")
     .maybeSingle();
 
@@ -215,6 +230,7 @@ async function getRecordingContext(
     registrationId,
     existingVideo,
     ownVideoUrl,
+    recordAttempts,
     maxAttempts,
     hasPendingPurchase: !!pendingPurchase,
     eventDate: competition?.event_date ?? null,
@@ -227,10 +243,8 @@ async function getRecordingContext(
 }
 
 function PersonalRecordingSection({
-  profile,
   ctx,
 }: {
-  profile: Pick<ProfileRow, "registration_id" | "record_attempts">;
   ctx: RecordingContext;
 }) {
   return (
@@ -251,7 +265,7 @@ function PersonalRecordingSection({
                 />
                 <DeleteRecordingControls
                   registrationId={ctx.registrationId}
-                  attemptsUsed={profile.record_attempts}
+                  attemptsUsed={ctx.recordAttempts}
                   maxAttempts={ctx.maxAttempts}
                   hasPendingPurchase={ctx.hasPendingPurchase}
                 />
@@ -266,7 +280,7 @@ function PersonalRecordingSection({
         <div className="space-y-6">
           <KataRecorder
             registrationId={ctx.registrationId}
-            initialAttempts={profile.record_attempts}
+            initialAttempts={ctx.recordAttempts}
             maxAttempts={ctx.maxAttempts}
             hasPendingPurchase={ctx.hasPendingPurchase}
             watermark={ctx.watermark}
@@ -523,7 +537,7 @@ export default async function AccountPage({
             </div>
           )}
           {recordingCtx ? (
-            <PersonalRecordingSection profile={profile} ctx={recordingCtx} />
+            <PersonalRecordingSection ctx={recordingCtx} />
           ) : (
             <LinkRegistrationPrompt />
           )}
@@ -675,7 +689,7 @@ export default async function AccountPage({
             <RefereeScoring refereeName={profile.full_name ?? "Judge"} refereeCountry={profile.country} items={items} />
           </div>
           {recordingCtx ? (
-            <PersonalRecordingSection profile={profile} ctx={recordingCtx} />
+            <PersonalRecordingSection ctx={recordingCtx} />
           ) : (
             <LinkRegistrationPrompt />
           )}
@@ -727,7 +741,7 @@ export default async function AccountPage({
             </div>
           )}
           {recordingCtx ? (
-            <PersonalRecordingSection profile={profile} ctx={recordingCtx} />
+            <PersonalRecordingSection ctx={recordingCtx} />
           ) : (
             <LinkRegistrationPrompt />
           )}
@@ -824,7 +838,7 @@ export default async function AccountPage({
             </div>
           )}
           {recordingCtx ? (
-            <PersonalRecordingSection profile={profile} ctx={recordingCtx} />
+            <PersonalRecordingSection ctx={recordingCtx} />
           ) : (
             <LinkRegistrationPrompt />
           )}
@@ -884,6 +898,7 @@ export default async function AccountPage({
   const ctx = await getRecordingContext(supabase, user.id, profile, requestedRegistrationId);
   const {
     pendingOthers,
+    recordAttempts,
     maxAttempts,
     hasPendingPurchase,
     existingVideo,
@@ -927,7 +942,7 @@ export default async function AccountPage({
                   />
                   <DeleteRecordingControls
                     registrationId={registrationId}
-                    attemptsUsed={profile.record_attempts}
+                    attemptsUsed={recordAttempts}
                     maxAttempts={maxAttempts}
                     hasPendingPurchase={hasPendingPurchase}
                   />
@@ -975,7 +990,7 @@ export default async function AccountPage({
           <div className="space-y-8">
             <KataRecorder
               registrationId={registrationId}
-              initialAttempts={profile.record_attempts}
+              initialAttempts={recordAttempts}
               maxAttempts={maxAttempts}
               hasPendingPurchase={hasPendingPurchase}
               watermark={watermark}
