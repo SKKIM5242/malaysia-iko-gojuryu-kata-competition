@@ -67,7 +67,7 @@ async function getPendingRegistrations(
   const { data: regs } = await supabase
     .from("registrations")
     .select(
-      "id, category:categories(name, sort_order), competition:competitions(id, name, event_date, registration_deadline)",
+      "id, category:categories(name, sort_order), competition:competitions(id, name, event_date, registration_deadline), participant:participants(full_name)",
     )
     .in("participant_id", participantIds)
     .eq("payment_status", "paid");
@@ -76,6 +76,7 @@ async function getPendingRegistrations(
       id: string;
       category: { name: string; sort_order: number } | null;
       competition: { id: string; name: string; event_date: string | null; registration_deadline: string | null } | null;
+      participant: { full_name: string | null } | null;
     }>) ?? [];
   if (regList.length === 0) return [];
 
@@ -97,10 +98,15 @@ async function getPendingRegistrations(
       competitionName: r.competition?.name ? shortTierName(r.competition.name) : null,
       eventDate: r.competition?.event_date ?? null,
       registrationDeadline: r.competition?.registration_deadline ?? null,
+      participantName: r.participant?.full_name ?? null,
     }));
 }
 
 interface RecordingContext {
+  /** Which registration this context actually resolved to -- the primary
+   * (profile.registration_id) unless a valid ?registration= query param
+   * pointed at a different one of this login's linked participants. */
+  registrationId: string;
   existingVideo: { id: string; storage_path: string } | null;
   ownVideoUrl: string | null;
   maxAttempts: number;
@@ -114,6 +120,10 @@ interface RecordingContext {
    * looking identical to whatever was showing before (the recorder never
    * displayed which kata it was for at all). */
   categoryName: string | null;
+  /** Whose kata this is -- burned into the recording itself alongside the
+   * watermark, so a login linked to several participants (a Sensei
+   * recording for several students) can tell whose take is whose. */
+  participantName: string | null;
   /** This registration's own tier's watermark customization (organizer-set
    * per competition, Create/Edit Competition page) -- was a single
    * hardcoded string+styling shared by every tier. */
@@ -124,13 +134,29 @@ interface RecordingContext {
  * registration is linked to this profile — shared by every role branch
  * below so an Admin/Organizer/Referee/Support/Audience account that has
  * also linked a paid registration (see ClaimForm) sees the same
- * record/watch experience a plain participant login gets. */
+ * record/watch experience a plain participant login gets.
+ *
+ * requestedRegistrationId (from the page's own ?registration= query param)
+ * lets a login linked to several participants pick which one's recorder to
+ * render -- validated against profile_participants before being trusted,
+ * falling back to the profile's own primary link when absent or when it
+ * doesn't actually belong to this account. */
 async function getRecordingContext(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
   profile: Pick<ProfileRow, "email" | "registration_id" | "bonus_record_attempts">,
+  requestedRegistrationId?: string | null,
 ): Promise<RecordingContext> {
-  const registrationId = profile.registration_id!;
+  let registrationId = profile.registration_id!;
+  if (requestedRegistrationId && requestedRegistrationId !== registrationId) {
+    const { data: link } = await supabase
+      .from("profile_participants")
+      .select("registration_id")
+      .eq("user_id", userId)
+      .eq("registration_id", requestedRegistrationId)
+      .maybeSingle();
+    if (link) registrationId = link.registration_id;
+  }
   const pendingOthers = await getPendingRegistrations(supabase, profile.email);
   const maxAttempts = 3 + (profile.bonus_record_attempts ?? 0);
   const { data: pendingPurchase } = await supabase
@@ -149,7 +175,7 @@ async function getRecordingContext(
   const { data: registration } = await supabase
     .from("registrations")
     .select(
-      "category:categories(name), competition:competitions(id, event_date, registration_deadline, watermark_text, watermark_font_size_px, watermark_font_family, watermark_bold, watermark_color, watermark_direction)",
+      "category:categories(name), competition:competitions(id, event_date, registration_deadline, watermark_text, watermark_font_size_px, watermark_font_family, watermark_bold, watermark_color, watermark_direction), participant:participants(full_name)",
     )
     .eq("id", registrationId)
     .maybeSingle();
@@ -161,6 +187,7 @@ async function getRecordingContext(
             typeof resolveWatermarkSettings
           >[0])
         | null;
+      participant: { full_name: string | null } | null;
     } | null
   )?.competition ?? null;
   const categoryName =
@@ -169,6 +196,12 @@ async function getRecordingContext(
         category: { name: string } | null;
       } | null
     )?.category?.name ?? null;
+  const participantName =
+    (
+      registration as unknown as {
+        participant: { full_name: string | null } | null;
+      } | null
+    )?.participant?.full_name ?? null;
 
   let ownVideoUrl: string | null = null;
   if (existingVideo) {
@@ -179,6 +212,7 @@ async function getRecordingContext(
   }
 
   return {
+    registrationId,
     existingVideo,
     ownVideoUrl,
     maxAttempts,
@@ -187,6 +221,7 @@ async function getRecordingContext(
     registrationDeadline: competition?.registration_deadline ?? null,
     pendingOthers,
     categoryName,
+    participantName,
     watermark: resolveWatermarkSettings(competition),
   };
 }
@@ -215,7 +250,7 @@ function PersonalRecordingSection({
                   className="rounded-md bg-neutral-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-neutral-700"
                 />
                 <DeleteRecordingControls
-                  registrationId={profile.registration_id!}
+                  registrationId={ctx.registrationId}
                   attemptsUsed={profile.record_attempts}
                   maxAttempts={ctx.maxAttempts}
                   hasPendingPurchase={ctx.hasPendingPurchase}
@@ -230,6 +265,7 @@ function PersonalRecordingSection({
       ) : (
         <div className="space-y-6">
           <KataRecorder
+            registrationId={ctx.registrationId}
             initialAttempts={profile.record_attempts}
             maxAttempts={ctx.maxAttempts}
             hasPendingPurchase={ctx.hasPendingPurchase}
@@ -237,6 +273,7 @@ function PersonalRecordingSection({
             recordingStart={ctx.eventDate}
             recordingEnd={ctx.registrationDeadline}
             categoryName={ctx.categoryName}
+            participantName={ctx.participantName}
           />
           <PendingRecordingsList items={ctx.pendingOthers} />
         </div>
@@ -265,9 +302,9 @@ function LinkRegistrationPrompt() {
 export default async function AccountPage({
   searchParams,
 }: {
-  searchParams: Promise<{ mode?: string; claim_error?: string }>;
+  searchParams: Promise<{ mode?: string; claim_error?: string; registration?: string }>;
 }) {
-  const { mode, claim_error: claimError } = await searchParams;
+  const { mode, claim_error: claimError, registration: requestedRegistrationId } = await searchParams;
   const ready = await schemaReady();
   if (!ready) {
     return (
@@ -392,7 +429,7 @@ export default async function AccountPage({
 
   // ── Staff / Admin / Organizer / Participant Support ────────────────────────
   if (["staff", "admin", "organizer", "customer_support"].includes(profile.role)) {
-    const recordingCtx = profile.registration_id ? await getRecordingContext(supabase, user.id, profile) : null;
+    const recordingCtx = profile.registration_id ? await getRecordingContext(supabase, user.id, profile, requestedRegistrationId) : null;
     const staffTelegramLinks = profile.approved ? await getAllTelegramLinks() : [];
     return (
       <>
@@ -516,7 +553,7 @@ export default async function AccountPage({
       );
     }
 
-    const recordingCtx = profile.registration_id ? await getRecordingContext(supabase, user.id, profile) : null;
+    const recordingCtx = profile.registration_id ? await getRecordingContext(supabase, user.id, profile, requestedRegistrationId) : null;
     const refereeTelegramLinks = await getAllTelegramLinks();
 
     const { data: assignments } = await supabase
@@ -641,7 +678,7 @@ export default async function AccountPage({
 
   // ── Audience / Spectator ─────────────────────────────────────────────────
   if (profile.role === "audience") {
-    const recordingCtx = profile.registration_id ? await getRecordingContext(supabase, user.id, profile) : null;
+    const recordingCtx = profile.registration_id ? await getRecordingContext(supabase, user.id, profile, requestedRegistrationId) : null;
     return (
       <>
         <SiteHeader />
@@ -702,7 +739,7 @@ export default async function AccountPage({
           .maybeSingle()
       : { data: null };
     const label = profile.role === "sensei" ? "Sensei" : "School / Dojo";
-    const recordingCtx = profile.registration_id ? await getRecordingContext(supabase, user.id, profile) : null;
+    const recordingCtx = profile.registration_id ? await getRecordingContext(supabase, user.id, profile, requestedRegistrationId) : null;
     const paid = record?.payment_status === "paid" || record?.payment_status === "waived";
     return (
       <>
@@ -827,57 +864,20 @@ export default async function AccountPage({
     );
   }
 
-  const pendingOthers = await getPendingRegistrations(supabase, profile.email);
-
-  const maxAttempts = 3 + (profile.bonus_record_attempts ?? 0);
-  const { data: pendingPurchase } = await supabase
-    .from("attempt_purchases")
-    .select("id")
-    .eq("user_id", user.id)
-    .eq("status", "pending")
-    .maybeSingle();
-  const hasPendingPurchase = !!pendingPurchase;
-
-  const { data: existingVideo } = await supabase
-    .from("kata_videos")
-    .select("id, storage_path")
-    .eq("registration_id", profile.registration_id)
-    .maybeSingle();
-
-  const { data: registration } = await supabase
-    .from("registrations")
-    .select(
-      "category:categories(name), competition:competitions(id, event_date, registration_deadline, watermark_text, watermark_font_size_px, watermark_font_family, watermark_bold, watermark_color, watermark_direction)",
-    )
-    .eq("id", profile.registration_id)
-    .maybeSingle();
-  const competition = (
-    registration as unknown as {
-      category: { name: string } | null;
-      competition:
-        | ({ id: string; event_date: string | null; registration_deadline: string | null } & Parameters<
-            typeof resolveWatermarkSettings
-          >[0])
-        | null;
-    } | null
-  )?.competition ?? null;
-  const categoryName =
-    (
-      registration as unknown as {
-        category: { name: string } | null;
-      } | null
-    )?.category?.name ?? null;
-  const eventDate = competition?.event_date ?? null;
-  const registrationDeadline = competition?.registration_deadline ?? null;
-  const watermark = resolveWatermarkSettings(competition);
-
-  let ownVideoUrl: string | null = null;
-  if (existingVideo) {
-    const { data: signed } = await supabase.storage
-      .from("kata-videos")
-      .createSignedUrl(existingVideo.storage_path, 3600);
-    ownVideoUrl = signed?.signedUrl ?? null;
-  }
+  const ctx = await getRecordingContext(supabase, user.id, profile, requestedRegistrationId);
+  const {
+    pendingOthers,
+    maxAttempts,
+    hasPendingPurchase,
+    existingVideo,
+    categoryName,
+    participantName,
+    eventDate,
+    registrationDeadline,
+    watermark,
+    ownVideoUrl,
+    registrationId,
+  } = ctx;
 
   return (
     <>
@@ -909,7 +909,7 @@ export default async function AccountPage({
                     className="rounded-md bg-neutral-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-neutral-700"
                   />
                   <DeleteRecordingControls
-                    registrationId={profile.registration_id}
+                    registrationId={registrationId}
                     attemptsUsed={profile.record_attempts}
                     maxAttempts={maxAttempts}
                     hasPendingPurchase={hasPendingPurchase}
@@ -957,6 +957,7 @@ export default async function AccountPage({
         ) : (
           <div className="space-y-8">
             <KataRecorder
+              registrationId={registrationId}
               initialAttempts={profile.record_attempts}
               maxAttempts={maxAttempts}
               hasPendingPurchase={hasPendingPurchase}
@@ -964,6 +965,7 @@ export default async function AccountPage({
               recordingStart={eventDate}
               recordingEnd={registrationDeadline}
               categoryName={categoryName}
+              participantName={participantName}
             />
             <div>
               <p className="mb-2 text-sm text-neutral-500">

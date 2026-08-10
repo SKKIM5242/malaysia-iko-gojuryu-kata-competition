@@ -226,6 +226,7 @@ function drawFrame(
   w: number,
   h: number,
   watermark: WatermarkSettings,
+  identityText: string,
 ): number {
   const srcW = video.videoWidth;
   const srcH = video.videoHeight;
@@ -300,6 +301,7 @@ function drawFrame(
     ctx.shadowBlur = 0;
 
     drawWatermark(ctx, w, h, watermark);
+    drawIdentityOverlay(ctx, w, h, topH, identityText);
     return topH / h;
   }
 
@@ -329,7 +331,29 @@ function drawFrame(
   ctx.shadowBlur = 0;
 
   drawWatermark(ctx, w, h, watermark);
+  drawIdentityOverlay(ctx, w, h, topH, identityText);
   return topH / h;
+}
+
+/** Small single-line overlay — "Participant name · Kata/category" — burned
+ * in just under the main title banner, left-aligned. Deliberately much
+ * smaller than the banner/watermark so it never competes with either or
+ * eats into the performer's own recording area; only drawn when there's
+ * actually a participant name to show (a solo account with no linked
+ * co-participants has nothing worth labelling). */
+function drawIdentityOverlay(ctx: CanvasRenderingContext2D, w: number, h: number, topH: number, text: string) {
+  if (!text) return;
+  ctx.save();
+  const fontPx = Math.max(10, Math.round(Math.min(w, h) * 0.022));
+  ctx.font = `600 ${fontPx}px Arial, sans-serif`;
+  ctx.textAlign = "left";
+  ctx.fillStyle = "#ffffff";
+  ctx.globalAlpha = 0.85;
+  ctx.shadowColor = "rgba(0,0,0,0.6)";
+  ctx.shadowBlur = 3;
+  const margin = Math.max(10, Math.round(Math.min(w, h) * 0.02));
+  ctx.fillText(text, margin, topH + fontPx + margin * 0.5);
+  ctx.restore();
 }
 
 function daysBetween(from: Date, to: Date): number {
@@ -389,6 +413,7 @@ function idealVideoDimensions(): { width: number; height: number } {
 }
 
 export default function KataRecorder({
+  registrationId,
   initialAttempts,
   maxAttempts,
   hasPendingPurchase,
@@ -396,7 +421,14 @@ export default function KataRecorder({
   recordingStart,
   recordingEnd,
   categoryName,
+  participantName,
 }: {
+  /** Which linked registration this recording is for — a login tied to
+   * several participants (e.g. a Sensei recording for several students)
+   * can have more than one; this is what tells the server which one a
+   * submission belongs to, instead of always trusting the account's own
+   * primary link. */
+  registrationId: string;
   initialAttempts: number;
   maxAttempts: number;
   hasPendingPurchase: boolean;
@@ -408,7 +440,14 @@ export default function KataRecorder({
    * Recording" button on the pending list) is actually visible, instead
    * of the screen looking identical no matter which one is now current. */
   categoryName?: string | null;
+  /** Whose kata this is — burned into the recording itself (small, below
+   * the main banner) alongside categoryName, so a login linked to several
+   * participants can tell whose take is whose after the fact. */
+  participantName?: string | null;
 }) {
+  // Only worth burning in when there's a name to show at all -- a solo
+  // account recording their own single kata has nothing to disambiguate.
+  const identityText = participantName ? `${participantName} · ${categoryName ?? ""}`.trim().replace(/·\s*$/, "").trim() : "";
   const [phase, setPhase] = useState<Phase>("idle");
   const [attempts, setAttempts] = useState(initialAttempts);
   const [seconds, setSeconds] = useState(0);
@@ -815,7 +854,7 @@ export default function KataRecorder({
     }
     const ctx = canvas.getContext("2d");
     if (ctx) {
-      const newBannerRatio = drawFrame(ctx, video, canvas.width, canvas.height, watermark);
+      const newBannerRatio = drawFrame(ctx, video, canvas.width, canvas.height, watermark, identityText);
       if (Number.isFinite(newBannerRatio) && newBannerRatio > 0 && Math.abs(bannerRatioRef.current - newBannerRatio) > 0.002) {
         bannerRatioRef.current = newBannerRatio;
         setBannerRatio(newBannerRatio);
@@ -960,6 +999,7 @@ export default function KataRecorder({
       const fd = new FormData();
       fd.set("path", path);
       fd.set("mime", blob.type || "video/webm");
+      fd.set("registration_id", registrationId);
       const result = await submitKataVideo({ ok: false }, fd);
       if (!result.ok) {
         setError(result.error ?? "Could not submit your recording.");

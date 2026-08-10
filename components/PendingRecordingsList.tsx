@@ -14,6 +14,10 @@ export interface PendingRegistration {
   competitionName: string | null;
   eventDate: string | null;
   registrationDeadline: string | null;
+  /** Whose kata this is — shown so a login linked to several participants
+   * (e.g. a Sensei recording for several students) can tell them apart in
+   * one flat list. */
+  participantName: string | null;
 }
 
 type TierStatus = "not_yet_open" | "open" | "closed";
@@ -114,7 +118,12 @@ export default function PendingRecordingsList({ items }: { items: PendingRegistr
                   key={item.id}
                   className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-200 bg-white px-3 py-2 text-sm"
                 >
-                  <span className="text-neutral-700">{item.categoryName ?? "Category not set"}</span>
+                  <span className="text-neutral-700">
+                    {item.participantName && (
+                      <span className="font-semibold text-neutral-900">{item.participantName} — </span>
+                    )}
+                    {item.categoryName ?? "Category not set"}
+                  </span>
                   {status === "open" && (
                     <form action={claimAndStartRecording} className="ml-auto self-center">
                       <input type="hidden" name="registration_id" value={item.id} />

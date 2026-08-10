@@ -90,18 +90,32 @@ export async function claimSensei(
 
 /** One-click version of claimRegistration for a registration already known
  * (server-side, via email match) to belong to this account — used by the
- * "Start Recording" button on a pending-recordings list, so the participant
- * never has to retype their reference ID + IC to switch which registration
- * is currently linked for recording. */
+ * "Start Recording" button on a pending-recordings list. Re-syncs every
+ * paid registration matching this account's email into profile_participants
+ * (idempotent — picks up anything newly paid since sign-up/last claim)
+ * rather than overwriting a single active slot, then lands on that specific
+ * registration's recorder via the ?registration= query param. This is what
+ * lets a Sensei's login hold several students' recordings at once instead
+ * of each click stealing the "active" one from the last. */
 export async function claimAndStartRecording(formData: FormData) {
   const registrationId = String(formData.get("registration_id") ?? "");
   if (registrationId) {
     const supabase = await createClient();
-    const { data } = await supabase.rpc("claim_registration_by_id", {
-      p_registration_id: registrationId,
-    });
-    if (data !== "OK") {
-      redirect(`/account?claim_error=${encodeURIComponent(String(data ?? "Could not claim that registration."))}`);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (user) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("email")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (profile?.email) {
+        await supabase.rpc("auto_link_participants_by_email", {
+          p_user_id: user.id,
+          p_email: profile.email,
+        });
+      }
     }
   }
   revalidatePath("/account");
@@ -109,7 +123,7 @@ export async function claimAndStartRecording(formData: FormData) {
   // otherwise the only visible sign anything happened is the pending list
   // shrinking by one row, and the participant has to scroll down manually
   // to find the recorder that's now active for their newly-claimed kata.
-  redirect("/account#record-your-kata");
+  redirect(`/account?registration=${encodeURIComponent(registrationId)}#record-your-kata`);
 }
 
 export interface DeleteVideoState {
@@ -137,7 +151,17 @@ export async function deleteSubmittedVideo(
     .select("registration_id, record_attempts")
     .eq("user_id", user.id)
     .maybeSingle();
-  if (!profile || profile.registration_id !== registrationId) {
+  let owns = !!profile && profile.registration_id === registrationId;
+  if (!owns) {
+    const { data: link } = await supabase
+      .from("profile_participants")
+      .select("registration_id")
+      .eq("user_id", user.id)
+      .eq("registration_id", registrationId)
+      .maybeSingle();
+    owns = !!link;
+  }
+  if (!profile || !owns) {
     return { ok: false, error: "This recording isn't linked to your account." };
   }
   if ((profile.record_attempts ?? 0) >= 3) {
@@ -381,13 +405,19 @@ export async function requestNewSubscription(
   return { ok: true };
 }
 
-/** Register the uploaded recording as the participant's competition entry. */
+/** Register the uploaded recording as the participant's competition entry.
+ * Accepts an explicit registration_id from the client (which linked
+ * participant this recording is for — a Sensei's login can have several)
+ * and verifies it against profile_participants before trusting it; falls
+ * back to the profile's own primary registration_id when the client sends
+ * none, for a solo account with no profile_participants rows yet. */
 export async function submitKataVideo(
   _prev: AccountActionState,
   formData: FormData,
 ): Promise<AccountActionState> {
   const path = String(formData.get("path") ?? "");
   const mime = String(formData.get("mime") ?? "video/webm");
+  const requestedRegistrationId = String(formData.get("registration_id") ?? "") || null;
   const supabase = await createClient();
   const {
     data: { user },
@@ -401,7 +431,23 @@ export async function submitKataVideo(
     .select("registration_id, participant_id")
     .eq("user_id", user.id)
     .maybeSingle();
-  if (!profile?.registration_id) {
+
+  let registrationId = profile?.registration_id ?? null;
+  let participantId = profile?.participant_id ?? null;
+  if (requestedRegistrationId) {
+    const { data: link } = await supabase
+      .from("profile_participants")
+      .select("registration_id, participant_id")
+      .eq("user_id", user.id)
+      .eq("registration_id", requestedRegistrationId)
+      .maybeSingle();
+    if (!link) {
+      return { ok: false, error: "That recording target isn't linked to your account." };
+    }
+    registrationId = link.registration_id;
+    participantId = link.participant_id;
+  }
+  if (!registrationId) {
     return { ok: false, error: "Link your paid registration before submitting a recording." };
   }
 
@@ -415,7 +461,7 @@ export async function submitKataVideo(
   const { data: regRow } = await supabase
     .from("registrations")
     .select("payment_status, competition:competitions(event_date, registration_deadline)")
-    .eq("id", profile.registration_id)
+    .eq("id", registrationId)
     .maybeSingle();
   const reg = regRow as unknown as {
     payment_status: string;
@@ -451,8 +497,8 @@ export async function submitKataVideo(
   }
 
   const { error } = await supabase.from("kata_videos").insert({
-    registration_id: profile.registration_id,
-    participant_id: profile.participant_id,
+    registration_id: registrationId,
+    participant_id: participantId,
     user_id: user.id,
     storage_path: path,
     mime,
@@ -462,7 +508,7 @@ export async function submitKataVideo(
   }
   await writeAudit(supabase, {
     table_name: "kata_videos",
-    record_id: profile.registration_id,
+    record_id: registrationId,
     action: "kata_video_submitted",
     new_value: { storage_path: path },
     actor_id: user.id,

@@ -66,6 +66,7 @@ export default async function AdminRecordingPreview() {
           </div>
           <div className={canTest ? "" : "pointer-events-none opacity-70"}>
             <KataRecorder
+              registrationId=""
               initialAttempts={0}
               maxAttempts={3}
               hasPendingPurchase={false}
