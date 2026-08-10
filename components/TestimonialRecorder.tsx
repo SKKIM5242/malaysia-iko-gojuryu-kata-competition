@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { submitTestimonial, editTestimonial } from "@/app/actions/account";
 import { pickVideoMimeType, pickAudioMimeType, extensionForMimeType, bareMimeType } from "@/lib/media-recording";
-import { playDingDong } from "@/lib/chime";
+import { playDingDong, playAlarmTick } from "@/lib/chime";
 import { startClapDetector } from "@/lib/clap-detector";
 import {
   TESTIMONIAL_KIND_LABEL,
@@ -173,11 +173,13 @@ function MediaTestimonialPanel({
       } catch {
         audioContextRef.current = null;
       }
-    } else if (audioContextRef.current.state === "suspended") {
+    }
+    if (audioContextRef.current && audioContextRef.current.state === "suspended") {
       void audioContextRef.current.resume().catch(() => {});
     }
     setCountdownSeconds(countdownDuration);
     setPhase("countdown");
+    if (audioContextRef.current) playAlarmTick(audioContextRef.current);
     countdownTimerRef.current = setInterval(() => {
       setCountdownSeconds((s) => {
         if (s <= 1) {
@@ -186,6 +188,7 @@ function MediaTestimonialPanel({
           void beginRecordingAfterCountdown();
           return 0;
         }
+        if (audioContextRef.current) playAlarmTick(audioContextRef.current);
         return s - 1;
       });
     }, 1000);
@@ -287,7 +290,9 @@ function MediaTestimonialPanel({
         .from("testimonials")
         .upload(path, blob, { contentType: bareMimeType(blob.type || (isVideo ? "video/webm" : "audio/webm")) });
       if (upErr) {
-        setError("Upload failed — please check your connection and try again.");
+        setError(
+          `Upload failed: ${upErr.message || "unknown error"} (type: ${blob.type || "unknown"}, size: ${(blob.size / 1024 / 1024).toFixed(1)}MB) — please try again or contact support with this message.`,
+        );
         setPhase("review");
         return;
       }
@@ -568,9 +573,11 @@ function UploadTestimonialPanel({
         return;
       }
       const path = `${user.id}/${crypto.randomUUID()}.${extensionForMimeType(file.type)}`;
-      const { error: upErr } = await supabase.storage.from("testimonials").upload(path, file, { contentType: file.type });
+      const { error: upErr } = await supabase.storage.from("testimonials").upload(path, file, { contentType: bareMimeType(file.type) });
       if (upErr) {
-        setError("Upload failed — please check your connection and try again.");
+        setError(
+          `Upload failed: ${upErr.message || "unknown error"} (type: ${file.type || "unknown"}, size: ${(file.size / 1024 / 1024).toFixed(1)}MB) — please try again or contact support with this message.`,
+        );
         setUploading(false);
         return;
       }

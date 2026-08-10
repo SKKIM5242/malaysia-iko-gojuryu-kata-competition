@@ -11,16 +11,23 @@ export interface ClapDetectorOptions {
 
 // Peak amplitude (0..1, time-domain) a sound must clear before it's even
 // considered -- ordinary speech picked up from a few metres away shouldn't
-// reach this; a clap or a shout both will.
-const LOUD_THRESHOLD = 0.4;
+// reach this; a clap or a shout both will. First-round on-device testing
+// (real iPhone, real clap, a few metres from the mic) found NOTHING was
+// triggering at 0.4 -- a phone mic's own AGC compresses a clap's raw peak
+// a lot more than a quiet desk-top test suggested, so this starts much
+// more permissive and may still need another pass of on-device tuning.
+const LOUD_THRESHOLD = 0.12;
 // Spectral flatness (0..1, geometric/arithmetic mean of the magnitude
 // spectrum) required on top of LOUD_THRESHOLD. A clap is a broadband
 // impulse -- its energy spreads roughly evenly across the spectrum, close
 // to white noise, which is HIGH flatness. A voice -- including a shouted
 // "Kiai" -- concentrates its energy at a pitch and that pitch's harmonic
 // overtones, which is LOW flatness even when very loud. Requiring both
-// loud AND flat in the same instant is what tells the two apart.
-const FLATNESS_THRESHOLD = 0.35;
+// loud AND flat in the same instant is what tells the two apart. Lowered
+// alongside LOUD_THRESHOLD for the same reason -- room reverb and a
+// compressed mic signal both pull a real clap's measured flatness down
+// from the clean-signal number a bare hand clap has in isolation.
+const FLATNESS_THRESHOLD = 0.15;
 const COOLDOWN_MS = 1500;
 const DEFAULT_ARM_DELAY_MS = 500;
 

@@ -6,7 +6,7 @@ import { useRecordAttempt, submitKataVideo } from "@/app/actions/account";
 import BuyExtraAttemptsButton from "@/components/BuyExtraAttemptsButton";
 import { formatDate, formatDateTime } from "@/components/ui";
 import { pickVideoMimeType as pickMimeType, extensionForMimeType, bareMimeType } from "@/lib/media-recording";
-import { playDingDong } from "@/lib/chime";
+import { playDingDong, playAlarmTick } from "@/lib/chime";
 import { startClapDetector } from "@/lib/clap-detector";
 import type { WatermarkSettings } from "@/lib/watermark";
 
@@ -529,6 +529,16 @@ export default function KataRecorder({
   // orientation.
   const [videoAspect, setVideoAspect] = useState<number | null>(null);
   const videoAspectRef = useRef(0);
+  // Temporary on-screen diagnostic (cam/screen/canvas pixel dimensions) --
+  // a reported "squeezed" portrait preview on a real iPhone X couldn't be
+  // reproduced or explained from code review alone (this exact crop-clamp
+  // math was tuned against other real devices per the comments below, and
+  // guessing at another blind adjustment risks un-fixing those). Shows just
+  // enough numbers to diagnose the real negotiated camera aspect from the
+  // next on-device screenshot instead of guessing a second time. Safe to
+  // remove once that's resolved.
+  const [debugDims, setDebugDims] = useState("");
+  const debugDimsRef = useRef("");
   // How tall the burned-in header banner actually came out (as a fraction
   // of frame height), reported back by drawFrame -- the DOM title bar below
   // uses this to sit directly under the real banner instead of a fixed
@@ -863,6 +873,13 @@ export default function KataRecorder({
         if (canvas.width !== canvasW) canvas.width = canvasW;
         if (canvas.height !== canvasH) canvas.height = canvasH;
       }
+      const dims =
+        `cam ${video.videoWidth}x${video.videoHeight} · screen ${Math.round(box.w)}x${Math.round(box.h)} · ` +
+        `canvas ${canvasW}x${canvasH} · target ${targetAspect.toFixed(2)}`;
+      if (dims !== debugDimsRef.current) {
+        debugDimsRef.current = dims;
+        setDebugDims(dims);
+      }
     }
     // Tracked from the CANVAS (not the raw camera frame) now -- the canvas
     // is what actually gets displayed, so it's the shape the non-fullscreen
@@ -899,11 +916,19 @@ export default function KataRecorder({
       } catch {
         audioContextRef.current = null;
       }
-    } else if (audioContextRef.current.state === "suspended") {
+    }
+    if (audioContextRef.current && audioContextRef.current.state === "suspended") {
       void audioContextRef.current.resume().catch(() => {});
     }
     setCountdownSeconds(countdownDuration);
     setPhase("countdown");
+    // Alarm-style tick on every second the countdown is visibly showing
+    // (loud, sharp, deliberately different from the softer ding-dong) --
+    // audible from several metres away without needing to watch the
+    // screen. The tick stream stops the instant the chime takes over,
+    // which is itself the "counting down is over, recording is starting"
+    // cue.
+    if (audioContextRef.current) playAlarmTick(audioContextRef.current);
     countdownTimerRef.current = setInterval(() => {
       setCountdownSeconds((s) => {
         if (s <= 1) {
@@ -912,6 +937,7 @@ export default function KataRecorder({
           void beginRecordingAfterCountdown();
           return 0;
         }
+        if (audioContextRef.current) playAlarmTick(audioContextRef.current);
         return s - 1;
       });
     }, 1000);
@@ -1072,7 +1098,15 @@ export default function KataRecorder({
         .from("kata-videos")
         .upload(path, blob, { contentType: bareMimeType(blob.type || "video/webm") });
       if (upErr) {
-        setError("Upload failed — please check your connection and try again.");
+        // Includes the real Supabase error (mime type rejected, size limit,
+        // permission, etc.) instead of a generic message -- a first fix for
+        // an iOS-only upload failure (stripping MediaRecorder's own
+        // `;codecs=...` suffix from the Content-Type) didn't fully resolve
+        // it on a real device, so guessing again without the actual
+        // rejection reason isn't a safe next step.
+        setError(
+          `Upload failed: ${upErr.message || "unknown error"} (type: ${blob.type || "unknown"}, size: ${(blob.size / 1024 / 1024).toFixed(1)}MB) — please try again or contact support with this message.`,
+        );
         setPhase("review");
         return;
       }
@@ -1314,7 +1348,17 @@ export default function KataRecorder({
             drop-shadow) keeps it legible now that it can span multiple
             lines over whatever's playing underneath. */}
         <div
-          className="absolute inset-x-0 z-20 flex flex-col"
+          // overflow-y-auto + a maxHeight bound: in landscape fullscreen on
+          // a short-viewport phone, this stack (title bar + error banner +
+          // review's Delete/Submit row) can be taller than the room left
+          // below the banner, and with the default overflow:visible the
+          // overflow was silently clipped by the container's own
+          // overflow-hidden below the fold -- Delete/Submit existed in the
+          // DOM but were literally unreachable until exiting full screen or
+          // rotating back to portrait. Scrolling this stack independently
+          // keeps every case that already fit (most of them) pixel-identical
+          // and just makes the cramped ones reachable instead of invisible.
+          className="absolute inset-x-0 z-20 flex flex-col overflow-y-auto"
           style={{
             // Straight off the burned-in banner's own measured height. The
             // canvas (and the recorded file the review <video> plays back)
@@ -1322,6 +1366,7 @@ export default function KataRecorder({
             // or letterbox and this percentage lands exactly on the real
             // banner's bottom edge -- no offset math in between.
             top: `${bannerRatio * 100}%`,
+            maxHeight: `${100 - bannerRatio * 100}%`,
           }}
         >
           {/* enterFullscreen was only ever called once, from startCamera --
@@ -1377,6 +1422,10 @@ export default function KataRecorder({
           )}
           {error && (
             <div className="bg-red-50/95 px-4 py-2 text-sm text-red-800 backdrop-blur-sm">{error}</div>
+          )}
+          {/* Temporary diagnostic -- see debugDims declaration above. */}
+          {(phase === "live" || phase === "countdown") && debugDims && (
+            <div className="bg-black/50 px-2 py-0.5 text-[10px] text-white/70">{debugDims}</div>
           )}
           {phase === "recording" && (
             <div className="flex flex-wrap gap-1.5 px-2 pt-1">
