@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { submitTestimonial, editTestimonial } from "@/app/actions/account";
 import { pickVideoMimeType, pickAudioMimeType, extensionForMimeType, bareMimeType } from "@/lib/media-recording";
+import { playDingDong } from "@/lib/chime";
+import { startClapDetector } from "@/lib/clap-detector";
 import {
   TESTIMONIAL_KIND_LABEL,
   TESTIMONIAL_MIN_VIDEO_SECONDS,
@@ -14,7 +16,9 @@ import {
 import { SCRIPT_LENGTH_LABEL, scriptsForBand, type ScriptLengthBand } from "@/lib/testimonial-scripts";
 import LockedVideo from "@/components/LockedVideo";
 
-type Phase = "idle" | "live" | "recording" | "review" | "uploading";
+const COUNTDOWN_CHOICES = [10, 15, 20, 25, 30] as const;
+
+type Phase = "idle" | "live" | "countdown" | "recording" | "review" | "uploading";
 
 function mmss(totalSeconds: number): string {
   const m = Math.floor(totalSeconds / 60);
@@ -112,6 +116,15 @@ function MediaTestimonialPanel({
   const recordedBlobRef = useRef<Blob | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Tap-to-start countdown + clap-to-stop -- same hands-free flow as the
+  // kata recorder (see components/KataRecorder.tsx and lib/clap-detector.ts
+  // for why: no phone browser can ever see a Bluetooth shutter remote's
+  // button press, since those work by emulating the volume key).
+  const [countdownDuration, setCountdownDuration] = useState<number>(10);
+  const [countdownSeconds, setCountdownSeconds] = useState(0);
+  const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const clapDetectorStopRef = useRef<(() => void) | null>(null);
 
   const isVideo = kind === "video";
   const minSeconds = isVideo ? TESTIMONIAL_MIN_VIDEO_SECONDS : 0;
@@ -121,6 +134,9 @@ function MediaTestimonialPanel({
     () => () => {
       streamRef.current?.getTracks().forEach((t) => t.stop());
       if (timerRef.current) clearInterval(timerRef.current);
+      if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+      if (clapDetectorStopRef.current) clapDetectorStopRef.current();
+      if (audioContextRef.current) void audioContextRef.current.close().catch(() => {});
       if (blobUrl) URL.revokeObjectURL(blobUrl);
     },
     [blobUrl],
@@ -141,6 +157,58 @@ function MediaTestimonialPanel({
     }
   }
 
+  /** Tap Start -> visible countdown -> ding-dong chime -> recording begins
+   * on its own. Replaces startRecording as the Start button's own handler;
+   * startRecording now only fires once the countdown reaches 0. */
+  function startCountdown() {
+    setError(null);
+    // Created on the tap itself (a real user gesture), reused for both the
+    // chime and the clap detector -- creating it later inside the
+    // countdown's own timer callback would not count as a gesture, and iOS
+    // Safari silently refuses to play sound from a context that was never
+    // unlocked that way.
+    if (!audioContextRef.current) {
+      try {
+        audioContextRef.current = new AudioContext();
+      } catch {
+        audioContextRef.current = null;
+      }
+    } else if (audioContextRef.current.state === "suspended") {
+      void audioContextRef.current.resume().catch(() => {});
+    }
+    setCountdownSeconds(countdownDuration);
+    setPhase("countdown");
+    countdownTimerRef.current = setInterval(() => {
+      setCountdownSeconds((s) => {
+        if (s <= 1) {
+          if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+          countdownTimerRef.current = null;
+          void beginRecordingAfterCountdown();
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+  }
+
+  function cancelCountdown() {
+    if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+    countdownTimerRef.current = null;
+    setPhase("live");
+  }
+
+  async function beginRecordingAfterCountdown() {
+    const ctx = audioContextRef.current;
+    if (ctx) {
+      try {
+        await playDingDong(ctx);
+      } catch {
+        // Best-effort -- a chime failure shouldn't block the recording.
+      }
+    }
+    startRecording();
+  }
+
   function startRecording() {
     const stream = streamRef.current;
     if (!stream) return;
@@ -151,6 +219,10 @@ function MediaTestimonialPanel({
       if (e.data.size > 0) chunksRef.current.push(e.data);
     };
     recorder.onstop = () => {
+      if (clapDetectorStopRef.current) {
+        clapDetectorStopRef.current();
+        clapDetectorStopRef.current = null;
+      }
       const blob = new Blob(chunksRef.current, { type: mimeType });
       recordedBlobRef.current = blob;
       setBlobUrl(URL.createObjectURL(blob));
@@ -158,6 +230,10 @@ function MediaTestimonialPanel({
     };
     recorderRef.current = recorder;
     recorder.start();
+    // Auto-stop on a hand clap -- starts right as recording does, well
+    // after the countdown's own chime has already finished, so the chime
+    // itself is never mistaken for the cue.
+    clapDetectorStopRef.current = startClapDetector(stream, { onClap: stopRecording });
     setSeconds(0);
     setPhase("recording");
     timerRef.current = setInterval(() => {
@@ -272,14 +348,47 @@ function MediaTestimonialPanel({
         </button>
       )}
 
-      {isVideo && (phase === "live" || phase === "recording") && (
+      {isVideo && (phase === "live" || phase === "countdown" || phase === "recording") && (
         <video ref={videoRef} muted playsInline className="mb-3 w-full max-w-md rounded-md bg-black" />
       )}
 
       {phase === "live" && (
-        <button type="button" onClick={startRecording} className="rounded-md bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-600">
-          ⏺ Start recording
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1 rounded-full border border-neutral-300 bg-white px-1.5 py-1">
+            {COUNTDOWN_CHOICES.map((d) => (
+              <button
+                key={d}
+                type="button"
+                onClick={() => setCountdownDuration(d)}
+                aria-pressed={countdownDuration === d}
+                className={`rounded-full px-2 py-1 text-[11px] font-semibold ${
+                  countdownDuration === d ? "bg-neutral-900 text-white" : "text-neutral-500 hover:text-neutral-800"
+                }`}
+              >
+                {d}s
+              </button>
+            ))}
+          </div>
+          <button type="button" onClick={startCountdown} className="rounded-md bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-600">
+            ⏺ Start recording
+          </button>
+        </div>
+      )}
+
+      {phase === "countdown" && (
+        <div className="flex flex-col items-center gap-2 rounded-md border border-neutral-200 bg-white py-6">
+          <span className="text-5xl font-black text-neutral-900" aria-live="assertive">
+            {countdownSeconds}
+          </span>
+          <p className="text-sm font-semibold text-neutral-600">Get ready…</p>
+          <button
+            type="button"
+            onClick={cancelCountdown}
+            className="mt-1 rounded-md border border-neutral-300 px-4 py-1.5 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
+          >
+            Cancel
+          </button>
+        </div>
       )}
 
       {phase === "recording" && (
@@ -291,6 +400,7 @@ function MediaTestimonialPanel({
           {isVideo && takeType === "actual" && seconds < minSeconds && (
             <p className="mb-2 text-xs text-amber-700">Keep going — at least {mmss(minSeconds)} needed.</p>
           )}
+          <p className="mb-2 text-xs font-semibold text-neutral-500">👏 Clap once to stop, or tap Stop below.</p>
           <button
             type="button"
             onClick={stopRecording}

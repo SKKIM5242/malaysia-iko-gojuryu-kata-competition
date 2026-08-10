@@ -6,11 +6,14 @@ import { useRecordAttempt, submitKataVideo } from "@/app/actions/account";
 import BuyExtraAttemptsButton from "@/components/BuyExtraAttemptsButton";
 import { formatDate, formatDateTime } from "@/components/ui";
 import { pickVideoMimeType as pickMimeType, extensionForMimeType, bareMimeType } from "@/lib/media-recording";
+import { playDingDong } from "@/lib/chime";
+import { startClapDetector } from "@/lib/clap-detector";
 import type { WatermarkSettings } from "@/lib/watermark";
 
 const MAX_SECONDS = 5 * 60;
+const COUNTDOWN_CHOICES = [10, 15, 20, 25, 30] as const;
 
-type Phase = "idle" | "live" | "recording" | "review" | "uploading" | "done";
+type Phase = "idle" | "live" | "countdown" | "recording" | "review" | "uploading" | "done";
 
 /** Organizer-configurable watermark (Create/Edit Competition page, per
  * tier) -- font size and margins still scale with the actual recorded
@@ -463,6 +466,20 @@ export default function KataRecorder({
   const [agreed, setAgreed] = useState(false);
   const [recordingStartedAt, setRecordingStartedAt] = useState<Date | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
+  // Tap-to-start countdown -- lets a solo performer walk into position
+  // before recording actually begins, instead of needing a second person
+  // (or a remote-control button no phone browser can ever see -- see the
+  // volume-button-shutter-remote discussion this replaces) to hit Start
+  // right as they're ready.
+  const [countdownDuration, setCountdownDuration] = useState<number>(10);
+  const [countdownSeconds, setCountdownSeconds] = useState(0);
+  const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Created on the Start tap itself (a real user gesture) and reused for
+  // both the ding-dong chime and the clap detector -- creating either
+  // later, when the countdown timer itself fires, would not count as a
+  // gesture and iOS Safari would refuse to let it produce sound at all.
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const clapDetectorStopRef = useRef<(() => void) | null>(null);
   // renderLoop re-schedules itself through requestAnimationFrame, so the
   // `fullscreen` it closed over on the frame it started is frozen at that
   // value forever. It needs the CURRENT one (to know which shape to give
@@ -554,6 +571,9 @@ export default function KataRecorder({
       streamRef.current?.getTracks().forEach((t) => t.stop());
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       if (timerRef.current) clearInterval(timerRef.current);
+      if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+      if (clapDetectorStopRef.current) clapDetectorStopRef.current();
+      if (audioContextRef.current) void audioContextRef.current.close().catch(() => {});
       if (blobUrl) URL.revokeObjectURL(blobUrl);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -863,6 +883,58 @@ export default function KataRecorder({
     rafRef.current = requestAnimationFrame(renderLoop);
   }
 
+  /** Tap Start -> a visible countdown (participant's chosen length) so a
+   * solo performer can walk into position -> ding-dong chime -> recording
+   * begins on its own. Replaces startRecording as the round Start button's
+   * handler; startRecording itself now only fires once the countdown ends. */
+  function startCountdown() {
+    setError(null);
+    // Created here, on the tap itself, so it's a genuine user gesture --
+    // creating it later inside the countdown's own timer callback would
+    // not count as one, and iOS Safari silently refuses to play any sound
+    // from a context that was never unlocked that way.
+    if (!audioContextRef.current) {
+      try {
+        audioContextRef.current = new AudioContext();
+      } catch {
+        audioContextRef.current = null;
+      }
+    } else if (audioContextRef.current.state === "suspended") {
+      void audioContextRef.current.resume().catch(() => {});
+    }
+    setCountdownSeconds(countdownDuration);
+    setPhase("countdown");
+    countdownTimerRef.current = setInterval(() => {
+      setCountdownSeconds((s) => {
+        if (s <= 1) {
+          if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+          countdownTimerRef.current = null;
+          void beginRecordingAfterCountdown();
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+  }
+
+  function cancelCountdown() {
+    if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+    countdownTimerRef.current = null;
+    setPhase("live");
+  }
+
+  async function beginRecordingAfterCountdown() {
+    const ctx = audioContextRef.current;
+    if (ctx) {
+      try {
+        await playDingDong(ctx);
+      } catch {
+        // Best-effort -- a chime failure shouldn't block the recording.
+      }
+    }
+    startRecording();
+  }
+
   /** Had no error handling at all -- any failure here (captureStream
    * unsupported on this device/browser, MediaRecorder rejecting the
    * mimeType, etc.) threw silently in the click handler: the button looked
@@ -890,6 +962,10 @@ export default function KataRecorder({
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
       recorder.onstop = () => {
+        if (clapDetectorStopRef.current) {
+          clapDetectorStopRef.current();
+          clapDetectorStopRef.current = null;
+        }
         const blob = new Blob(chunksRef.current, { type: mimeType });
         recordedBlobRef.current = blob;
         const url = URL.createObjectURL(blob);
@@ -912,6 +988,10 @@ export default function KataRecorder({
       };
       recorder.start(1000);
       recorderRef.current = recorder;
+      // Auto-stop on a hand clap -- starts right as recording does, well
+      // after the countdown's own ding-dong chime has already finished
+      // playing, so the chime itself is never mistaken for the cue.
+      clapDetectorStopRef.current = startClapDetector(camStream, { onClap: stopRecording });
       setSeconds(0);
       setRecordingStartedAt(new Date());
       setPhase("recording");
@@ -1163,13 +1243,17 @@ export default function KataRecorder({
           — the recording should be able to see your whole kata move from start to end.
         </p>
         <p>
-          Tap <strong>Start</strong>. Imagine you are just outside the Tatami box or Kata Arena:
-          bow first, then walk 3–6 steps forward into position, then bow again. State the name of
-          the kata you are performing, then start with <strong>&quot;Yo e&quot;</strong> with hard
-          breathing and perform your kata to the end, then <strong>&quot;Na o te&quot;</strong>{" "}
-          with hard or soft breathing depending on your kata, and bow. After that, walk backward
-          3–5 steps and bow again. Tap <strong>Stop</strong> when you have faced forward for a
-          second or two after your bow.
+          Pick a countdown length (10–30 seconds), then tap <strong>Start</strong> — you&apos;ll
+          hear a <strong>ding-dong</strong> chime and recording begins on its own once it reaches
+          0, giving you time to walk into position first. Imagine you are just outside the Tatami
+          box or Kata Arena: bow first, then walk 3–6 steps forward into position, then bow again.
+          State the name of the kata you are performing, then start with{" "}
+          <strong>&quot;Yo e&quot;</strong> with hard breathing and perform your kata to the end,
+          then <strong>&quot;Na o te&quot;</strong> with hard or soft breathing depending on your
+          kata, and bow. After that, walk backward 3–5 steps and bow again, then either tap{" "}
+          <strong>Stop</strong> or simply <strong>clap your hands once</strong> — recording stops
+          on its own. (A shouted kiai will not stop it — only a clap does; if a clap isn&apos;t
+          picked up, tap Stop instead.)
         </p>
         <p>All the best to you — may your recording be a successful one. Thank you for participating.</p>
       </div>
@@ -1283,7 +1367,7 @@ export default function KataRecorder({
                 >
                   ✕ Exit full screen
                 </button>
-                {(phase === "live" || phase === "recording") && (
+                {(phase === "live" || phase === "countdown" || phase === "recording") && (
                   <span className="text-[10px] font-semibold leading-tight">
                     Deleted Recording: {attempts} / Available: {maxAttempts}
                   </span>
@@ -1295,9 +1379,12 @@ export default function KataRecorder({
             <div className="bg-red-50/95 px-4 py-2 text-sm text-red-800 backdrop-blur-sm">{error}</div>
           )}
           {phase === "recording" && (
-            <div className="px-2 pt-1">
+            <div className="flex flex-wrap gap-1.5 px-2 pt-1">
               <div className="inline-flex items-center gap-1.5 rounded-full bg-black/70 px-2.5 py-0.5 text-xs font-semibold text-white">
                 <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" /> LIVE REC {mm}:{ss} / 05:00
+              </div>
+              <div className="inline-flex items-center gap-1 rounded-full bg-black/70 px-2.5 py-0.5 text-xs font-semibold text-white">
+                👏 Clap to stop
               </div>
             </div>
           )}
@@ -1348,7 +1435,7 @@ export default function KataRecorder({
             // frames, say) the participant sees the whole recorded frame
             // shrunk rather than a cropped view of a picture whose edges
             // are silently going into the file regardless.
-            phase === "live" || phase === "recording"
+            phase === "live" || phase === "countdown" || phase === "recording"
               ? "block h-full w-full object-contain"
               : "hidden"
           }
@@ -1471,13 +1558,53 @@ export default function KataRecorder({
             Sits a bit clear of the very bottom edge so it doesn't crowd
             the burned-in watermark text there. */}
         {phase === "live" && (
-          <button
-            onClick={startRecording}
-            aria-label="Start recording"
-            className="absolute bottom-10 left-1/2 flex h-16 w-16 -translate-x-1/2 items-center justify-center rounded-full border-4 border-white/80 bg-red-600/90 text-2xl text-white shadow-lg active:scale-95"
-          >
-            ●
-          </button>
+          <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 flex-col items-center gap-2">
+            {/* Countdown length -- picked before Start, so a solo performer
+                gets long enough to walk into position and no unwanted
+                surprise silence during the wait. */}
+            <div className="flex items-center gap-1 rounded-full bg-black/55 px-1.5 py-1">
+              {COUNTDOWN_CHOICES.map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => setCountdownDuration(d)}
+                  aria-pressed={countdownDuration === d}
+                  className={
+                    "rounded-full px-2 py-1 text-[11px] font-semibold " +
+                    (countdownDuration === d ? "bg-white text-neutral-900" : "text-white/80 hover:text-white")
+                  }
+                >
+                  {d}s
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={startCountdown}
+              aria-label="Start countdown"
+              className="flex h-16 w-16 items-center justify-center rounded-full border-4 border-white/80 bg-red-600/90 text-2xl text-white shadow-lg active:scale-95"
+            >
+              ●
+            </button>
+          </div>
+        )}
+        {phase === "countdown" && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/45">
+            <span
+              className="text-7xl font-black text-white"
+              style={{ textShadow: "0 2px 8px rgba(0,0,0,0.7)" }}
+              aria-live="assertive"
+            >
+              {countdownSeconds}
+            </span>
+            <p className="text-sm font-semibold text-white/90">Get into position…</p>
+            <button
+              type="button"
+              onClick={cancelCountdown}
+              className="mt-2 rounded-md border border-white/60 bg-black/40 px-4 py-1.5 text-xs font-semibold text-white hover:bg-black/60"
+            >
+              Cancel
+            </button>
+          </div>
         )}
         {phase === "recording" && (
           <button
@@ -1492,7 +1619,11 @@ export default function KataRecorder({
             screen" -- without this there was no way back in short of
             reloading the page. */}
         {!fullscreen &&
-          (phase === "live" || phase === "recording" || phase === "review" || phase === "uploading") && (
+          (phase === "live" ||
+            phase === "countdown" ||
+            phase === "recording" ||
+            phase === "review" ||
+            phase === "uploading") && (
             <button
               type="button"
               onClick={enterFullscreen}
