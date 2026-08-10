@@ -38,19 +38,29 @@ const DEFAULT_ARM_DELAY_MS = 500;
  * still pass both thresholds, and a soft or muffled clap could miss them --
  * just an additional, hands-free way to trigger the same stop.
  *
- * Returns a cleanup function that stops listening and releases the audio
- * graph. Safe to call more than once.
+ * `ctx` MUST be a context already resumed by a real user gesture (the same
+ * one the countdown's chime plays through, created at the moment of the
+ * Start tap) -- this used to create its own fresh AudioContext here
+ * instead, but that construction happens well after the tap, inside the
+ * countdown timer's own async callback, which is NOT a user gesture. A
+ * context created there can be silently left suspended by the browser, in
+ * which case the analyser below never receives real microphone data at
+ * all -- getByteTimeDomainData/getByteFrequencyData just return silence
+ * forever, so NO threshold, however loose, could ever fire. That's a much
+ * better explanation for "doesn't work on desktop OR iPhone" than a
+ * sensitivity problem: a desktop mic has no trouble producing a clap peak
+ * well past even a conservative threshold if the pipeline is actually
+ * running at all.
+ *
+ * Returns a cleanup function that stops listening and disconnects from
+ * `ctx` -- it does NOT close ctx, since that context is owned by the
+ * caller (shared with the chime, and reused for the next countdown/take in
+ * the same session). Safe to call more than once.
  */
-export function startClapDetector(stream: MediaStream, options: ClapDetectorOptions): () => void {
+export function startClapDetector(ctx: AudioContext, stream: MediaStream, options: ClapDetectorOptions): () => void {
   const audioTrack = stream.getAudioTracks()[0];
-  if (!audioTrack || typeof AudioContext === "undefined") return () => {};
+  if (!audioTrack) return () => {};
 
-  let ctx: AudioContext;
-  try {
-    ctx = new AudioContext();
-  } catch {
-    return () => {};
-  }
   const source = ctx.createMediaStreamSource(new MediaStream([audioTrack]));
   const analyser = ctx.createAnalyser();
   analyser.fftSize = 1024;
@@ -109,6 +119,7 @@ export function startClapDetector(stream: MediaStream, options: ClapDetectorOpti
     } catch {
       // Already disconnected -- nothing left to do.
     }
-    void ctx.close().catch(() => {});
+    // ctx itself is NOT closed here -- it's owned by the caller (see the
+    // doc comment above).
   };
 }

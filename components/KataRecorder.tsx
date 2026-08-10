@@ -1095,8 +1095,14 @@ export default function KataRecorder({
       recorderRef.current = recorder;
       // Auto-stop on a hand clap -- starts right as recording does, well
       // after the countdown's own ding-dong chime has already finished
-      // playing, so the chime itself is never mistaken for the cue.
-      clapDetectorStopRef.current = startClapDetector(camStream, { onClap: stopRecording });
+      // playing, so the chime itself is never mistaken for the cue. Reuses
+      // the SAME AudioContext the chime just played through (created back
+      // on the Start tap, a real user gesture) rather than a fresh one --
+      // see startClapDetector's own doc comment for why that distinction
+      // is what was actually silencing the detector entirely.
+      if (audioContextRef.current) {
+        clapDetectorStopRef.current = startClapDetector(audioContextRef.current, camStream, { onClap: stopRecording });
+      }
       setSeconds(0);
       setRecordingStartedAt(new Date());
       setPhase("recording");

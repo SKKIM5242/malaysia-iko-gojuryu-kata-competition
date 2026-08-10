@@ -235,8 +235,12 @@ function MediaTestimonialPanel({
     recorder.start();
     // Auto-stop on a hand clap -- starts right as recording does, well
     // after the countdown's own chime has already finished, so the chime
-    // itself is never mistaken for the cue.
-    clapDetectorStopRef.current = startClapDetector(stream, { onClap: stopRecording });
+    // itself is never mistaken for the cue. Reuses the SAME AudioContext
+    // the chime just played through (created on the Start tap itself)
+    // rather than a fresh one -- see startClapDetector's own doc comment.
+    if (audioContextRef.current) {
+      clapDetectorStopRef.current = startClapDetector(audioContextRef.current, stream, { onClap: stopRecording });
+    }
     setSeconds(0);
     setPhase("recording");
     timerRef.current = setInterval(() => {

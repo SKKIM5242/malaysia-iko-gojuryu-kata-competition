@@ -113,6 +113,22 @@ export default function FloatingWindow({
   useEffect(() => {
     if (!fitAspect || !Number.isFinite(fitAspect) || fitAspect <= 0) return;
     const applyFit = () => {
+    // Desktop/laptop in landscape: skip the tight content-hugging reshape
+    // below entirely and just stay maximized instead. A recording is
+    // almost always portrait-shaped (phone camera), so hugging its own
+    // aspect on a wide desktop monitor was producing a narrow "handphone
+    // size" window every single time, regardless of how big the actual
+    // screen was -- a desktop viewer wants one big, consistent window with
+    // the video simply letterboxed inside it, not a window whose size
+    // depends on which recording happens to be open. Only phones/tablets
+    // (where a big generic maximized box is itself the awkward choice, and
+    // there's no spare width to letterbox into anyway) still hug the
+    // content's own shape below.
+    if (window.innerWidth >= 900 && window.innerWidth > window.innerHeight) {
+      setMaximized(true);
+      setMinimized(false);
+      return;
+    }
     const win = winRef.current;
     const content = contentRef.current;
     const chrome = win && content ? Math.max(0, win.offsetHeight - content.offsetHeight) : 40;
