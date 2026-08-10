@@ -571,16 +571,6 @@ export default function KataRecorder({
   // orientation.
   const [videoAspect, setVideoAspect] = useState<number | null>(null);
   const videoAspectRef = useRef(0);
-  // Temporary on-screen diagnostic (cam/screen/canvas pixel dimensions) --
-  // a reported "squeezed" portrait preview on a real iPhone X couldn't be
-  // reproduced or explained from code review alone (this exact crop-clamp
-  // math was tuned against other real devices per the comments below, and
-  // guessing at another blind adjustment risks un-fixing those). Shows just
-  // enough numbers to diagnose the real negotiated camera aspect from the
-  // next on-device screenshot instead of guessing a second time. Safe to
-  // remove once that's resolved.
-  const [debugDims, setDebugDims] = useState("");
-  const debugDimsRef = useRef("");
   // How tall the burned-in header banner actually came out (as a fraction
   // of frame height), reported back by drawFrame -- the DOM title bar below
   // uses this to sit directly under the real banner instead of a fixed
@@ -951,13 +941,6 @@ export default function KataRecorder({
       if (canvasW > 0 && canvasH > 0) {
         if (canvas.width !== canvasW) canvas.width = canvasW;
         if (canvas.height !== canvasH) canvas.height = canvasH;
-      }
-      const dims =
-        `cam ${video.videoWidth}x${video.videoHeight} · screen ${Math.round(box.w)}x${Math.round(box.h)} · ` +
-        `canvas ${canvasW}x${canvasH} · target ${targetAspect.toFixed(2)}`;
-      if (dims !== debugDimsRef.current) {
-        debugDimsRef.current = dims;
-        setDebugDims(dims);
       }
     }
     // Tracked from the CANVAS (not the raw camera frame) now -- the canvas
@@ -1432,28 +1415,6 @@ export default function KataRecorder({
             background bar behind the title (rather than just a
             drop-shadow) keeps it legible now that it can span multiple
             lines over whatever's playing underneath. */}
-        {/* "Kata Recording" -- an independent sibling of the stack below, NOT
-            nested inside it, specifically so it can carry its OWN top
-            offset instead of inheriting bannerRatio a second time (nesting
-            it inside the stack, which is already offset by bannerRatio,
-            double-applied that offset). Portrait keeps the original
-            translucent bar at that same bannerRatio offset (comfortably
-            more vertical room there, nothing directly under it). Landscape
-            phone pulls it up onto the burned-in banner's own second row
-            instead -- transparent, no background box -- since that's
-            where the multi-line overlap this whole stack exists to avoid
-            was actually happening: a short landscape screen left barely
-            any room between the banner and the identity overlay for a
-            second translucent bar to sit in without colliding with one of
-            them. */}
-        {fullscreen && (
-          <p
-            className="pointer-events-none absolute left-3 z-20 max-w-[65%] truncate rounded bg-black/45 px-2 py-1 text-sm font-bold text-white [@media(orientation:landscape)]:!top-[4%] [@media(orientation:landscape)]:!max-w-[50%] [@media(orientation:landscape)]:!rounded-none [@media(orientation:landscape)]:!bg-transparent [@media(orientation:landscape)]:!px-0 [@media(orientation:landscape)]:!py-0"
-            style={{ top: `${bannerRatio * 100}%`, textShadow: "0 1px 3px rgba(0,0,0,0.85)" }}
-          >
-            Kata Recording
-          </p>
-        )}
         <div
           // overflow-y-auto + a maxHeight bound: in landscape fullscreen on
           // a short-viewport phone, this stack (title bar + error banner +
@@ -1501,13 +1462,6 @@ export default function KataRecorder({
           )}
           {fullscreen && (
             <div className="flex items-start justify-end gap-2 px-3 py-2 text-white" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.85)" }}>
-              {/* "Kata Recording" itself now renders as an independent
-                  sibling of this whole stack (see landscapeTitle below) --
-                  it used to be the first item IN this row, which pinned it
-                  to the same top-offset (bannerRatio) as everything else
-                  here. Category stays dropped from this line -- the
-                  burned-in overlay (drawIdentityOverlay) already shows it
-                  clearly. */}
               {/* Deleted Recording sits right under Exit full screen, in the
                   SAME row as the title, instead of its own row below --
                   plain text with just the row's own drop-shadow (no
@@ -1533,14 +1487,6 @@ export default function KataRecorder({
           )}
           {error && (
             <div className="bg-red-50/95 px-4 py-2 text-sm text-red-800 backdrop-blur-sm">{error}</div>
-          )}
-          {/* Temporary diagnostic -- see debugDims declaration above. Shown
-              through "review" too (frozen at whatever it last read right
-              before recording started, since the resize logic above stops
-              updating once recording begins) since that's the phase a
-              squeezed take actually gets noticed and screenshotted in. */}
-          {(phase === "live" || phase === "countdown" || phase === "review") && debugDims && (
-            <div className="bg-black/50 px-2 py-0.5 text-[10px] text-white/70">{debugDims}</div>
           )}
           {phase === "recording" && (
             <div className="flex flex-wrap gap-1.5 px-2 pt-1">
@@ -1632,6 +1578,18 @@ export default function KataRecorder({
               onPause={() => setReviewPlaying(false)}
               onEnded={() => setReviewPlaying(false)}
               onTimeUpdate={(e) => setReviewCurrentTime(e.currentTarget.currentTime)}
+              // Blocks iOS Safari's own long-press "Enter Full Screen"
+              // context-menu entry, which exists on any <video> regardless
+              // of the `controls` attribute -- that native fullscreen is
+              // OS-level video chrome with zero access to this component's
+              // own overlay (Delete/Submit, Exit full screen), so a
+              // participant who long-presses lands in a bare video player
+              // with none of those controls reachable. preventDefault here
+              // stops the menu from appearing in the first place on the
+              // platforms that respect it; it's a best-effort mitigation of
+              // a real OS-level gesture, not a guaranteed block on every
+              // iOS version.
+              onContextMenu={(e) => e.preventDefault()}
               onLoadedMetadata={(e) => {
                 const v = e.currentTarget;
                 if (Number.isFinite(v.duration)) {
@@ -1657,12 +1615,19 @@ export default function KataRecorder({
                 type="button"
                 onClick={toggleReviewPlayback}
                 aria-label="Play"
-                className="absolute left-1/2 top-1/2 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-3xl text-white shadow-lg"
+                // z-10, below both control clusters (z-20 top stack, z-20
+                // bottom bar) -- explicit rather than relying on it being
+                // the lowest z-index:auto by default, so there's no
+                // ambiguity about the video's own play/replay icon ever
+                // sitting in front of Delete/Submit or the seek bar,
+                // including right as the replay ends and this button
+                // reappears.
+                className="absolute left-1/2 top-1/2 z-10 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-3xl text-white shadow-lg"
               >
                 ▶
               </button>
             )}
-            <div className="absolute inset-x-0 bottom-0 z-10 flex flex-col gap-1.5 bg-gradient-to-t from-black/75 to-transparent px-3 pb-3 pt-10">
+            <div className="absolute inset-x-0 bottom-0 z-20 flex flex-col gap-1.5 bg-gradient-to-t from-black/75 to-transparent px-3 pb-3 pt-10">
               <input
                 type="range"
                 min={0}
