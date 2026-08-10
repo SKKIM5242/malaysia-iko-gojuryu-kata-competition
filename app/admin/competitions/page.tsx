@@ -244,6 +244,15 @@ export default async function AdminCompetitions({
                         defaultValueISO={editing?.default_sign_in_valid_from ?? ""}
                         className={adminInput}
                       />
+                      <label htmlFor="sign_in_from_follows_event_date" className="mt-1.5 flex items-center gap-1.5 text-xs text-neutral-500">
+                        <input
+                          id="sign_in_from_follows_event_date"
+                          name="sign_in_from_follows_event_date"
+                          type="checkbox"
+                          defaultChecked={editing ? !!editing.sign_in_from_follows_event_date : true}
+                        />
+                        Keep synced to Event date (overwrites whatever&apos;s typed above on every save)
+                      </label>
                     </div>
                     <div>
                       <label htmlFor="default_sign_in_valid_until" className={adminLabel}>Sign-in valid until</label>

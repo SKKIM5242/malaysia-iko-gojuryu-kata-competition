@@ -26,6 +26,10 @@ export interface Competition {
    * from the account's role default, not from here. */
   default_sign_in_valid_from: string | null;
   default_sign_in_valid_until: string | null;
+  /** When true, saving this competition always overwrites
+   * default_sign_in_valid_from with event_date (see saveCompetition) so the
+   * two can't silently drift apart again. */
+  sign_in_from_follows_event_date: boolean;
   /** Date printed on this tier's certificates — set by the organizer
    * alongside "Publish all Certificates" on /admin/certificates. Null falls
    * back to event_date wherever a certificate's date field is rendered. */

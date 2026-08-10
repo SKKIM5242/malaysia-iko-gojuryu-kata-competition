@@ -333,6 +333,7 @@ export async function saveCompetition(formData: FormData) {
     audience_signin_date: String(formData.get("audience_signin_date") ?? "") || null,
     default_sign_in_valid_from: String(formData.get("default_sign_in_valid_from") ?? "") || null,
     default_sign_in_valid_until: String(formData.get("default_sign_in_valid_until") ?? "") || null,
+    sign_in_from_follows_event_date: formData.get("sign_in_from_follows_event_date") === "on",
     watermark_text: String(formData.get("watermark_text") ?? "").trim() || null,
     watermark_font_size_px: formData.get("watermark_font_size_px")
       ? Number(formData.get("watermark_font_size_px"))
@@ -342,6 +343,15 @@ export async function saveCompetition(formData: FormData) {
     watermark_color: String(formData.get("watermark_color") ?? "").trim() || null,
     watermark_direction: String(formData.get("watermark_direction") ?? "ltr"),
   };
+  // Overwrites whatever was typed into "Sign-in valid from" with the
+  // current Event date on every save when linked -- this is what keeps the
+  // two from silently drifting apart again (see migration 0119: USD 10
+  // Tier's sign-in window had drifted 2 days past its own event date,
+  // blocking every paid participant, including from their own recording
+  // page, until the gap was noticed).
+  if (values.sign_in_from_follows_event_date) {
+    values.default_sign_in_valid_from = values.event_date;
+  }
   if (!values.name) backTo(returnTo, { error: "Competition name is required." });
   if (
     values.default_sign_in_valid_from &&
