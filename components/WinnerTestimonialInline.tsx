@@ -39,12 +39,19 @@ export interface WinnerTestimonialInfo {
  *    in app/actions/account.ts).
  */
 export default function WinnerTestimonialInline({
+  registrationId,
   isOwner,
   isManager,
   canAssist,
   testimonial,
   editDeadlineISO,
 }: {
+  /** Which registration this testimonial is for — a login linked to
+   * several participants (a Sensei recording for several students) needs
+   * this passed explicitly, since it may not be the account's own primary
+   * link (see submitTestimonial/editTestimonial in app/actions/account.ts,
+   * which validate it against profile_participants). */
+  registrationId: string;
   isOwner: boolean;
   isManager: boolean;
   /** Signed in with any role except Audience (Organizer/School/Sensei/
@@ -95,7 +102,7 @@ export default function WinnerTestimonialInline({
               Cancel
             </button>
           </div>
-          <TestimonialRecorder mode="edit" onSaved={() => setEditing(false)} />
+          <TestimonialRecorder mode="edit" registrationId={registrationId} onSaved={() => setEditing(false)} />
         </div>
       );
     }
@@ -171,7 +178,7 @@ export default function WinnerTestimonialInline({
         </p>
       )}
       <div className="mt-2">
-        <TestimonialRecorder />
+        <TestimonialRecorder registrationId={registrationId} />
       </div>
     </div>
   );

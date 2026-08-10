@@ -427,6 +427,23 @@ export default async function AccountPage({
     );
   }
 
+  // Every registration this login can reach -- the primary link plus
+  // whatever else got bulk-linked into profile_participants (e.g. a Sensei
+  // whose email is on several students' registrations). Fetched once, fed
+  // into CertificatesSection below so a login linked to several
+  // participants sees every one of their certificates, not just the
+  // primary's.
+  const { data: myLinkedRegs } = await supabase
+    .from("profile_participants")
+    .select("registration_id")
+    .eq("user_id", user.id);
+  const myRegistrationIds = [
+    ...new Set([
+      ...(myLinkedRegs ?? []).map((r) => r.registration_id as string),
+      ...(profile.registration_id ? [profile.registration_id] : []),
+    ]),
+  ];
+
   // ── Staff / Admin / Organizer / Participant Support ────────────────────────
   if (["staff", "admin", "organizer", "customer_support"].includes(profile.role)) {
     const recordingCtx = profile.registration_id ? await getRecordingContext(supabase, user.id, profile, requestedRegistrationId) : null;
@@ -512,7 +529,7 @@ export default async function AccountPage({
           )}
           <CertificatesSection
             userId={user.id}
-            registrationId={profile.registration_id}
+            registrationIds={myRegistrationIds}
             senseiId={profile.sensei_id}
             schoolId={profile.school_id}
             isSupport={profile.role === "customer_support"}
@@ -664,7 +681,7 @@ export default async function AccountPage({
           )}
           <CertificatesSection
             userId={user.id}
-            registrationId={profile.registration_id}
+            registrationIds={myRegistrationIds}
             senseiId={profile.sensei_id}
             schoolId={profile.school_id}
             isSupport={false}
@@ -716,7 +733,7 @@ export default async function AccountPage({
           )}
           <CertificatesSection
             userId={user.id}
-            registrationId={profile.registration_id}
+            registrationIds={myRegistrationIds}
             senseiId={profile.sensei_id}
             schoolId={profile.school_id}
             isSupport={false}
@@ -813,7 +830,7 @@ export default async function AccountPage({
           )}
           <CertificatesSection
             userId={user.id}
-            registrationId={profile.registration_id}
+            registrationIds={myRegistrationIds}
             senseiId={profile.sensei_id}
             schoolId={profile.school_id}
             isSupport={false}
@@ -984,7 +1001,7 @@ export default async function AccountPage({
         )}
         <CertificatesSection
           userId={user.id}
-          registrationId={profile.registration_id}
+          registrationIds={myRegistrationIds}
           senseiId={profile.sensei_id}
           schoolId={profile.school_id}
           isSupport={false}

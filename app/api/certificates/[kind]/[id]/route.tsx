@@ -163,7 +163,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ kind
       return new Response("Registration not found.", { status: 404 });
     }
 
-    const isOwner = !!user && myProfile?.registration_id === registrationId;
+    let isOwner = !!user && myProfile?.registration_id === registrationId;
+    if (!isOwner && user) {
+      const { data: link } = await supabase
+        .from("profile_participants")
+        .select("registration_id")
+        .eq("user_id", user.id)
+        .eq("registration_id", registrationId)
+        .maybeSingle();
+      isOwner = !!link;
+    }
     if (!isOwner && !isManager && !isPublicWinnerView) {
       return new Response(user ? "Not authorized for this certificate." : "Sign in first.", { status: user ? 403 : 401 });
     }

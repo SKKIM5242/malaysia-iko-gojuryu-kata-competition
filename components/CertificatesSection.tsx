@@ -11,6 +11,13 @@ interface CertLink {
    * of being silently omitted, so it's clear why the download isn't there
    * yet rather than looking like it's just missing. */
   locked?: boolean;
+  /** React list key. A locked link has no href (nothing to link to yet),
+   * and two different linked participants can share the same label/href
+   * shape (same competition, both winners, neither has testified yet) once
+   * a login can hold more than one — so this has to be its own field
+   * rather than reusing label/href, which is what silently collapsed
+   * distinct entries under one React key when this was still 1:1. */
+  key: string;
 }
 
 type CompetitionRow = { name: string; registration_deadline: string | null; winners_announce_date: string | null };
@@ -33,6 +40,7 @@ async function participantLinks(
   const participationLink: CertLink = {
     label: `Certificate of Participation — ${competition.name}`,
     href: `/api/certificates/participant/${registrationId}`,
+    key: `participant-${registrationId}`,
   };
   if (!isWinner) return [participationLink];
 
@@ -47,8 +55,17 @@ async function participantLinks(
     .eq("registration_id", registrationId);
   const winnerLink: CertLink =
     (testimonialCount ?? 0) > 0
-      ? { label: `Winner Certificate — ${competition.name}`, href: `/api/certificates/winner/${registrationId}` }
-      : { label: `Winner Certificate — ${competition.name}`, href: "", locked: true };
+      ? {
+          label: `Winner Certificate — ${competition.name}`,
+          href: `/api/certificates/winner/${registrationId}`,
+          key: `winner-${registrationId}`,
+        }
+      : {
+          label: `Winner Certificate — ${competition.name}`,
+          href: "",
+          locked: true,
+          key: `winner-locked-${registrationId}`,
+        };
   return [winnerLink, participationLink];
 }
 
@@ -74,6 +91,7 @@ async function refereeLinks(supabase: Awaited<ReturnType<typeof createClient>>, 
     .map(([compId, c]) => ({
       label: `Referee / Judge Certificate — ${c.name}`,
       href: `/api/certificates/referee/${userId}?competition_id=${compId}`,
+      key: `referee-${userId}-${compId}`,
     }));
 }
 
@@ -106,6 +124,7 @@ async function roleRecordLinks(
     .map(([compId, c]) => ({
       label: `${kind === "sensei" ? "Sensei" : "School / Dojo"} Certificate — ${c.name}`,
       href: `/api/certificates/${kind}/${recordId}?competition_id=${compId}`,
+      key: `${kind}-${recordId}-${compId}`,
     }));
 }
 
@@ -123,6 +142,7 @@ async function supportLinks(supabase: Awaited<ReturnType<typeof createClient>>, 
     .map((c) => ({
       label: `Certificate of Appreciation — ${c.name}`,
       href: `/api/certificates/support/${userId}?competition_id=${c.id}`,
+      key: `support-${userId}-${c.id}`,
     }));
 }
 
@@ -137,20 +157,24 @@ async function supportLinks(supabase: Awaited<ReturnType<typeof createClient>>, 
  */
 export default async function CertificatesSection({
   userId,
-  registrationId,
+  registrationIds,
   senseiId,
   schoolId,
   isSupport,
 }: {
   userId: string;
-  registrationId: string | null;
+  /** Every registration this login can reach — the primary link plus
+   * whatever else got bulk-linked into profile_participants (e.g. a Sensei
+   * whose email is on several students' registrations), so this shows
+   * every one of their certificates, not just the primary's. */
+  registrationIds: string[];
   senseiId: string | null;
   schoolId: string | null;
   isSupport: boolean;
 }) {
   const supabase = await createClient();
   const linkGroups = await Promise.all([
-    registrationId ? participantLinks(supabase, registrationId) : Promise.resolve([]),
+    Promise.all(registrationIds.map((id) => participantLinks(supabase, id))).then((groups) => groups.flat()),
     refereeLinks(supabase, userId),
     senseiId ? roleRecordLinks(supabase, "sensei", senseiId) : Promise.resolve([]),
     schoolId ? roleRecordLinks(supabase, "school", schoolId) : Promise.resolve([]),
@@ -165,7 +189,7 @@ export default async function CertificatesSection({
       <div className="space-y-3 rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
         {links.map((l) =>
           l.locked ? (
-            <div key={l.label} className="rounded-md border border-amber-200 bg-amber-50 p-3">
+            <div key={l.key} className="rounded-md border border-amber-200 bg-amber-50 p-3">
               <p className="mb-1 text-sm font-semibold text-amber-900">{l.label}</p>
               <p className="text-xs text-amber-800">
                 🔒 Give your testimonial to unlock this download — go to the Winners page and find your win to submit
@@ -176,7 +200,7 @@ export default async function CertificatesSection({
               </div>
             </div>
           ) : (
-            <div key={l.href} className="rounded-md border border-neutral-200 p-3">
+            <div key={l.key} className="rounded-md border border-neutral-200 p-3">
               <p className="mb-2 text-sm font-semibold text-neutral-700">{l.label}</p>
               <div className="flex flex-wrap gap-2">
                 <a

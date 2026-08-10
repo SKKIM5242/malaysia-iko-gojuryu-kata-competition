@@ -93,10 +93,12 @@ function ScriptPicker() {
 function MediaTestimonialPanel({
   kind,
   mode,
+  registrationId,
   onDone,
 }: {
   kind: "video" | "voice";
   mode: "submit" | "edit";
+  registrationId: string;
   onDone: () => void;
 }) {
   const [takeType, setTakeType] = useState<"practice" | "actual">("practice");
@@ -216,6 +218,7 @@ function MediaTestimonialPanel({
       const fd = new FormData();
       fd.set("kind", kind);
       fd.set("path", path);
+      fd.set("registration_id", registrationId);
       const action = mode === "edit" ? editTestimonial : submitTestimonial;
       const result = await action({ ok: false }, fd);
       if (!result.ok) {
@@ -335,7 +338,15 @@ function MediaTestimonialPanel({
   );
 }
 
-function MessageTestimonialPanel({ mode, onDone }: { mode: "submit" | "edit"; onDone: () => void }) {
+function MessageTestimonialPanel({
+  mode,
+  registrationId,
+  onDone,
+}: {
+  mode: "submit" | "edit";
+  registrationId: string;
+  onDone: () => void;
+}) {
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -350,6 +361,7 @@ function MessageTestimonialPanel({ mode, onDone }: { mode: "submit" | "edit"; on
     const fd = new FormData();
     fd.set("kind", "message");
     fd.set("message", message.trim());
+    fd.set("registration_id", registrationId);
     const action = mode === "edit" ? editTestimonial : submitTestimonial;
     const result = await action({ ok: false }, fd);
     setPending(false);
@@ -389,9 +401,11 @@ function MessageTestimonialPanel({ mode, onDone }: { mode: "submit" | "edit"; on
  * different file if this isn't the one. */
 function UploadTestimonialPanel({
   mode,
+  registrationId,
   onDone,
 }: {
   mode: "submit" | "edit";
+  registrationId: string;
   onDone: (kind: TestimonialKind) => void;
 }) {
   const [kind, setKind] = useState<"video" | "voice" | null>(null);
@@ -453,6 +467,7 @@ function UploadTestimonialPanel({
       const fd = new FormData();
       fd.set("kind", kind);
       fd.set("path", path);
+      fd.set("registration_id", registrationId);
       const action = mode === "edit" ? editTestimonial : submitTestimonial;
       const result = await action({ ok: false }, fd);
       if (!result.ok) {
@@ -542,6 +557,7 @@ type ChooserOption = TestimonialKind | "upload";
  * "already submitted" replay shown once one exists. */
 export default function TestimonialRecorder({
   mode = "submit",
+  registrationId,
   onSaved,
 }: {
   /** "edit" re-records/re-types an already-submitted testimonial (calls
@@ -549,6 +565,11 @@ export default function TestimonialRecorder({
    * (calls submitTestimonial, an INSERT) — see WinnerTestimonialInline.tsx,
    * which shows this in "edit" mode inside its own Edit/Retake toggle. */
   mode?: "submit" | "edit";
+  /** Which registration this testimonial is for — a login linked to
+   * several participants (a Sensei recording for several students) needs
+   * this explicit, since it may not be the account's own primary link (see
+   * submitTestimonial/editTestimonial in app/actions/account.ts). */
+  registrationId: string;
   /** "edit" mode only — called once the update succeeds, so the parent can
    * collapse back to the read-only view instead of showing the "thank you"
    * screen below (which only makes sense for a first submission). */
@@ -606,22 +627,22 @@ export default function TestimonialRecorder({
       {chosen === "video" && (
         <div className="mt-3">
           <ScriptPicker />
-          <MediaTestimonialPanel kind="video" mode={mode} onDone={() => handleDone("video")} />
+          <MediaTestimonialPanel kind="video" mode={mode} registrationId={registrationId} onDone={() => handleDone("video")} />
         </div>
       )}
       {chosen === "voice" && (
         <div className="mt-3">
           <ScriptPicker />
-          <MediaTestimonialPanel kind="voice" mode={mode} onDone={() => handleDone("voice")} />
+          <MediaTestimonialPanel kind="voice" mode={mode} registrationId={registrationId} onDone={() => handleDone("voice")} />
         </div>
       )}
       {chosen === "message" && (
         <div className="mt-3">
           <ScriptPicker />
-          <MessageTestimonialPanel mode={mode} onDone={() => handleDone("message")} />
+          <MessageTestimonialPanel mode={mode} registrationId={registrationId} onDone={() => handleDone("message")} />
         </div>
       )}
-      {chosen === "upload" && <UploadTestimonialPanel mode={mode} onDone={handleDone} />}
+      {chosen === "upload" && <UploadTestimonialPanel mode={mode} registrationId={registrationId} onDone={handleDone} />}
     </div>
   );
 }

@@ -524,6 +524,30 @@ export async function submitKataVideo(
  * Unlocks the Winner Certificate download (see CertificatesSection.tsx and
  * the certificate API route) and clears the reward payout hold (see
  * app/admin/commissions/page.tsx). */
+/** Resolves which registration a testimonial submit/edit belongs to.
+ * Accepts an explicit registration_id from the client (a login linked to
+ * several participants — a Sensei recording for several students — needs
+ * this, since it may not be the account's own primary link) and validates
+ * it against profile_participants before trusting it; falls back to the
+ * profile's own primary link when the client sends none or it doesn't
+ * belong to this account. Mirrors the same pattern already used by
+ * submitKataVideo. */
+async function resolveTestimonialRegistrationId(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  primaryRegistrationId: string | null,
+  requested: string | null,
+): Promise<string | null> {
+  if (!requested || requested === primaryRegistrationId) return primaryRegistrationId;
+  const { data: link } = await supabase
+    .from("profile_participants")
+    .select("registration_id")
+    .eq("user_id", userId)
+    .eq("registration_id", requested)
+    .maybeSingle();
+  return link ? link.registration_id : primaryRegistrationId;
+}
+
 export async function submitTestimonial(
   _prev: AccountActionState,
   formData: FormData,
@@ -543,19 +567,26 @@ export async function submitTestimonial(
     .select("registration_id")
     .eq("user_id", user.id)
     .maybeSingle();
-  if (!profile?.registration_id) return { ok: false, error: "Link your registration first." };
+  const requestedRegistrationId = String(formData.get("registration_id") ?? "") || null;
+  const registrationId = await resolveTestimonialRegistrationId(
+    supabase,
+    user.id,
+    profile?.registration_id ?? null,
+    requestedRegistrationId,
+  );
+  if (!registrationId) return { ok: false, error: "Link your registration first." };
 
   const { data: reg } = await supabase
     .from("registrations")
     .select("competition_id")
-    .eq("id", profile.registration_id)
+    .eq("id", registrationId)
     .maybeSingle();
   if (!reg) return { ok: false, error: "Registration not found." };
 
   // Same Top-3 check the certificate route and reward payout list use —
   // a testimonial only ever applies to a registration that actually won.
   const rankings = await computeCategoryRankings(supabase, reg.competition_id as string);
-  const isWinner = [...rankings.values()].flat().some((e) => e.registrationId === profile.registration_id);
+  const isWinner = [...rankings.values()].flat().some((e) => e.registrationId === registrationId);
   if (!isWinner) return { ok: false, error: "Testimonials are only for Top 3 winners." };
 
   let media_path: string | null = null;
@@ -569,7 +600,7 @@ export async function submitTestimonial(
   }
 
   const { error } = await supabase.from("winner_testimonials").insert({
-    registration_id: profile.registration_id,
+    registration_id: registrationId,
     kind,
     media_path,
     message,
@@ -577,7 +608,7 @@ export async function submitTestimonial(
   if (error) return { ok: false, error: "Could not save — you may have already submitted a testimonial." };
   await writeAudit(supabase, {
     table_name: "winner_testimonials",
-    record_id: profile.registration_id,
+    record_id: registrationId,
     action: "testimonial_submitted",
     new_value: { kind: kind as TestimonialKind },
     actor_id: user.id,
@@ -617,17 +648,24 @@ export async function editTestimonial(
     .select("registration_id")
     .eq("user_id", user.id)
     .maybeSingle();
-  if (!profile?.registration_id) return { ok: false, error: "Link your registration first." };
+  const requestedRegistrationId = String(formData.get("registration_id") ?? "") || null;
+  const registrationId = await resolveTestimonialRegistrationId(
+    supabase,
+    user.id,
+    profile?.registration_id ?? null,
+    requestedRegistrationId,
+  );
+  if (!registrationId) return { ok: false, error: "Link your registration first." };
 
   const { data: reg } = await supabase
     .from("registrations")
     .select("competition_id, competition:competitions(registration_deadline, winners_announce_date)")
-    .eq("id", profile.registration_id)
+    .eq("id", registrationId)
     .maybeSingle();
   if (!reg) return { ok: false, error: "Registration not found." };
 
   const rankings = await computeCategoryRankings(supabase, reg.competition_id as string);
-  const isWinner = [...rankings.values()].flat().some((e) => e.registrationId === profile.registration_id);
+  const isWinner = [...rankings.values()].flat().some((e) => e.registrationId === registrationId);
   if (!isWinner) return { ok: false, error: "Testimonials are only for Top 3 winners." };
 
   const competition = reg.competition as unknown as {
@@ -645,7 +683,7 @@ export async function editTestimonial(
   const { data: existing } = await supabase
     .from("winner_testimonials")
     .select("id, media_path, deleted_at")
-    .eq("registration_id", profile.registration_id)
+    .eq("registration_id", registrationId)
     .maybeSingle();
   if (!existing) return { ok: false, error: "Submit your first testimonial before editing." };
   if (existing.deleted_at) {
@@ -673,7 +711,7 @@ export async function editTestimonial(
 
   await writeAudit(supabase, {
     table_name: "winner_testimonials",
-    record_id: profile.registration_id,
+    record_id: registrationId,
     action: "testimonial_edited",
     new_value: { kind: kind as TestimonialKind },
     actor_id: user.id,

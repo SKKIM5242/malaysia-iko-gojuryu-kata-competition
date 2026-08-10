@@ -144,14 +144,16 @@ async function computeWinners(
 async function CompetitionWinners({
   competition,
   supabase,
-  myRegistrationId,
+  myRegistrationIds,
   isManager,
   canAssist,
   canToggleDeductions,
 }: {
   competition: Competition;
   supabase: Awaited<ReturnType<typeof createClient>>;
-  myRegistrationId: string | null;
+  /** Every registration this login can reach — see the same-named comment
+   * where this is built in the page component below. */
+  myRegistrationIds: string[];
   isManager: boolean;
   /** Signed in with any role except Audience — see WinnerTestimonialInline
    * for what this widens (button visibility, not submission attribution). */
@@ -258,13 +260,14 @@ async function CompetitionWinners({
                               </span>
                             </div>
                             <WinnerTestimonialInline
-                              isOwner={w.registrationId === myRegistrationId}
+                              registrationId={w.registrationId}
+                              isOwner={myRegistrationIds.includes(w.registrationId)}
                               isManager={isManager}
                               canAssist={canAssist}
                               testimonial={w.testimonial}
                               editDeadlineISO={editDeadlineISO}
                             />
-                            {w.registrationId === myRegistrationId && (
+                            {myRegistrationIds.includes(w.registrationId) && (
                               <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5">
                                 <span className="text-xs font-semibold text-amber-800">🎓 That&apos;s you:</span>
                                 <span className="flex flex-wrap items-center gap-1.5">
@@ -372,7 +375,20 @@ export default async function WinnersPage() {
   const { data: myProfile } = user
     ? await supabase.from("profiles").select("registration_id, role").eq("user_id", user.id).maybeSingle()
     : { data: null };
-  const myRegistrationId = (myProfile?.registration_id as string | null) ?? null;
+  // Every registration this login can reach — the primary link plus
+  // whatever else got bulk-linked into profile_participants (e.g. a Sensei
+  // whose email is on several students' registrations), so "that's you"
+  // and the testimonial-submit UI recognize every one of them, not just
+  // the primary's.
+  const { data: myLinkedRegs } = user
+    ? await supabase.from("profile_participants").select("registration_id").eq("user_id", user.id)
+    : { data: null };
+  const myRegistrationIds = [
+    ...new Set([
+      ...(myLinkedRegs ?? []).map((r) => r.registration_id as string),
+      ...(myProfile?.registration_id ? [myProfile.registration_id as string] : []),
+    ]),
+  ];
   // Only Admin/Organizer/Staff ever see the ✕ delete button on a
   // testimonial (see deleteTestimonial in app/actions/admin.ts, which
   // enforces the same tier server-side regardless of what this hides).
@@ -401,7 +417,7 @@ export default async function WinnersPage() {
           testimonial is delayed or not submitted at all). A big congratulations to all the winners, from the
           organizer, the support team, and the referee/judge panel! Thank you for participating in this competition.
         </p>
-        {!myRegistrationId && (
+        {myRegistrationIds.length === 0 && (
           <p className="mb-6 rounded-md border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
             🏆 Placed in the Top 3?{" "}
             <a href="/account" className="font-semibold text-red-700 underline underline-offset-2">
@@ -419,7 +435,7 @@ export default async function WinnersPage() {
                 key={c.id}
                 competition={c}
                 supabase={supabase}
-                myRegistrationId={myRegistrationId}
+                myRegistrationIds={myRegistrationIds}
                 isManager={isManager}
                 canAssist={canAssist}
                 canToggleDeductions={canToggleDeductions}
