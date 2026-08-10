@@ -1432,6 +1432,28 @@ export default function KataRecorder({
             background bar behind the title (rather than just a
             drop-shadow) keeps it legible now that it can span multiple
             lines over whatever's playing underneath. */}
+        {/* "Kata Recording" -- an independent sibling of the stack below, NOT
+            nested inside it, specifically so it can carry its OWN top
+            offset instead of inheriting bannerRatio a second time (nesting
+            it inside the stack, which is already offset by bannerRatio,
+            double-applied that offset). Portrait keeps the original
+            translucent bar at that same bannerRatio offset (comfortably
+            more vertical room there, nothing directly under it). Landscape
+            phone pulls it up onto the burned-in banner's own second row
+            instead -- transparent, no background box -- since that's
+            where the multi-line overlap this whole stack exists to avoid
+            was actually happening: a short landscape screen left barely
+            any room between the banner and the identity overlay for a
+            second translucent bar to sit in without colliding with one of
+            them. */}
+        {fullscreen && (
+          <p
+            className="pointer-events-none absolute left-3 z-20 max-w-[65%] truncate rounded bg-black/45 px-2 py-1 text-sm font-bold text-white [@media(orientation:landscape)]:!top-[4%] [@media(orientation:landscape)]:!max-w-[50%] [@media(orientation:landscape)]:!rounded-none [@media(orientation:landscape)]:!bg-transparent [@media(orientation:landscape)]:!px-0 [@media(orientation:landscape)]:!py-0"
+            style={{ top: `${bannerRatio * 100}%`, textShadow: "0 1px 3px rgba(0,0,0,0.85)" }}
+          >
+            Kata Recording
+          </p>
+        )}
         <div
           // overflow-y-auto + a maxHeight bound: in landscape fullscreen on
           // a short-viewport phone, this stack (title bar + error banner +
@@ -1478,12 +1500,14 @@ export default function KataRecorder({
             </div>
           )}
           {fullscreen && (
-            <div className="flex items-start justify-between gap-2 bg-black/45 px-3 py-2 text-white" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.85)" }}>
-              {/* Category dropped from this line -- it's now shown clearly
-                  in the burned-in overlay itself (drawIdentityOverlay),
-                  directly under the banner; repeating it here as well was
-                  the second half of the two texts visually colliding. */}
-              <p className="min-w-0 flex-1 break-words text-sm font-bold">Kata Recording</p>
+            <div className="flex items-start justify-end gap-2 px-3 py-2 text-white" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.85)" }}>
+              {/* "Kata Recording" itself now renders as an independent
+                  sibling of this whole stack (see landscapeTitle below) --
+                  it used to be the first item IN this row, which pinned it
+                  to the same top-offset (bannerRatio) as everything else
+                  here. Category stays dropped from this line -- the
+                  burned-in overlay (drawIdentityOverlay) already shows it
+                  clearly. */}
               {/* Deleted Recording sits right under Exit full screen, in the
                   SAME row as the title, instead of its own row below --
                   plain text with just the row's own drop-shadow (no
