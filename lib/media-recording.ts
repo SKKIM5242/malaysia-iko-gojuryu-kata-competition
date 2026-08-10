@@ -39,3 +39,13 @@ export function extensionForMimeType(mimeType: string): string {
   }
   return "webm";
 }
+
+/** Strips MediaRecorder's `;codecs=...` suffix (e.g. iOS Safari's own
+ * `video/mp4;codecs=avc1,mp4a`) before the type is used as a Storage
+ * upload's Content-Type -- Supabase Storage's bucket `allowed_mime_types`
+ * check matches the header verbatim against entries like "video/mp4", so
+ * the untouched, codec-qualified string is rejected with a 400 on every
+ * iOS upload attempt even though the bucket does allow plain "video/mp4". */
+export function bareMimeType(mimeType: string): string {
+  return mimeType.split(";")[0].trim();
+}

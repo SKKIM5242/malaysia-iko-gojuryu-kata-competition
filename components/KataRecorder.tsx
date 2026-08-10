@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useRecordAttempt, submitKataVideo } from "@/app/actions/account";
 import BuyExtraAttemptsButton from "@/components/BuyExtraAttemptsButton";
 import { formatDate, formatDateTime } from "@/components/ui";
-import { pickVideoMimeType as pickMimeType, extensionForMimeType } from "@/lib/media-recording";
+import { pickVideoMimeType as pickMimeType, extensionForMimeType, bareMimeType } from "@/lib/media-recording";
 import type { WatermarkSettings } from "@/lib/watermark";
 
 const MAX_SECONDS = 5 * 60;
@@ -990,7 +990,7 @@ export default function KataRecorder({
       const path = `${user.id}/${crypto.randomUUID()}.${extensionForMimeType(blob.type)}`;
       const { error: upErr } = await supabase.storage
         .from("kata-videos")
-        .upload(path, blob, { contentType: blob.type || "video/webm" });
+        .upload(path, blob, { contentType: bareMimeType(blob.type || "video/webm") });
       if (upErr) {
         setError("Upload failed — please check your connection and try again.");
         setPhase("review");

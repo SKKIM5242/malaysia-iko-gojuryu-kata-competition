@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { submitTestimonial, editTestimonial } from "@/app/actions/account";
-import { pickVideoMimeType, pickAudioMimeType, extensionForMimeType } from "@/lib/media-recording";
+import { pickVideoMimeType, pickAudioMimeType, extensionForMimeType, bareMimeType } from "@/lib/media-recording";
 import {
   TESTIMONIAL_KIND_LABEL,
   TESTIMONIAL_MIN_VIDEO_SECONDS,
@@ -209,7 +209,7 @@ function MediaTestimonialPanel({
       const path = `${user.id}/${crypto.randomUUID()}.${extensionForMimeType(blob.type)}`;
       const { error: upErr } = await supabase.storage
         .from("testimonials")
-        .upload(path, blob, { contentType: blob.type || (isVideo ? "video/webm" : "audio/webm") });
+        .upload(path, blob, { contentType: bareMimeType(blob.type || (isVideo ? "video/webm" : "audio/webm")) });
       if (upErr) {
         setError("Upload failed — please check your connection and try again.");
         setPhase("review");
