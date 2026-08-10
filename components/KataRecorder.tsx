@@ -229,7 +229,8 @@ function drawFrame(
   w: number,
   h: number,
   watermark: WatermarkSettings,
-  identityText: string,
+  participantName: string,
+  categoryName: string,
 ): number {
   const srcW = video.videoWidth;
   const srcH = video.videoHeight;
@@ -304,8 +305,8 @@ function drawFrame(
     ctx.shadowBlur = 0;
 
     drawWatermark(ctx, w, h, watermark);
-    drawIdentityOverlay(ctx, w, h, topH, identityText);
-    return topH / h;
+    const identityH = drawIdentityOverlay(ctx, w, h, topH, participantName, categoryName);
+    return (topH + identityH) / h;
   }
 
   // Landscape: single-line layout, banner height taken from the frame's own
@@ -334,29 +335,73 @@ function drawFrame(
   ctx.shadowBlur = 0;
 
   drawWatermark(ctx, w, h, watermark);
-  drawIdentityOverlay(ctx, w, h, topH, identityText);
-  return topH / h;
+  const identityH = drawIdentityOverlay(ctx, w, h, topH, participantName, categoryName);
+  return (topH + identityH) / h;
 }
 
-/** Small single-line overlay — "Participant name · Kata/category" — burned
- * in just under the main title banner, left-aligned. Deliberately much
- * smaller than the banner/watermark so it never competes with either or
- * eats into the performer's own recording area; only drawn when there's
- * actually a participant name to show (a solo account with no linked
- * co-participants has nothing worth labelling). */
-function drawIdentityOverlay(ctx: CanvasRenderingContext2D, w: number, h: number, topH: number, text: string) {
-  if (!text) return;
+/** Row 1: participant name (bold, clearly readable). Row 2+: kata/category,
+ * smaller, wrapping onto further rows rather than shrinking indefinitely or
+ * running off-canvas. Burned in just under the main title banner,
+ * left-aligned — deliberately still smaller than the banner/watermark so it
+ * never competes with either, but no longer the near-illegible single line
+ * this used to be, which is what collided with the DOM title bar sitting
+ * directly on top of it (see the returned height below). Only drawn when
+ * there's actually a participant name to show (a solo account with no
+ * linked co-participants has nothing worth labelling).
+ *
+ * Returns the pixel height this overlay actually used, so the caller
+ * (drawFrame) can push the DOM title bar stacked on top of the canvas down
+ * far enough to clear it — previously that stack started right at topH,
+ * the SAME position this overlay's own text started at, which is exactly
+ * why the two visually overlapped/collided on screen. */
+function drawIdentityOverlay(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  topH: number,
+  participantName: string,
+  categoryName: string,
+): number {
+  if (!participantName) return 0;
   ctx.save();
-  const fontPx = Math.max(10, Math.round(Math.min(w, h) * 0.022));
-  ctx.font = `600 ${fontPx}px Arial, sans-serif`;
+  const margin = Math.max(10, Math.round(Math.min(w, h) * 0.02));
+  const nameFontPx = Math.max(14, Math.round(Math.min(w, h) * 0.034));
+  const categoryFontPx = Math.max(11, Math.round(nameFontPx * 0.7));
+  const maxWidth = w - margin * 2;
   ctx.textAlign = "left";
   ctx.fillStyle = "#ffffff";
-  ctx.globalAlpha = 0.85;
-  ctx.shadowColor = "rgba(0,0,0,0.6)";
+  ctx.globalAlpha = 0.92;
+  ctx.shadowColor = "rgba(0,0,0,0.65)";
   ctx.shadowBlur = 3;
-  const margin = Math.max(10, Math.round(Math.min(w, h) * 0.02));
-  ctx.fillText(text, margin, topH + fontPx + margin * 0.5);
+
+  let y = topH + nameFontPx + margin * 0.5;
+  ctx.font = `700 ${nameFontPx}px Arial, sans-serif`;
+  ctx.fillText(participantName, margin, y);
+
+  if (categoryName) {
+    ctx.font = `600 ${categoryFontPx}px Arial, sans-serif`;
+    // Word-wraps onto as many rows as needed at a FIXED size, instead of
+    // the old single-line overlay which just ran under everything else
+    // uncontrolled at whatever length the category name happened to be.
+    const words = categoryName.split(" ");
+    let line = "";
+    for (const word of words) {
+      const attempt = line ? `${line} ${word}` : word;
+      if (line && ctx.measureText(attempt).width > maxWidth) {
+        y += categoryFontPx * 1.3;
+        ctx.fillText(line, margin, y);
+        line = word;
+      } else {
+        line = attempt;
+      }
+    }
+    if (line) {
+      y += categoryFontPx * 1.3;
+      ctx.fillText(line, margin, y);
+    }
+  }
   ctx.restore();
+  return y + margin * 0.4 - topH;
 }
 
 function daysBetween(from: Date, to: Date): number {
@@ -448,9 +493,6 @@ export default function KataRecorder({
    * participants can tell whose take is whose after the fact. */
   participantName?: string | null;
 }) {
-  // Only worth burning in when there's a name to show at all -- a solo
-  // account recording their own single kata has nothing to disambiguate.
-  const identityText = participantName ? `${participantName} · ${categoryName ?? ""}`.trim().replace(/·\s*$/, "").trim() : "";
   const [phase, setPhase] = useState<Phase>("idle");
   const [attempts, setAttempts] = useState(initialAttempts);
   const [seconds, setSeconds] = useState(0);
@@ -616,6 +658,16 @@ export default function KataRecorder({
       onResize();
       setTimeout(onResize, 60);
       setTimeout(onResize, 300);
+      // Rotating can bring Safari's own chrome back regardless of the CSS
+      // overlay (a genuine platform limit -- real Fullscreen API support
+      // for a non-<video> element like this one isn't there on iOS Safari
+      // to prevent it), so the same scroll nudge as enterFullscreen is
+      // re-applied here to at least re-collapse it as fast as possible
+      // instead of leaving it up until the participant swipes themselves.
+      if (fullscreenRef.current) {
+        requestAnimationFrame(() => window.scrollTo(0, 1));
+        setTimeout(() => window.scrollTo(0, 1), 350);
+      }
     }
     window.addEventListener("resize", onResize);
     window.addEventListener("orientationchange", onOrientationChange);
@@ -750,6 +802,15 @@ export default function KataRecorder({
    * already covers the requirement either way. */
   function enterFullscreen() {
     setFullscreen(true);
+    // A tiny scroll nudge -- iOS Safari's own chrome (URL bar, tab strip)
+    // can still be showing at this exact instant, and the fixed inset-0
+    // overlay gets sized against whichever viewport state Safari committed
+    // to at its LAST layout pass, not the one this triggers -- leaving a
+    // visible gap at the top until something (normally the participant
+    // swiping the page themselves) makes Safari recompute. This is the same
+    // trick Safari's own address-bar-hiding behaviour has always relied on;
+    // doing it ourselves here means the participant doesn't have to.
+    requestAnimationFrame(() => window.scrollTo(0, 1));
     const el = containerRef.current as
       | (HTMLDivElement & { webkitRequestFullscreen?: () => Promise<void> })
       | null;
@@ -909,7 +970,7 @@ export default function KataRecorder({
     }
     const ctx = canvas.getContext("2d");
     if (ctx) {
-      const newBannerRatio = drawFrame(ctx, video, canvas.width, canvas.height, watermark, identityText);
+      const newBannerRatio = drawFrame(ctx, video, canvas.width, canvas.height, watermark, participantName ?? "", categoryName ?? "");
       if (Number.isFinite(newBannerRatio) && newBannerRatio > 0 && Math.abs(bannerRatioRef.current - newBannerRatio) > 0.002) {
         bannerRatioRef.current = newBannerRatio;
         setBannerRatio(newBannerRatio);
@@ -1412,9 +1473,11 @@ export default function KataRecorder({
           )}
           {fullscreen && (
             <div className="flex items-start justify-between gap-2 bg-black/45 px-3 py-2 text-white" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.85)" }}>
-              <p className="min-w-0 flex-1 break-words text-sm font-bold">
-                Kata Recording{categoryName ? ` — ${categoryName}` : ""}
-              </p>
+              {/* Category dropped from this line -- it's now shown clearly
+                  in the burned-in overlay itself (drawIdentityOverlay),
+                  directly under the banner; repeating it here as well was
+                  the second half of the two texts visually colliding. */}
+              <p className="min-w-0 flex-1 break-words text-sm font-bold">Kata Recording</p>
               {/* Deleted Recording sits right under Exit full screen, in the
                   SAME row as the title, instead of its own row below --
                   plain text with just the row's own drop-shadow (no
@@ -1486,11 +1549,10 @@ export default function KataRecorder({
                   text block above the recording area, which full screen mode
                   now hides for the whole live/recording/review flow, making
                   the button effectively unreachable right when it's actually
-                  needed. */}
+                  needed. compact: no white card, no explanatory paragraph --
+                  the label alone is clear enough here. */}
               {attemptsLeft <= 0 && (
-                <div className="rounded-md bg-white/95 px-2 py-1.5 shadow">
-                  <BuyExtraAttemptsButton registrationId={registrationId} hasPendingPurchase={hasPendingPurchase} />
-                </div>
+                <BuyExtraAttemptsButton registrationId={registrationId} hasPendingPurchase={hasPendingPurchase} compact />
               )}
             </div>
           )}

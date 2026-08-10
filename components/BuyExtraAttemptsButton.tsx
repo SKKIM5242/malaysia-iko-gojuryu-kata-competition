@@ -15,9 +15,16 @@ const initial: AccountActionState = { ok: false };
 export default function BuyExtraAttemptsButton({
   registrationId,
   hasPendingPurchase,
+  compact,
 }: {
   registrationId: string;
   hasPendingPurchase: boolean;
+  /** Drops the explanatory paragraph and switches to a semi-transparent
+   * button -- for the fullscreen recorder's review overlay, where a solid
+   * white card with a paragraph of copy read as an intrusive box floating
+   * over the recording; the button's own label is already self-explanatory
+   * there. */
+  compact?: boolean;
 }) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState(requestExtraAttempts, initial);
@@ -29,7 +36,7 @@ export default function BuyExtraAttemptsButton({
 
   if (hasPendingPurchase || (state.ok && !state.checkoutUrl)) {
     return (
-      <p className="text-xs font-semibold text-amber-700">
+      <p className={compact ? "text-xs font-semibold text-amber-200" : "text-xs font-semibold text-amber-700"}>
         Payment pending — the organizer will confirm your USD 10 payment and add 3 more attempts.
       </p>
     );
@@ -43,15 +50,21 @@ export default function BuyExtraAttemptsButton({
         <button
           type="submit"
           disabled={pending}
-          className="rounded-md bg-red-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-600 disabled:opacity-60"
+          className={
+            compact
+              ? "rounded-md border border-white/70 bg-red-700/70 px-3 py-1.5 text-xs font-semibold text-white shadow hover:bg-red-600/80 disabled:opacity-60"
+              : "rounded-md bg-red-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-600 disabled:opacity-60"
+          }
         >
           {pending ? "Redirecting to payment…" : "Buy 3 more attempts — USD 10"}
         </button>
       </form>
-      <p className="mt-1 text-xs text-neutral-400">
-        Takes you to a secure Stripe checkout — 3 more delete-and-re-record chances are added to your
-        account the moment payment succeeds.
-      </p>
+      {!compact && (
+        <p className="mt-1 text-xs text-neutral-400">
+          Takes you to a secure Stripe checkout — 3 more delete-and-re-record chances are added to your
+          account the moment payment succeeds.
+        </p>
+      )}
     </div>
   );
 }
