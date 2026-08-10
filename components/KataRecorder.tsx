@@ -823,6 +823,24 @@ export default function KataRecorder({
     const recording = recorderRef.current?.state === "recording";
     if (!recording) {
       const cameraAspect = video.videoWidth / video.videoHeight;
+      // Re-measured directly every frame here, not just trusted from the
+      // ResizeObserver-fed ref below -- that effect only re-fires on an
+      // ACTUAL further resize of the element, so a single bad snapshot
+      // taken mid-transition (e.g. right as the countdown overlay's own
+      // buttons mount/unmount, or while requestFullscreen() is still
+      // settling) had nothing to correct it for the rest of that take.
+      // Intermittent squeezed recordings reported on a real device -- same
+      // phone, same session, one take squeezed and the next one correct --
+      // are exactly this: a stale one-off measurement getting frozen in by
+      // canvas.captureStream() at recording start. Re-measuring on every
+      // live frame instead means any bad reading self-corrects within one
+      // frame, well before a take actually begins.
+      if (containerRef.current) {
+        const liveRect = containerRef.current.getBoundingClientRect();
+        if (liveRect.width > 0 && liveRect.height > 0) {
+          containerBoxRef.current = { w: liveRect.width, h: liveRect.height };
+        }
+      }
       // Measured from the box the canvas is actually painted into, NOT from
       // window.innerWidth/innerHeight. Those are a second, independent
       // source of truth for "how big is the screen", and when they disagree
@@ -1423,8 +1441,12 @@ export default function KataRecorder({
           {error && (
             <div className="bg-red-50/95 px-4 py-2 text-sm text-red-800 backdrop-blur-sm">{error}</div>
           )}
-          {/* Temporary diagnostic -- see debugDims declaration above. */}
-          {(phase === "live" || phase === "countdown") && debugDims && (
+          {/* Temporary diagnostic -- see debugDims declaration above. Shown
+              through "review" too (frozen at whatever it last read right
+              before recording started, since the resize logic above stops
+              updating once recording begins) since that's the phase a
+              squeezed take actually gets noticed and screenshotted in. */}
+          {(phase === "live" || phase === "countdown" || phase === "review") && debugDims && (
             <div className="bg-black/50 px-2 py-0.5 text-[10px] text-white/70">{debugDims}</div>
           )}
           {phase === "recording" && (
