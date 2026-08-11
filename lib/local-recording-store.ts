@@ -21,6 +21,26 @@ interface StoredRecording {
   savedAt: number;
 }
 
+/** Fired after every save/clear so a listener rendered elsewhere on the
+ * page (UploadSavedRecording, a sibling of KataRecorder rather than a
+ * descendant of it) can react immediately -- without this, the "Upload
+ * saved recording" row only ever picked up a change on its own next mount
+ * (a full page navigation/reload), even though the save that triggered it
+ * happened this same page view. */
+const CHANGE_EVENT = "kata-local-recording-changed";
+
+function notifyChanged(registrationId: string) {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(CHANGE_EVENT, { detail: { registrationId } }));
+  }
+}
+
+export function onLocalRecordingChanged(handler: (registrationId: string) => void): () => void {
+  const listener = (e: Event) => handler((e as CustomEvent<{ registrationId: string }>).detail.registrationId);
+  window.addEventListener(CHANGE_EVENT, listener);
+  return () => window.removeEventListener(CHANGE_EVENT, listener);
+}
+
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
@@ -45,6 +65,7 @@ export async function saveLocalRecording(registrationId: string, blob: Blob, mim
       tx.onerror = () => reject(tx.error);
     });
     db.close();
+    notifyChanged(registrationId);
   } catch {
     // No local backup this time -- the participant still has the normal
     // upload path and, if they used it, their own device's Save option.
@@ -83,6 +104,7 @@ export async function clearLocalRecording(registrationId: string): Promise<void>
       tx.onerror = () => reject(tx.error);
     });
     db.close();
+    notifyChanged(registrationId);
   } catch {
     // Nothing to clean up if the store never worked in the first place.
   }

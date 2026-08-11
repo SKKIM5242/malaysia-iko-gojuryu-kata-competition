@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { submitKataVideo } from "@/app/actions/account";
 import { extensionForMimeType, bareMimeType } from "@/lib/media-recording";
-import { getLocalRecording, clearLocalRecording } from "@/lib/local-recording-store";
+import { getLocalRecording, clearLocalRecording, onLocalRecordingChanged } from "@/lib/local-recording-store";
 
 const ATTESTATION_TEXT =
   "I confirm this is my own previously recorded kata video, submitted without any editing. Any editing is subject to disqualification.";
@@ -34,11 +34,23 @@ export default function UploadSavedRecording({ registrationId }: { registrationI
 
   useEffect(() => {
     let cancelled = false;
-    getLocalRecording(registrationId).then((r) => {
-      if (!cancelled) setLocalBlob(r);
+    function refresh() {
+      getLocalRecording(registrationId).then((r) => {
+        if (!cancelled) setLocalBlob(r);
+      });
+    }
+    refresh();
+    // Tapping "Save to device" in KataRecorder happens in a sibling
+    // component, not a parent/child of this one -- without listening for
+    // its change event, this row would only ever pick up a fresh save on
+    // its own next mount (a full page navigation), even though the save
+    // just happened on this same page view.
+    const unsubscribe = onLocalRecordingChanged((changedId) => {
+      if (changedId === registrationId) refresh();
     });
     return () => {
       cancelled = true;
+      unsubscribe();
     };
   }, [registrationId]);
 

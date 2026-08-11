@@ -542,8 +542,19 @@ export default function KataRecorder({
   const [reviewCurrentTime, setReviewCurrentTime] = useState(0);
   const [reviewDuration, setReviewDuration] = useState(0);
   const [reviewMuted, setReviewMuted] = useState(false);
+  // Where the review <video>'s own visible picture actually sits within its
+  // box (top/height as percentages), computed from its real videoWidth /
+  // videoHeight against the box's own current shape -- the review file's
+  // aspect is frozen at record time, but the box can be a DIFFERENT shape
+  // by review time (most commonly the device got rotated in between), which
+  // is exactly when object-contain letterboxes it and the controls below
+  // used to float in that black gap instead of over the actual picture.
+  // Null until the first measurement lands, during which every consumer
+  // below falls back to the whole box (today's existing behaviour).
+  const [reviewContentRect, setReviewContentRect] = useState<{ top: number; height: number } | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const recordingBoxRef = useRef<HTMLDivElement>(null);
   // The recording box's REAL painted size, kept in a ref because
   // renderLoop re-schedules itself through requestAnimationFrame and would
   // otherwise read whatever value it closed over on its first frame. This
@@ -666,7 +677,18 @@ export default function KataRecorder({
       window.removeEventListener("resize", onResize);
       window.removeEventListener("orientationchange", onOrientationChange);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Re-measure the review video's own content rect on every viewport change
+  // (piggybacking on the resize/orientationchange handling above, rather
+  // than a second set of listeners) -- this is what keeps the review
+  // controls sitting on the actual picture through a rotation that happens
+  // WHILE reviewing, not just the one at record time.
+  useEffect(() => {
+    if (phase === "review" || phase === "uploading") updateReviewContentRect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewport, phase]);
 
   // Take the site's fixed footer out of the page entirely while full
   // screen is up (see app/globals.css). Cleaned up on exit AND on unmount,
@@ -1118,6 +1140,27 @@ export default function KataRecorder({
     }
   }
 
+  /** Re-derives reviewContentRect from the review video's real pixel shape
+   * against the box's CURRENT shape -- the same width-vs-height-constrained
+   * math object-contain itself uses, done here in JS because CSS has no way
+   * to hand that computed rect back to sibling elements (the button stack,
+   * the seek bar) that need to sit ON it rather than guess at it. */
+  function updateReviewContentRect() {
+    const video = reviewVideoRef.current;
+    const box = recordingBoxRef.current;
+    if (!video || !box || !video.videoWidth || !video.videoHeight) return;
+    const boxRect = box.getBoundingClientRect();
+    if (boxRect.width <= 0 || boxRect.height <= 0) return;
+    const videoAspect = video.videoWidth / video.videoHeight;
+    const boxAspect = boxRect.width / boxRect.height;
+    const contentHeightPx = videoAspect > boxAspect ? boxRect.width / videoAspect : boxRect.height;
+    const offsetYPx = (boxRect.height - contentHeightPx) / 2;
+    setReviewContentRect({
+      top: (offsetYPx / boxRect.height) * 100,
+      height: (contentHeightPx / boxRect.height) * 100,
+    });
+  }
+
   function toggleReviewPlayback() {
     const v = reviewVideoRef.current;
     if (!v) return;
@@ -1149,6 +1192,7 @@ export default function KataRecorder({
     setReviewPlaying(false);
     setReviewCurrentTime(0);
     setReviewDuration(0);
+    setReviewContentRect(null);
     recordedBlobRef.current = null;
     // The take being discarded is no longer a valid "saved recording" to
     // offer for upload later -- without this, a stale previous take could
@@ -1408,6 +1452,7 @@ export default function KataRecorder({
       )}
 
       <div
+        ref={recordingBoxRef}
         className={
           // h-full (not h-[100dvh]) -- this div's own parent (containerRef,
           // just above) is already `fixed inset-0`, which the browser
@@ -1494,7 +1539,13 @@ export default function KataRecorder({
               overlap the banner above it or the Kata Recording/Submit row
               below it -- normal document flow pushes both automatically,
               the same reason the rest of this stack never overlaps either. */}
-          {!fullscreen && phase !== "idle" && (
+          {/* Review/uploading are excluded from every piece below -- they
+              get their own independently-positioned stack (see just after
+              this div), sited on the review video's actual content rect
+              rather than bannerRatio (which describes the LIVE canvas
+              banner and has no relationship to a review file whose own
+              aspect can differ from the box's current shape). */}
+          {!fullscreen && phase !== "idle" && phase !== "review" && phase !== "uploading" && (
             <div className="flex justify-end px-2 pt-1">
               <button
                 type="button"
@@ -1505,7 +1556,7 @@ export default function KataRecorder({
               </button>
             </div>
           )}
-          {fullscreen && (
+          {fullscreen && phase !== "review" && phase !== "uploading" && (
             <div className="flex items-start justify-end gap-2 px-3 py-2 text-white" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.85)" }}>
               {/* Deleted Recording sits right under Exit full screen, in the
                   SAME row as the title, instead of its own row below --
@@ -1530,7 +1581,7 @@ export default function KataRecorder({
               </div>
             </div>
           )}
-          {error && (
+          {error && phase !== "review" && phase !== "uploading" && (
             <div className="bg-red-50/95 px-4 py-2 text-sm text-red-800 backdrop-blur-sm">{error}</div>
           )}
           {phase === "recording" && (
@@ -1543,53 +1594,82 @@ export default function KataRecorder({
               </div>
             </div>
           )}
-          {/* Delete & re-record / Submit sit just under the title, overlaid
-              on the replay itself, instead of a row below the video. Save
-              to device sits in its own row just above them -- a personal
-              backup copy for a poor-connection moment, not part of the
-              submit decision itself, so it reads as a separate action
-              rather than a third option alongside Delete/Submit. */}
-          {phase === "review" && (
-            <div className="flex flex-col items-center gap-1.5 px-3 pt-2">
-              <div className="flex w-full justify-center">
-                <button
-                  onClick={handleSaveToDevice}
-                  className="rounded-md border border-white/50 bg-black/40 px-3 py-1 text-xs font-semibold text-white shadow hover:bg-black/60"
-                >
-                  💾 Save to device
-                </button>
-              </div>
-              <div className="flex w-full items-center justify-between gap-2">
-                <button
-                  onClick={handleReRecord}
-                  disabled={!canReRecord}
-                  className="rounded-md border border-neutral-300 bg-white/90 px-3 py-1.5 text-xs font-semibold text-neutral-700 shadow hover:bg-white disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
-                >
-                  Delete &amp; re-record ({attemptsLeft} left)
-                </button>
-                <button
-                  onClick={() => {
-                    setAgreed(false);
-                    setAgreementOpen(true);
-                  }}
-                  className="rounded-md bg-red-700/90 px-4 py-1.5 text-xs font-semibold text-white shadow hover:bg-red-600 sm:text-sm"
-                >
-                  Submit this recording
-                </button>
-              </div>
-              {/* Buy more delete-and-re-record chances -- only reachable once
-                  the free 3 are gone. This used to live in the instructional
-                  text block above the recording area, which full screen mode
-                  now hides for the whole live/recording/review flow, making
-                  the button effectively unreachable right when it's actually
-                  needed. compact: no white card, no explanatory paragraph --
-                  the label alone is clear enough here. */}
-              {attemptsLeft <= 0 && (
-                <BuyExtraAttemptsButton registrationId={registrationId} hasPendingPurchase={hasPendingPurchase} compact />
-              )}
-            </div>
-          )}
         </div>
+        {/* Review/uploading's own control stack -- Exit full screen, Save to
+            device, Delete & re-record, and Submit all sit together here,
+            positioned on reviewContentRect (the review video's REAL visible
+            picture, not the raw box) so they land on the actual recording
+            instead of floating in a letterboxed black gap above/below it
+            when the box and the recorded file's own aspect don't match
+            (typically the device rotated in between recording and
+            reviewing). All four hide while the replay is actually playing
+            (nothing to act on until it's paused or has ended) and reappear
+            the instant it isn't -- the seek bar below is a SEPARATE stack
+            and stays up throughout, since pause/seek/mute need to stay
+            reachable while playing. */}
+        {(phase === "review" || phase === "uploading") && !reviewPlaying && (
+          <div
+            className="absolute inset-x-0 z-20 flex flex-col gap-1.5 px-3 pt-2"
+            style={{ top: `${reviewContentRect?.top ?? 0}%` }}
+          >
+            <div className="flex items-center justify-between gap-2">
+              {fullscreen ? (
+                <button
+                  type="button"
+                  onClick={exitFullscreen}
+                  className="rounded border border-white/50 bg-black/60 px-2.5 py-1 text-xs font-semibold text-white hover:bg-black/80"
+                >
+                  ✕ Exit full screen
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={enterFullscreen}
+                  className="rounded border border-white/50 bg-black/60 px-2.5 py-1 text-xs font-semibold text-white hover:bg-black/80"
+                >
+                  ⛶ Full screen
+                </button>
+              )}
+              <button
+                onClick={handleSaveToDevice}
+                className="rounded-md border border-white/50 bg-black/60 px-3 py-1 text-xs font-semibold text-white shadow hover:bg-black/80"
+              >
+                💾 Save to device
+              </button>
+            </div>
+            {error && (
+              <div className="rounded bg-red-50/95 px-4 py-2 text-sm text-red-800 backdrop-blur-sm">{error}</div>
+            )}
+            <div className="flex w-full items-center justify-between gap-2">
+              <button
+                onClick={handleReRecord}
+                disabled={!canReRecord}
+                className="rounded-md border border-neutral-300 bg-white/90 px-3 py-1.5 text-xs font-semibold text-neutral-700 shadow hover:bg-white disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
+              >
+                Delete &amp; re-record ({attemptsLeft} left)
+              </button>
+              <button
+                onClick={() => {
+                  setAgreed(false);
+                  setAgreementOpen(true);
+                }}
+                className="rounded-md bg-red-700/90 px-4 py-1.5 text-xs font-semibold text-white shadow hover:bg-red-600 sm:text-sm"
+              >
+                Submit this recording
+              </button>
+            </div>
+            {/* Buy more delete-and-re-record chances -- only reachable once
+                the free 3 are gone. This used to live in the instructional
+                text block above the recording area, which full screen mode
+                now hides for the whole live/recording/review flow, making
+                the button effectively unreachable right when it's actually
+                needed. compact: no white card, no explanatory paragraph --
+                the label alone is clear enough here. */}
+            {attemptsLeft <= 0 && (
+              <BuyExtraAttemptsButton registrationId={registrationId} hasPendingPurchase={hasPendingPurchase} compact />
+            )}
+          </div>
+        )}
         <video ref={videoRef} playsInline muted className="hidden" />
         <canvas
           ref={canvasRef}
@@ -1649,6 +1729,10 @@ export default function KataRecorder({
               onContextMenu={(e) => e.preventDefault()}
               onLoadedMetadata={(e) => {
                 const v = e.currentTarget;
+                // First point videoWidth/videoHeight are actually known --
+                // the one moment reviewContentRect can be computed from
+                // real data instead of the whole-box fallback.
+                updateReviewContentRect();
                 if (Number.isFinite(v.duration)) {
                   setReviewDuration(v.duration);
                   return;
@@ -1678,13 +1762,20 @@ export default function KataRecorder({
                 // ambiguity about the video's own play/replay icon ever
                 // sitting in front of Delete/Submit or the seek bar,
                 // including right as the replay ends and this button
-                // reappears.
-                className="absolute left-1/2 top-1/2 z-10 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-3xl text-white shadow-lg"
+                // reappears. top is the vertical CENTER of the actual
+                // picture (reviewContentRect), not the whole box, so a
+                // letterboxed review doesn't leave this floating off to one
+                // side of the video it controls.
+                className="absolute left-1/2 z-10 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-3xl text-white shadow-lg"
+                style={{ top: `${(reviewContentRect?.top ?? 0) + (reviewContentRect?.height ?? 100) / 2}%` }}
               >
                 ▶
               </button>
             )}
-            <div className="absolute inset-x-0 bottom-0 z-20 flex flex-col gap-1.5 bg-gradient-to-t from-black/75 to-transparent px-3 pb-3 pt-10">
+            <div
+              className="absolute inset-x-0 z-20 flex flex-col gap-1.5 bg-gradient-to-t from-black/75 to-transparent px-3 pb-3 pt-10"
+              style={{ bottom: `${100 - (reviewContentRect ? reviewContentRect.top + reviewContentRect.height : 100)}%` }}
+            >
               <input
                 type="range"
                 min={0}
