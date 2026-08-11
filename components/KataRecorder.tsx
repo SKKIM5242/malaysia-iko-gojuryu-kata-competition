@@ -1211,8 +1211,23 @@ export default function KataRecorder({
   function toggleReviewPlayback() {
     const v = reviewVideoRef.current;
     if (!v) return;
-    if (v.paused || v.ended) void v.play();
-    else v.pause();
+    if (v.ended) {
+      // Calling play() while currentTime is still sitting at duration
+      // doesn't restart playback -- most browsers just fire "play" once,
+      // with nothing left to actually play, and never fire "ended" again
+      // since no further time-to-end transition happens. That's exactly
+      // why the 4-button row (which listens for onEnded/onPause to know
+      // when to reappear) came back after the FIRST watch-through but not
+      // the second or third -- there was never a second "ended" event to
+      // hear. Seeking back to 0 first guarantees a real play-through, and
+      // a real "ended" event, every single time.
+      v.currentTime = 0;
+      void v.play();
+    } else if (v.paused) {
+      void v.play();
+    } else {
+      v.pause();
+    }
   }
 
   function toggleReviewMute() {
@@ -1826,6 +1841,20 @@ export default function KataRecorder({
               className="absolute inset-x-0 z-20 flex flex-col gap-1.5 bg-gradient-to-t from-black/75 to-transparent px-3 pb-3 pt-10"
               style={{ bottom: `${100 - (reviewContentRect ? reviewContentRect.top + reviewContentRect.height : 100)}%` }}
             >
+              {/* Was a SEPARATE element pinned at a flat bottom-20 -- it
+                  never moved together with this bar once the bar started
+                  tracking reviewContentRect instead of a flat offset, which
+                  is exactly what could leave it misaligned or overlapping
+                  in landscape. Now it's one row in the SAME bar, so it's
+                  always wherever the rest of these controls are. */}
+              {recordingStartedAt && (
+                <p
+                  className="pointer-events-none text-center text-xs font-semibold text-white"
+                  style={{ textShadow: "0 1px 3px rgba(0,0,0,0.85)" }}
+                >
+                  Recording dated {formatDateTime(recordingStartedAt.toISOString())}
+                </p>
+              )}
               <input
                 type="range"
                 min={0}
@@ -1968,20 +1997,6 @@ export default function KataRecorder({
               ⛶
             </button>
           )}
-        {/* Only shown once there's an actual submitted/reviewable take --
-            bottom-center, plain white text (no background box) so it reads
-            as part of the recording itself. Sits above the custom seek/
-            play/mute bar now (that bar occupies roughly the bottom ~90px),
-            not right above the burned-in watermark as before -- the bar's
-            own gradient already covers that area. */}
-        {phase === "review" && recordingStartedAt && (
-          <div
-            className="pointer-events-none absolute inset-x-0 bottom-20 text-center text-xs font-semibold text-white"
-            style={{ textShadow: "0 1px 3px rgba(0,0,0,0.85)" }}
-          >
-            Recording dated {formatDateTime(recordingStartedAt.toISOString())}
-          </div>
-        )}
       </div>
 
       {/* "Enable camera" now lives inside the preview box itself (right
