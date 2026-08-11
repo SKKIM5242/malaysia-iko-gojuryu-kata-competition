@@ -2,6 +2,7 @@
 
 import { claimAndStartRecording } from "@/app/actions/account";
 import { formatDateWithDay } from "@/components/ui";
+import UploadSavedRecording from "@/components/UploadSavedRecording";
 
 export interface PendingRegistration {
   id: string;
@@ -144,6 +145,10 @@ export default function PendingRecordingsList({ items }: { items: PendingRegistr
                   )}
                 </li>
               ))}
+              {/* One extra row per item that actually has a device-local
+                  recording waiting -- renders nothing of its own otherwise,
+                  so a tier with nothing saved never grows an empty row. */}
+              {status === "open" && g.items.map((item) => <UploadSavedRecording key={`upload-${item.id}`} registrationId={item.id} />)}
             </ul>
             {status === "not_yet_open" && (
               <p className="mt-3 text-xs text-amber-800">

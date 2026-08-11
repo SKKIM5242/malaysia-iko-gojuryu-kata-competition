@@ -8,6 +8,7 @@ import { formatDate, formatDateTime } from "@/components/ui";
 import { pickVideoMimeType as pickMimeType, extensionForMimeType, bareMimeType } from "@/lib/media-recording";
 import { playDingDong, playAlarmTick } from "@/lib/chime";
 import { startClapDetector } from "@/lib/clap-detector";
+import { saveLocalRecording, clearLocalRecording } from "@/lib/local-recording-store";
 import type { WatermarkSettings } from "@/lib/watermark";
 
 const MAX_SECONDS = 5 * 60;
@@ -1056,6 +1057,12 @@ export default function KataRecorder({
         }
         const blob = new Blob(chunksRef.current, { type: mimeType });
         recordedBlobRef.current = blob;
+        // Cached locally the instant a take finishes, before the
+        // participant has even tapped Submit -- if the actual submit later
+        // fails on a bad connection, this backup already exists and can be
+        // retried from the pending-recordings list without re-recording.
+        // Cleared again once a submission actually succeeds (handleSubmit).
+        saveLocalRecording(registrationId, blob, mimeType).catch(() => {});
         const url = URL.createObjectURL(blob);
         // Grab the canvas's own last-drawn frame synchronously, right now --
         // it already has the banner/watermark burned in, same as every frame
@@ -1143,7 +1150,44 @@ export default function KataRecorder({
     setReviewCurrentTime(0);
     setReviewDuration(0);
     recordedBlobRef.current = null;
+    // The take being discarded is no longer a valid "saved recording" to
+    // offer for upload later -- without this, a stale previous take could
+    // sit in local storage and get submitted by mistake from the pending
+    // list while a fresh one is being recorded here.
+    void clearLocalRecording(registrationId);
     setPhase("live");
+  }
+
+  /** Puts a copy of the just-recorded take directly into the participant's
+   * own device (their Photos/video album, via the native share sheet where
+   * available) -- purely a personal backup for a poor-connection moment,
+   * independent of the automatic local cache above (which this component
+   * already keeps for the in-app retry path). Failure here is silent: the
+   * automatic cache already covers the retry case, so a share-sheet
+   * cancellation or an unsupported browser isn't a real error. */
+  async function handleSaveToDevice() {
+    const blob = recordedBlobRef.current;
+    if (!blob) return;
+    const file = new File([blob], `kata-recording.${extensionForMimeType(blob.type)}`, {
+      type: bareMimeType(blob.type || "video/webm"),
+    });
+    try {
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: "Kata recording" });
+        return;
+      }
+    } catch {
+      // Share sheet cancelled or unsupported -- fall through to a direct
+      // download instead of leaving the tap looking like it did nothing.
+    }
+    const url = URL.createObjectURL(file);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = file.name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   }
 
   async function handleSubmit() {
@@ -1190,6 +1234,7 @@ export default function KataRecorder({
       }
       streamRef.current?.getTracks().forEach((t) => t.stop());
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      void clearLocalRecording(registrationId);
       setPhase("done");
     } catch {
       setError("Something went wrong submitting your recording. Please try again.");
@@ -1499,9 +1544,21 @@ export default function KataRecorder({
             </div>
           )}
           {/* Delete & re-record / Submit sit just under the title, overlaid
-              on the replay itself, instead of a row below the video. */}
+              on the replay itself, instead of a row below the video. Save
+              to device sits in its own row just above them -- a personal
+              backup copy for a poor-connection moment, not part of the
+              submit decision itself, so it reads as a separate action
+              rather than a third option alongside Delete/Submit. */}
           {phase === "review" && (
             <div className="flex flex-col items-center gap-1.5 px-3 pt-2">
+              <div className="flex w-full justify-center">
+                <button
+                  onClick={handleSaveToDevice}
+                  className="rounded-md border border-white/50 bg-black/40 px-3 py-1 text-xs font-semibold text-white shadow hover:bg-black/60"
+                >
+                  💾 Save to device
+                </button>
+              </div>
               <div className="flex w-full items-center justify-between gap-2">
                 <button
                   onClick={handleReRecord}
