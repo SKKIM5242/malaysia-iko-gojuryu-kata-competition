@@ -583,6 +583,14 @@ export default function KataRecorder({
   // orientation.
   const [videoAspect, setVideoAspect] = useState<number | null>(null);
   const videoAspectRef = useRef(0);
+  // TEMPORARY diagnostic -- a participant confirmed the video picture fills
+  // the screen correctly but the button row still doesn't line up with it,
+  // which rules out the canvas/box aspect mismatch this file's other recent
+  // fix targets (that fix is a no-op whenever the two already agree, which
+  // they do here). Shows the actual numbers from a real device instead of
+  // guessing at another fix blind. Remove once the real cause is found.
+  const [debugBanner, setDebugBanner] = useState("");
+  const debugBannerRef = useRef("");
   // How tall the burned-in header banner actually came out (as a fraction
   // of frame height), reported back by drawFrame -- the DOM title bar below
   // uses this to sit directly under the real banner instead of a fixed
@@ -1011,6 +1019,13 @@ export default function KataRecorder({
         if (Math.abs(bannerRatioRef.current - finalRatio) > 0.002) {
           bannerRatioRef.current = finalRatio;
           setBannerRatio(finalRatio);
+        }
+        const dbg =
+          `canvas ${canvas.width}x${canvas.height} box ${Math.round(liveBoxRect?.width ?? 0)}x${Math.round(liveBoxRect?.height ?? 0)} ` +
+          `raw ${bannerRatioOfCanvas.toFixed(3)} final ${finalRatio.toFixed(3)} rec ${recorderRef.current?.state ?? "none"}`;
+        if (dbg !== debugBannerRef.current) {
+          debugBannerRef.current = dbg;
+          setDebugBanner(dbg);
         }
       }
     }
@@ -1615,6 +1630,9 @@ export default function KataRecorder({
           )}
           {error && phase !== "review" && phase !== "uploading" && (
             <div className="bg-red-50/95 px-4 py-2 text-sm text-red-800 backdrop-blur-sm">{error}</div>
+          )}
+          {(phase === "live" || phase === "countdown" || phase === "recording") && debugBanner && (
+            <div className="bg-black/60 px-2 py-0.5 text-[10px] text-white/80">{debugBanner}</div>
           )}
           {phase === "recording" && (
             <div className="flex flex-wrap gap-1.5 px-2 pt-1">
