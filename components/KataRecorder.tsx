@@ -548,17 +548,6 @@ export default function KataRecorder({
   const [reviewCurrentTime, setReviewCurrentTime] = useState(0);
   const [reviewDuration, setReviewDuration] = useState(0);
   const [reviewMuted, setReviewMuted] = useState(false);
-  // Where the review <video>'s own visible picture actually sits within its
-  // box (top/height as percentages), computed from its real videoWidth /
-  // videoHeight against the box's own current shape -- the review file's
-  // aspect is frozen at record time, but the box can be a DIFFERENT shape
-  // by review time (most commonly the device got rotated in between), which
-  // is exactly when object-contain letterboxes it and the controls below
-  // used to float in that black gap instead of over the actual picture.
-  // Null until the first measurement lands, during which every consumer
-  // below falls back to the whole box (today's existing behaviour).
-  const [reviewContentRect, setReviewContentRect] = useState<{ top: number; height: number } | null>(null);
-
   const containerRef = useRef<HTMLDivElement>(null);
   const recordingBoxRef = useRef<HTMLDivElement>(null);
   // The recording box's REAL painted size, kept in a ref because
@@ -699,16 +688,6 @@ export default function KataRecorder({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Re-measure the review video's own content rect on every viewport change
-  // (piggybacking on the resize/orientationchange handling above, rather
-  // than a second set of listeners) -- this is what keeps the review
-  // controls sitting on the actual picture through a rotation that happens
-  // WHILE reviewing, not just the one at record time.
-  useEffect(() => {
-    if (phase === "review" || phase === "uploading") updateReviewContentRect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewport, phase]);
 
   // Take the site's fixed footer out of the page entirely while full
   // screen is up (see app/globals.css). Cleaned up on exit AND on unmount,
@@ -1193,27 +1172,6 @@ export default function KataRecorder({
     }
   }
 
-  /** Re-derives reviewContentRect from the review video's real pixel shape
-   * against the box's CURRENT shape -- the same width-vs-height-constrained
-   * math object-contain itself uses, done here in JS because CSS has no way
-   * to hand that computed rect back to sibling elements (the button stack,
-   * the seek bar) that need to sit ON it rather than guess at it. */
-  function updateReviewContentRect() {
-    const video = reviewVideoRef.current;
-    const box = recordingBoxRef.current;
-    if (!video || !box || !video.videoWidth || !video.videoHeight) return;
-    const boxRect = box.getBoundingClientRect();
-    if (boxRect.width <= 0 || boxRect.height <= 0) return;
-    const videoAspect = video.videoWidth / video.videoHeight;
-    const boxAspect = boxRect.width / boxRect.height;
-    const contentHeightPx = videoAspect > boxAspect ? boxRect.width / videoAspect : boxRect.height;
-    const offsetYPx = (boxRect.height - contentHeightPx) / 2;
-    setReviewContentRect({
-      top: (offsetYPx / boxRect.height) * 100,
-      height: (contentHeightPx / boxRect.height) * 100,
-    });
-  }
-
   function toggleReviewPlayback() {
     const v = reviewVideoRef.current;
     if (!v) return;
@@ -1260,7 +1218,6 @@ export default function KataRecorder({
     setReviewPlaying(false);
     setReviewCurrentTime(0);
     setReviewDuration(0);
-    setReviewContentRect(null);
     recordedBlobRef.current = null;
     // The take being discarded is no longer a valid "saved recording" to
     // offer for upload later -- without this, a stale previous take could
@@ -1649,7 +1606,7 @@ export default function KataRecorder({
               of this stack, right under the identity row, rather than
               floating up against the banner where Exit full screen now
               sits (see the independent block above this whole stack). */}
-          {(phase === "live" || phase === "countdown" || phase === "recording") && debugBanner && (
+          {(phase === "live" || phase === "countdown") && debugBanner && (
             <div className="px-2 py-0.5 text-[10px] text-white/80" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.85)" }}>
               {debugBanner}
             </div>
@@ -1666,21 +1623,28 @@ export default function KataRecorder({
           )}
         </div>
         {/* Review/uploading's own control stack -- Exit full screen, Save to
-            device, Delete & re-record, and Submit all sit together here,
-            positioned on reviewContentRect (the review video's REAL visible
-            picture, not the raw box) so they land on the actual recording
-            instead of floating in a letterboxed black gap above/below it
-            when the box and the recorded file's own aspect don't match
-            (typically the device rotated in between recording and
-            reviewing). All four hide while the replay is actually playing
-            (nothing to act on until it's paused or has ended) and reappear
-            the instant it isn't -- the seek bar below is a SEPARATE stack
-            and stays up throughout, since pause/seek/mute need to stay
-            reachable while playing. */}
+            device, Delete & re-record, and Submit all sit together here.
+            Positioned off bannerRatio (same reference the live/recording
+            controls use, and just as continuously self-correcting -- the
+            render loop keeps drawing the live camera feed to the canvas
+            underneath even during review, in case of a re-record, so this
+            value never goes stale) plus a fixed two-row offset on request,
+            rather than a one-off measurement of the review video's own
+            rendered rect: that measurement only ever recomputed on a
+            genuine viewport-resize event, which on a real device can also
+            fire mid-playback (iOS Safari's chrome hiding/showing as a video
+            plays, in particular) -- landing on a bad reading at exactly the
+            wrong moment left the whole control stack, seek bar included,
+            stuck invisible with no further trigger to correct it. All four
+            hide while the replay is actually playing (nothing to act on
+            until it's paused or has ended) and reappear the instant it
+            isn't -- the seek bar below is a SEPARATE stack and stays up
+            throughout, since pause/seek/mute need to stay reachable while
+            playing. */}
         {(phase === "review" || phase === "uploading") && !reviewPlaying && (
           <div
             className="absolute inset-x-0 z-20 flex flex-col gap-1.5 px-3 pt-2"
-            style={{ top: `${reviewContentRect?.top ?? 0}%` }}
+            style={{ top: `calc(${bannerRatio * 100}% + 3.5rem)` }}
           >
             <div className="flex items-center justify-between gap-2">
               {fullscreen ? (
@@ -1799,10 +1763,6 @@ export default function KataRecorder({
               onContextMenu={(e) => e.preventDefault()}
               onLoadedMetadata={(e) => {
                 const v = e.currentTarget;
-                // First point videoWidth/videoHeight are actually known --
-                // the one moment reviewContentRect can be computed from
-                // real data instead of the whole-box fallback.
-                updateReviewContentRect();
                 if (Number.isFinite(v.duration)) {
                   setReviewDuration(v.duration);
                   return;
@@ -1832,26 +1792,17 @@ export default function KataRecorder({
                 // ambiguity about the video's own play/replay icon ever
                 // sitting in front of Delete/Submit or the seek bar,
                 // including right as the replay ends and this button
-                // reappears. top is the vertical CENTER of the actual
-                // picture (reviewContentRect), not the whole box, so a
-                // letterboxed review doesn't leave this floating off to one
-                // side of the video it controls.
-                className="absolute left-1/2 z-10 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-3xl text-white shadow-lg"
-                style={{ top: `${(reviewContentRect?.top ?? 0) + (reviewContentRect?.height ?? 100) / 2}%` }}
+                // reappears.
+                className="absolute left-1/2 top-1/2 z-10 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-3xl text-white shadow-lg"
               >
                 ▶
               </button>
             )}
-            <div
-              className="absolute inset-x-0 z-20 flex flex-col gap-1.5 bg-gradient-to-t from-black/75 to-transparent px-3 pb-3 pt-10"
-              style={{ bottom: `${100 - (reviewContentRect ? reviewContentRect.top + reviewContentRect.height : 100)}%` }}
-            >
-              {/* Was a SEPARATE element pinned at a flat bottom-20 -- it
-                  never moved together with this bar once the bar started
-                  tracking reviewContentRect instead of a flat offset, which
-                  is exactly what could leave it misaligned or overlapping
-                  in landscape. Now it's one row in the SAME bar, so it's
-                  always wherever the rest of these controls are. */}
+            <div className="absolute inset-x-0 bottom-0 z-20 flex flex-col gap-1.5 bg-gradient-to-t from-black/75 to-transparent px-3 pb-3 pt-10">
+              {/* Was a SEPARATE element pinned at its own flat bottom-20 --
+                  now it's one row in this SAME bar, so it always moves
+                  together with the rest of these controls instead of
+                  drifting independently. */}
               {recordingStartedAt && (
                 <p
                   className="pointer-events-none text-center text-xs font-semibold text-white"
