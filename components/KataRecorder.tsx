@@ -698,6 +698,17 @@ export default function KataRecorder({
     return () => document.body.classList.remove("kata-recorder-fullscreen");
   }, [fullscreen]);
 
+  // Same reasoning as scrollRecorderIntoView, for the case where a take
+  // ENDS outside full screen (the recording stopped on its own, or full
+  // screen was already exited): the review controls appear on a box that's
+  // far below the fold, so without this they're invisible until the
+  // participant happens to scroll down and find them.
+  useEffect(() => {
+    if (fullscreen || phase !== "review") return;
+    scrollRecorderIntoView();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fullscreen, phase]);
+
   // Track the recording box's real size. A ResizeObserver rather than the
   // window resize handler above: this fires for every reason the box's own
   // size can change -- rotation, browser UI appearing or retracting,
@@ -830,9 +841,30 @@ export default function KataRecorder({
     else if (el?.webkitRequestFullscreen) void el.webkitRequestFullscreen().catch(() => {});
   }
 
+  /** Brings the recording box (and therefore every control layered on it)
+   * back into view. Outside full screen the box sits in normal page flow,
+   * BELOW the two instruction blocks -- measured on a 812x375 landscape
+   * phone that puts it over 1100px down the page, roughly three screenfuls
+   * past the fold. The controls are all present and clickable there, but a
+   * participant looking at the instructions can't see any of them, which
+   * reads exactly like the buttons never appeared. */
+  function scrollRecorderIntoView() {
+    // setTimeout rather than requestAnimationFrame: rAF is throttled to
+    // zero whenever the tab isn't actively compositing, and the scroll then
+    // simply never happens. Two attempts because the box only settles into
+    // its final non-fullscreen size once React has committed the layout
+    // change AND the render loop has re-measured it -- scrolling to a
+    // half-sized box would land short. Instant, not smooth: a smooth scroll
+    // that gets interrupted leaves the page parked halfway there.
+    const scroll = () => recordingBoxRef.current?.scrollIntoView({ block: "center" });
+    setTimeout(scroll, 60);
+    setTimeout(scroll, 300);
+  }
+
   function exitFullscreen() {
     setFullscreen(false);
     if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+    scrollRecorderIntoView();
   }
 
   async function startCamera() {
@@ -1616,9 +1648,10 @@ export default function KataRecorder({
               <div className="inline-flex items-center gap-1.5 rounded-full bg-black/70 px-2.5 py-0.5 text-xs font-semibold text-white">
                 <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" /> LIVE REC {mm}:{ss} / 05:00
               </div>
-              <div className="inline-flex items-center gap-1 rounded-full bg-black/70 px-2.5 py-0.5 text-xs font-semibold text-white">
-                👏 Clap to stop
-              </div>
+              {/* "Clap to stop" used to sit here beside the LIVE REC chip --
+                  moved down beside the Stop button itself (see the recording
+                  block further below), since it describes the alternative to
+                  pressing that button and reads better right next to it. */}
             </div>
           )}
         </div>
@@ -1928,14 +1961,23 @@ export default function KataRecorder({
             </button>
           </div>
         )}
+        {/* Stop button with the clap hint directly underneath it -- same
+            bottom-3 flex-col shape the live phase uses for its own Start
+            button, so the two phases' controls sit in exactly the same
+            place instead of jumping when recording begins. */}
         {phase === "recording" && (
-          <button
-            onClick={stopRecording}
-            aria-label="Stop recording"
-            className="absolute bottom-10 left-1/2 flex h-16 w-16 -translate-x-1/2 items-center justify-center rounded-full border-4 border-white/80 bg-neutral-900/90 text-2xl text-white shadow-lg active:scale-95"
-          >
-            ■
-          </button>
+          <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 flex-col items-center gap-2">
+            <button
+              onClick={stopRecording}
+              aria-label="Stop recording"
+              className="flex h-16 w-16 items-center justify-center rounded-full border-4 border-white/80 bg-neutral-900/90 text-2xl text-white shadow-lg active:scale-95"
+            >
+              ■
+            </button>
+            <div className="inline-flex items-center gap-1 rounded-full bg-black/70 px-2.5 py-0.5 text-xs font-semibold text-white">
+              👏 Clap to stop
+            </div>
+          </div>
         )}
         {/* Manual way back into full screen after tapping "Exit full
             screen" -- without this there was no way back in short of
