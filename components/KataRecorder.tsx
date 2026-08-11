@@ -224,6 +224,12 @@ function drawBannerRect(ctx: CanvasRenderingContext2D, w: number, topH: number) 
  * is the screen's shape), no preview-only crop (the crop happens here, in
  * the recorded pixels), and no stretching (a center crop preserves the
  * camera's proportions). */
+/** bannerRatio: fraction of h taken up by the burned banner PLUS the
+ * identity (name/category) overlay below it -- where the DOM controls that
+ * belong below both need to start. bannerOnlyRatio: fraction of h taken up
+ * by the banner alone -- where controls that belong right under the
+ * banner but ABOVE the identity overlay (Exit full screen, moved there on
+ * request to sit one row higher than the identity text) need to start. */
 function drawFrame(
   ctx: CanvasRenderingContext2D,
   video: HTMLVideoElement,
@@ -232,7 +238,7 @@ function drawFrame(
   watermark: WatermarkSettings,
   participantName: string,
   categoryName: string,
-): number {
+): { bannerRatio: number; bannerOnlyRatio: number } {
   const srcW = video.videoWidth;
   const srcH = video.videoHeight;
   const canvasAspect = w / h;
@@ -307,7 +313,7 @@ function drawFrame(
 
     drawWatermark(ctx, w, h, watermark);
     const identityH = drawIdentityOverlay(ctx, w, h, topH, participantName, categoryName);
-    return (topH + identityH) / h;
+    return { bannerRatio: (topH + identityH) / h, bannerOnlyRatio: topH / h };
   }
 
   // Landscape: single-line layout, banner height taken from the frame's own
@@ -337,7 +343,7 @@ function drawFrame(
 
   drawWatermark(ctx, w, h, watermark);
   const identityH = drawIdentityOverlay(ctx, w, h, topH, participantName, categoryName);
-  return (topH + identityH) / h;
+  return { bannerRatio: (topH + identityH) / h, bannerOnlyRatio: topH / h };
 }
 
 /** Row 1: participant name (bold, clearly readable). Row 2+: kata/category,
@@ -598,6 +604,12 @@ export default function KataRecorder({
   // orientation and how much the banner's own text needed to shrink.
   const [bannerRatio, setBannerRatio] = useState(0.13);
   const bannerRatioRef = useRef(0.13);
+  // Where Exit full screen + the deleted-recording counter sit -- one row
+  // higher than bannerRatio (which is banner + identity/name-category
+  // combined), so this cluster lands right under the main banner instead
+  // of below the name/category text too.
+  const [bannerOnlyRatio, setBannerOnlyRatio] = useState(0.08);
+  const bannerOnlyRatioRef = useRef(0.08);
   // CSS `aspect-ratio` on a plain block element doesn't shrink-to-fit the
   // way it does on a replaced element (img/video) -- a statically-positioned
   // div with width:auto fills its container's full width first, THEN derives
@@ -877,6 +889,22 @@ export default function KataRecorder({
     }
   }
 
+  /** Backs out of an enabled-but-not-yet-recording camera session -- stops
+   * the stream (so the camera/mic indicator actually turns off), cancels
+   * the render loop, leaves full screen, and drops back to the same idle
+   * "Enable camera" screen this all started from. Only reachable during
+   * "live" (before the countdown/recording commits to anything), which is
+   * also the only phase that had no way back out short of leaving the page
+   * entirely. */
+  function disableCamera() {
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    exitFullscreen();
+    setError(null);
+    setPhase("idle");
+  }
+
   function renderLoop() {
     const video = videoRef.current;
     const canvas = canvasRef.current;
@@ -889,14 +917,18 @@ export default function KataRecorder({
       rafRef.current = requestAnimationFrame(renderLoop);
       return;
     }
-    // Shape the canvas like the screen it's being displayed on, and let
-    // drawFrame center-crop the camera into that shape. The canvas is both
-    // what's shown AND (via captureStream) what's recorded, so making it
-    // the screen's shape is what delivers full-bleed with no black bars
-    // and what-you-see-is-what-you-record at the same time -- the earlier
-    // approaches could only ever buy one at the other's expense, because
-    // they left the canvas at the camera's shape and then argued about how
-    // to display a mismatched picture.
+    // Shape the canvas EXACTLY like the camera's own delivered frame -- no
+    // cropping to match the screen's shape. This used to crop toward the
+    // screen's own aspect (down to 68% of the camera's frame kept, as a
+    // backstop) specifically to avoid letterbox bars, but that crop is
+    // what a participant sees as their own recording looking artificially
+    // zoomed in / narrower than what their camera actually sees -- the
+    // participant explicitly asked for their camera's true field of view
+    // over avoiding letterbox bars, so this no longer trades one for the
+    // other. Whatever letterboxing results from a camera/screen aspect
+    // mismatch is handled by the DOM controls tracking the canvas's real
+    // rendered position within the box (see the bannerRatio conversion
+    // below), not by cropping the picture itself.
     //
     // Resizing a canvas mid-recording disturbs the track captureStream()
     // is feeding MediaRecorder, so once a take is rolling the shape is
@@ -904,62 +936,22 @@ export default function KataRecorder({
     // started with rather than corrupting the recording).
     const recording = recorderRef.current?.state === "recording";
     if (!recording) {
-      const cameraAspect = video.videoWidth / video.videoHeight;
-      // Re-measured directly every frame here, not just trusted from the
-      // ResizeObserver-fed ref below -- that effect only re-fires on an
-      // ACTUAL further resize of the element, so a single bad snapshot
-      // taken mid-transition (e.g. right as the countdown overlay's own
-      // buttons mount/unmount, or while requestFullscreen() is still
-      // settling) had nothing to correct it for the rest of that take.
-      // Intermittent squeezed recordings reported on a real device -- same
-      // phone, same session, one take squeezed and the next one correct --
-      // are exactly this: a stale one-off measurement getting frozen in by
-      // canvas.captureStream() at recording start. Re-measuring on every
-      // live frame instead means any bad reading self-corrects within one
-      // frame, well before a take actually begins.
+      // Still re-measured every frame -- containerBoxRef feeds the
+      // bannerRatio-to-box conversion below regardless of whether the
+      // canvas itself is cropped to it.
       if (containerRef.current) {
         const liveRect = containerRef.current.getBoundingClientRect();
         if (liveRect.width > 0 && liveRect.height > 0) {
           containerBoxRef.current = { w: liveRect.width, h: liveRect.height };
         }
       }
-      // Measured from the box the canvas is actually painted into, NOT from
-      // window.innerWidth/innerHeight. Those are a second, independent
-      // source of truth for "how big is the screen", and when they disagree
-      // with the real `fixed inset-0` box even slightly -- which they do
-      // wherever the visual and layout viewports differ, mobile browser UI
-      // and emulated device toolbars included -- object-contain faithfully
-      // letterboxes the difference. That mismatch is the residual black
-      // band along the bottom on iPhone SE and XR in portrait. Measuring
-      // the element itself makes the canvas match its container by
-      // construction, so there is nothing left to letterbox.
-      const box = containerBoxRef.current;
-      const screenAspect =
-        fullscreenRef.current && box.w > 0 && box.h > 0 ? box.w / box.h : cameraAspect;
-      // How much of the camera frame we must keep. Below this the canvas
-      // stops matching the box and the display letterboxes the difference.
-      //
-      // This is the backstop for a camera that can only deliver its native
-      // aspect ratio and ignores the shape we asked for; when the camera
-      // does honour the request there's no mismatch and it never binds.
-      // It was 0.85, which was far too strict to be a backstop: a phone in
-      // LANDSCAPE has a very wide box (iPhone XR 2.16, Pixel 2.22, Z Fold
-      // 2.56) and filling it from a 16:9 frame keeps 82%, 80% and 69%
-      // respectively -- all of which 0.85 refused, which is why landscape
-      // still had bars down both sides after every earlier fix. 0.68
-      // clears every device in the organizer's list.
-      //
-      // Cropping this hard is safe here in a way it wouldn't be otherwise,
-      // because the preview is what gets recorded: a participant framed
-      // too tight sees it live and steps back, rather than finding out
-      // afterwards.
-      const MIN_FRAME_KEPT = 0.68;
-      const targetAspect = Math.min(
-        Math.max(screenAspect, cameraAspect * MIN_FRAME_KEPT),
-        cameraAspect / MIN_FRAME_KEPT,
-      );
-      // Largest region of the source frame matching targetAspect, so the
-      // canvas never upscales beyond what the camera actually delivered.
+      const targetAspect = video.videoWidth / video.videoHeight;
+      // No cropping: canvas dimensions are the camera's own delivered
+      // pixels, exactly. (The videoWidth/videoHeight branch below always
+      // resolves to a straight copy now that targetAspect IS that same
+      // ratio -- kept in this shape rather than simplified to a flat
+      // assignment so a future backstop, if one's ever needed again, has
+      // an obvious place to reintroduce itself.)
       let canvasW: number;
       let canvasH: number;
       if (video.videoWidth / video.videoHeight > targetAspect) {
@@ -984,7 +976,15 @@ export default function KataRecorder({
     }
     const ctx = canvas.getContext("2d");
     if (ctx) {
-      const bannerRatioOfCanvas = drawFrame(ctx, video, canvas.width, canvas.height, watermark, participantName ?? "", categoryName ?? "");
+      const { bannerRatio: bannerRatioOfCanvas, bannerOnlyRatio: bannerOnlyRatioOfCanvas } = drawFrame(
+        ctx,
+        video,
+        canvas.width,
+        canvas.height,
+        watermark,
+        participantName ?? "",
+        categoryName ?? "",
+      );
       if (Number.isFinite(bannerRatioOfCanvas) && bannerRatioOfCanvas > 0) {
         // Converts "fraction of the CANVAS's own height" (what drawFrame
         // returns) into "fraction of the BOX's CURRENT height" (what the
@@ -1008,6 +1008,7 @@ export default function KataRecorder({
         // sizing above) rather than only catching up once.
         const liveBoxRect = recordingBoxRef.current?.getBoundingClientRect();
         let finalRatio = bannerRatioOfCanvas;
+        let finalBannerOnlyRatio = bannerOnlyRatioOfCanvas;
         if (liveBoxRect && liveBoxRect.width > 0 && liveBoxRect.height > 0 && canvas.width > 0 && canvas.height > 0) {
           const canvasAspect = canvas.width / canvas.height;
           const boxAspect = liveBoxRect.width / liveBoxRect.height;
@@ -1015,10 +1016,15 @@ export default function KataRecorder({
           const contentTopFraction = (liveBoxRect.height - contentHeightPx) / 2 / liveBoxRect.height;
           const contentHeightFraction = contentHeightPx / liveBoxRect.height;
           finalRatio = contentTopFraction + bannerRatioOfCanvas * contentHeightFraction;
+          finalBannerOnlyRatio = contentTopFraction + bannerOnlyRatioOfCanvas * contentHeightFraction;
         }
         if (Math.abs(bannerRatioRef.current - finalRatio) > 0.002) {
           bannerRatioRef.current = finalRatio;
           setBannerRatio(finalRatio);
+        }
+        if (Math.abs(bannerOnlyRatioRef.current - finalBannerOnlyRatio) > 0.002) {
+          bannerOnlyRatioRef.current = finalBannerOnlyRatio;
+          setBannerOnlyRatio(finalBannerOnlyRatio);
         }
         const dbg =
           `canvas ${canvas.width}x${canvas.height} box ${Math.round(liveBoxRect?.width ?? 0)}x${Math.round(liveBoxRect?.height ?? 0)} ` +
@@ -1552,6 +1558,52 @@ export default function KataRecorder({
               }
         }
       >
+        {/* Exit full screen (or, outside full screen, the toggle to enter
+            it) -- an independent block, positioned at bannerOnlyRatio (the
+            banner's own height alone), one row higher than the stack below
+            it which sits under the identity/name-category row too. Moved
+            out to its own offset on request, so it lands right under the
+            main banner instead of below the performer's name and category
+            as well. */}
+        {!fullscreen && phase !== "idle" && phase !== "review" && phase !== "uploading" && (
+          <div className="absolute inset-x-0 z-20 flex justify-end px-2 pt-1" style={{ top: `${bannerOnlyRatio * 100}%` }}>
+            <button
+              type="button"
+              onClick={enterFullscreen}
+              className="rounded border border-white/50 bg-black/45 px-2.5 py-1 text-xs font-semibold text-white hover:bg-black/65"
+            >
+              ⛶ Full screen
+            </button>
+          </div>
+        )}
+        {fullscreen && phase !== "review" && phase !== "uploading" && (
+          <div
+            className="absolute inset-x-0 z-20 flex items-start justify-end gap-2 px-3 py-2 text-white"
+            style={{ top: `${bannerOnlyRatio * 100}%`, textShadow: "0 1px 3px rgba(0,0,0,0.85)" }}
+          >
+            {/* Deleted Recording sits right under Exit full screen, in the
+                SAME row as the title, instead of its own row below --
+                plain text with just the row's own drop-shadow (no
+                background box), matching the "Recording dated…" and
+                watermark text style elsewhere instead of reading as a
+                separate dark chip. */}
+            <div className="flex shrink-0 flex-col items-end gap-1">
+              <button
+                type="button"
+                onClick={exitFullscreen}
+                className="rounded border border-white/50 bg-black/30 px-2.5 py-1 text-xs font-semibold hover:bg-black/50"
+                style={{ textShadow: "none" }}
+              >
+                ✕ Exit full screen
+              </button>
+              {(phase === "live" || phase === "countdown" || phase === "recording") && (
+                <span className="text-[10px] font-semibold leading-tight">
+                  Deleted Recording: {attempts} / {maxAttempts}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
         {/* Title bar, error banner, the live/recording badges, and the
             review controls all stack in ONE column starting right below the
             burned-in header banner -- previously each piece was
@@ -1589,65 +1641,18 @@ export default function KataRecorder({
             maxHeight: `${100 - bannerRatio * 100}%`,
           }}
         >
-          {/* enterFullscreen was only ever called once, from startCamera --
-              exiting fullscreen (during live, recording, or review) had no
-              way back in short of restarting the whole camera flow. This
-              covers every phase that still has an active session to return
-              to; idle hasn't started a camera yet, and "done" already
-              returned its own JSX above (its own auto-exits fullscreen too),
-              so phase can only be live/recording/review/uploading here.
-              Placed as the FIRST child in this same flex-col stack (not an
-              independently absolute-positioned button) so it can never
-              overlap the banner above it or the Kata Recording/Submit row
-              below it -- normal document flow pushes both automatically,
-              the same reason the rest of this stack never overlaps either. */}
-          {/* Review/uploading are excluded from every piece below -- they
-              get their own independently-positioned stack (see just after
-              this div), sited on the review video's actual content rect
-              rather than bannerRatio (which describes the LIVE canvas
-              banner and has no relationship to a review file whose own
-              aspect can differ from the box's current shape). */}
-          {!fullscreen && phase !== "idle" && phase !== "review" && phase !== "uploading" && (
-            <div className="flex justify-end px-2 pt-1">
-              <button
-                type="button"
-                onClick={enterFullscreen}
-                className="rounded border border-white/50 bg-black/45 px-2.5 py-1 text-xs font-semibold text-white hover:bg-black/65"
-              >
-                ⛶ Full screen
-              </button>
-            </div>
-          )}
-          {fullscreen && phase !== "review" && phase !== "uploading" && (
-            <div className="flex items-start justify-end gap-2 px-3 py-2 text-white" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.85)" }}>
-              {/* Deleted Recording sits right under Exit full screen, in the
-                  SAME row as the title, instead of its own row below --
-                  plain text with just the row's own drop-shadow (no
-                  background box), matching the "Recording dated…" and
-                  watermark text style elsewhere instead of reading as a
-                  separate dark chip. */}
-              <div className="flex shrink-0 flex-col items-end gap-1">
-                <button
-                  type="button"
-                  onClick={exitFullscreen}
-                  className="rounded border border-white/50 bg-black/30 px-2.5 py-1 text-xs font-semibold hover:bg-black/50"
-                  style={{ textShadow: "none" }}
-                >
-                  ✕ Exit full screen
-                </button>
-                {(phase === "live" || phase === "countdown" || phase === "recording") && (
-                  <span className="text-[10px] font-semibold leading-tight">
-                    Deleted Recording: {attempts} / Available: {maxAttempts}
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
           {error && phase !== "review" && phase !== "uploading" && (
             <div className="bg-red-50/95 px-4 py-2 text-sm text-red-800 backdrop-blur-sm">{error}</div>
           )}
+          {/* Positioned via bannerRatio (below name/category too), not
+              bannerOnlyRatio -- moved here specifically so it reads as part
+              of this stack, right under the identity row, rather than
+              floating up against the banner where Exit full screen now
+              sits (see the independent block above this whole stack). */}
           {(phase === "live" || phase === "countdown" || phase === "recording") && debugBanner && (
-            <div className="bg-black/60 px-2 py-0.5 text-[10px] text-white/80">{debugBanner}</div>
+            <div className="px-2 py-0.5 text-[10px] text-white/80" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.85)" }}>
+              {debugBanner}
+            </div>
           )}
           {phase === "recording" && (
             <div className="flex flex-wrap gap-1.5 px-2 pt-1">
@@ -1939,6 +1944,17 @@ export default function KataRecorder({
               className="flex h-16 w-16 items-center justify-center rounded-full border-4 border-white/80 bg-red-600/90 text-2xl text-white shadow-lg active:scale-95"
             >
               ●
+            </button>
+            {/* Backs all the way out to "Enable camera" -- the only exit
+                from a live-but-not-recording session used to be leaving the
+                page entirely, since Exit full screen only drops the CSS
+                overlay and leaves the camera itself running underneath. */}
+            <button
+              type="button"
+              onClick={disableCamera}
+              className="rounded-full border border-white/50 bg-black/45 px-3 py-1 text-[11px] font-semibold text-white/90 hover:bg-black/65"
+            >
+              Disable camera
             </button>
           </div>
         )}
