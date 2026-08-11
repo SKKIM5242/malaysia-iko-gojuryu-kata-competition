@@ -976,10 +976,42 @@ export default function KataRecorder({
     }
     const ctx = canvas.getContext("2d");
     if (ctx) {
-      const newBannerRatio = drawFrame(ctx, video, canvas.width, canvas.height, watermark, participantName ?? "", categoryName ?? "");
-      if (Number.isFinite(newBannerRatio) && newBannerRatio > 0 && Math.abs(bannerRatioRef.current - newBannerRatio) > 0.002) {
-        bannerRatioRef.current = newBannerRatio;
-        setBannerRatio(newBannerRatio);
+      const bannerRatioOfCanvas = drawFrame(ctx, video, canvas.width, canvas.height, watermark, participantName ?? "", categoryName ?? "");
+      if (Number.isFinite(bannerRatioOfCanvas) && bannerRatioOfCanvas > 0) {
+        // Converts "fraction of the CANVAS's own height" (what drawFrame
+        // returns) into "fraction of the BOX's CURRENT height" (what the
+        // DOM stack's top:% actually needs) -- these agree exactly when
+        // canvas and box share the same aspect, which is true in normal
+        // steady state, but NOT once recording starts: canvas.width/height
+        // are then frozen (resizing mid-take would corrupt the
+        // captureStream() feeding MediaRecorder, see above), while the
+        // box's real on-screen size can still change for a few more
+        // seconds after that -- Safari's own chrome finishing its collapse
+        // is the common case, since enterFullscreen's scroll nudge doesn't
+        // guarantee it settles before the countdown/recording start. In
+        // that window the canvas ends up object-contain letterboxed WITHIN
+        // the box, and the DOM stack has to land on that actual letterboxed
+        // picture, not a flat percentage of the raw box -- which is what
+        // left it floating in the resulting black gap on real devices,
+        // reported as happening well into an active recording (not just at
+        // the very start), consistent with exactly this freeze. Measured
+        // fresh every frame, recording or not, so it self-corrects the
+        // instant the two next agree (recording stopping unfreezes canvas
+        // sizing above) rather than only catching up once.
+        const liveBoxRect = recordingBoxRef.current?.getBoundingClientRect();
+        let finalRatio = bannerRatioOfCanvas;
+        if (liveBoxRect && liveBoxRect.width > 0 && liveBoxRect.height > 0 && canvas.width > 0 && canvas.height > 0) {
+          const canvasAspect = canvas.width / canvas.height;
+          const boxAspect = liveBoxRect.width / liveBoxRect.height;
+          const contentHeightPx = canvasAspect > boxAspect ? liveBoxRect.width / canvasAspect : liveBoxRect.height;
+          const contentTopFraction = (liveBoxRect.height - contentHeightPx) / 2 / liveBoxRect.height;
+          const contentHeightFraction = contentHeightPx / liveBoxRect.height;
+          finalRatio = contentTopFraction + bannerRatioOfCanvas * contentHeightFraction;
+        }
+        if (Math.abs(bannerRatioRef.current - finalRatio) > 0.002) {
+          bannerRatioRef.current = finalRatio;
+          setBannerRatio(finalRatio);
+        }
       }
     }
     rafRef.current = requestAnimationFrame(renderLoop);
