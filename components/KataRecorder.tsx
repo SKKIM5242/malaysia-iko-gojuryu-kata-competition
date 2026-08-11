@@ -375,11 +375,11 @@ function drawIdentityOverlay(
   ctx.shadowBlur = 3;
 
   let y = topH + nameFontPx + margin * 0.5;
-  ctx.font = `700 ${nameFontPx}px Arial, sans-serif`;
+  ctx.font = `900 ${nameFontPx}px Arial, sans-serif`;
   ctx.fillText(participantName, margin, y);
 
   if (categoryName) {
-    ctx.font = `600 ${categoryFontPx}px Arial, sans-serif`;
+    ctx.font = `700 ${categoryFontPx}px Arial, sans-serif`;
     // Word-wraps onto as many rows as needed at a FIXED size, instead of
     // the old single-line overlay which just ran under everything else
     // uncontrolled at whatever length the category name happened to be.

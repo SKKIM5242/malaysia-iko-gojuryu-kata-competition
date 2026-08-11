@@ -76,6 +76,8 @@ export default async function AdminRecordingPreview() {
               }}
               recordingStart={start}
               recordingEnd={end}
+              participantName="Sample Participant Name"
+              categoryName="Kata Geiksai Dai Ichi — Black Belt & Dan Holders — Age 41-65 — Female"
             />
           </div>
         </div>
