@@ -235,7 +235,9 @@ export default async function AdminCommissions({
   // Only Admin/Organizer/Staff see the ✕ to remove a testimonial (see
   // deleteTestimonial in app/actions/admin.ts, which enforces the same
   // tier server-side regardless of what this hides).
-  const canDeleteTestimonial = ["admin", "organizer", "staff"].includes((myProfile?.role as string | null) ?? "");
+  const canDeleteTestimonial = ["admin", "organizer", "staff", "customer_support"].includes(
+    (myProfile?.role as string | null) ?? "",
+  );
   // Reward payout is held until the winner has given a testimonial (see
   // components/WinnerTestimonialInline.tsx on /winners) — also drives the Testimonial /
   // Testimonial Date columns below, always computed live on every page load

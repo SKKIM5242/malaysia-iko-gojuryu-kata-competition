@@ -42,6 +42,7 @@ export default function WinnerTestimonialInline({
   registrationId,
   isOwner,
   isManager,
+  canModerate,
   canAssist,
   testimonial,
   editDeadlineISO,
@@ -54,6 +55,12 @@ export default function WinnerTestimonialInline({
   registrationId: string;
   isOwner: boolean;
   isManager: boolean;
+  /** Admin/Organizer/Staff AND Participant Support — who may take a
+   * testimonial down for being abusive or working against the
+   * competition's purpose. A superset of isManager; the same tier is
+   * enforced server-side in deleteTestimonial regardless of what this
+   * shows. */
+  canModerate: boolean;
   /** Signed in with any role except Audience (Organizer/School/Sensei/
    * Referee/Support/Admin/Staff, in addition to the winner themself) — lets
    * that broader staff/coach set see the same submission buttons a winner
@@ -82,7 +89,7 @@ export default function WinnerTestimonialInline({
         </p>
       );
     }
-    if (isManager) {
+    if (canModerate) {
       return <p className="mt-1 text-xs font-semibold text-neutral-400">🚫 Testimonial removed</p>;
     }
     return null;
@@ -128,7 +135,7 @@ export default function WinnerTestimonialInline({
                 ✏️ Edit / Retake
               </button>
             )}
-            {isManager && <TestimonialDeleteButton testimonialId={testimonial.id} returnTo="/winners" />}
+            {canModerate && <TestimonialDeleteButton testimonialId={testimonial.id} returnTo="/winners" />}
           </div>
         </div>
         {canEdit && (
@@ -155,26 +162,39 @@ export default function WinnerTestimonialInline({
     );
   }
 
-  if (!isOwner && !canAssist) {
-    return <p className="mt-1 text-xs font-semibold text-amber-700">⏳ Testimonial pending</p>;
+  // The recorder is shown ONLY to the winner's own account now. It used to
+  // render for any signed-in non-Audience role, on the theory that staff
+  // could "help submit" -- but a submission is always resolved against the
+  // CLICKING account's own linked registrations, falling back to that
+  // account's own registration when the requested one isn't theirs. So a
+  // staff member who filled the form in and pressed Submit was silently
+  // retargeted at their OWN (non-winning) registration and rejected with
+  // "Testimonials are only for Top 3 winners." Offering a form that cannot
+  // succeed is what made that read as a bug; non-owners now get a plain
+  // explanation instead.
+  if (!isOwner) {
+    return (
+      <div className="mt-1 space-y-1">
+        <p className="text-xs font-semibold text-amber-700">⏳ Testimonial pending</p>
+        {canAssist && (
+          <p className="text-[11px] text-neutral-500">
+            Only this winner&apos;s own account can record and submit their testimonial — share the sample
+            scripts with them. Organizer and Participant Support can remove a testimonial once it has been
+            submitted, but cannot submit one on a winner&apos;s behalf.
+          </p>
+        )}
+      </div>
+    );
   }
 
   return (
     <div className="mt-1.5 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2">
-      {!isOwner && <p className="mb-1 text-xs font-semibold text-amber-700">⏳ Testimonial pending</p>}
-      <p className="text-xs font-semibold text-amber-800">🎓 {isOwner ? "Give your testimonial" : "Help submit this winner's testimonial"}</p>
+      <p className="text-xs font-semibold text-amber-800">🎓 Give your testimonial</p>
       <p className="mt-1 text-[11px] text-amber-900">{TESTIMONIAL_GATE_NOTE}</p>
       <p className="mt-1 text-[11px] text-amber-900">{TESTIMONIAL_VIDEO_GUIDANCE_NOTE}</p>
-      {!isOwner && (
-        <p className="mt-1 text-[11px] font-semibold text-amber-700">
-          Only the winner&apos;s own account can complete a submission — this is shown to Organizer/School/Sensei/
-          Referee/Support accounts too, so you can preview the process or share the sample scripts with them.
-        </p>
-      )}
       {editDeadlineISO && (
         <p className="mt-1 text-[11px] text-amber-900">
-          Once submitted, {isOwner ? "you" : "the winner"} can edit or retake it as many times as {isOwner ? "you like" : "they like"} until{" "}
-          {formatDate(editDeadlineISO)}.
+          Once submitted, you can edit or retake it as many times as you like until {formatDate(editDeadlineISO)}.
         </p>
       )}
       <div className="mt-2">

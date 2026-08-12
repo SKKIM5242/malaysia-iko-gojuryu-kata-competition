@@ -21,11 +21,15 @@ async function CompetitionPreview({
   competition,
   supabase,
   canManage,
+  canDeleteTestimonial,
   testimonialByRegId,
 }: {
   competition: Competition;
   supabase: Awaited<ReturnType<typeof createClient>>;
   canManage: boolean;
+  /** Adds Participant Support on top of canManage — testimonial moderation
+   * only, never the "Publish winners now" control canManage also gates. */
+  canDeleteTestimonial: boolean;
   testimonialByRegId: Map<string, TestimonialInfo>;
 }) {
   if (!competition.registration_deadline) {
@@ -114,7 +118,7 @@ async function CompetitionPreview({
                               <span className="font-semibold text-neutral-700">{w.finalScore.toFixed(2)}</span>
                               <TestimonialStatusCell
                                 testimonial={testimonialByRegId.get(w.registrationId) ?? null}
-                                canDelete={canManage}
+                                canDelete={canDeleteTestimonial}
                                 returnTo="/admin/winners"
                               />
                               {playbackUrls.get(w.storagePath) && (
@@ -166,6 +170,7 @@ export default async function AdminWinners({
     ? await supabase.from("profiles").select("role").eq("user_id", user.id).maybeSingle()
     : { data: null };
   const canManage = ["admin", "organizer", "staff"].includes(myProfile?.role ?? "");
+  const canDeleteTestimonial = ["admin", "organizer", "staff", "customer_support"].includes(myProfile?.role ?? "");
 
   const { data: competitionsData } = await supabase
     .from("competitions")
@@ -204,7 +209,7 @@ export default async function AdminWinners({
       ) : (
         <div className="space-y-8">
           {competitions.map((c) => (
-            <CompetitionPreview key={c.id} competition={c} supabase={supabase} canManage={canManage} testimonialByRegId={testimonialByRegId} />
+            <CompetitionPreview key={c.id} competition={c} supabase={supabase} canManage={canManage} canDeleteTestimonial={canDeleteTestimonial} testimonialByRegId={testimonialByRegId} />
           ))}
         </div>
       )}

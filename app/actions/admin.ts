@@ -105,6 +105,25 @@ async function requireCompetitionManager(
   }
 }
 
+/** Testimonial moderation specifically — the competition-manager tier PLUS
+ * Participant Support. Support is deliberately blocked from competition
+ * management everywhere else, but taking down a testimonial that's abusive
+ * or works against the competition's purpose is front-line moderation, and
+ * the organizer asked for Support to be able to act on it without waiting
+ * for an Admin. Deliberately its own gate rather than widening
+ * requireCompetitionManager, which would hand Support the whole
+ * competition/kata-category surface as a side effect. */
+async function requireTestimonialModerator(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  actorId: string | null,
+  returnTo: string,
+) {
+  const role = await getActorRole(supabase, actorId);
+  if (!["admin", "organizer", "staff", "customer_support"].includes(role ?? "")) {
+    backTo(returnTo, { error: "Only Admin / Organizer / Participant Support can remove a testimonial." });
+  }
+}
+
 /** Only Admin/Organizer (and legacy "staff") may create, edit, reorder, or
  * delete announcements/notes/messages — every other admin-panel role
  * (Referee/Judge, Participant Support) has read-only access to the Content
@@ -508,7 +527,7 @@ export async function deleteTestimonial(formData: FormData) {
   const reason = String(formData.get("reason") ?? "").trim() || null;
   const returnTo = String(formData.get("return_to") ?? "") || "/winners";
   const { supabase, actorId } = await getActor();
-  await requireCompetitionManager(supabase, actorId, returnTo);
+  await requireTestimonialModerator(supabase, actorId, returnTo);
 
   const admin = createAdminClient();
   const { data: beforeRaw } = await admin

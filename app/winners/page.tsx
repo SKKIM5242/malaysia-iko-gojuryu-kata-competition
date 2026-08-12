@@ -146,6 +146,7 @@ async function CompetitionWinners({
   supabase,
   myRegistrationIds,
   isManager,
+  canModerateTestimonials,
   canAssist,
   canToggleDeductions,
 }: {
@@ -155,6 +156,10 @@ async function CompetitionWinners({
    * where this is built in the page component below. */
   myRegistrationIds: string[];
   isManager: boolean;
+  /** Admin/Organizer/Staff plus Participant Support — who may take a
+   * testimonial down for being abusive or against the competition's
+   * purpose. Same tier enforced server-side in deleteTestimonial. */
+  canModerateTestimonials: boolean;
   /** Signed in with any role except Audience — see WinnerTestimonialInline
    * for what this widens (button visibility, not submission attribution). */
   canAssist: boolean;
@@ -263,6 +268,7 @@ async function CompetitionWinners({
                               registrationId={w.registrationId}
                               isOwner={myRegistrationIds.includes(w.registrationId)}
                               isManager={isManager}
+                              canModerate={canModerateTestimonials}
                               canAssist={canAssist}
                               testimonial={w.testimonial}
                               editDeadlineISO={editDeadlineISO}
@@ -393,6 +399,13 @@ export default async function WinnersPage() {
   // testimonial (see deleteTestimonial in app/actions/admin.ts, which
   // enforces the same tier server-side regardless of what this hides).
   const isManager = ["admin", "organizer", "staff"].includes((myProfile?.role as string | null) ?? "");
+  // Taking a testimonial down (abusive, or working against the
+  // competition's purpose) additionally allows Participant Support, who are
+  // the front line for this kind of report and shouldn't have to wait for
+  // an Admin. Same tier enforced server-side in deleteTestimonial.
+  const canModerateTestimonials = ["admin", "organizer", "staff", "customer_support"].includes(
+    (myProfile?.role as string | null) ?? "",
+  );
   // Everyone signed in except Audience — see WinnerTestimonialInline for
   // what this widens.
   const canAssist = !!user && (myProfile?.role as string | null) != null && myProfile?.role !== "audience";
@@ -437,6 +450,7 @@ export default async function WinnersPage() {
                 supabase={supabase}
                 myRegistrationIds={myRegistrationIds}
                 isManager={isManager}
+                canModerateTestimonials={canModerateTestimonials}
                 canAssist={canAssist}
                 canToggleDeductions={canToggleDeductions}
               />
