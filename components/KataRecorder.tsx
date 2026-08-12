@@ -9,6 +9,7 @@ import { pickVideoMimeType as pickMimeType, extensionForMimeType, bareMimeType }
 import { playDingDong, playAlarmTick } from "@/lib/chime";
 import { startClapDetector } from "@/lib/clap-detector";
 import { saveLocalRecording, clearLocalRecording } from "@/lib/local-recording-store";
+import { torchSupported, setTorch } from "@/lib/camera-torch";
 import type { WatermarkSettings } from "@/lib/watermark";
 
 const MAX_SECONDS = 5 * 60;
@@ -588,6 +589,10 @@ export default function KataRecorder({
   // orientation.
   const [videoAspect, setVideoAspect] = useState<number | null>(null);
   const videoAspectRef = useRef(0);
+  // Camera flash. Hidden entirely where the device/browser can't do it
+  // (iOS Safari never can) rather than shown as a dead control.
+  const [torchOn, setTorchOn] = useState(false);
+  const [torchAvailable, setTorchAvailable] = useState(false);
   // TEMPORARY diagnostic -- a participant confirmed the video picture fills
   // the screen correctly but the button row still doesn't line up with it,
   // which rules out the canvas/box aspect mismatch this file's other recent
@@ -941,9 +946,15 @@ export default function KataRecorder({
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: "environment",
-          width: { ideal: width },
-          height: { ideal: height },
+          // HD, fixed: 1280 on the long edge (720p class) and 30fps, with
+          // `max` alongside `ideal` so a phone that would otherwise hand
+          // back 1080p60 is actually held to it. Every judge sees the same
+          // format, and the file stays a size a participant on a modest
+          // connection can realistically upload.
+          width: { ideal: width, max: 1280 },
+          height: { ideal: height, max: 1280 },
           aspectRatio: { ideal: width / height },
+          frameRate: { ideal: 30, max: 30 },
         },
         audio: audioConstraints,
       });
@@ -952,6 +963,8 @@ export default function KataRecorder({
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
       }
+      setTorchAvailable(torchSupported(stream));
+      setTorchOn(false);
       setPhase("live");
       requestAnimationFrame(renderLoop);
       enterFullscreen();
@@ -967,9 +980,20 @@ export default function KataRecorder({
    * "live" (before the countdown/recording commits to anything), which is
    * also the only phase that had no way back out short of leaving the page
    * entirely. */
+  /** Kept honest against the hardware: if applyConstraints refuses, the
+   * button stays where it was rather than claiming a light that isn't on. */
+  async function toggleTorch() {
+    const next = !torchOn;
+    const applied = await setTorch(streamRef.current, next);
+    if (applied) setTorchOn(next);
+    else setTorchAvailable(false);
+  }
+
   function disableCamera() {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
+    setTorchOn(false);
+    setTorchAvailable(false);
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     exitFullscreen();
     setError(null);
@@ -1464,6 +1488,24 @@ export default function KataRecorder({
       👏 Clap to stop
     </span>
   );
+
+  /** Sits on the LEFT of the round button, so the button itself stays
+   * dead-centre. Rendered only where the hardware can actually switch the
+   * flash on -- see lib/camera-torch.ts for why that excludes every
+   * browser on iPhone. */
+  const torchButton = torchAvailable ? (
+    <button
+      type="button"
+      onClick={toggleTorch}
+      aria-pressed={torchOn}
+      className={
+        "absolute right-full top-1/2 mr-3 -translate-y-1/2 whitespace-nowrap rounded-full border px-3 py-1 text-xs font-semibold " +
+        (torchOn ? "border-amber-300 bg-amber-400/90 text-neutral-900" : "border-white/50 bg-black/60 text-white")
+      }
+    >
+      {torchOn ? "🔦 Light on" : "🔦 Light off"}
+    </button>
+  ) : null;
 
   // Fit the box within a height and viewport-width-minus-margins budget
   // while preserving the real video's aspect ratio -- whichever dimension
@@ -2084,6 +2126,7 @@ export default function KataRecorder({
               >
                 ●
               </button>
+              {torchButton}
               {clapHint}
             </div>
             {/* Backs all the way out to "Enable camera" -- the only exit
@@ -2132,6 +2175,7 @@ export default function KataRecorder({
               >
                 ■
               </button>
+              {torchButton}
               {clapHint}
             </div>
           </div>

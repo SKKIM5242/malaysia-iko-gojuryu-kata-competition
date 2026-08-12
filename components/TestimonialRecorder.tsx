@@ -128,7 +128,11 @@ function MediaTestimonialPanel({
 
   const isVideo = kind === "video";
   const minSeconds = isVideo ? TESTIMONIAL_MIN_VIDEO_SECONDS : 0;
-  const maxSeconds = isVideo ? TESTIMONIAL_MAX_VIDEO_SECONDS : 10 * 60;
+  // Voice gets 15 minutes, not 10: the sample scripts offer a ~10 minute
+  // option, and people read a prepared speech noticeably slower than the
+  // word count suggests, so a 10 minute cap was cutting off the longest
+  // scripts mid-sentence.
+  const maxSeconds = isVideo ? TESTIMONIAL_MAX_VIDEO_SECONDS : 15 * 60;
 
   useEffect(
     () => () => {
@@ -145,7 +149,30 @@ function MediaTestimonialPanel({
   async function startLive() {
     setError(null);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia(isVideo ? { video: true, audio: true } : { audio: true });
+      // Same audio treatment as the kata recorder: the browser defaults are
+      // tuned for a phone held to your face on a call, and echo cancellation
+      // in particular gates out a voice speaking from across a room, which
+      // is how a testimonial is usually recorded.
+      const audioConstraints: MediaTrackConstraints = {
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: true,
+      };
+      (audioConstraints as Record<string, unknown>).voiceIsolation = false;
+      const stream = await navigator.mediaDevices.getUserMedia(
+        isVideo
+          ? {
+              // HD 30fps, fixed -- matches the kata recorder so both
+              // submissions arrive in one consistent format.
+              video: {
+                width: { ideal: 1280, max: 1280 },
+                height: { ideal: 720, max: 1280 },
+                frameRate: { ideal: 30, max: 30 },
+              },
+              audio: audioConstraints,
+            }
+          : { audio: audioConstraints },
+      );
       streamRef.current = stream;
       if (isVideo && videoRef.current) {
         videoRef.current.srcObject = stream;
