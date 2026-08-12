@@ -5,38 +5,52 @@ export interface ClapDetectorOptions {
    * the mic a moment to settle right as recording begins (immediately
    * after the countdown's own ding-dong chime finishes), so residual
    * reverb or the participant's opening bow/footsteps can't trigger an
-   * immediate false stop. */
+   * immediate false stop. Also the window used to learn the room's own
+   * background level before anything can fire. */
   armDelayMs?: number;
 }
 
-// Peak amplitude (0..1, time-domain) a sound must clear before it's even
-// considered -- ordinary speech picked up from a few metres away shouldn't
-// reach this; a clap or a shout both will. First-round on-device testing
-// (real iPhone, real clap, a few metres from the mic) found NOTHING was
-// triggering at 0.4 -- a phone mic's own AGC compresses a clap's raw peak
-// a lot more than a quiet desk-top test suggested, so this starts much
-// more permissive and may still need another pass of on-device tuning.
-const LOUD_THRESHOLD = 0.12;
+// How many times louder than the room's own rolling background level a
+// sound must be to count as an onset.
+//
+// This replaced a pair of FIXED absolute thresholds, which is why detection
+// only ever worked at one distance: a clap one metre from the phone lands
+// near full scale, while the same clap fifteen metres away lands barely
+// above the room tone. No single absolute number can accept the far one
+// without the near one's own room noise constantly tripping it. Measuring
+// the RATIO against whatever the room is currently doing scales across that
+// whole range by construction, and adapts to a noisy dojo vs a silent one
+// without any per-venue tuning.
+const ONSET_RATIO = 4;
+// Absolute floor, applied on top of the ratio, so that near-silence (where
+// the rolling background approaches zero and almost anything clears the
+// ratio) can't self-trigger on mic hiss.
+const ABSOLUTE_FLOOR = 0.045;
 // Spectral flatness (0..1, geometric/arithmetic mean of the magnitude
-// spectrum) required on top of LOUD_THRESHOLD. A clap is a broadband
-// impulse -- its energy spreads roughly evenly across the spectrum, close
-// to white noise, which is HIGH flatness. A voice -- including a shouted
-// "Kiai" -- concentrates its energy at a pitch and that pitch's harmonic
-// overtones, which is LOW flatness even when very loud. Requiring both
-// loud AND flat in the same instant is what tells the two apart. Lowered
-// alongside LOUD_THRESHOLD for the same reason -- room reverb and a
-// compressed mic signal both pull a real clap's measured flatness down
-// from the clean-signal number a bare hand clap has in isolation.
-const FLATNESS_THRESHOLD = 0.15;
+// spectrum). A clap is a broadband impulse -- its energy spreads roughly
+// evenly across the spectrum, close to white noise, which is HIGH flatness.
+// A voice -- including a shouted "Kiai" -- concentrates its energy at a
+// pitch and that pitch's harmonic overtones, which is LOW flatness even
+// when very loud. Requiring both an onset AND flatness is what tells the
+// two apart. Deliberately lower than a clean-signal clap measures, because
+// distance and room reverb both smear a clap's spectrum and pull its
+// measured flatness down.
+const FLATNESS_THRESHOLD = 0.1;
 const COOLDOWN_MS = 1500;
 const DEFAULT_ARM_DELAY_MS = 500;
+// How fast the rolling background level tracks the room. Deliberately slow:
+// a clap lasts a few tens of milliseconds, so at this rate a single burst
+// barely moves the background it is being compared against, while a genuine
+// change in room noise (an air-conditioner starting, a crowd arriving) is
+// absorbed within a second or two.
+const FLOOR_SMOOTHING = 0.02;
 
 /**
- * Listens to `stream`'s audio track for a single hand clap and calls
- * `onClap()` when one is heard. Not a replacement for a manual Stop button
- * -- a sufficiently sharp, unpitched shout or a loud ambient bang could
- * still pass both thresholds, and a soft or muffled clap could miss them --
- * just an additional, hands-free way to trigger the same stop.
+ * Listens to `stream`'s audio track for a hand clap and calls `onClap()`
+ * when one is heard. Not a replacement for a manual Stop button -- a
+ * sufficiently sharp, unpitched bang could still pass both tests, and a
+ * soft or heavily muffled clap could miss them -- just an additional,
+ * hands-free way to trigger the same stop.
  *
  * `ctx` MUST be a context already resumed by a real user gesture (the same
  * one the countdown's chime plays through, created at the moment of the
@@ -45,12 +59,8 @@ const DEFAULT_ARM_DELAY_MS = 500;
  * countdown timer's own async callback, which is NOT a user gesture. A
  * context created there can be silently left suspended by the browser, in
  * which case the analyser below never receives real microphone data at
- * all -- getByteTimeDomainData/getByteFrequencyData just return silence
- * forever, so NO threshold, however loose, could ever fire. That's a much
- * better explanation for "doesn't work on desktop OR iPhone" than a
- * sensitivity problem: a desktop mic has no trouble producing a clap peak
- * well past even a conservative threshold if the pipeline is actually
- * running at all.
+ * all -- the reads just return silence forever, so NO threshold, however
+ * loose, could ever fire.
  *
  * Returns a cleanup function that stops listening and disconnects from
  * `ctx` -- it does NOT close ctx, since that context is owned by the
@@ -62,35 +72,81 @@ export function startClapDetector(ctx: AudioContext, stream: MediaStream, option
   if (!audioTrack) return () => {};
 
   const source = ctx.createMediaStreamSource(new MediaStream([audioTrack]));
+
+  // Pre-amp ahead of the analyser. A clap from across a hall can arrive at
+  // only a few percent of full scale, and the level readings below are
+  // taken AFTER this, so lifting the signal first gives the maths something
+  // with real resolution to work on instead of a handful of tiny values.
+  const preamp = ctx.createGain();
+  preamp.gain.value = 8;
+
+  // Everything below ~800Hz is discarded before measuring: room rumble,
+  // air-conditioning, traffic, footfall and handling noise all live down
+  // there and would otherwise dominate the level readings and hold the
+  // rolling background high enough to mask a distant clap. A clap's own
+  // energy is overwhelmingly above this point, so it loses almost nothing.
+  const highpass = ctx.createBiquadFilter();
+  highpass.type = "highpass";
+  highpass.frequency.value = 800;
+
   const analyser = ctx.createAnalyser();
   analyser.fftSize = 1024;
   // No smoothing -- a clap's whole signature is its sharp, near-instant
   // attack; the AnalyserNode's default exponential smoothing would blur
   // exactly that away.
   analyser.smoothingTimeConstant = 0;
-  source.connect(analyser);
+
+  // Terminating the chain into a MUTED gain node connected to the
+  // destination, rather than leaving the analyser dangling. An analyser
+  // with no path to a destination is not guaranteed to be pulled by the
+  // audio graph at all; routing it through silence guarantees it runs
+  // without emitting anything (which would otherwise feed the mic straight
+  // back out of the speaker mid-recording).
+  const silent = ctx.createGain();
+  silent.gain.value = 0;
+
+  source.connect(preamp);
+  preamp.connect(highpass);
+  highpass.connect(analyser);
+  analyser.connect(silent);
+  silent.connect(ctx.destination);
 
   const freqData = new Uint8Array(analyser.frequencyBinCount);
-  const timeData = new Uint8Array(analyser.fftSize);
+  const timeData = new Float32Array(analyser.fftSize);
   const startedAt = performance.now();
   const armDelayMs = options.armDelayMs ?? DEFAULT_ARM_DELAY_MS;
+  // Seeded low so the very first frames don't compare against zero.
+  let backgroundPeak = 0.01;
   let cooldownUntil = 0;
   let rafId = 0;
+  let timerId: ReturnType<typeof setInterval> | null = null;
   let stopped = false;
 
   function tick() {
     if (stopped) return;
-    rafId = requestAnimationFrame(tick);
-    const now = performance.now();
-    if (now - startedAt < armDelayMs || now < cooldownUntil) return;
 
-    analyser.getByteTimeDomainData(timeData);
+    // getFloatTimeDomainData, not the byte version: the byte version
+    // quantises to 256 steps across the whole range, so a distant clap and
+    // the room tone underneath it can land on the SAME step and become
+    // literally indistinguishable. Float keeps the difference the ratio
+    // test depends on.
+    analyser.getFloatTimeDomainData(timeData);
     let peak = 0;
     for (let i = 0; i < timeData.length; i++) {
-      const v = Math.abs(timeData[i] - 128) / 128;
+      const v = Math.abs(timeData[i]);
       if (v > peak) peak = v;
     }
-    if (peak < LOUD_THRESHOLD) return;
+
+    const now = performance.now();
+    const armed = now - startedAt >= armDelayMs && now >= cooldownUntil;
+    const isOnset = armed && peak > backgroundPeak * ONSET_RATIO && peak > ABSOLUTE_FLOOR;
+
+    if (!isOnset) {
+      // Track the room only on frames that AREN'T a candidate onset, so a
+      // clap never raises the very background it's being measured against.
+      backgroundPeak = backgroundPeak * (1 - FLOOR_SMOOTHING) + peak * FLOOR_SMOOTHING;
+      return;
+    }
 
     analyser.getByteFrequencyData(freqData);
     let sum = 0;
@@ -109,15 +165,31 @@ export function startClapDetector(ctx: AudioContext, stream: MediaStream, option
     cooldownUntil = now + COOLDOWN_MS;
     options.onClap();
   }
-  rafId = requestAnimationFrame(tick);
+
+  // Driven by BOTH requestAnimationFrame and a timer. rAF alone is throttled
+  // to zero the moment the page stops compositing -- which on a phone
+  // includes the screen dimming or locking part-way through a long kata --
+  // and the detector would simply stop listening with no sign anything was
+  // wrong. The interval keeps it running in that state; the two are
+  // idempotent, and the cooldown means overlapping calls can't double-fire.
+  function rafLoop() {
+    if (stopped) return;
+    rafId = requestAnimationFrame(rafLoop);
+    tick();
+  }
+  rafId = requestAnimationFrame(rafLoop);
+  timerId = setInterval(tick, 16);
 
   return () => {
     stopped = true;
     cancelAnimationFrame(rafId);
-    try {
-      source.disconnect();
-    } catch {
-      // Already disconnected -- nothing left to do.
+    if (timerId !== null) clearInterval(timerId);
+    for (const node of [source, preamp, highpass, analyser, silent]) {
+      try {
+        node.disconnect();
+      } catch {
+        // Already disconnected -- nothing left to do.
+      }
     }
     // ctx itself is NOT closed here -- it's owned by the caller (see the
     // doc comment above).

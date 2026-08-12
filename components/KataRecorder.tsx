@@ -878,6 +878,30 @@ export default function KataRecorder({
       // matching (not just pixel count) part of what the browser optimizes
       // for, so it's less likely to hand back something needlessly narrower
       // than the screen even when it can't hit the exact size requested.
+      // `audio: true` silently accepts every browser default, and all of
+      // those defaults are tuned for a phone held against your face in a
+      // voice call -- the opposite of a kata performed several metres away
+      // in a hall:
+      //  - echoCancellation gates hard on anything it decides is "far" or
+      //    room-reflected, which is most of a kata's own sound and is the
+      //    most likely reason a recording comes back near-silent.
+      //  - noiseSuppression is built to delete short, sharp, non-speech
+      //    sounds -- i.e. precisely a hand clap, and most aggressively the
+      //    faint distant one we need to detect.
+      //  - autoGainControl is the one default worth KEEPING on: it lifts a
+      //    quiet, distant source up to a usable level.
+      const audioConstraints: MediaTrackConstraints = {
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: true,
+      };
+      // Safari 17+ only, and not in the DOM typings yet. Apple's Voice
+      // Isolation beam-forms toward whoever is speaking in front of the
+      // phone and actively attenuates whatever arrives from other
+      // directions -- a literal match for "the clap is only picked up from
+      // one direction". Unknown constraint keys are ignored elsewhere, so
+      // this is harmless on browsers that don't implement it.
+      (audioConstraints as Record<string, unknown>).voiceIsolation = false;
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: "environment",
@@ -885,7 +909,7 @@ export default function KataRecorder({
           height: { ideal: height },
           aspectRatio: { ideal: width / height },
         },
-        audio: true,
+        audio: audioConstraints,
       });
       streamRef.current = stream;
       if (videoRef.current) {
@@ -1128,10 +1152,20 @@ export default function KataRecorder({
       }
       const canvasStream = canvas.captureStream(30);
       const audioTrack = camStream.getAudioTracks()[0];
-      if (audioTrack) canvasStream.addTrack(audioTrack);
+      // Build ONE stream holding both tracks up front, rather than
+      // addTrack()-ing the microphone onto the canvas stream afterwards.
+      // Several WebKit/iOS versions only mux the tracks a MediaStream was
+      // CONSTRUCTED with and quietly ignore any added later -- which
+      // produces exactly the reported symptom: the picture records fine and
+      // the sound is missing, with no error anywhere.
+      const recordStream = new MediaStream(
+        audioTrack ? [...canvasStream.getVideoTracks(), audioTrack] : canvasStream.getVideoTracks(),
+      );
+      // A track that arrives disabled records as pure silence.
+      if (audioTrack) audioTrack.enabled = true;
 
       const mimeType = pickMimeType();
-      const recorder = new MediaRecorder(canvasStream, { mimeType });
+      const recorder = new MediaRecorder(recordStream, { mimeType });
       chunksRef.current = [];
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data);
@@ -1345,6 +1379,19 @@ export default function KataRecorder({
 
   const mm = String(Math.floor(seconds / 60)).padStart(2, "0");
   const ss = String(seconds % 60).padStart(2, "0");
+
+  /** Sits to the RIGHT of the round Start/Stop button, never stacked
+   * underneath it, and shows from the moment the camera is on rather than
+   * only once recording has begun -- so the participant knows the clap
+   * option exists BEFORE they walk out to start, which is the only time
+   * they can actually plan around it. Absolutely positioned off the
+   * button's own wrapper so the button itself stays exactly centred on
+   * screen instead of being shoved off-centre by a sibling. */
+  const clapHint = (
+    <span className="pointer-events-none absolute left-full top-1/2 ml-3 -translate-y-1/2 whitespace-nowrap rounded-full bg-black/70 px-2.5 py-0.5 text-xs font-semibold text-white">
+      👏 Clap to stop
+    </span>
+  );
 
   // Fit the box within a height and viewport-width-minus-margins budget
   // while preserving the real video's aspect ratio -- whichever dimension
@@ -1922,13 +1969,16 @@ export default function KataRecorder({
                 </button>
               ))}
             </div>
-            <button
-              onClick={startCountdown}
-              aria-label="Start countdown"
-              className="flex h-16 w-16 items-center justify-center rounded-full border-4 border-white/80 bg-red-600/90 text-2xl text-white shadow-lg active:scale-95"
-            >
-              ●
-            </button>
+            <div className="relative">
+              <button
+                onClick={startCountdown}
+                aria-label="Start countdown"
+                className="flex h-16 w-16 items-center justify-center rounded-full border-4 border-white/80 bg-red-600/90 text-2xl text-white shadow-lg active:scale-95"
+              >
+                ●
+              </button>
+              {clapHint}
+            </div>
             {/* Backs all the way out to "Enable camera" -- the only exit
                 from a live-but-not-recording session used to be leaving the
                 page entirely, since Exit full screen only drops the CSS
@@ -1967,15 +2017,15 @@ export default function KataRecorder({
             place instead of jumping when recording begins. */}
         {phase === "recording" && (
           <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 flex-col items-center gap-2">
-            <button
-              onClick={stopRecording}
-              aria-label="Stop recording"
-              className="flex h-16 w-16 items-center justify-center rounded-full border-4 border-white/80 bg-neutral-900/90 text-2xl text-white shadow-lg active:scale-95"
-            >
-              ■
-            </button>
-            <div className="inline-flex items-center gap-1 rounded-full bg-black/70 px-2.5 py-0.5 text-xs font-semibold text-white">
-              👏 Clap to stop
+            <div className="relative">
+              <button
+                onClick={stopRecording}
+                aria-label="Stop recording"
+                className="flex h-16 w-16 items-center justify-center rounded-full border-4 border-white/80 bg-neutral-900/90 text-2xl text-white shadow-lg active:scale-95"
+              >
+                ■
+              </button>
+              {clapHint}
             </div>
           </div>
         )}
