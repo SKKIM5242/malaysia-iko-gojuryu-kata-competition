@@ -548,6 +548,16 @@ export default function KataRecorder({
   const [reviewCurrentTime, setReviewCurrentTime] = useState(0);
   const [reviewDuration, setReviewDuration] = useState(0);
   const [reviewMuted, setReviewMuted] = useState(false);
+  // What the participant can ACTUALLY see, as opposed to the layout
+  // viewport `fixed inset-0` resolves against -- see the container's own
+  // style prop for why the difference matters. Null until measured, and on
+  // any browser without visualViewport (where the two are the same thing
+  // anyway) it stays null and the plain inset-0 behaviour is kept.
+  const [visualViewportBox, setVisualViewportBox] = useState<{ height: number; offsetTop: number } | null>(null);
+  // Playback volume for the review player, 0..1. Starts at full -- the
+  // organizer's requirement is that maximum volume is always available and
+  // never capped, so nothing here ever clamps it below 1.
+  const [reviewVolume, setReviewVolume] = useState(1);
   const containerRef = useRef<HTMLDivElement>(null);
   const recordingBoxRef = useRef<HTMLDivElement>(null);
   // The recording box's REAL painted size, kept in a ref because
@@ -649,6 +659,14 @@ export default function KataRecorder({
   // more reliable belt-and-suspenders way to keep it off entirely.
   useEffect(() => {
     if (reviewVideoRef.current) reviewVideoRef.current.disablePictureInPicture = true;
+    // Carry the chosen volume onto each newly-loaded take, so re-recording
+    // doesn't silently reset the player back to full after the participant
+    // has turned it down.
+    if (reviewVideoRef.current) {
+      reviewVideoRef.current.muted = reviewVolume === 0;
+      reviewVideoRef.current.volume = reviewVolume;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [blobUrl]);
 
   useEffect(() => {
@@ -687,6 +705,24 @@ export default function KataRecorder({
       window.removeEventListener("orientationchange", onOrientationChange);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Track the visual viewport. Both events matter on iOS: "resize" fires
+  // when Safari's toolbars slide in or out (which is exactly the moment the
+  // controls would otherwise disappear under them), and "scroll" fires when
+  // the visual viewport is panned relative to the layout viewport, which
+  // changes offsetTop and would leave the overlay misaligned.
+  useEffect(() => {
+    const vv = typeof window !== "undefined" ? window.visualViewport : null;
+    if (!vv) return;
+    const update = () => setVisualViewportBox({ height: vv.height, offsetTop: vv.offsetTop });
+    update();
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+    };
   }, []);
 
   // Take the site's fixed footer out of the page entirely while full
@@ -1260,11 +1296,24 @@ export default function KataRecorder({
     }
   }
 
-  function toggleReviewMute() {
+  /** Volume slider handler. Sliding all the way down to 0 mutes, anything
+   * above unmutes, and the top of the slider is full volume -- never capped.
+   *
+   * Both `muted` and `volume` are set deliberately, because iOS is the odd
+   * one out: on iPhone/iPad `video.volume` is READ-ONLY and assigning to it
+   * does nothing at all (Apple reserves playback level for the hardware
+   * buttons). `muted` however is honoured everywhere. So on a phone this
+   * slider works as a mute/unmute at the bottom of its travel with the
+   * hardware buttons setting the actual level, while on desktop and Android
+   * it behaves as a true continuous volume control. */
+  function applyReviewVolume(next: number) {
+    const clamped = Math.min(1, Math.max(0, next));
+    setReviewVolume(clamped);
+    setReviewMuted(clamped === 0);
     const v = reviewVideoRef.current;
     if (!v) return;
-    v.muted = !v.muted;
-    setReviewMuted(v.muted);
+    v.muted = clamped === 0;
+    v.volume = clamped;
   }
 
   function formatPlaybackTime(seconds: number): string {
@@ -1380,15 +1429,16 @@ export default function KataRecorder({
   const mm = String(Math.floor(seconds / 60)).padStart(2, "0");
   const ss = String(seconds % 60).padStart(2, "0");
 
-  /** Sits to the RIGHT of the round Start/Stop button, never stacked
-   * underneath it, and shows from the moment the camera is on rather than
-   * only once recording has begun -- so the participant knows the clap
-   * option exists BEFORE they walk out to start, which is the only time
-   * they can actually plan around it. Absolutely positioned off the
-   * button's own wrapper so the button itself stays exactly centred on
-   * screen instead of being shoved off-centre by a sibling. */
+  /** Sits UNDER the round Start/Stop button, separated by a clear gap
+   * rather than tucked tight against its edge, and shows from the moment
+   * the camera is on rather than only once recording has begun -- so the
+   * participant knows the clap option exists BEFORE they walk out to
+   * start, which is the only time they can actually plan around it.
+   * Absolutely positioned off the button's own wrapper so the button
+   * itself stays exactly centred on screen instead of being shoved
+   * off-centre by a sibling in normal flow. */
   const clapHint = (
-    <span className="pointer-events-none absolute left-full top-1/2 ml-3 -translate-y-1/2 whitespace-nowrap rounded-full bg-black/70 px-2.5 py-0.5 text-xs font-semibold text-white">
+    <span className="pointer-events-none absolute left-1/2 top-full mt-4 -translate-x-1/2 whitespace-nowrap rounded-full bg-black/70 px-2.5 py-0.5 text-xs font-semibold text-white">
       👏 Clap to stop
     </span>
   );
@@ -1465,6 +1515,27 @@ export default function KataRecorder({
       // (the footer sits at 40, the accessibility toolbar at 60, modals at
       // 150-200) so nothing can paint over the recording area.
       className={fullscreen ? "fixed inset-0 z-[999] bg-black" : "space-y-4"}
+      // Sized to the VISUAL viewport, not the layout viewport that
+      // `fixed inset-0` resolves against.
+      //
+      // This is the root cause of the review controls "missing" in
+      // landscape on iPhone. On iOS Safari the layout viewport is the FULL
+      // screen, while Safari's own toolbars are drawn on top of the bottom
+      // of it. So a bar pinned to bottom-0 of this container is rendered
+      // underneath Safari's chrome -- present in the DOM, correct in every
+      // measurement, and completely invisible and untappable on the actual
+      // phone. Landscape is where it bites hardest, because the viewport is
+      // barely 375px tall to begin with and Safari's bar eats a large share
+      // of it. visualViewport.height is exactly "how much can the user
+      // actually see right now", so constraining to it puts the seek bar,
+      // play/pause, volume, timer and date back above the chrome. It also
+      // means every measurement taken off this box (bannerRatio included)
+      // is finally taken against the real visible area.
+      style={
+        fullscreen && visualViewportBox
+          ? { top: visualViewportBox.offsetTop, height: visualViewportBox.height, bottom: "auto" }
+          : undefined
+      }
     >
       {!fullscreen && categoryName && (
         <p className="text-sm font-bold text-neutral-800">Recording: {categoryName}</p>
@@ -1878,7 +1949,13 @@ export default function KataRecorder({
                 ▶
               </button>
             )}
-            <div className="absolute inset-x-0 bottom-0 z-20 flex flex-col gap-1.5 bg-gradient-to-t from-black/75 to-transparent px-3 pb-3 pt-10">
+            <div
+              className="absolute inset-x-0 bottom-0 z-20 flex flex-col gap-1.5 bg-gradient-to-t from-black/75 to-transparent px-3 pb-3 pt-10"
+              // Clear of the iPhone home indicator, which is drawn over the
+              // bottom edge and otherwise sits right on top of the
+              // play/volume row. Resolves to 0 on devices without one.
+              style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
+            >
               {/* Was a SEPARATE element pinned at its own flat bottom-20 --
                   now it's one row in this SAME bar, so it always moves
                   together with the rest of these controls instead of
@@ -1915,14 +1992,22 @@ export default function KataRecorder({
                   >
                     {reviewPlaying ? "❚❚" : "▶"}
                   </button>
-                  <button
-                    type="button"
-                    onClick={toggleReviewMute}
-                    aria-label={reviewMuted ? "Unmute" : "Mute"}
-                    className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 hover:bg-white/30"
-                  >
+                  {/* Volume slider in place of the old mute-only button.
+                      Slid to the far left it mutes; the far right is full
+                      volume, never capped. */}
+                  <span aria-hidden className="text-sm leading-none">
                     {reviewMuted ? "🔇" : "🔊"}
-                  </button>
+                  </span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    value={reviewVolume}
+                    onChange={(e) => applyReviewVolume(Number(e.target.value))}
+                    aria-label="Volume"
+                    className="h-1.5 w-20 cursor-pointer accent-white"
+                  />
                 </div>
                 <span style={{ textShadow: "0 1px 2px rgba(0,0,0,0.8)" }}>
                   {formatPlaybackTime(reviewCurrentTime)} / {formatPlaybackTime(reviewDuration)}
