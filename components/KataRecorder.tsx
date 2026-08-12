@@ -1201,7 +1201,29 @@ export default function KataRecorder({
       if (audioTrack) audioTrack.enabled = true;
 
       const mimeType = pickMimeType();
-      const recorder = new MediaRecorder(recordStream, { mimeType });
+      // Explicit bitrates, sized so a full-length take fits the upload
+      // limit.
+      //
+      // Left to itself MediaRecorder picks whatever bitrate it likes, and on
+      // a real iPhone that came out around 10 Mbit/s -- a 1m30s take weighed
+      // 111.6MB, which means a full 5-minute kata would be roughly 370MB.
+      // Supabase rejects it long before that: the project-wide ceiling is
+      // 50MB (the kata-videos bucket's own 500MB setting sits above it and
+      // never applies), which is the "object exceeded the maximum allowed
+      // size" failure participants were hitting.
+      //
+      // MAX_SECONDS is the hard recording cap, so budgeting against it
+      // bounds the worst case rather than the typical one: ~1.1 Mbit/s over
+      // 5 minutes is roughly 41MB, leaving real headroom under 50MB even
+      // though these are targets the encoder can overshoot on very busy
+      // footage. Smaller files also upload far faster and far more reliably
+      // on mobile data, which is its own win given how often submissions
+      // were failing mid-upload.
+      const recorder = new MediaRecorder(recordStream, {
+        mimeType,
+        videoBitsPerSecond: 1_000_000,
+        audioBitsPerSecond: 96_000,
+      });
       chunksRef.current = [];
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data);
