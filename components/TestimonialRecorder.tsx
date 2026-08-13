@@ -20,6 +20,23 @@ const COUNTDOWN_CHOICES = [10, 15, 20, 25, 30] as const;
 
 type Phase = "idle" | "live" | "countdown" | "recording" | "review" | "uploading";
 
+type ScreenLightLevel = "off" | "low" | "medium" | "high";
+
+/** Warm off-white rather than pure #FFFFFF. Two reasons: a full-brightness
+ * pure-white panel at arm's length is genuinely uncomfortable to look into
+ * and makes people squint on camera, and pure white from a phone display is
+ * a cold, slightly blue light that drains colour out of skin. A warm tone
+ * (roughly 3500-4000K) reads as flattering rather than clinical.
+ *
+ * The three levels hold the same hue and drop luminance, which is the only
+ * intensity control available -- no web API can change screen brightness,
+ * so the colour itself has to carry it. */
+const SCREEN_LIGHT_TONES: Record<Exclude<ScreenLightLevel, "off">, string> = {
+  low: "#D9C7AC",
+  medium: "#F0DFC5",
+  high: "#FFF3E3",
+};
+
 function mmss(totalSeconds: number): string {
   const m = Math.floor(totalSeconds / 60);
   const s = Math.floor(totalSeconds % 60);
@@ -357,9 +374,9 @@ function MediaTestimonialPanel({
   // actually live -- deriving that rather than resetting state on every
   // phase change means it can never be left stuck on over the review
   // screen.
-  const [screenLight, setScreenLight] = useState(false);
+  const [screenLight, setScreenLight] = useState<ScreenLightLevel>("off");
   const screenLightOn =
-    screenLight && isVideo && (phase === "live" || phase === "countdown" || phase === "recording");
+    screenLight !== "off" && isVideo && (phase === "live" || phase === "countdown" || phase === "recording");
 
   return (
     <>
@@ -367,7 +384,13 @@ function MediaTestimonialPanel({
           accessibility toolbar at 60) so the white really does fill the
           screen, but below the app's modals (150-200) so a dialog can still
           appear over it. */}
-      {screenLightOn && <div aria-hidden className="pointer-events-none fixed inset-0 z-[90] bg-white" />}
+      {screenLightOn && (
+        <div
+          aria-hidden
+          className="pointer-events-none fixed inset-0 z-[90]"
+          style={{ backgroundColor: SCREEN_LIGHT_TONES[screenLight as Exclude<ScreenLightLevel, "off">] }}
+        />
+      )}
     <div className={"mt-3 rounded-md border border-neutral-200 bg-neutral-50 p-4" + (screenLightOn ? " relative z-[95]" : "")}>
       <div className="mb-3 flex gap-2">
         <button
@@ -407,22 +430,30 @@ function MediaTestimonialPanel({
         <>
           <video ref={videoRef} muted playsInline className="mb-3 w-full max-w-md rounded-md bg-black" />
           <div className="mb-3">
-            <button
-              type="button"
-              onClick={() => setScreenLight((on) => !on)}
-              aria-pressed={screenLightOn}
-              className={
-                "rounded-full border px-3 py-1 text-xs font-semibold " +
-                (screenLightOn
-                  ? "border-amber-400 bg-amber-300 text-neutral-900"
-                  : "border-neutral-300 bg-white text-neutral-600 hover:bg-neutral-50")
-              }
-            >
-              {screenLightOn ? "💡 Screen light on" : "💡 Screen light off"}
-            </button>
+            <div className="flex flex-wrap items-center gap-1">
+              <span className="mr-1 text-xs font-semibold text-neutral-600">💡 Screen light</span>
+              {(["off", "low", "medium", "high"] as const).map((level) => (
+                <button
+                  key={level}
+                  type="button"
+                  onClick={() => setScreenLight(level)}
+                  aria-pressed={screenLight === level}
+                  className={
+                    "rounded-full border px-3 py-1 text-xs font-semibold capitalize " +
+                    (screenLight === level
+                      ? "border-amber-500 bg-amber-300 text-neutral-900"
+                      : "border-neutral-300 bg-white text-neutral-600 hover:bg-neutral-50")
+                  }
+                >
+                  {level}
+                </button>
+              ))}
+            </div>
             <p className="mt-1 text-[11px] text-neutral-500">
-              Fills the screen white to light your face. No browser can switch the camera&apos;s own flash on for a
-              front-camera recording, so the screen is the light — turn your phone&apos;s brightness up for more of it.
+              Lights your face with a warm off-white — easier on the eyes than pure white, and it keeps skin tone
+              natural on camera. Your preview stays visible in the middle. No browser can switch the camera&apos;s own
+              flash on for a front-camera recording, so the screen is the light — raise your phone&apos;s brightness
+              for more of it.
             </p>
           </div>
         </>
