@@ -1,0 +1,24 @@
+# Binary assets must never go through end-of-line conversion.
+#
+# Added after a real corruption: on a Windows checkout, git's autocrlf
+# rewrote every 0x0A inside public/winner-testimonial-sample-scripts.pdf as
+# 0x0D 0x0A. That shifted the file by ~2KB, so every byte offset in the
+# PDF's own cross-reference table pointed at the wrong place and the file
+# would not open. The blob in the repository was fine; only the working
+# copy was destroyed, which is exactly the kind of failure that gets
+# noticed late.
+*.pdf binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.mp4 binary
+*.webm binary
+*.mp3 binary
+*.wav binary
