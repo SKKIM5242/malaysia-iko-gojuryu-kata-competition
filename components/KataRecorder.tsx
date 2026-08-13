@@ -593,6 +593,17 @@ export default function KataRecorder({
   // (iOS Safari never can) rather than shown as a dead control.
   const [torchOn, setTorchOn] = useState(false);
   const [torchAvailable, setTorchAvailable] = useState(false);
+  // iPhone/iPad get a written Control Centre hint instead of a light
+  // button, because no browser on iOS can switch the camera flash on from a
+  // web page at all -- there is no API to call, so there is nothing to put
+  // behind a button. Detected after mount (never during render) so the
+  // server and first client paint agree. iPadOS reports itself as a Mac,
+  // hence the touch-points check.
+  const [isIOS, setIsIOS] = useState(false);
+  useEffect(() => {
+    const ua = navigator.userAgent;
+    setIsIOS(/iP(hone|od|ad)/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
+  }, []);
   // TEMPORARY diagnostic -- a participant confirmed the video picture fills
   // the screen correctly but the button row still doesn't line up with it,
   // which rules out the canvas/box aspect mismatch this file's other recent
@@ -1672,6 +1683,15 @@ export default function KataRecorder({
           Malaysia Open Virtual Kata Competition. Leave enough space in frame for the full routine
           — the recording should be able to see your whole kata move from start to end.
         </p>
+        {isIOS && (
+          <p>
+            <strong>iPhone / iPad — if the room is dim:</strong> Safari can&apos;t switch the camera flash on from a
+            web page (Apple has never allowed it), so there is no light button here. Swipe into Control Centre and
+            turn the torch on <em>before</em> you start — the LED sits beside the rear camera, so it lights the same
+            direction the recording is pointing. Better still, record with the room lights on or facing a window:
+            a phone torch does very little at 300cm.
+          </p>
+        )}
         <p>
           Pick a countdown length (10–30 seconds), then tap <strong>Start</strong> — you&apos;ll
           hear a <strong>ding-dong</strong> chime and recording begins on its own once it reaches

@@ -348,8 +348,27 @@ function MediaTestimonialPanel({
 
   const tooShort = takeType === "actual" && isVideo && seconds < minSeconds;
 
+  // Screen flash. This panel records on the FRONT camera, which faces the
+  // same way as the display -- so filling the screen with white genuinely
+  // lights the speaker's face, which is the trick selfie-flash apps use.
+  // It's also the only light available here at all: no browser on iOS can
+  // switch the camera's LED on, and the front camera has no usable torch on
+  // Android either. Only meaningful for video, and only while the camera is
+  // actually live -- deriving that rather than resetting state on every
+  // phase change means it can never be left stuck on over the review
+  // screen.
+  const [screenLight, setScreenLight] = useState(false);
+  const screenLightOn =
+    screenLight && isVideo && (phase === "live" || phase === "countdown" || phase === "recording");
+
   return (
-    <div className="mt-3 rounded-md border border-neutral-200 bg-neutral-50 p-4">
+    <>
+      {/* Above the site's own fixed chrome (footer sits at 40, the
+          accessibility toolbar at 60) so the white really does fill the
+          screen, but below the app's modals (150-200) so a dialog can still
+          appear over it. */}
+      {screenLightOn && <div aria-hidden className="pointer-events-none fixed inset-0 z-[90] bg-white" />}
+    <div className={"mt-3 rounded-md border border-neutral-200 bg-neutral-50 p-4" + (screenLightOn ? " relative z-[95]" : "")}>
       <div className="mb-3 flex gap-2">
         <button
           type="button"
@@ -385,7 +404,28 @@ function MediaTestimonialPanel({
       )}
 
       {isVideo && (phase === "live" || phase === "countdown" || phase === "recording") && (
-        <video ref={videoRef} muted playsInline className="mb-3 w-full max-w-md rounded-md bg-black" />
+        <>
+          <video ref={videoRef} muted playsInline className="mb-3 w-full max-w-md rounded-md bg-black" />
+          <div className="mb-3">
+            <button
+              type="button"
+              onClick={() => setScreenLight((on) => !on)}
+              aria-pressed={screenLightOn}
+              className={
+                "rounded-full border px-3 py-1 text-xs font-semibold " +
+                (screenLightOn
+                  ? "border-amber-400 bg-amber-300 text-neutral-900"
+                  : "border-neutral-300 bg-white text-neutral-600 hover:bg-neutral-50")
+              }
+            >
+              {screenLightOn ? "💡 Screen light on" : "💡 Screen light off"}
+            </button>
+            <p className="mt-1 text-[11px] text-neutral-500">
+              Fills the screen white to light your face. No browser can switch the camera&apos;s own flash on for a
+              front-camera recording, so the screen is the light — turn your phone&apos;s brightness up for more of it.
+            </p>
+          </div>
+        </>
       )}
 
       {phase === "live" && (
@@ -481,6 +521,7 @@ function MediaTestimonialPanel({
       {phase === "uploading" && <p className="text-sm font-semibold text-neutral-600">Uploading…</p>}
       {error && <p className="mt-2 text-sm font-semibold text-red-700">{error}</p>}
     </div>
+    </>
   );
 }
 
