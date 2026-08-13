@@ -13,7 +13,13 @@ import {
   TESTIMONIAL_MAX_VIDEO_SECONDS,
   type TestimonialKind,
 } from "@/lib/testimonials";
-import { SCRIPT_LENGTH_LABEL, scriptsForBand, type ScriptLengthBand } from "@/lib/testimonial-scripts";
+import {
+  SCRIPT_LENGTH_LABEL,
+  scriptsForBand,
+  scriptText,
+  type ScriptLengthBand,
+  type TestimonialScript,
+} from "@/lib/testimonial-scripts";
 import LockedVideo from "@/components/LockedVideo";
 
 const COUNTDOWN_CHOICES = [10, 15, 20, 25, 30] as const;
@@ -43,10 +49,75 @@ function mmss(totalSeconds: number): string {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-/** Sample scripts to read from — cue cards, not word-for-word text (see
- * lib/testimonial-scripts.ts for why). Shown for Video/Voice/Message, the
- * three "make it yourself" paths — not for Choose file, since there's
- * nothing left to prepare once you already have a finished recording. */
+/** One opened script: the lettered cues on the left of the organizer's
+ * template, and the written-out first-person version on the right.
+ *
+ * The written half is a real <textarea>, not styled text, for three
+ * reasons the organizer asked for directly: it can be selected, it can be
+ * edited in place (fill in the XXX and ______ before recording), and it can
+ * be copied in one press. Local state starts from the shared template so
+ * edits never leak between scripts or across sessions. */
+function ScriptDetail({ script }: { script: TestimonialScript }) {
+  const [text, setText] = useState(() => scriptText(script));
+  const [copied, setCopied] = useState(false);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      // Clipboard permission can be refused — the textarea is still
+      // selectable by hand, so this is not worth an error message.
+    }
+  }
+
+  return (
+    <div className="grid gap-3 px-3 pb-3 pt-1 sm:grid-cols-2">
+      <div>
+        <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-neutral-400">
+          What to cover
+        </p>
+        <ol className="list-[lower-alpha] space-y-1 pl-4 text-xs text-neutral-600">
+          {script.prompts.map((p, i) => (
+            <li key={i}>{p}</li>
+          ))}
+        </ol>
+      </div>
+      <div>
+        <div className="mb-1 flex items-center justify-between gap-2">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-neutral-400">
+            Your script — edit the blanks
+          </p>
+          <button
+            type="button"
+            onClick={copy}
+            className="rounded border border-neutral-300 px-2 py-0.5 text-[11px] font-semibold text-neutral-600 hover:bg-neutral-50"
+          >
+            {copied ? "✓ Copied" : "Copy"}
+          </button>
+        </div>
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          rows={12}
+          spellCheck={false}
+          className="w-full select-text rounded border border-neutral-300 bg-white p-2 text-xs leading-relaxed text-neutral-800"
+        />
+        <p className="mt-1 text-[11px] text-neutral-400">
+          Replace XXX with names and fill in each ______ with your own details.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/** Sample scripts to prepare with. Each one carries the organizer's own
+ * two-column template: lettered cues on one side, the same thing written
+ * out in the first person on the other (see lib/testimonial-scripts.ts).
+ * Shown for Video/Voice/Message, the three "make it yourself" paths — not
+ * for Choose file, since there's nothing left to prepare once you already
+ * have a finished recording. */
 function ScriptPicker() {
   const [band, setBand] = useState<ScriptLengthBand | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -80,7 +151,7 @@ function ScriptPicker() {
         ))}
       </div>
       {band && (
-        <ul className="mt-2 max-h-64 space-y-1 overflow-y-auto">
+        <ul className="mt-2 max-h-[32rem] space-y-1 overflow-y-auto">
           {scriptsForBand(band).map((script) => (
             <li key={script.id} className="rounded border border-neutral-200">
               <button
@@ -91,13 +162,7 @@ function ScriptPicker() {
                 {script.title}
                 <span className="text-neutral-400">{openId === script.id ? "▲" : "▼"}</span>
               </button>
-              {openId === script.id && (
-                <ol className="list-decimal space-y-1 px-6 pb-2 text-xs text-neutral-600">
-                  {script.prompts.map((p, i) => (
-                    <li key={i}>{p}</li>
-                  ))}
-                </ol>
-              )}
+              {openId === script.id && <ScriptDetail script={script} />}
             </li>
           ))}
         </ul>

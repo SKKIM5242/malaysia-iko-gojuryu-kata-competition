@@ -1,11 +1,22 @@
-/** Sample testimonial "scripts" a Top-3 winner can pick from before
- * recording their video testimonial — talking-point cue cards, not
- * word-for-word paragraphs to recite. A read testimonial sounds recited;
- * a winner speaking naturally from a short list of cues, in their own
- * words, sounds like themselves — and still lands in the organizer's
- * required length band once each cue is answered at a normal, unhurried
- * pace. Shown in the TestimonialRecorder video panel, next to the
- * practice-take toggle. */
+/** Sample testimonial scripts a Top-3 winner can pick from before recording
+ * their video testimonial.
+ *
+ * Each script now carries BOTH halves of the organizer's own template:
+ *
+ *   - `prompts` — the lettered cues (a, b, c...) saying what to cover;
+ *   - `script`  — the same thing written out in the first person, on the
+ *     participant's behalf, with XXX and ______ left for them to fill in.
+ *
+ * The written half exists because cue cards alone assume the speaker can
+ * compose fluent English on camera under pressure, which is not a fair
+ * assumption for a competition whose entrants span many countries and ages.
+ * Every script opens with "Hi" and closes with "Thank you", per the
+ * organizer's template.
+ *
+ * They stay editable and copyable everywhere they appear: the picker
+ * renders `script` in a selectable textarea with a Copy button, and the
+ * downloadable PDF prints the cues and the script side by side, exactly
+ * like the organizer's own two-column table. */
 
 export type ScriptLengthBand = "3min" | "5min" | "10min";
 
@@ -16,6 +27,9 @@ export interface TestimonialScript {
   /** Roughly how long a natural, unhurried answer to each cue takes —
    * enough cues at that pace to fill the band's target length. */
   prompts: string[];
+  /** The same cues written out on the participant's behalf, one line per
+   * element. Blanks are XXX (names) or ______ (everything else). */
+  script: string[];
 }
 
 export const SCRIPT_LENGTH_LABEL: Record<ScriptLengthBand, string> = {
@@ -23,6 +37,15 @@ export const SCRIPT_LENGTH_LABEL: Record<ScriptLengthBand, string> = {
   "5min": "~5 minutes (10 scripts)",
   "10min": "~10 minutes (20 scripts)",
 };
+
+/** Repeated opening block from the organizer's own example — kept identical
+ * across scripts so a participant who fills it in once can reuse it. */
+const OPEN_BELT = [
+  "Hi, My name is XXX, I am a ___________ holder.",
+  "I compete in Kata ______________",
+  "Gender: _________ - Age group: __________",
+  "In Malaysia Open Virtual Karate-do Kata Competition USD 10 /100/200 Tier.",
+];
 
 const THREE_MIN: TestimonialScript[] = [
   {
@@ -34,6 +57,13 @@ const THREE_MIN: TestimonialScript[] = [
       "Mention one thing about how it was run that you appreciated.",
       "Say what you'd tell a friend thinking about joining next time.",
     ],
+    script: [
+      ...OPEN_BELT,
+      "I am very happy to say that I won ________ place in my category.",
+      "A big Thanks to the organizer for putting together a virtual competition where I could join from anywhere.",
+      "This event was run in a period of ______ weeks times is the one thing that I really appreciated.",
+      "I would really encourage my karateka friends to join next time as all the judging score & video were disclose after the winner announcement date - I am really impressed & learn a lot about the fair & square & the disclosure system. Thank you.",
+    ],
   },
   {
     id: "3-02", lengthBand: "3min", title: "My kata journey, the short version",
@@ -43,6 +73,15 @@ const THREE_MIN: TestimonialScript[] = [
       "Describe one moment during training that stands out.",
       "Say how it felt watching the scores come in.",
       "Close with what this win means for your training going forward.",
+    ],
+    script: [
+      "Hi, My name is XXX, I have been training Goju-ryu karate-do for the past ______ years.",
+      "I compete in Kata ______________",
+      "Gender: _________ - Age group: __________",
+      "because I have confidence I will do better.",
+      "This is the Kata my sensei stress a lot which to area to do what & which area must be in this way in order to score.",
+      "I surprise watching the judging score & video which was disclose on the winner announcement date.",
+      "This win means that I will train harder base on my experience sensei advise more seriously in the training going forward. Thank you.",
     ],
   },
   {
@@ -54,6 +93,13 @@ const THREE_MIN: TestimonialScript[] = [
       "Say something encouraging to everyone who competed alongside you.",
       "End with congratulations to the other winners in your category.",
     ],
+    script: [
+      ...OPEN_BELT,
+      "To anyone who is nervous about their first competition, I want to say that I was nervous too, and the nervous feeling goes away the moment I start my first move.",
+      "My advice for the recording is to prepare your space first - clear the floor, check your light, and stand far enough so the camera can see your whole body from head to toe.",
+      "To everyone who competed with me, you already won something by having the courage to record and submit.",
+      "Congratulations to the other winners in my category, ________ and ________ - you both performed very well and I learn from watching you. Thank you.",
+    ],
   },
   {
     id: "3-04", lengthBand: "3min", title: "Thank you to my sensei",
@@ -63,6 +109,15 @@ const THREE_MIN: TestimonialScript[] = [
       "Share a specific correction or piece of coaching that helped you improve.",
       "Say how it felt to bring this result back to your dojo.",
       "Thank your sensei directly, by name.",
+    ],
+    script: [
+      "Hi, My name is XXX, I train under Sensei XXX at ______________ Dojo.",
+      "I compete in Kata ______________",
+      "Gender: _________ - Age group: __________",
+      "The most important thing my sensei taught me for this kata is ______________________, and it is the reason my performance held together on the day.",
+      "The correction that helped me most was when my sensei told me ______________________ - after that my ________ became much more stable.",
+      "Bringing this result back to my dojo felt very good, because it belongs to the whole dojo and not only to me.",
+      "Sensei XXX, thank you very much for your patience and your teaching. Thank you.",
     ],
   },
   {
@@ -74,6 +129,13 @@ const THREE_MIN: TestimonialScript[] = [
       "Say what this win means to share with them.",
       "Thank them directly, by name if you'd like.",
     ],
+    script: [
+      ...OPEN_BELT,
+      "My family supported my training all the way, especially XXX, who ______________________ for me every week.",
+      "On the recording day, XXX helped me by ______________________, and we had to do it ______ times before I was satisfied.",
+      "Sharing this win with them means everything to me, because they gave up their own time so I could train.",
+      "XXX and XXX, thank you for supporting me from the beginning until today. Thank you.",
+    ],
   },
   {
     id: "3-06", lengthBand: "3min", title: "Overcoming nerves on recording day",
@@ -83,6 +145,13 @@ const THREE_MIN: TestimonialScript[] = [
       "Say what helped you calm down or focus.",
       "Share what happened once you actually started your kata.",
       "End with advice for someone else who gets nervous on camera.",
+    ],
+    script: [
+      ...OPEN_BELT,
+      "Right before I press the record button, I felt ______________________ - my hands were not steady and my mind was thinking too much.",
+      "What helped me calm down was ______________________, and I also reminded myself that I have practiced this kata ______ times already.",
+      "Once I started the kata, the nervous feeling disappeared and my body just followed the training.",
+      "So my advice is simple - do not fight the nervous feeling, just start your first move and let your training take over. Thank you.",
     ],
   },
   {
@@ -94,6 +163,13 @@ const THREE_MIN: TestimonialScript[] = [
       "Share one surprise — good or challenging — about competing this way.",
       "Say whether you'd choose this format again.",
     ],
+    script: [
+      ...OPEN_BELT,
+      "This virtual format was easier for me because ______________________ - I did not need to travel and I could compete from my own place.",
+      "I recorded at ______________________, using ______________________ as my camera, and I made sure the background was clean and the light was in front of me.",
+      "The thing that surprised me was ______________________, which I did not expect at all before I started.",
+      "I would definitely choose this format again, and I hope the organizer keeps running it this way. Thank you.",
+    ],
   },
   {
     id: "3-08", lengthBand: "3min", title: "What winning this means to me",
@@ -103,6 +179,13 @@ const THREE_MIN: TestimonialScript[] = [
       "Describe the moment you found out you placed.",
       "Say what this result changes for you — confidence, goals, next steps.",
       "Thank the organizer and judges briefly.",
+    ],
+    script: [
+      ...OPEN_BELT,
+      "I won ________ place, and honestly, going in I was only hoping to ______________________.",
+      "The moment I found out I placed, I was at ______________________ and my first reaction was ______________________.",
+      "This result changes a lot for me - it gives me the confidence to aim for ______________________ next.",
+      "Thank you to the organizer for the opportunity, and thank you to the judges for taking the time to watch and score my recording. Thank you.",
     ],
   },
   {
@@ -114,6 +197,15 @@ const THREE_MIN: TestimonialScript[] = [
       "Say what keeps you motivated to keep training.",
       "Encourage a beginner watching this to enter next time.",
     ],
+    script: [
+      "Hi, My name is XXX, I have been practicing karate for the past ______ years.",
+      "I compete in Kata ______________",
+      "Gender: _________ - Age group: __________",
+      "The one thing I wish somebody told me when I started is ______________________.",
+      "My best tip for learning a new kata is to break it into small sections and repeat one section until it feels natural, instead of running the whole kata from the beginning every time.",
+      "What keeps me motivated is ______________________, and also seeing myself improve little by little.",
+      "If you are a beginner watching this, please join next time - you will learn more from one competition than from many months of normal class. Thank you.",
+    ],
   },
   {
     id: "3-10", lengthBand: "3min", title: "My favorite moment from this competition",
@@ -123,6 +215,13 @@ const THREE_MIN: TestimonialScript[] = [
       "Say why that moment stuck with you.",
       "Connect it to why you love this sport.",
       "Close with thanks to everyone who made the competition possible.",
+    ],
+    script: [
+      ...OPEN_BELT,
+      "My favourite moment from this whole competition was ______________________.",
+      "That moment stuck in my mind because ______________________.",
+      "It reminds me why I love this sport - karate is not only about winning, it is about the small moments where you feel your own progress.",
+      "Thank you to the organizer, the judges, my sensei and everyone who made this competition possible. Thank you.",
     ],
   },
 ];
@@ -141,6 +240,21 @@ const FIVE_MIN: TestimonialScript[] = [
       "Say what's next for your training.",
       "Thank the organizer, your sensei, and your family, briefly, by name.",
     ],
+    script: [
+      "Hi, My name is XXX, I train at ______________ Dojo and I am a ___________ holder.",
+      "I compete in Kata ______________",
+      "Gender: _________ - Age group: __________",
+      "In Malaysia Open Virtual Karate-do Kata Competition USD 10 /100/200 Tier.",
+      "I have been training for ______ years, and I started Goju-ryu because ______________________.",
+      "In the weeks before this competition, my routine was ______ sessions a week, about ______ hours each time, and I spent most of that time on ______________________.",
+      "The kata I performed is ______________, which was ________ for my category, and I felt it suited me because ______________________.",
+      "The most difficult part of this kata for me was ______________________ - my ________ was not correct and it kept costing me balance.",
+      "I worked through it by ______________________, and after about ______ weeks it finally became stable.",
+      "On the recording day I recorded at ______________________, in the ________, and I needed ______ takes before I was satisfied with one.",
+      "When I found out my result, I was ______________________ and my first feeling was ______________________.",
+      "What is next for me is ______________________, and I want to train more seriously on ______________________.",
+      "Thank you to the organizer for running this competition, thank you Sensei XXX for your teaching, and thank you to XXX and XXX in my family for supporting me all the way. Thank you.",
+    ],
   },
   {
     id: "5-02", lengthBand: "5min", title: "Overcoming a specific challenge",
@@ -154,6 +268,17 @@ const FIVE_MIN: TestimonialScript[] = [
       "Say how you felt performing despite it.",
       "Reflect on what this taught you about yourself.",
       "Close with advice for someone facing a similar obstacle right now.",
+    ],
+    script: [
+      ...OPEN_BELT,
+      "This season I faced a real problem, which was ______________________.",
+      "I first noticed it was holding me back around ______________________, when I realised I could not ______________________ the way I used to.",
+      "To work through it I changed ______________________, and I also had to accept that progress would be slower than I wanted.",
+      "XXX helped me a lot during that period by ______________________ - without that help I do not think I would have submitted at all.",
+      "On the recording day, the problem showed up ______________________, but I had already prepared for it.",
+      "Performing despite it felt ______________________, and I am proud that I did not give myself an excuse to stop.",
+      "What this taught me about myself is ______________________.",
+      "If you are facing the same kind of obstacle right now, my advice is to keep training the parts you still can, and be patient with the parts you cannot. Thank you.",
     ],
   },
   {
@@ -169,6 +294,20 @@ const FIVE_MIN: TestimonialScript[] = [
       "Say what you hope for your dojo's future competitors.",
       "Thank your dojo directly, by name.",
     ],
+    script: [
+      "Hi, My name is XXX, I train at ______________ Dojo under Sensei XXX.",
+      "I compete in Kata ______________",
+      "Gender: _________ - Age group: __________",
+      "In Malaysia Open Virtual Karate-do Kata Competition USD 10 /100/200 Tier.",
+      "Training at my dojo is normally ______________________ - we usually start with ______________________ and finish with ______________________.",
+      "For this competition, my dojo prepared me by ______________________, which was different from our normal class.",
+      "XXX pushed me the most during that period, especially when ______________________.",
+      "There was one session on ______________________ that really made the difference for me, because ______________________.",
+      "Representing my dojo in this competition felt ______________________, and I was very aware that I was not only performing for myself.",
+      "What I want my dojo-mates to know is that the recording is not as frightening as it looks, and the preparation is the same discipline we do every week.",
+      "I hope our future competitors from ______________ Dojo will enter in bigger numbers next time.",
+      "Thank you to everyone at ______________ Dojo. Thank you.",
+    ],
   },
   {
     id: "5-04", lengthBand: "5min", title: "A message to future competitors",
@@ -182,6 +321,18 @@ const FIVE_MIN: TestimonialScript[] = [
       "Give one concrete tip about the mental side (focus, breathing, routine).",
       "Say what surprised you most about the experience.",
       "End with direct encouragement to someone thinking about entering.",
+    ],
+    script: [
+      ...OPEN_BELT,
+      "I placed ________ in my category.",
+      "What I wish somebody had told me before my first competition is ______________________.",
+      "I chose my kata because ______________________, and I practiced it ______ times a week for about ______ weeks.",
+      "For the recording, I chose ______________________ as my space and recorded in the ________ when the light was best, and I used ______ takes in total.",
+      "I managed my nerves by ______________________, and by reminding myself that a retake is allowed.",
+      "My technical tip is this - stand far enough back that your whole body including your hands and feet stays inside the frame for the entire kata, and check it by watching one practice take before the real one.",
+      "My mental tip is this - do your normal warm-up routine exactly as you do in class, because the familiar routine tells your body that this is not something strange.",
+      "What surprised me the most was ______________________.",
+      "If you are thinking about entering, please do it - you will not regret it, and you will improve just from the preparation. Thank you.",
     ],
   },
   {
@@ -197,6 +348,20 @@ const FIVE_MIN: TestimonialScript[] = [
       "Describe how practice felt different the week of the actual recording.",
       "Close with what you'll focus on next in your kata training.",
     ],
+    script: [
+      "Hi, My name is XXX, and the kata I performed is ______________.",
+      "I compete in Kata ______________",
+      "Gender: _________ - Age group: __________",
+      "In Malaysia Open Virtual Karate-do Kata Competition USD 10 /100/200 Tier.",
+      "My usual practice space is ______________________, which is ______________________ but it is enough for me to work.",
+      "When I practice, I break the kata into ______ sections and work on one section at a time, stance by stance, before I put the whole kata together.",
+      "The mistake I used to make in this kata was ______________________, and I fixed it by ______________________.",
+      "Leading into the competition I practiced ______ times a week, about ______ minutes each session.",
+      "I also recorded myself on my phone and watched it back - seeing my own ________ from outside was the fastest way to correct it.",
+      "The part of this kata I am proudest of now is ______________________.",
+      "In the week of the actual recording, practice felt ______________________ compared to normal weeks.",
+      "Next in my kata training, I want to focus on ______________________. Thank you.",
+    ],
   },
   {
     id: "5-06", lengthBand: "5min", title: "What Goju-ryu means to me",
@@ -210,6 +375,20 @@ const FIVE_MIN: TestimonialScript[] = [
       "Describe what you felt performing it on camera, alone, versus in a group class.",
       "Reflect on how this art continues to challenge you.",
       "Close with what Goju-ryu means to you today, in one or two sentences.",
+    ],
+    script: [
+      "Hi, My name is XXX, I have been studying Goju-ryu for the past ______ years.",
+      "I compete in Kata ______________",
+      "Gender: _________ - Age group: __________",
+      "In Malaysia Open Virtual Karate-do Kata Competition USD 10 /100/200 Tier.",
+      "What first drew me to Goju-ryu instead of another style was ______________________.",
+      "Goju means hard and soft, and in my own kata I feel the hard part in ______________________ and the soft part in ______________________.",
+      "The value from Goju-ryu training that has shaped me outside the dojo is ______________________.",
+      "The teacher who matters most in my line is ______________________, and what I learned from that teaching is ______________________.",
+      "Performing this kata for a competition changed my relationship with it, because now I understand ______________________ that I never paid attention to before.",
+      "Performing it alone on camera felt very different from a group class - there is nobody beside me to follow, so every timing is my own decision.",
+      "This art still challenges me in ______________________, and I do not think that will ever finish.",
+      "Today, Goju-ryu means ______________________ to me. Thank you.",
     ],
   },
   {
@@ -225,6 +404,18 @@ const FIVE_MIN: TestimonialScript[] = [
       "Reflect on what pride in this achievement actually feels like for you.",
       "Close with thanks to whoever made this moment possible.",
     ],
+    script: [
+      ...OPEN_BELT,
+      "I placed ________ in my category.",
+      "I found out on ______________________, when I was at ______________________.",
+      "My honest first reaction was ______________________ - I had to check the announcement again to believe it.",
+      "The first person I told was XXX, and the reaction was ______________________.",
+      "This moment means more to me because of an earlier time when ______________________, and back then I really thought about stopping.",
+      "This win feels different from anything before because ______________________.",
+      "To celebrate, I ______________________ - nothing big, but it felt right.",
+      "Being proud of this does not feel like showing off, it feels like ______________________.",
+      "Thank you to everyone who made this moment possible - Sensei XXX, my family, and the organizer. Thank you.",
+    ],
   },
   {
     id: "5-08", lengthBand: "5min", title: "Thanks to everyone who helped",
@@ -238,6 +429,18 @@ const FIVE_MIN: TestimonialScript[] = [
       "Thank the referees/judges for their time reviewing your recording.",
       "Say what it means to have this many people behind one performance.",
       "Close with a general thank-you to everyone watching this testimonial.",
+    ],
+    script: [
+      ...OPEN_BELT,
+      "I placed ________ in my category.",
+      "Thank you Sensei XXX - what you gave me was not only the technique, it was ______________________.",
+      "Thank you XXX, my training partner, for ______________________ even when you had your own training to worry about.",
+      "Thank you XXX from my family, for ______________________ - I know it was not convenient.",
+      "Thank you XXX for helping me film and set up the recording, and for being patient through ______ takes.",
+      "Thank you to the organizer for running this competition and making it possible for people like me to take part from anywhere.",
+      "Thank you to all the referees and judges who spent their own time watching and scoring every recording carefully.",
+      "It means a lot to realise that one performance of a few minutes actually carries this many people behind it.",
+      "And thank you to everyone watching this. Thank you.",
     ],
   },
   {
@@ -253,6 +456,18 @@ const FIVE_MIN: TestimonialScript[] = [
       "Reflect on whether it felt worth it now that you've placed.",
       "Close with advice for someone else juggling training with a full life.",
     ],
+    script: [
+      ...OPEN_BELT,
+      "Outside of karate, my main commitment is ______________________, which takes most of my day.",
+      "In a typical week, I train on ______________________, usually ______________________, because that is the only time I can protect.",
+      "To prepare properly I had to give up ______________________, and rearrange ______________________.",
+      "The hardest week was ______________________, when ______________________ happened at the same time as my training.",
+      "What kept me going was ______________________.",
+      "The people around me supported me by ______________________, and I could not have kept the balance without that.",
+      "What I learned about discipline is that it is not about training when you feel strong, it is about training on the days you do not feel like it.",
+      "Now that I have placed ________, I can say it was worth every rearrangement.",
+      "If you are juggling training with a full life, my advice is to protect one fixed session a week and never move it. Thank you.",
+    ],
   },
   {
     id: "5-10", lengthBand: "5min", title: "My kata story — why I chose this kata",
@@ -266,6 +481,20 @@ const FIVE_MIN: TestimonialScript[] = [
       "Say how your understanding of this kata changed as you prepared for competition.",
       "Describe how it felt to perform it, knowing it would be judged.",
       "Close with what this kata means to you going forward.",
+    ],
+    script: [
+      "Hi, My name is XXX, and the kata I performed for this competition is ______________.",
+      "I compete in Kata ______________",
+      "Gender: _________ - Age group: __________",
+      "In Malaysia Open Virtual Karate-do Kata Competition USD 10 /100/200 Tier.",
+      "I first learned this kata in ________, and it was taught to me by Sensei XXX.",
+      "What drew me to this kata over the others is ______________________.",
+      "As I understand it, the meaning behind this kata is ______________________.",
+      "The most difficult sequence for me is ______________________, because ______________________.",
+      "The most satisfying part to perform is ______________________ - when it is correct, you can feel it.",
+      "Preparing for competition changed my understanding, because I had to think about ______________________ instead of just remembering the moves.",
+      "Performing it knowing that judges would watch every detail felt ______________________.",
+      "Going forward, this kata means ______________________ to me. Thank you.",
     ],
   },
 ];
@@ -291,6 +520,28 @@ const TEN_MIN: TestimonialScript[] = [
       "Say what this result means for your training and goals going forward.",
       "Close with thanks to your sensei, your family, the organizer, and the judges, each by name if possible.",
     ],
+    script: [
+      "Hi, My name is XXX, I am a ___________ holder, I train at ______________ Dojo under Sensei XXX.",
+      "I compete in Kata ______________",
+      "Gender: _________ - Age group: __________",
+      "In Malaysia Open Virtual Karate-do Kata Competition USD 10 /100/200 Tier.",
+      "I first started karate in ________, when I was ______ years old, and I came into Goju-ryu specifically because ______________________.",
+      "What made me decide to enter this competition was ______________________.",
+      "The registration itself was ______________________ for me, I chose the ________ Tier, and the only thing I was not sure about at first was ______________________.",
+      "From the day I registered until the recording deadline, my plan was ______ sessions a week for ______ weeks, and each week I focused on one thing at a time.",
+      "The kata for my category is ______________, and my first impression of it was ______________________.",
+      "I practiced it with ______________________, and week by week I worked on ______________________, then ______________________, then ______________________.",
+      "During preparation I had a setback - ______________________ - and it happened around ______________________.",
+      "I worked through it by ______________________, and by accepting that I had to slow down before I could speed up again.",
+      "For the recording, I chose ______________________ as my space, because the floor was ______________________ and the light came from ______________________.",
+      "I wore ______________________, and I made sure the background was plain so nothing would distract the judges.",
+      "On the recording day itself I needed ______ takes - the first one failed because ______________________, and the one I kept was better because ______________________.",
+      "Watching my own recording back before submitting was uncomfortable at first, because I could see every small mistake, but it also showed me that the overall kata was solid.",
+      "The wait between submitting and the announcement felt ______________________, and I tried not to think about it too much.",
+      "When I found out I placed in the Top 3, I was at ______________________ and I felt ______________________.",
+      "For my training going forward, this result means ______________________, and my next goal is ______________________.",
+      "Thank you Sensei XXX for your teaching, thank you XXX and XXX in my family, thank you to the organizer for making this competition possible, and thank you to all the judges who reviewed my recording. Thank you.",
+    ],
   },
   {
     id: "10-02", lengthBand: "10min", title: "Family support, from start to finish",
@@ -307,6 +558,21 @@ const TEN_MIN: TestimonialScript[] = [
       "Say what you'd want your family to know that you don't usually say out loud.",
       "Describe how you hope to repay or honor that support going forward.",
       "Close with a direct, heartfelt thank-you to your family, by name.",
+    ],
+    script: [
+      ...OPEN_BELT,
+      "I placed ________ in my category.",
+      "My family first got involved in my karate journey when ______________________.",
+      "XXX played the biggest role by ______________________, XXX helped by ______________________, and XXX supported me by ______________________.",
+      "Early in my training there was a moment when ______________________, and without my family I would have stopped there.",
+      "In the lead-up to this competition, my family helped by ______________________, including rearranging ______________________ so I could train.",
+      "XXX filmed my recording, and that day was long for them too - they had to stand and hold still for ______ takes without complaining.",
+      "The funniest moment was when ______________________, and we still laugh about it now.",
+      "When I told them my result, XXX reacted by ______________________, and XXX ______________________.",
+      "Sharing this achievement with them means more than the placing itself, because they carried the parts nobody sees.",
+      "What I do not usually say out loud is ______________________.",
+      "Going forward, I hope to repay that support by ______________________.",
+      "XXX, XXX and XXX - thank you for everything you did for me. Thank you.",
     ],
   },
   {
@@ -325,6 +591,23 @@ const TEN_MIN: TestimonialScript[] = [
       "Describe what you'd want other students to know about training under your sensei.",
       "Close with a direct, respectful thank-you to your sensei.",
     ],
+    script: [
+      "Hi, My name is XXX, I train under Sensei XXX at ______________ Dojo.",
+      "I compete in Kata ______________",
+      "Gender: _________ - Age group: __________",
+      "In Malaysia Open Virtual Karate-do Kata Competition USD 10 /100/200 Tier, and I placed ________.",
+      "I first met Sensei XXX in ________, and my early lessons were ______________________ - I remember being ______________________.",
+      "My sensei's teaching style is ______________________, and the philosophy behind it is ______________________.",
+      "One lesson that has stayed with me is ______________________, and it applies far outside the dojo.",
+      "For this competition's kata, Sensei XXX prepared me by ______________________.",
+      "The one correction that changed my performance the most was ______________________ - before that, my ________ was wrong every single time and I could not see it myself.",
+      "There was a moment when I doubted myself, around ______________________, and Sensei XXX told me ______________________, which is the reason I kept going.",
+      "After seeing my result, my sensei ______________________, and that meant a great deal to me.",
+      "Over the years our relationship has grown from ______________________ into ______________________.",
+      "What I hope to carry forward from this teaching is ______________________.",
+      "To other students thinking about training under Sensei XXX - ______________________.",
+      "Sensei XXX, thank you very much for everything you have taught me. Thank you.",
+    ],
   },
   {
     id: "10-04", lengthBand: "10min", title: "Mental preparation and focus",
@@ -341,6 +624,21 @@ const TEN_MIN: TestimonialScript[] = [
       "Reflect on how your mental approach to competition has changed over time.",
       "Share one mental-preparation tip you'd give another competitor.",
       "Close with what mental strength means to you as a martial artist.",
+    ],
+    script: [
+      ...OPEN_BELT,
+      "I placed ________ in my category.",
+      "In the weeks before the deadline, my mindset was ______________________ - some days confident, some days not.",
+      "My routine before performing is ______________________, then ______________________, and finally ______ deep breaths before I bow.",
+      "During preparation, self-doubt got in my way around ______________________, when I kept making the same mistake in ______________________.",
+      "I talked myself through it by ______________________, and by reminding myself that one bad session is not the whole training.",
+      "In the seconds right before starting a kata, focus for me feels like ______________________ - everything outside the frame disappears.",
+      "During my kata I had to refocus at ______________________, because ______________________ almost pulled my attention away.",
+      "Recording alone without an audience affected me ______________________ - there is no energy from a crowd, so all the intensity has to come from inside.",
+      "Afterwards, I reviewed my own recording by looking for one thing to fix and one thing done well, instead of only hunting for mistakes.",
+      "Over time, my mental approach has changed from ______________________ to ______________________.",
+      "My one tip for another competitor is to rehearse your routine, not only your kata - the routine is what carries you when the nerves arrive.",
+      "For me, mental strength means ______________________. Thank you.",
     ],
   },
   {
@@ -359,6 +657,21 @@ const TEN_MIN: TestimonialScript[] = [
       "Say what you'd tell someone else currently dealing with an injury.",
       "Close with gratitude for being able to compete and place despite the setback.",
     ],
+    script: [
+      ...OPEN_BELT,
+      "I placed ________ in my category.",
+      "In ________ I suffered ______________________, and it happened while I was ______________________.",
+      "It affected my training badly - I could not ______________________ for about ______ weeks, and my confidence dropped even more than my ability.",
+      "My recovery involved ______________________, plus rest and a modified training plan where I only worked on ______________________.",
+      "XXX supported me through the recovery by ______________________, and ______________________ also helped me a great deal.",
+      "The day I returned to full training, I felt ______________________.",
+      "The setback changed how I approach this kata - now I pay much more attention to ______________________ before I do anything at full power.",
+      "For the recording itself, I still adjusted ______________________ to protect myself.",
+      "Performing fully again after all of that felt ______________________, and honestly that feeling was already a win before any result came out.",
+      "What this taught me about patience is ______________________.",
+      "If you are dealing with an injury right now, I would tell you to train what you still can, follow the recovery properly, and do not compare yourself to where you were before.",
+      "I am grateful that I was able to compete at all, and placing ________ on top of that is something I will not forget. Thank you.",
+    ],
   },
   {
     id: "10-06", lengthBand: "10min", title: "Why karate matters to me",
@@ -375,6 +688,23 @@ const TEN_MIN: TestimonialScript[] = [
       "Reflect on how you hope to keep growing in this art.",
       "Describe what you'd want a non-practitioner to understand about why this matters to you.",
       "Close with what karate means to you today, in your own words.",
+    ],
+    script: [
+      "Hi, My name is XXX, I have practiced karate for the past ______ years.",
+      "I compete in Kata ______________",
+      "Gender: _________ - Age group: __________",
+      "In Malaysia Open Virtual Karate-do Kata Competition USD 10 /100/200 Tier, and I placed ________.",
+      "What first brought me to karate was ______________________.",
+      "In the early days it was hard and sometimes boring, and what kept me training was ______________________.",
+      "Karate has shaped my discipline outside the dojo - because of training, I now ______________________ in my daily life.",
+      "It has also changed how I carry myself, especially ______________________.",
+      "There was a difficult period in my life around ______________________, and karate helped me through it by ______________________.",
+      "What I value about Goju-ryu specifically is ______________________, compared with the other styles I have seen.",
+      "Between kata and kumite, I am drawn more to ______________________, because ______________________.",
+      "Performing this kata for competition added something to my understanding - I realised ______________________.",
+      "I hope to keep growing in this art by ______________________.",
+      "If somebody has never trained, what I would want them to understand is that karate is not about fighting, it is about ______________________.",
+      "Today, karate means ______________________ to me. Thank you.",
     ],
   },
   {
@@ -393,6 +723,21 @@ const TEN_MIN: TestimonialScript[] = [
       "Describe the kind of competitor or teacher you hope to become.",
       "Close with direct, encouraging words to the next generation of Goju-ryu students.",
     ],
+    script: [
+      ...OPEN_BELT,
+      "I placed ________ in my category.",
+      "My own first competition was in ________, and honestly it was ______________________.",
+      "Since then I have come a long way - back then I could not ______________________, and now ______________________.",
+      "What I wish an older student had told me when I started is ______________________.",
+      "If I had to explain the value of competing to a newer student, I would say that competition is the fastest way to find out which parts of your kata you actually own.",
+      "My step-by-step approach is this - first learn the sequence, then fix the stances, then fix the timing, then add the power, and only at the end run the whole kata at full speed.",
+      "For the video submission - set up your space and light first, do one practice take and watch it, then do your real takes, and always review before you submit.",
+      "For nerves and pressure - keep your normal warm-up, breathe slowly before you bow, and remember that everybody recording today feels exactly the same.",
+      "If you did not place this time, I would tell you that ______________________, and that the next one is much closer than you think.",
+      "What keeps competitors coming back year after year is ______________________.",
+      "The kind of competitor and teacher I hope to become is ______________________.",
+      "To the next generation of Goju-ryu students - train honestly, enter the competition, and do not wait until you feel ready. Thank you.",
+    ],
   },
   {
     id: "10-08", lengthBand: "10min", title: "Detailed thanks to everyone involved",
@@ -409,6 +754,21 @@ const TEN_MIN: TestimonialScript[] = [
       "Reflect on the responsibility that comes with representing all of them.",
       "Describe how you hope to pay this support forward to someone else.",
       "Close with one last, sincere thank-you to everyone who made this possible.",
+    ],
+    script: [
+      ...OPEN_BELT,
+      "I placed ________ in my category.",
+      "Thank you Sensei XXX - for this kata you taught me ______________________, and you kept correcting it until it was right.",
+      "Thank you XXX, my senior at the dojo, for pushing me by ______________________ even when I wanted to stop early.",
+      "Thank you XXX for ______________________, thank you XXX for ______________________, and thank you XXX for ______________________.",
+      "Thank you XXX for helping with the filming - you set up ______________________ and stayed patient through ______ takes.",
+      "Thank you to the organizer. What stood out for me was ______________________, and also that the judging scores and videos were disclosed after the winner announcement date.",
+      "Thank you to every referee and judge who spent their own time watching and scoring recordings carefully and fairly.",
+      "Thank you also to ______________________ and everybody at my dojo who encouraged me along the way.",
+      "It is a strange feeling to realise how many people stand behind a performance of only a few minutes.",
+      "That also brings a responsibility - when I perform, I am representing all of them, not only myself.",
+      "I hope to pay this forward by ______________________ for the next student who needs the same help.",
+      "One last sincere thank you to everyone who made this possible. Thank you.",
     ],
   },
   {
@@ -427,6 +787,23 @@ const TEN_MIN: TestimonialScript[] = [
       "Describe what you hope to understand better in the years ahead.",
       "Close with what Goju-ryu's philosophy means to you as a person, not just a competitor.",
     ],
+    script: [
+      "Hi, My name is XXX, I am a ___________ holder with ______ years of training.",
+      "I compete in Kata ______________",
+      "Gender: _________ - Age group: __________",
+      "In Malaysia Open Virtual Karate-do Kata Competition USD 10 /100/200 Tier, and I placed ________.",
+      "In my own words, Goju means the balance of hard and soft, and to me that means ______________________.",
+      "In my own kata, I feel the hardness in ______________________, where the technique has to finish completely.",
+      "I feel the softness in ______________________, where forcing it only makes the movement worse.",
+      "The breathing principle that shapes my training comes from ______________________, and it teaches me ______________________.",
+      "Outside the dojo, this same balance shows up when ______________________.",
+      "There was one training session, around ______________________, where this balance really clicked for me, because ______________________.",
+      "Preparing this kata for competition deepened my understanding, because the judges look at ______________________, and that forced me to be honest about my own technique.",
+      "The part of Goju-ryu that still humbles me is ______________________.",
+      "Since I started, my understanding has changed from ______________________ to ______________________.",
+      "In the years ahead, I hope to understand ______________________ much better.",
+      "As a person, and not only as a competitor, this philosophy means ______________________ to me. Thank you.",
+    ],
   },
   {
     id: "10-10", lengthBand: "10min", title: "Competition day, play by play",
@@ -443,6 +820,22 @@ const TEN_MIN: TestimonialScript[] = [
       "Describe the moment you hit submit.",
       "Describe the waiting period before scores were released.",
       "Close with the moment you found out your result, and how you felt.",
+    ],
+    script: [
+      ...OPEN_BELT,
+      "I placed ________ in my category.",
+      "In the days right before the deadline I was ______________________, and I kept running the kata in my head.",
+      "I chose to record on ______________________ at ______________________, because that is when ______________________.",
+      "For my space I used ______________________ - plain background, light coming from ______________________, and the camera placed ______________________ so my whole body stayed in frame.",
+      "I wore ______________________, clean and properly tied.",
+      "My warm-up was exactly the same as in class - ______________________, then ______________________, so my body would not feel that anything was unusual.",
+      "My first take went wrong because ______________________.",
+      "In total I needed ______ takes, and between them I changed ______________________ and ______________________.",
+      "The take I finally submitted was the one where ______________________ - it was not perfect, but it was the most honest performance.",
+      "Reviewing the footage before uploading, I noticed ______________________, and I decided it was still the right one to send.",
+      "The moment I hit submit I felt ______________________.",
+      "The waiting period was ______________________ - I checked the announcement page more times than I want to admit.",
+      "When I finally found out my result, I felt ______________________, and I want to remember that feeling for a long time. Thank you.",
     ],
   },
   {
@@ -461,6 +854,21 @@ const TEN_MIN: TestimonialScript[] = [
       "Describe what success looks like for you a year from now.",
       "Close with your commitment to keep training and competing.",
     ],
+    script: [
+      ...OPEN_BELT,
+      "I placed ________ in my category.",
+      "In the short term, this result changes my goals - now I want to ______________________ within the next ______ months.",
+      "I am currently working towards ______________________, and my next grading target is ______________________.",
+      "For the next competition I plan to enter the ________ Tier, in the ______________________ category.",
+      "The skills I want to focus on now are ______________________ and ______________________.",
+      "At my dojo I would like to help the newer students by ______________________.",
+      "Beyond competition, my long-term goal in karate is ______________________.",
+      "Balancing that with the rest of my life will mean ______________________, and I know I will have to protect my training time.",
+      "The support I will need is ______________________ from my sensei, and ______________________ from my family.",
+      "This competition shaped those goals because it showed me ______________________.",
+      "A year from now, success for me looks like ______________________.",
+      "Whatever happens, I am committed to keep training and keep competing. Thank you.",
+    ],
   },
   {
     id: "10-12", lengthBand: "10min", title: "Advice for parents of young karateka",
@@ -477,6 +885,21 @@ const TEN_MIN: TestimonialScript[] = [
       "Reflect on what you'd want parents watching this to know.",
       "Describe the role of the dojo and sensei in supporting families.",
       "Close with encouragement to parents considering signing their child up.",
+    ],
+    script: [
+      ...OPEN_BELT,
+      "I placed ________ in my category, and I am ______ years old.",
+      "It was XXX who first brought me into karate, in ________, because ______________________.",
+      "At home, support looked like ______________________ - not pushing, just making it possible.",
+      "A parent can help best by ______________________, and by leaving the technical corrections to the sensei.",
+      "From a parent's side, filming a competition recording means standing still, holding the camera steady, and repeating it as many times as the child needs without showing frustration.",
+      "For a child's nerves before a competition, my advice is ______________________ - do not add extra pressure by talking about winning.",
+      "If a child does not place, the best thing to say is ______________________, because the disappointment passes much faster when the effort is recognised.",
+      "Competition is valuable for a young student because it builds ______________________ and ______________________ in a way normal class cannot.",
+      "The balance with school and other activities means ______________________, and it has to be planned, not left to chance.",
+      "What I would want parents watching this to know is ______________________.",
+      "The dojo and the sensei also carry part of this - they support the whole family, not only the student.",
+      "If you are a parent thinking about signing your child up, please do it - the discipline they gain lasts far longer than any medal. Thank you.",
     ],
   },
   {
@@ -495,6 +918,21 @@ const TEN_MIN: TestimonialScript[] = [
       "Describe how you'd explain this cultural depth to someone new to karate.",
       "Close with what this tradition means to you personally.",
     ],
+    script: [
+      ...OPEN_BELT,
+      "I placed ________ in my category.",
+      "I first learned about karate's Okinawan roots from ______________________, and it changed how I saw the training.",
+      "Learning the Japanese and Okinawan terminology meant ______________________ to me - the words carry the meaning that a translation loses.",
+      "Etiquette and respect show up in my daily training when ______________________, and it is not only a formality.",
+      "One tradition in my dojo that I value is ______________________.",
+      "To connect with the history behind my kata, I ______________________.",
+      "That understanding shaped how I performed for the competition, because I stopped treating the kata as a sequence and started treating it as ______________________.",
+      "Representing this tradition on a global online stage means ______________________.",
+      "There is a responsibility in carrying forward an art with this much history - it is not mine to change casually.",
+      "Going forward, I would like to learn more about ______________________.",
+      "If somebody new to karate asked me about this cultural depth, I would explain it by saying ______________________.",
+      "Personally, this tradition means ______________________ to me. Thank you.",
+    ],
   },
   {
     id: "10-14", lengthBand: "10min", title: "Comparing this competition to past ones",
@@ -511,6 +949,21 @@ const TEN_MIN: TestimonialScript[] = [
       "Describe what you'll carry forward from this experience into the next competition.",
       "Share advice for someone re-entering after a previous disappointing result.",
       "Close with how proud you are of the growth between then and now.",
+    ],
+    script: [
+      ...OPEN_BELT,
+      "I placed ________ in my category.",
+      "Before this, I entered ______________________ in ________, which was ______________________.",
+      "The preparation was different - for that one I ______________________, and for this one I ______________________.",
+      "The nerves were also different. Back then I felt ______________________, and this time I felt ______________________.",
+      "Based on that past experience, this time I changed ______________________.",
+      "The lesson from that earlier competition that shaped me most was ______________________.",
+      "Technically, my kata has improved since then in ______________________ and ______________________.",
+      "My mindset around winning and losing has changed from ______________________ to ______________________.",
+      "Comparing the formats, this virtual recorded competition is ______________________ compared with an in-person one, and I think both have their place.",
+      "What I will carry forward into the next competition is ______________________.",
+      "If you are re-entering after a disappointing result, my advice is that the earlier result is information, not a verdict - use it and enter again.",
+      "Looking at the difference between then and now, I am genuinely proud of the growth. Thank you.",
     ],
   },
   {
@@ -529,6 +982,23 @@ const TEN_MIN: TestimonialScript[] = [
       "Describe what you'll keep refining technically going forward.",
       "Close with what mastering this kata's technical details has taught you.",
     ],
+    script: [
+      "Hi, My name is XXX, and the kata I performed is ______________.",
+      "I compete in Kata ______________",
+      "Gender: _________ - Age group: __________",
+      "In Malaysia Open Virtual Karate-do Kata Competition USD 10 /100/200 Tier, and I placed ________.",
+      "The opening sequence demands ______________________, and if the opening is not clean the whole kata looks unsettled.",
+      "The stances used through this kata are ______________________, and the hardest one for me is ______________________ because ______________________.",
+      "The breathing pattern I follow is ______________________, and it has to match the technique, not the other way around.",
+      "The technique that really defines this kata is ______________________.",
+      "The rhythm is not flat - it is fast at ______________________ and slow and controlled at ______________________.",
+      "For precision, knowing that judges would review the recording frame by frame, I worked on ______________________ and checked it on video.",
+      "For power and kime, I focused on ______________________ at the key moments, without losing control of the stance.",
+      "The closing sequence is ______________________, and I wanted to finish as strongly as I started.",
+      "Technically, the part I am proudest of is ______________________.",
+      "Going forward I will keep refining ______________________.",
+      "What mastering the details of this kata has taught me is ______________________. Thank you.",
+    ],
   },
   {
     id: "10-16", lengthBand: "10min", title: "The mental-health benefits of martial arts",
@@ -545,6 +1015,23 @@ const TEN_MIN: TestimonialScript[] = [
       "Describe what you'd say to someone using martial arts to cope with a hard period in life.",
       "Describe your plans to keep training for wellbeing, not just competition.",
       "Close with what karate has given you mentally, beyond the medals.",
+    ],
+    script: [
+      "Hi, My name is XXX, I have been training for the past ______ years.",
+      "I compete in Kata ______________",
+      "Gender: _________ - Age group: __________",
+      "In Malaysia Open Virtual Karate-do Kata Competition USD 10 /100/200 Tier, and I placed ________.",
+      "Before I started karate, my state of mind was ______________________.",
+      "Over time, regular training changed that - now when I finish a session I feel ______________________.",
+      "Preparing for this specific competition affected me ______________________, especially in the last ______ weeks.",
+      "There was one moment, around ______________________, when training helped me manage real pressure by ______________________.",
+      "The discipline of practice carried over into ______________________ in my daily life.",
+      "My dojo community also supports my wellbeing, because ______________________.",
+      "Competing specifically affected my confidence by ______________________.",
+      "Around the result, I managed the pressure and self-criticism by ______________________.",
+      "If somebody is using martial arts to cope with a hard period in life, I would say ______________________ - and that showing up for class is already progress.",
+      "I plan to keep training for wellbeing and not only for competition, by ______________________.",
+      "Beyond any medal, what karate has given me mentally is ______________________. Thank you.",
     ],
   },
   {
@@ -563,6 +1050,21 @@ const TEN_MIN: TestimonialScript[] = [
       "Reflect on the effort it takes to run something like this for competitors worldwide.",
       "Close with a direct thank-you to the organizer and every volunteer/staff involved.",
     ],
+    script: [
+      ...OPEN_BELT,
+      "I placed ________ in my category.",
+      "My first impression when I signed up was ______________________.",
+      "The registration and information process was ______________________ from my point of view, and I found ______________________ especially clear.",
+      "What stood out about the categories and kata assignments was ______________________.",
+      "The recording and submission process was ______________________ - the part I appreciated most was ______________________.",
+      "I received ______________________ from the organizer, including confirmations and reminders, which helped me keep track of the deadline.",
+      "There was one moment when the organizing team's effort was obvious to me - ______________________.",
+      "Seeing the winners announced felt ______________________, and I appreciated that the judging score and video were disclosed after the winner announcement date.",
+      "What worked really well was ______________________. If I may suggest one improvement, it would be ______________________.",
+      "I would recommend this competition to others because ______________________.",
+      "Running something like this for competitors all over the world takes an enormous amount of work that most of us never see.",
+      "Thank you to the organizer and to every volunteer and staff member involved. Thank you.",
+    ],
   },
   {
     id: "10-18", lengthBand: "10min", title: "A message to the judges",
@@ -579,6 +1081,21 @@ const TEN_MIN: TestimonialScript[] = [
       "Share appreciation for the referees/judges who volunteer their time for this.",
       "Describe how their scoring motivates you to keep improving technically.",
       "Close with a sincere thank-you to every judge who reviewed your recording.",
+    ],
+    script: [
+      ...OPEN_BELT,
+      "I placed ________ in my category.",
+      "I understand that judging a recorded kata is not the same as judging live - you cannot walk around the competitor or feel the power in the room.",
+      "Knowing that, I tried to make things clear for the camera by ______________________, and by keeping my pacing steady so nothing was lost on video.",
+      "My understanding is that judges look at stances, timing, power, precision and the overall control, and that every one of those has to hold from the first move to the last.",
+      "It takes real expertise and a lot of time to score that fairly across so many recordings, and I respect that.",
+      "Waiting for scores I could not see being given live felt ______________________.",
+      "When I saw my own score, my reaction was ______________________.",
+      "The feedback I received was ______________________, and it helps me because now I know exactly what to work on.",
+      "What I would want judges to know is that competitors read every point carefully, and a fair score is taken seriously even when it is not the score we hoped for.",
+      "I appreciate very much that the referees and judges give their own time for this.",
+      "Their scoring motivates me to keep improving, especially in ______________________.",
+      "Thank you sincerely to every judge who reviewed my recording. Thank you.",
     ],
   },
   {
@@ -597,6 +1114,21 @@ const TEN_MIN: TestimonialScript[] = [
       "Share your hopes for where you personally will be competing a few years from now.",
       "Close with your genuine hope for the sport's future growth.",
     ],
+    script: [
+      ...OPEN_BELT,
+      "I placed ________ in my category.",
+      "What drew me to a virtual kata competition specifically was ______________________.",
+      "I think this format opens the door for people in remote areas, people with busy schedules, and people who simply cannot afford to travel for a competition.",
+      "My hope is that future events will have many more competitors - even ______________________ would already be a big difference.",
+      "In future competitions I would like to see ______________________ added or expanded.",
+      "I will encourage my own dojo-mates by ______________________, and by showing them that the process is not complicated.",
+      "I do not think virtual competition replaces in-person events - it complements them, because ______________________.",
+      "What I hope the worldwide karate community takes from formats like this is ______________________.",
+      "At my local dojo, my own role in growing interest is ______________________.",
+      "To anyone organizing a similar event elsewhere, I would say ______________________.",
+      "A few years from now, I hope to be competing at ______________________.",
+      "My genuine hope is that this sport keeps growing and reaches many more people. Thank you.",
+    ],
   },
   {
     id: "10-20", lengthBand: "10min", title: "Final reflections on this achievement",
@@ -614,6 +1146,21 @@ const TEN_MIN: TestimonialScript[] = [
       "Offer a closing thought to anyone watching who is considering this path.",
       "Close with heartfelt thanks to everyone who made this moment possible.",
     ],
+    script: [
+      ...OPEN_BELT,
+      "The kata I performed is ______________, and I placed ________ in my category.",
+      "When I started my karate journey I was ______________________, and today I am ______________________ - the distance between those two is the real result.",
+      "The single hardest part of preparing for this competition was ______________________.",
+      "The single most rewarding part was ______________________.",
+      "What surprised me most about the whole experience, from start to finish, was ______________________.",
+      "Compared with my own expectations going in, this result was ______________________.",
+      "Beyond the ranking itself, this achievement means ______________________ to me.",
+      "Years from now, I will remember this moment as ______________________.",
+      "If I could talk to myself before I started training, I would say ______________________.",
+      "My intention is to keep growing in Goju-ryu by ______________________.",
+      "To anyone watching who is considering this path - start now, train honestly, and enter when the chance comes.",
+      "Heartfelt thanks to my sensei, my family, my dojo, the organizer and every judge who made this moment possible. Thank you.",
+    ],
   },
 ];
 
@@ -621,4 +1168,10 @@ export const TESTIMONIAL_SCRIPTS: TestimonialScript[] = [...THREE_MIN, ...FIVE_M
 
 export function scriptsForBand(band: ScriptLengthBand): TestimonialScript[] {
   return TESTIMONIAL_SCRIPTS.filter((s) => s.lengthBand === band);
+}
+
+/** One plain-text block per script — what the Copy button puts on the
+ * clipboard and what the textarea starts with. */
+export function scriptText(script: TestimonialScript): string {
+  return script.script.join("\n");
 }

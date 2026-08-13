@@ -77,8 +77,15 @@ export default function WinnerTestimonialInline({
   editDeadlineISO: string | null;
 }) {
   const [editing, setEditing] = useState(false);
+  const [opened, setOpened] = useState(false);
   const canEdit = isOwner && editDeadlineISO != null && new Date() <= new Date(editDeadlineISO);
   const editWindowClosed = isOwner && editDeadlineISO != null && !canEdit;
+
+  /** Who sees the testimonial laid out in full straight away: the account
+   * whose own email is on the registration, plus Organizer and Participant
+   * Support. Everyone else — audience, other participants — gets buttons
+   * instead, and the player only appears once they press one. */
+  const seesDetail = isOwner || canModerate;
 
   if (testimonial?.deleted) {
     if (isOwner) {
@@ -141,7 +148,64 @@ export default function WinnerTestimonialInline({
         {canEdit && (
           <p className="mb-1.5 text-[11px] text-neutral-400">Editable as many times as you like until {formatDate(editDeadlineISO)}.</p>
         )}
-        {testimonial.kind === "video" && testimonial.mediaUrl && (
+
+        {/* Audience and other participants get a button per available
+            format rather than an auto-embedded player. A winners page can
+            list dozens of boxes, and loading every video and audio element
+            at once is both slow and presumptuous about what the visitor
+            actually wants to open. */}
+        {!seesDetail && !opened && (
+          <div className="flex flex-wrap gap-1.5">
+            {testimonial.kind === "video" && testimonial.mediaUrl && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setOpened(true)}
+                  className="rounded-md bg-red-700 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-red-600"
+                >
+                  ▶ Watch video testimonial
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOpened(true)}
+                  className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-[11px] font-semibold text-neutral-700 hover:bg-neutral-50"
+                >
+                  🎧 Listen only
+                </button>
+              </>
+            )}
+            {testimonial.kind === "voice" && testimonial.mediaUrl && (
+              <button
+                type="button"
+                onClick={() => setOpened(true)}
+                className="rounded-md bg-red-700 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-red-600"
+              >
+                🎧 Listen to voice testimonial
+              </button>
+            )}
+            {testimonial.kind === "message" && testimonial.message && (
+              <button
+                type="button"
+                onClick={() => setOpened(true)}
+                className="rounded-md bg-red-700 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-red-600"
+              >
+                📄 Read written testimonial
+              </button>
+            )}
+          </div>
+        )}
+
+        {!seesDetail && opened && (
+          <button
+            type="button"
+            onClick={() => setOpened(false)}
+            className="mb-1.5 text-[11px] font-semibold text-neutral-500 hover:text-neutral-700"
+          >
+            ▲ Hide
+          </button>
+        )}
+
+        {(seesDetail || opened) && testimonial.kind === "video" && testimonial.mediaUrl && (
           <div className="space-y-1.5">
             <LockedVideo src={testimonial.mediaUrl} className="w-full max-w-xs rounded bg-black" />
             <div>
@@ -150,10 +214,10 @@ export default function WinnerTestimonialInline({
             </div>
           </div>
         )}
-        {testimonial.kind === "voice" && testimonial.mediaUrl && (
+        {(seesDetail || opened) && testimonial.kind === "voice" && testimonial.mediaUrl && (
           <audio src={testimonial.mediaUrl} controls className="w-full max-w-xs" />
         )}
-        {testimonial.kind === "message" && testimonial.message && (
+        {(seesDetail || opened) && testimonial.kind === "message" && testimonial.message && (
           <blockquote className="border-l-4 border-neutral-300 pl-2 text-xs italic text-neutral-700">
             “{testimonial.message}”
           </blockquote>
