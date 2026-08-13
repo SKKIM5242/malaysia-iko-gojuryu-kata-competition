@@ -136,19 +136,24 @@ export default function PendingRecordingsList({ items }: { items: PendingRegistr
                     {item.categoryName ?? "Category not set"}
                   </span>
                   {status === "open" && (
-                    <form action={claimAndStartRecording} className="ml-auto self-center">
-                      <input type="hidden" name="registration_id" value={item.id} />
-                      <button className="rounded-md bg-red-700 px-4 py-1.5 text-xs font-semibold text-white hover:bg-red-600">
-                        Start Recording
-                      </button>
-                    </form>
+                    <>
+                      <form action={claimAndStartRecording} className="ml-auto self-center">
+                        <input type="hidden" name="registration_id" value={item.id} />
+                        <button className="rounded-md bg-red-700 px-4 py-1.5 text-xs font-semibold text-white hover:bg-red-600">
+                          Start Recording
+                        </button>
+                      </form>
+                      {/* Sits right beside Start Recording and is ALWAYS
+                          offered -- it used to be a separate row that only
+                          appeared when this particular browser still held a
+                          cached copy, which is why it looked missing after
+                          recording on a different device. Its own panel
+                          explains which source it found. */}
+                      <UploadSavedRecording registrationId={item.id} />
+                    </>
                   )}
                 </li>
               ))}
-              {/* One extra row per item that actually has a device-local
-                  recording waiting -- renders nothing of its own otherwise,
-                  so a tier with nothing saved never grows an empty row. */}
-              {status === "open" && g.items.map((item) => <UploadSavedRecording key={`upload-${item.id}`} registrationId={item.id} />)}
             </ul>
             {status === "not_yet_open" && (
               <p className="mt-3 text-xs text-amber-800">
