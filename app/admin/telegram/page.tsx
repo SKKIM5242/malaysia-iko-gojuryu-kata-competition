@@ -4,6 +4,7 @@ import { AdminShell } from "@/components/admin";
 import { SetupNotice, EmptyState } from "@/components/ui";
 import { listTelegramGroups } from "@/lib/telegram";
 import { saveTelegramGroup, deleteTelegramGroup } from "@/app/actions/admin";
+import TelegramBotGuide from "@/components/TelegramBotGuide";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +57,23 @@ export default async function AdminTelegramLinks({
   }
 
   const groups = await listTelegramGroups();
+
+  // Grouped in JS rather than SQL: this is a handful of rows, and a count
+  // per role is far more useful than a bare total — "3 referees, 0
+  // participants" tells the organizer exactly who still needs chasing.
+  const { data: connectedProfiles } = await supabase
+    .from("profiles")
+    .select("role")
+    .not("telegram_chat_id", "is", null);
+  const connectedCounts = new Map<string, number>();
+  for (const p of connectedProfiles ?? []) {
+    const r = (p.role as string | null) ?? "unknown";
+    connectedCounts.set(r, (connectedCounts.get(r) ?? 0) + 1);
+  }
+  const connectedByRole = [...connectedCounts.entries()]
+    .map(([role, count]) => ({ role, count }))
+    .sort((a, b) => b.count - a.count);
+
   const cellInput = "w-full rounded-md border border-neutral-300 px-2 py-1 text-xs";
   const gridHeaderCell = "px-2 py-1.5 text-[11px] font-bold uppercase tracking-wide text-neutral-500";
 
@@ -182,6 +200,14 @@ export default async function AdminTelegramLinks({
           {canEdit ? "No Telegram groups yet — add one above." : "No Telegram groups configured yet."}
         </EmptyState>
       )}
+
+      <TelegramBotGuide
+        botUsername={process.env.TELEGRAM_BOT_USERNAME?.trim() || null}
+        tokenSet={Boolean(process.env.TELEGRAM_BOT_TOKEN?.trim())}
+        webhookSecretSet={Boolean(process.env.TELEGRAM_WEBHOOK_SECRET?.trim())}
+        appUrl={process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}
+        connectedByRole={connectedByRole}
+      />
     </AdminShell>
   );
 }
