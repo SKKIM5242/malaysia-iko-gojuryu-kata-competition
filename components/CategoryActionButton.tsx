@@ -3,7 +3,7 @@
 import { useTransition } from "react";
 import {
   deleteCategory, mergeCategoryToMix, mergeCategoryAgeGroup, mergeKataFamily, mergeKataBeltGroup,
-  mergeAdjacentKata, undoLastMerge, undoLastDelete,
+  mergeAdjacentKata, undoLastMerge, undoLastDelete, deleteKata,
 } from "@/app/actions/admin";
 
 const ACTIONS = {
@@ -15,6 +15,7 @@ const ACTIONS = {
   undoMerge: undoLastMerge,
   undoDelete: undoLastDelete,
   delete: deleteCategory,
+  deleteKata: deleteKata,
 } as const;
 
 /**

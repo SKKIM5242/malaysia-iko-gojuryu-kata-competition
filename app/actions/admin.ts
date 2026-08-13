@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { writeAudit } from "@/lib/audit";
 import { headers } from "next/headers";
-import { kataBaseOf, groupByKata, ageAt, resolveCategory } from "@/lib/division";
+import { kataBaseOf, groupByKata, ageAt, resolveCategory, AGE_BRACKETS } from "@/lib/division";
 import { KATA_FAMILIES, categoriesInFamily, adjacentKataOf, type KataFamily } from "@/lib/kata-families";
 import { WATERMARK_DIRECTIONS } from "@/lib/watermark";
 import {
@@ -689,6 +689,180 @@ export async function deleteCategory(formData: FormData) {
   });
   revalidatePath("/");
   backTo(returnTo, { ok: "Category deleted." });
+}
+
+/** The two belt labels exactly as they appear inside a category name — the
+ * generated set has to match the existing rows character for character,
+ * because kataBaseOf/splitCategoryName parse names on " — ". */
+const KATA_BELT_LABEL: Record<"kyu" | "dan", string> = {
+  kyu: "Color/Kyu Belt",
+  dan: "Black Belt & Dan Holders",
+};
+
+/** The standard 16 sub-categories for one kata: 2 belt groups x 4 age
+ * brackets x male/female, in the same belt → age → gender order the admin
+ * list already displays them in. */
+function kataSubcategoryRows(
+  competitionId: string,
+  base: string,
+  maxParticipants: number | null,
+  startSortOrder: number,
+) {
+  const rows = [];
+  let sortOrder = startSortOrder;
+  for (const belt of ["kyu", "dan"] as const) {
+    for (const [lo, hi] of AGE_BRACKETS) {
+      for (const gender of ["male", "female"] as const) {
+        rows.push({
+          competition_id: competitionId,
+          name: `${base} — ${KATA_BELT_LABEL[belt]} — Age ${lo}–${hi} — ${gender === "male" ? "Male" : "Female"}`,
+          age_min: lo,
+          age_max: hi,
+          belt_group: belt,
+          gender,
+          max_participants: maxParticipants,
+          sort_order: sortOrder++,
+        });
+      }
+    }
+  }
+  return rows;
+}
+
+/** Creates a whole kata at once — the full standard set of 16
+ * sub-categories — rather than making the organizer add sixteen rows by
+ * hand and risk a half-built kata that resolveCategory can't place a
+ * registrant into. */
+export async function addKata(formData: FormData) {
+  const competitionId = String(formData.get("competition_id") ?? "");
+  const base = String(formData.get("kata_base") ?? "").trim();
+  const maxRaw = String(formData.get("max_participants") ?? "").trim();
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/competitions";
+  const { supabase, actorId } = await getActor();
+  await requireCompetitionManager(supabase, actorId, returnTo);
+
+  if (!competitionId || !base) backTo(returnTo, { error: "Kata name is required." });
+  // " — " is the separator every name is parsed on, so a kata name
+  // containing it would split into the wrong belt/age/gender parts.
+  if (base.includes(" — ")) {
+    backTo(returnTo, { error: "Kata name can't contain “ — ” — that separates the belt, age and gender parts." });
+  }
+  const maxParticipants = maxRaw ? Number(maxRaw) : 200;
+  if (Number.isNaN(maxParticipants)) backTo(returnTo, { error: "Max participants must be a number." });
+
+  const { data: existing } = await supabase
+    .from("categories")
+    .select("name, sort_order")
+    .eq("competition_id", competitionId);
+  const rows = (existing ?? []) as Array<{ name: string; sort_order: number | null }>;
+  if (rows.some((r) => kataBaseOf(r.name) === base)) {
+    backTo(returnTo, { error: `“${base}” already exists in this tier.` });
+  }
+  const nextSort = rows.reduce((max, r) => Math.max(max, r.sort_order ?? 0), 0) + 1;
+
+  const { error } = await supabase
+    .from("categories")
+    .insert(kataSubcategoryRows(competitionId, base, maxParticipants, nextSort));
+  if (error) backTo(returnTo, { error: "Could not create the kata." });
+
+  await writeAudit(supabase, {
+    table_name: "categories", record_id: competitionId, action: "kata_created",
+    new_value: { kata_base: base, max_participants: maxParticipants, sub_categories: 16 }, actor_id: actorId,
+  });
+  revalidatePath("/");
+  backTo(returnTo, { ok: `Kata “${base}” added, with all 16 sub-categories.` });
+}
+
+/** Renames a kata across every one of its sub-categories at once. Only the
+ * kata part of each name changes; the belt/age/gender tail is preserved
+ * exactly, so nothing about how registrants are resolved into categories
+ * shifts. Registrations are untouched — they point at category IDs, not
+ * names. */
+export async function renameKata(formData: FormData) {
+  const competitionId = String(formData.get("competition_id") ?? "");
+  const oldBase = String(formData.get("kata_base") ?? "");
+  const newBase = String(formData.get("new_name") ?? "").trim();
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/competitions";
+  const { supabase, actorId } = await getActor();
+  await requireCompetitionManager(supabase, actorId, returnTo);
+
+  if (!competitionId || !oldBase || !newBase) backTo(returnTo, { error: "New kata name is required." });
+  if (newBase.includes(" — ")) {
+    backTo(returnTo, { error: "Kata name can't contain “ — ” — that separates the belt, age and gender parts." });
+  }
+  if (newBase === oldBase) backTo(returnTo, { ok: "Kata name unchanged." });
+
+  const { data: all } = await supabase
+    .from("categories")
+    .select("id, name")
+    .eq("competition_id", competitionId);
+  const rows = (all ?? []) as Array<{ id: string; name: string }>;
+  if (rows.some((r) => kataBaseOf(r.name) === newBase)) {
+    backTo(returnTo, { error: `“${newBase}” already exists in this tier — merge them instead of renaming.` });
+  }
+  const mine = rows.filter((r) => kataBaseOf(r.name) === oldBase);
+  if (mine.length === 0) backTo(returnTo, { error: "Kata not found." });
+
+  for (const row of mine) {
+    const tail = row.name.split(" — ").slice(1).join(" — ");
+    const { error } = await supabase
+      .from("categories")
+      .update({ name: tail ? `${newBase} — ${tail}` : newBase })
+      .eq("id", row.id);
+    if (error) backTo(returnTo, { error: "Could not rename every sub-category — nothing else was changed." });
+  }
+
+  await writeAudit(supabase, {
+    table_name: "categories", record_id: competitionId, action: "kata_renamed",
+    old_value: { kata_base: oldBase }, new_value: { kata_base: newBase, sub_categories: mine.length },
+    actor_id: actorId,
+  });
+  revalidatePath("/");
+  backTo(returnTo, { ok: `Renamed to “${newBase}” across ${mine.length} sub-categories.` });
+}
+
+/** Deletes a whole kata (every sub-category under it). Refused outright if
+ * ANY sub-category already has a registration against it — per the
+ * organizer's instruction that a kata with a slot taken must not be
+ * deletable. Each row is logged individually first, so the existing
+ * undoLastDelete path can restore the whole kata. */
+export async function deleteKata(formData: FormData) {
+  const competitionId = String(formData.get("competition_id") ?? "");
+  const base = String(formData.get("kata_base") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/competitions";
+  const { supabase, actorId } = await getActor();
+  await requireCompetitionManager(supabase, actorId, returnTo);
+
+  const { data: all } = await supabase
+    .from("categories")
+    .select("*")
+    .eq("competition_id", competitionId);
+  const mine = ((all ?? []) as Category[]).filter((c) => kataBaseOf(c.name) === base);
+  if (mine.length === 0) backTo(returnTo, { error: "Kata not found." });
+
+  const ids = mine.map((c) => c.id);
+  const { count } = await supabase
+    .from("registrations")
+    .select("id", { count: "exact", head: true })
+    .in("category_id", ids);
+  if ((count ?? 0) > 0) {
+    backTo(returnTo, {
+      error: `Cannot delete “${base}” — ${count} registration${count === 1 ? "" : "s"} already reference it. Merge it instead, or remove those registrations first.`,
+    });
+  }
+
+  for (const category of mine) {
+    await logCategoryDelete(supabase, { competitionId, category, actorId });
+  }
+  const { error } = await supabase.from("categories").delete().in("id", ids);
+  if (error) backTo(returnTo, { error: "Cannot delete — registrations reference this kata." });
+
+  await writeAudit(supabase, {
+    table_name: "categories", record_id: competitionId, action: "kata_deleted",
+    old_value: { kata_base: base, sub_categories: mine.length }, actor_id: actorId,
+  });
+  revalidatePath("/");
+  backTo(returnTo, { ok: `Kata “${base}” and its ${mine.length} sub-categories deleted. Use Undo if that was a mistake.` });
 }
 
 /**

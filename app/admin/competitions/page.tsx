@@ -10,6 +10,7 @@ import KataGroupDragZone from "@/components/KataGroupDragZone";
 import SubcategoryDragZone from "@/components/SubcategoryDragZone";
 import ScrollToAnchor from "@/components/ScrollToAnchor";
 import CategoryActionButton from "@/components/CategoryActionButton";
+import { AddKataForm, RenameKataControl } from "@/components/KataAdminControls";
 import DateField from "@/components/DateField";
 import { kataBaseOf } from "@/lib/division";
 import { groupByFamily, adjacentKataOf } from "@/lib/kata-families";
@@ -464,6 +465,7 @@ export default async function AdminCompetitions({
                           >
                             + Add category
                           </Link>
+                          <AddKataForm competitionId={c.id} returnTo={categoryReturnTo(c.id)} />
                           <CategoryActionButton
                             actionName="undoMerge"
                             fields={{ competition_id: c.id, return_to: categoryReturnTo(c.id) }}
@@ -541,6 +543,12 @@ export default async function AdminCompetitions({
                           const danMerged = danCats.length === 1 && danCats[0].name === `${base} — Black Belt & Dan Holders — Combined (All Ages & Genders)`;
                           const neighborAbove = adjacentKataOf(base, "above");
                           const neighborBelow = adjacentKataOf(base, "below");
+                          // Any slot taken anywhere in this kata blocks deleting the
+                          // whole thing, per the organizer's rule. The server enforces
+                          // the same check against ALL registrations (not just paid
+                          // ones) and is the authority; this only decides whether to
+                          // offer the button at all.
+                          const kataTaken = cats.reduce((n, cat) => n + (categoryPaidCount.get(cat.id) ?? 0), 0);
                           return (
                           <details
                             key={base}
@@ -566,8 +574,27 @@ export default async function AdminCompetitions({
                                   <span className="font-normal text-neutral-400">({cats.length} sub-categories)</span>
                                 </span>
                               )}
-                              {canManageCompetition && (neighborAbove || neighborBelow || kyuCats.length > 1 || danCats.length > 1) && (
+                              {canManageCompetition && (
                                 <span className="ml-auto flex flex-wrap gap-1">
+                                  <RenameKataControl competitionId={c.id} base={base} returnTo={categoryReturnTo(c.id, base)} />
+                                  {kataTaken > 0 ? (
+                                    <span
+                                      className="cursor-not-allowed rounded border border-neutral-200 px-2 py-0.5 text-xs font-normal text-neutral-400"
+                                      title={`Can't delete — ${kataTaken} slot${kataTaken === 1 ? "" : "s"} already taken in this kata. Merge it instead.`}
+                                    >
+                                      Delete
+                                    </span>
+                                  ) : (
+                                    <CategoryActionButton
+                                      actionName="deleteKata"
+                                      fields={{ competition_id: c.id, kata_base: base, return_to: categoryReturnTo(c.id) }}
+                                      className="rounded border border-red-300 px-2 py-0.5 text-xs font-normal text-red-700 hover:bg-red-50"
+                                      title={`Delete “${base}” and all ${cats.length} of its sub-categories`}
+                                      confirmMessage={`Delete “${base}” and ALL ${cats.length} of its sub-categories?\n\nOnly possible because no slots are taken. Undo is available next to “+ Add category”.`}
+                                    >
+                                      Delete
+                                    </CategoryActionButton>
+                                  )}
                                   {neighborAbove && (
                                     <CategoryActionButton
                                       actionName="mergeAdjacentKata"

@@ -8,6 +8,7 @@ import { kataBaseOf } from "@/lib/division";
 import KataGroupDragZone from "@/components/KataGroupDragZone";
 import SubcategoryDragZone from "@/components/SubcategoryDragZone";
 import CategoryActionButton from "@/components/CategoryActionButton";
+import { AddKataForm, RenameKataControl } from "@/components/KataAdminControls";
 import { NoTranslate, SetupNotice } from "@/components/ui";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import AuthForms from "@/components/AuthForms";
@@ -169,6 +170,7 @@ export default async function KataCategoriesPage() {
                         >
                           + Add category
                         </Link>
+                        <AddKataForm competitionId={competition.id} returnTo="/kata-categories" />
                         <CategoryActionButton
                           actionName="undoMerge"
                           fields={{ competition_id: competition.id, return_to: "/kata-categories" }}
@@ -248,6 +250,10 @@ export default async function KataCategoriesPage() {
                               const danCats = subCats.filter((cat) => cat.belt_group === "dan");
                               const kyuMerged = kyuCats.length === 1 && kyuCats[0].name === `${base} — Color/Kyu Belt — Combined (All Ages & Genders)`;
                               const danMerged = danCats.length === 1 && danCats[0].name === `${base} — Black Belt & Dan Holders — Combined (All Ages & Genders)`;
+                              // Any taken slot anywhere in this kata blocks deleting the
+                              // whole thing; the server re-checks against ALL
+                              // registrations and is the authority.
+                              const kataTaken = subCats.reduce((n, cat) => n + (categoryTaken.get(cat.id) ?? 0), 0);
                               return (
                               <details key={base} data-drag-item={base} className="rounded-lg border border-neutral-200 bg-white shadow-sm">
                                 <summary className="flex cursor-pointer items-center gap-2 px-4 py-2.5 text-sm font-semibold text-neutral-800 hover:bg-neutral-50">
@@ -264,8 +270,27 @@ export default async function KataCategoriesPage() {
                                       <span className="font-normal text-neutral-400">({subCats.length} sub-categories)</span>
                                     </span>
                                   )}
-                                  {canManageKata && (neighborAbove || neighborBelow || kyuCats.length > 1 || danCats.length > 1) && (
+                                  {canManageKata && (
                                     <span className="ml-auto flex flex-wrap gap-1">
+                                      <RenameKataControl competitionId={competition.id} base={base} returnTo="/kata-categories" />
+                                      {kataTaken > 0 ? (
+                                        <span
+                                          className="cursor-not-allowed rounded border border-neutral-200 px-2 py-0.5 text-xs font-normal text-neutral-400"
+                                          title={`Can't delete — ${kataTaken} slot${kataTaken === 1 ? "" : "s"} already taken in this kata. Merge it instead.`}
+                                        >
+                                          Delete
+                                        </span>
+                                      ) : (
+                                        <CategoryActionButton
+                                          actionName="deleteKata"
+                                          fields={{ competition_id: competition.id, kata_base: base, return_to: "/kata-categories" }}
+                                          className="rounded border border-red-300 px-2 py-0.5 text-xs font-normal text-red-700 hover:bg-red-50"
+                                          title={`Delete “${base}” and all ${subCats.length} of its sub-categories`}
+                                          confirmMessage={`Delete “${base}” and ALL ${subCats.length} of its sub-categories?\n\nOnly possible because no slots are taken. Undo is available on the All Competitions page in the admin panel.`}
+                                        >
+                                          Delete
+                                        </CategoryActionButton>
+                                      )}
                                       {neighborAbove && (
                                         <CategoryActionButton
                                           actionName="mergeAdjacentKata"
