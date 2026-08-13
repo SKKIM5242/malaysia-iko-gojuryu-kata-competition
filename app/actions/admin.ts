@@ -20,7 +20,7 @@ import {
   notifyCertificatesPublished, competitionCertificateRecipients, notifyInvitationCodeIssued, notifyStatusChanged,
   notifyOrganizersBulkPaymentConfirmed, notifyOrganizersBulkTallyDone, notifySenseiBulkPaymentConfirmed,
   notifySenseiBulkCsvConfirmed, notifyOrganizersDirectoryBulkUpload, sendAdminTelegramDM,
-  notifyParticipantEmailChanged, notifyTestimonialDeleted,
+  notifyParticipantEmailChanged, notifyTestimonialDeleted, sendStaffEmail, sendStaffTelegramDM,
 } from "@/lib/notify";
 import { applySubscriptionRenewalTerms } from "@/lib/finalize";
 import type { PaymentStatus, Category } from "@/lib/types";
@@ -689,6 +689,131 @@ export async function deleteCategory(formData: FormData) {
   });
   revalidatePath("/");
   backTo(returnTo, { ok: "Category deleted." });
+}
+
+/** Sending feedback to a participant — Admin/Organizer/Staff plus
+ * Participant Support, who are the ones actually answering participants
+ * day to day. Its own gate rather than widening requireCompetitionManager,
+ * which would also hand Support the competition/kata-category surface. */
+async function requireParticipantMessenger(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  actorId: string | null,
+  returnTo: string,
+) {
+  const role = await getActorRole(supabase, actorId);
+  if (!["admin", "organizer", "staff", "customer_support"].includes(role ?? "")) {
+    backTo(returnTo, { error: "Only Admin / Organizer / Participant Support can message participants." });
+  }
+}
+
+/** Sends one message to a participant over Telegram DM or email and records
+ * exactly what was sent, where it went, and whether it actually landed.
+ *
+ * The destination is resolved here and stored ON the log row rather than
+ * left as a pointer to the participant: if they change their email later,
+ * the record of what we sent and where must not silently rewrite itself.
+ * Failures are logged too — an organizer needs to see a bounce, not an
+ * empty list that implies nothing was ever attempted. */
+export async function sendParticipantMessage(formData: FormData) {
+  const participantId = String(formData.get("participant_id") ?? "");
+  const channel = String(formData.get("channel") ?? "");
+  const subject = String(formData.get("subject") ?? "").trim();
+  const body = String(formData.get("body") ?? "").trim();
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/participants";
+  const { supabase, actorId } = await getActor();
+  await requireParticipantMessenger(supabase, actorId, returnTo);
+
+  if (!["email", "telegram"].includes(channel)) backTo(returnTo, { error: "Unknown message channel." });
+  if (!participantId) backTo(returnTo, { error: "No participant selected." });
+  if (!body) backTo(returnTo, { error: "Type the message you want to send." });
+
+  const admin = createAdminClient();
+  const { data: participant } = await admin
+    .from("participants")
+    .select("id, full_name, email")
+    .eq("id", participantId)
+    .maybeSingle();
+  if (!participant) backTo(returnTo, { error: "Participant not found." });
+
+  // A login can reach a participant through its own primary link or through
+  // profile_participants (a Sensei recording for several students), so check
+  // both before concluding there's no Telegram to send to.
+  const { data: primaryProfile } = await admin
+    .from("profiles")
+    .select("user_id, telegram_chat_id")
+    .eq("participant_id", participantId)
+    .maybeSingle();
+  let recipientUserId = (primaryProfile?.user_id as string | null) ?? null;
+  let chatId = (primaryProfile?.telegram_chat_id as string | null) ?? null;
+  if (!chatId) {
+    const { data: link } = await admin
+      .from("profile_participants")
+      .select("user_id")
+      .eq("participant_id", participantId)
+      .maybeSingle();
+    if (link?.user_id) {
+      const { data: linked } = await admin
+        .from("profiles")
+        .select("user_id, telegram_chat_id")
+        .eq("user_id", link.user_id as string)
+        .maybeSingle();
+      recipientUserId = recipientUserId ?? ((linked?.user_id as string | null) ?? null);
+      chatId = (linked?.telegram_chat_id as string | null) ?? null;
+    }
+  }
+
+  const name = (participant!.full_name as string | null) ?? "there";
+  const email = (participant!.email as string | null) ?? null;
+  let result: { ok: boolean; error?: string };
+
+  if (channel === "email") {
+    if (!email) {
+      backTo(returnTo, { error: `${name} has no email address on file.` });
+    }
+    result = await sendStaffEmail(
+      email!,
+      subject || "A message about the Malaysia Open Virtual Karate-do Kata Competition",
+      `Hi ${name},\n\n${body}\n\n— Malaysia Open Virtual Karate-do Kata Competition`,
+    );
+  } else {
+    if (!chatId) {
+      backTo(returnTo, {
+        error: `${name} hasn't connected Telegram yet, so there is no chat to message. Ask them to connect it from My Account first.`,
+      });
+    }
+    result = await sendStaffTelegramDM(chatId!, `🥋 ${subject ? subject + "\n\n" : ""}${body}`);
+  }
+
+  const { data: actorProfile } = actorId
+    ? await admin.from("profiles").select("full_name").eq("user_id", actorId).maybeSingle()
+    : { data: null };
+
+  await admin.from("participant_messages").insert({
+    participant_id: participantId,
+    recipient_user_id: recipientUserId,
+    recipient_name: participant!.full_name ?? null,
+    recipient_email: channel === "email" ? email : null,
+    recipient_telegram_chat_id: channel === "telegram" ? chatId : null,
+    channel,
+    subject: subject || null,
+    body,
+    status: result.ok ? "sent" : "failed",
+    error: result.ok ? null : (result.error ?? "Unknown error"),
+    sent_by: actorId,
+    sent_by_name: (actorProfile?.full_name as string | null) ?? null,
+  });
+
+  await writeAudit(supabase, {
+    table_name: "participant_messages", record_id: participantId,
+    action: result.ok ? "participant_message_sent" : "participant_message_failed",
+    new_value: { channel, subject, status: result.ok ? "sent" : "failed" }, actor_id: actorId,
+  });
+
+  revalidatePath(returnTo);
+  if (!result.ok) {
+    backTo(returnTo, { error: `Could not send: ${result.error ?? "unknown error"}. It has been logged as failed.` });
+  }
+  backTo(returnTo, { ok: `${channel === "email" ? "Email" : "Telegram DM"} sent to ${name} and recorded.` });
 }
 
 /** The two belt labels exactly as they appear inside a category name — the

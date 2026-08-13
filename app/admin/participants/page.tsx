@@ -6,6 +6,7 @@ import { saveParticipant, deleteParticipant, bulkUploadParticipants } from "@/ap
 import { AdminShell, Card, CertificateField, adminBtn, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice, formatDOB } from "@/components/ui";
 import FilterableTable from "@/components/FilterableTable";
+import ParticipantMessageButton from "@/components/ParticipantMessageButton";
 import CsvUploadForm from "@/components/CsvUploadForm";
 import InvitationCodeForm from "@/components/InvitationCodeForm";
 import InvitationCodeList from "@/components/InvitationCodeList";
@@ -75,6 +76,7 @@ export default async function AdminParticipants({
   const isCustomerSupport = myProfile?.role === "customer_support";
   const isReferee = myProfile?.role === "referee";
   const canDelete = !isCustomerSupport && !isReferee;
+  const canMessage = ["admin", "organizer", "staff", "customer_support"].includes(myProfile?.role ?? "");
   const canBulkUpload = ["admin", "organizer"].includes(myProfile?.role ?? "");
 
   return (
@@ -266,6 +268,8 @@ export default async function AdminParticipants({
                 { key: "bank_name", label: "Bank Name", width: 150 },
                 { key: "bank_account_no", label: "IBAN / Account No.", width: 180 },
                 { key: "bank_account_name", label: "Account Holder Name", width: 170 },
+                { key: "telegram_dm", label: "Telegram DM", width: 130 },
+                { key: "email_message", label: "Email Message", width: 130 },
                 { key: "actions", label: "Actions", width: 150 },
               ]}
               csvColumns={[
@@ -327,6 +331,26 @@ export default async function AdminParticipants({
                 bank_name: p.bank?.bank_name ?? "",
                 bank_account_no: p.bank?.bank_account_no ?? "",
                 bank_account_name: p.bank?.bank_account_name ?? "",
+                telegram_dm: canMessage ? (
+                  <ParticipantMessageButton
+                    participantId={p.id}
+                    participantName={p.full_name ?? "this participant"}
+                    channel="telegram"
+                    returnTo="/admin/participants"
+                  />
+                ) : (
+                  ""
+                ),
+                email_message: canMessage ? (
+                  <ParticipantMessageButton
+                    participantId={p.id}
+                    participantName={p.full_name ?? "this participant"}
+                    channel="email"
+                    returnTo="/admin/participants"
+                  />
+                ) : (
+                  ""
+                ),
                 actions: (
                   <div className="flex gap-1.5">
                     <Link

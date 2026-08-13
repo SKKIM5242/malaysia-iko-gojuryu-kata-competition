@@ -1336,3 +1336,57 @@ export async function notifySenseiBulkCsvConfirmed(input: {
     ),
   ]);
 }
+
+/** Direct, one-off message from staff to a participant — behind the
+ * Telegram DM / Email feedback buttons on the admin Participants page.
+ *
+ * Unlike every other sender in this file, these two REPORT their outcome
+ * instead of swallowing it. Everywhere else a failed notification is a
+ * side-effect of an action that already succeeded, so staying quiet is
+ * right. Here the message IS the action, and the result is written into
+ * participant_messages — an organizer needs to see a bounce, not a silent
+ * row claiming it was sent. */
+export async function sendStaffEmail(
+  to: string,
+  subject: string,
+  text: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return { ok: false, error: "Email is not configured on the server (RESEND_API_KEY missing)." };
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ from: process.env.EMAIL_FROM || "onboarding@resend.dev", to, subject, text }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      return { ok: false, error: `Resend ${res.status}: ${body.slice(0, 300)}` };
+    }
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Network error sending email." };
+  }
+}
+
+export async function sendStaffTelegramDM(
+  chatId: string,
+  text: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) return { ok: false, error: "Telegram is not configured on the server (TELEGRAM_BOT_TOKEN missing)." };
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, text }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      return { ok: false, error: `Telegram ${res.status}: ${body.slice(0, 300)}` };
+    }
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Network error sending Telegram message." };
+  }
+}
