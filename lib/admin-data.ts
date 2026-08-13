@@ -146,6 +146,11 @@ export interface ParticipantRecord {
   competitionName: string | null;
   registrationDeadline: string | null;
   categoryName: string | null;
+  /** Needed by the Participant Records category editor, which offers the
+   * other categories in this registration's own competition — the name
+   * alone can't identify a row to move to. */
+  categoryId: string | null;
+  competitionId: string | null;
   participant: Participant;
   recordAttempts: number;
   maxAttempts: number;
@@ -246,6 +251,8 @@ export async function getParticipantRecords(): Promise<ParticipantRecord[]> {
         competitionName: r.competition?.name ?? null,
         registrationDeadline: r.competition?.registration_deadline ?? null,
         categoryName: r.category?.name ?? null,
+        categoryId: r.category?.id ?? null,
+        competitionId: r.competition?.id ?? null,
         participant: r.participant as Participant,
         recordAttempts: attemptsByReg.get(r.id) ?? 0,
         maxAttempts: maxAttemptsByReg.get(r.id) ?? 3,

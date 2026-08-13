@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
-import { CategoryName, formatDate } from "@/components/ui";
+import { formatDate } from "@/components/ui";
 import VideoWatchButton from "@/components/VideoWatchButton";
 import DownloadCsvButton from "@/components/DownloadCsvButton";
 import AdminVideoUploadForm from "@/components/AdminVideoUploadForm";
@@ -10,14 +10,34 @@ import DualScrollBox from "@/components/DualScrollBox";
 import { useGridControls, isClosed, CLOSED_SIZE } from "@/lib/useGridControls";
 import { useTableInteractions } from "@/lib/useTableInteractions";
 import TableInteractionOverlays from "@/components/TableInteractionOverlays";
-import { updateRegistrationSlotStatus, linkRegistrationToAccount, unlinkRegistrationFromAccount, resendRegistrationConfirmation } from "@/app/actions/admin";
+import { updateRegistrationSlotStatus, updateRegistrationCategory, linkRegistrationToAccount, unlinkRegistrationFromAccount, resendRegistrationConfirmation } from "@/app/actions/admin";
 
 export type SlotStatus = "active" | "unslotted" | "forfeited" | "given_up";
+
+/** One choosable category within a competition, for the per-row editor. */
+export interface CategoryChoice {
+  id: string;
+  name: string;
+  kata: string;
+  belt: string;
+  gender: string;
+  age: string;
+}
 
 export interface ParticipantRecordRow {
   registrationId: string;
   competition: string;
+  /** The four parts of the assigned category name, split out so each gets
+   * its own sortable, filterable, individually-resizable column — the
+   * single "Category" column crammed all four into one 240px cell. The
+   * whole name is kept for the CSV export and the edit control. */
   category: string;
+  categoryId: string | null;
+  competitionId: string | null;
+  kataName: string;
+  beltGroup: string;
+  genderGroup: string;
+  ageGroup: string;
   fullName: string;
   icPassport: string;
   dateOfBirth: string;
@@ -134,7 +154,10 @@ const COLUMNS: Array<{ key: keyof ParticipantRecordRow; label: string; width: nu
   { key: "fullName", label: "Full Name", width: 200 },
   { key: "registrationId", label: "Reference ID", width: 110 },
   { key: "competition", label: "Tier", width: 170 },
-  { key: "category", label: "Category", width: 240 },
+  { key: "kataName", label: "Kata Name", width: 150 },
+  { key: "beltGroup", label: "Belt Group", width: 150 },
+  { key: "genderGroup", label: "Gender Group", width: 110 },
+  { key: "ageGroup", label: "Age Group", width: 120 },
   { key: "icPassport", label: "IC / Passport", width: 130 },
   { key: "dateOfBirth", label: "DOB", width: 100 },
   { key: "age", label: "Age", width: 70 },
@@ -162,6 +185,7 @@ const COLUMNS: Array<{ key: keyof ParticipantRecordRow; label: string; width: nu
 /** The trailing columns rendered outside `ParticipantRecordRow` (rich
  * JSX, not a single field) — same resize treatment as every other column. */
 const EXTRA_COLUMNS: Array<{ key: string; label: string; width: number }> = [
+  { key: "categoryEdit", label: "Category Edit / Save", width: 210 },
   { key: "certificate", label: "Certificate", width: 100 },
   { key: "recording", label: "Recording", width: 170 },
   { key: "accountLink", label: "Account Link", width: 190 },
@@ -192,8 +216,14 @@ function standardCell(
       return { className: "font-mono text-xs", title: row.registrationId, content: row.registrationId.slice(0, 8).toUpperCase() };
     case "competition":
       return { className: "", title: row.competition, content: row.competition };
-    case "category":
-      return { className: "", title: row.category, content: <CategoryName name={row.category} /> };
+    case "kataName":
+      return { className: "font-medium", title: row.category, content: row.kataName || "—" };
+    case "beltGroup":
+      return { className: "text-xs", title: row.beltGroup, content: row.beltGroup || "—" };
+    case "genderGroup":
+      return { className: "text-xs", title: row.genderGroup, content: row.genderGroup || "—" };
+    case "ageGroup":
+      return { className: "text-xs", title: row.ageGroup, content: row.ageGroup || "—" };
     case "icPassport":
       return { className: "font-mono text-xs", title: row.icPassport, content: row.icPassport };
     case "dateOfBirth":
@@ -256,6 +286,93 @@ function standardCell(
   }
 }
 
+/** Edit / Save for the four category columns, for Admin / Organizer /
+ * Participant Support only.
+ *
+ * It is one <select> rather than four editable cells because the four
+ * columns are not four independent fields — they are one `categories` row
+ * whose name is parsed on " — ". Free-typing "Sanchin" into a Kata cell
+ * would produce a category matching no real category, and the registration
+ * would vanish from its own division listing and from judging. Choosing an
+ * existing category cannot do that, and the server re-checks that the
+ * chosen one belongs to the same competition tier. */
+function CategoryEditCell({
+  row,
+  canEditCategory,
+  choices,
+}: {
+  row: ParticipantRecordRow;
+  canEditCategory: boolean;
+  choices: CategoryChoice[];
+}) {
+  const [editing, setEditing] = useState(false);
+
+  if (!canEditCategory) return <span className="text-xs text-neutral-400">—</span>;
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        className="rounded border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
+      >
+        ✏️ Edit
+      </button>
+    );
+  }
+
+  if (choices.length === 0) {
+    return (
+      <div className="flex flex-col items-start gap-1">
+        <span className="text-[11px] text-neutral-500">
+          No other categories exist in this tier yet — add them on Kata Categories first.
+        </span>
+        <button
+          type="button"
+          onClick={() => setEditing(false)}
+          className="text-[11px] font-semibold text-neutral-500 hover:text-neutral-700"
+        >
+          Cancel
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <form action={updateRegistrationCategory} className="flex flex-col items-start gap-1">
+      <input type="hidden" name="registration_id" value={row.registrationId} />
+      <input type="hidden" name="return_to" value="/admin/records" />
+      <select
+        name="category_id"
+        defaultValue={row.categoryId ?? ""}
+        className="w-full rounded border border-neutral-300 px-1.5 py-1 text-[11px]"
+      >
+        <option value="">— pick a category —</option>
+        {choices.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.kata} · {c.belt} · {c.gender} · {c.age}
+          </option>
+        ))}
+      </select>
+      <div className="flex gap-1.5">
+        <button
+          type="submit"
+          className="rounded bg-neutral-900 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-neutral-700"
+        >
+          Save
+        </button>
+        <button
+          type="button"
+          onClick={() => setEditing(false)}
+          className="rounded border border-neutral-300 px-2.5 py-1 text-[11px] font-semibold text-neutral-600 hover:bg-neutral-50"
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+}
+
 function extraCell(
   key: string,
   row: ParticipantRecordRow,
@@ -263,8 +380,18 @@ function extraCell(
   canManageSlot: boolean,
   canLinkAccount: boolean,
   canResendEmail: boolean,
+  canEditCategory: boolean,
+  categoryChoices: Record<string, CategoryChoice[]>,
 ): ReactNode {
   switch (key) {
+    case "categoryEdit":
+      return (
+        <CategoryEditCell
+          row={row}
+          canEditCategory={canEditCategory}
+          choices={row.competitionId ? (categoryChoices[row.competitionId] ?? []) : []}
+        />
+      );
     case "certificate":
       return row.certificateUrl ? (
         <a
@@ -378,12 +505,21 @@ export default function ParticipantRecordsTable({
   canManageSlot = false,
   canLinkAccount = false,
   canResendEmail = false,
+  canEditCategory = false,
+  categoryChoices = {},
 }: {
   rows: ParticipantRecordRow[];
   isAdmin?: boolean;
   canManageSlot?: boolean;
   canLinkAccount?: boolean;
   canResendEmail?: boolean;
+  /** Admin / Organizer / Participant Support only — the same tier the
+   * server action enforces. Referees are deliberately excluded: moving a
+   * competitor between divisions changes who they are judged against. */
+  canEditCategory?: boolean;
+  /** Selectable categories keyed by competition id, so the editor only
+   * ever offers categories from that registration's own tier. */
+  categoryChoices?: Record<string, CategoryChoice[]>;
 }) {
   const [filters, setFilters] = useState<Partial<Record<keyof ParticipantRecordRow, Set<string>>>>({});
   const [colWidths, setColWidths] = useState<Record<string, number>>({});
@@ -641,7 +777,7 @@ export default function ParticipantRecordsTable({
                       const isStandard = c.kind === "standard";
                       const { className, title, content } = isStandard
                         ? standardCell(STANDARD_BY_KEY.get(c.key)!, row)
-                        : { className: "", title: undefined, content: extraCell(c.key, row, isAdmin, canManageSlot, canLinkAccount, canResendEmail) };
+                        : { className: "", title: undefined, content: extraCell(c.key, row, isAdmin, canManageSlot, canLinkAccount, canResendEmail, canEditCategory, categoryChoices) };
                       const cellText = isStandard ? String(row[c.key as keyof ParticipantRecordRow] ?? "") : "";
                       const cellKey = `${row.registrationId}:${c.key}`;
                       const isCellSelected = !isHandle && isStandard && t.isCellSelected(row.registrationId, c.key);

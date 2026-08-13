@@ -1,8 +1,14 @@
 "use client";
 
+import { useState } from "react";
 import { claimAndStartRecording } from "@/app/actions/account";
 import { formatDateWithDay } from "@/components/ui";
 import UploadSavedRecording from "@/components/UploadSavedRecording";
+
+/** Shown in place of the Start Recording / Upload buttons the instant an
+ * upload is accepted, and the same wording the account page uses for a
+ * registration whose recording is already in. */
+export const SUBMITTED_NOTE = "✅ Your kata recording is submitted — waiting for judge to give score.";
 
 export interface PendingRegistration {
   id: string;
@@ -80,10 +86,31 @@ function groupByTier(items: PendingRegistration[]): TierGroup[] {
 }
 
 export default function PendingRecordingsList({ items }: { items: PendingRegistration[] }) {
+  // Registrations whose upload this page has just accepted, with enough
+  // label to name them afterwards.
+  //
+  // Two jobs. First, it stops the row offering Start Recording the instant
+  // the upload lands, rather than after the refreshed server data arrives —
+  // that gap is long enough to start recording over a kata already
+  // submitted. Second, the refresh then drops the row from `items`
+  // entirely (getPendingRegistrations excludes anything with a
+  // kata_video), so without keeping the label here the confirmation would
+  // vanish along with it and the upload would look like it did nothing.
+  const [submitted, setSubmitted] = useState<Map<string, string>>(new Map());
   const groups = groupByTier(items);
-  if (groups.length === 0) return null;
+  const confirmations = [...submitted.entries()];
+  if (groups.length === 0 && confirmations.length === 0) return null;
   return (
     <div className="space-y-4">
+      {confirmations.map(([id, label]) => (
+        <div key={id} className="rounded-lg border border-green-300 bg-green-50 p-4">
+          <p className="text-sm font-semibold text-green-900">{SUBMITTED_NOTE}</p>
+          <p className="mt-1 text-sm text-green-800">{label}</p>
+          <p className="mt-1 text-xs text-green-700">
+            Nothing further to do for this kata — recording is closed for it now.
+          </p>
+        </div>
+      ))}
       {groups.map((g) => {
         const status = tierStatus(g.eventDate, g.registrationDeadline);
         const tierName = g.competitionName ?? "this competition tier";
@@ -135,22 +162,44 @@ export default function PendingRecordingsList({ items }: { items: PendingRegistr
                     )}
                     {item.categoryName ?? "Category not set"}
                   </span>
-                  {status === "open" && (
-                    <>
-                      <form action={claimAndStartRecording} className="ml-auto self-center">
-                        <input type="hidden" name="registration_id" value={item.id} />
-                        <button className="rounded-md bg-red-700 px-4 py-1.5 text-xs font-semibold text-white hover:bg-red-600">
-                          Start Recording
-                        </button>
-                      </form>
-                      {/* Sits right beside Start Recording and is ALWAYS
-                          offered -- it used to be a separate row that only
-                          appeared when this particular browser still held a
-                          cached copy, which is why it looked missing after
-                          recording on a different device. Its own panel
-                          explains which source it found. */}
-                      <UploadSavedRecording registrationId={item.id} />
-                    </>
+                  {submitted.has(item.id) ? (
+                    // Once a file has been accepted for this registration
+                    // there is nothing left to start: offering Start
+                    // Recording again would let a participant record over a
+                    // kata they have already submitted for judging.
+                    <span className="ml-auto self-center text-xs font-semibold text-green-700">
+                      {SUBMITTED_NOTE}
+                    </span>
+                  ) : (
+                    status === "open" && (
+                      <>
+                        <form action={claimAndStartRecording} className="ml-auto self-center">
+                          <input type="hidden" name="registration_id" value={item.id} />
+                          <button className="rounded-md bg-red-700 px-4 py-1.5 text-xs font-semibold text-white hover:bg-red-600">
+                            Start Recording
+                          </button>
+                        </form>
+                        {/* Sits right beside Start Recording and is ALWAYS
+                            offered -- it used to be a separate row that only
+                            appeared when this particular browser still held a
+                            cached copy, which is why it looked missing after
+                            recording on a different device. Its own panel
+                            explains which source it found. */}
+                        <UploadSavedRecording
+                          registrationId={item.id}
+                          onSubmitted={() =>
+                            setSubmitted((prev) =>
+                              new Map(prev).set(
+                                item.id,
+                                [item.participantName, item.categoryName ?? "Category not set"]
+                                  .filter(Boolean)
+                                  .join(" — "),
+                              ),
+                            )
+                          }
+                        />
+                      </>
+                    )
                   )}
                 </li>
               ))}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { submitKataVideo } from "@/app/actions/account";
 import { extensionForMimeType, bareMimeType } from "@/lib/media-recording";
@@ -28,7 +29,19 @@ const ATTESTATION_TEXT =
  * is the one route in the whole flow that cannot itself prove the file
  * wasn't edited.
  */
-export default function UploadSavedRecording({ registrationId }: { registrationId: string }) {
+export default function UploadSavedRecording({
+  registrationId,
+  onSubmitted,
+}: {
+  registrationId: string;
+  /** Fired the moment the server accepts the upload, so the row can swap
+   * straight to the submitted state. Without it the row would keep showing
+   * "Start Recording" until the refreshed server data arrived — a window in
+   * which a participant can start a second recording over a kata they have
+   * already submitted. */
+  onSubmitted?: () => void;
+}) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [localBlob, setLocalBlob] = useState<{ blob: Blob; mime: string } | null>(null);
   const [pickedFile, setPickedFile] = useState<File | null>(null);
@@ -92,7 +105,14 @@ export default function UploadSavedRecording({ registrationId }: { registrationI
         return;
       }
       void clearLocalRecording(registrationId);
-      window.location.reload();
+      // router.refresh(), not window.location.reload(): a full reload throws
+      // away the just-set submitted state and re-renders from scratch, so
+      // any staleness in the served page shows "Start Recording" again for a
+      // beat. A refresh re-fetches the server tree underneath the state we
+      // have already flipped, so the row can never go backwards.
+      setOpen(false);
+      onSubmitted?.();
+      router.refresh();
     } catch {
       setError("Something went wrong uploading your recording. Please try again.");
       setStatus("error");

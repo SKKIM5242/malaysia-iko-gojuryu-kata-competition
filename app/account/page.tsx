@@ -278,7 +278,7 @@ function PersonalRecordingSection({
                 />
               </div>
             ) : (
-              <p className="mt-2 text-sm text-green-800">Thank you — it is ready for judging.</p>
+              <p className="mt-2 text-sm font-semibold text-green-800">Your kata recording is submitted — waiting for judge to give score.</p>
             )}
           </div>
           <PendingRecordingsList items={ctx.pendingOthers} />
@@ -955,7 +955,7 @@ export default async function AccountPage({
                   />
                 </div>
               ) : (
-                <p className="mt-2 text-sm text-green-800">Thank you — it is ready for judging.</p>
+                <p className="mt-2 text-sm font-semibold text-green-800">Your kata recording is submitted — waiting for judge to give score.</p>
               )}
             </div>
             {(() => {

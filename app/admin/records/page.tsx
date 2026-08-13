@@ -10,10 +10,13 @@ import {
 } from "@/lib/admin-data";
 import { AdminShell, adminBtn, adminBtnSecondary } from "@/components/admin";
 import { EmptyState, SetupNotice, formatDate, formatDOB, formatUSD } from "@/components/ui";
-import ParticipantRecordsTable, { type ParticipantRecordRow } from "@/components/ParticipantRecordsTable";
+import ParticipantRecordsTable, {
+  type ParticipantRecordRow,
+  type CategoryChoice,
+} from "@/components/ParticipantRecordsTable";
 import FilterableTable from "@/components/FilterableTable";
 import DownloadCsvButton from "@/components/DownloadCsvButton";
-import { ageAt } from "@/lib/division";
+import { ageAt, splitCategoryName } from "@/lib/division";
 import { shortTierName } from "@/lib/invitation-codes";
 import {
   markAttemptPurchasePaid, markBulkUploadPaymentPaid, markSubscriptionRenewalFulfilled,
@@ -93,6 +96,34 @@ export default async function AdminParticipantRecords({
   const canManageSlot = ["admin", "organizer", "staff", "referee"].includes(myProfile?.role ?? "");
   const canLinkAccount = ["admin", "organizer", "staff", "customer_support", "referee"].includes(myProfile?.role ?? "");
   const canResendEmail = ["admin", "organizer", "staff", "customer_support"].includes(myProfile?.role ?? "");
+  // Same tier updateRegistrationCategory enforces server-side. Referee is
+  // deliberately absent: a judge must not be able to move a competitor into
+  // a different division, which would change who they are scored against.
+  const canEditCategory = ["admin", "organizer", "staff", "customer_support"].includes(myProfile?.role ?? "");
+
+  // Loaded once for the whole page rather than per row: ~900 registrations
+  // share a few hundred categories, so a per-row query would be thousands of
+  // round trips for the same handful of answers.
+  const categoryChoices: Record<string, CategoryChoice[]> = {};
+  if (canEditCategory) {
+    const { data: allCategories } = await supabase
+      .from("categories")
+      .select("id, name, competition_id, sort_order")
+      .order("sort_order", { ascending: true });
+    for (const c of allCategories ?? []) {
+      const competitionId = c.competition_id as string | null;
+      if (!competitionId) continue;
+      const parts = splitCategoryName(c.name as string);
+      (categoryChoices[competitionId] ??= []).push({
+        id: c.id as string,
+        name: c.name as string,
+        kata: parts.kata || (c.name as string),
+        belt: parts.belt || "—",
+        gender: parts.sex || "—",
+        age: parts.age || "—",
+      });
+    }
+  }
 
   const { data: purchases } = await supabase
     .from("attempt_purchases")
@@ -219,10 +250,21 @@ export default async function AdminParticipantRecords({
     })
     .sort((a, b) => a.deadlineRaw.localeCompare(b.deadlineRaw));
 
-  const participantRows: ParticipantRecordRow[] = participantRecords.map((r) => ({
+  const participantRows: ParticipantRecordRow[] = participantRecords.map((r) => {
+    // "«kata» — «belt label» — Age «lo»–«hi» — «Male|Female»" is the naming
+    // convention every category follows, so the four columns come from
+    // parsing the one name rather than from four stored fields.
+    const parts = splitCategoryName(r.categoryName);
+    return {
     registrationId: r.registrationId,
     competition: r.competitionName ? shortTierName(r.competitionName) : "—",
     category: r.categoryName ?? "—",
+    categoryId: r.categoryId,
+    competitionId: r.competitionId,
+    kataName: parts.kata,
+    beltGroup: parts.belt,
+    genderGroup: parts.sex,
+    ageGroup: parts.age,
     fullName: r.participant.full_name,
     icPassport: r.participant.ic_passport,
     dateOfBirth: formatDOB(r.participant.date_of_birth),
@@ -256,7 +298,8 @@ export default async function AdminParticipantRecords({
     slotStatusChangedBy: r.slotStatusChangedBy,
     slotStatusChangedAt: r.slotStatusChangedAt,
     linkedAccountEmail: r.linkedAccountEmail,
-  }));
+    };
+  });
 
   const refereeColumns = [
     { key: "full_name", label: "Full Name" },
@@ -460,6 +503,8 @@ export default async function AdminParticipantRecords({
             rows={participantRows}
             isAdmin={isAdmin}
             canManageSlot={canManageSlot}
+            canEditCategory={canEditCategory}
+            categoryChoices={categoryChoices}
             canLinkAccount={canLinkAccount}
             canResendEmail={canResendEmail}
           />

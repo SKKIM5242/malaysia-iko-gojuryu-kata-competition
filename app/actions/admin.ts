@@ -6066,6 +6066,68 @@ const SLOT_STATUS_LABEL: Record<string, string> = {
  * deadline. Delegates to the set_registration_slot_status() RPC so
  * referees get exactly this one capability without a general UPDATE grant
  * on registrations. */
+/** Moves one registration into a different kata category.
+ *
+ * The Participant Records table shows the category split into its four
+ * parts (Kata / Belt group / Gender group / Age group), but they are NOT
+ * four independent fields — a category is one row in `categories`, and the
+ * four parts are just its name parsed on " — ". So editing is a choice
+ * between categories that already exist in that registration's own
+ * competition, never four free-text boxes: typing "Sanchin" into a Kata
+ * cell would otherwise produce a category name matching no real category,
+ * and the registration would drop out of its own division listing.
+ *
+ * Restricted to Admin / Organizer / Participant Support. Referees can
+ * change slot status but must not be able to move a competitor between
+ * divisions, which would change who they are judged against. */
+export async function updateRegistrationCategory(formData: FormData) {
+  const registrationId = String(formData.get("registration_id") ?? "");
+  const categoryId = String(formData.get("category_id") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "/admin/records");
+  const { supabase, actorId } = await getActor();
+  const actorRole = await getActorRole(supabase, actorId);
+  if (!["admin", "organizer", "staff", "customer_support"].includes(actorRole ?? "")) {
+    backTo(returnTo, { error: "Only Admin / Organizer / Participant Support can change a participant's category." });
+  }
+  if (!registrationId || !categoryId) backTo(returnTo, { error: "Pick a category first." });
+
+  const { data: reg } = await supabase
+    .from("registrations")
+    .select("id, competition_id, category_id")
+    .eq("id", registrationId)
+    .maybeSingle();
+  if (!reg) backTo(returnTo, { error: "That registration no longer exists." });
+
+  const { data: category } = await supabase
+    .from("categories")
+    .select("id, name, competition_id")
+    .eq("id", categoryId)
+    .maybeSingle();
+  if (!category) backTo(returnTo, { error: "That category no longer exists." });
+  // A category belongs to exactly one competition tier. Moving a
+  // registration across tiers here would silently change what was paid for,
+  // so it is refused rather than quietly allowed.
+  if (category!.competition_id !== reg!.competition_id) {
+    backTo(returnTo, { error: "That category belongs to a different competition tier." });
+  }
+
+  const { error } = await supabase
+    .from("registrations")
+    .update({ category_id: categoryId })
+    .eq("id", registrationId);
+  if (error) backTo(returnTo, { error: "Could not update the category — please try again." });
+
+  await writeAudit(supabase, {
+    table_name: "registrations",
+    record_id: registrationId,
+    action: "category_updated",
+    old_value: { category_id: reg!.category_id },
+    new_value: { category_id: categoryId, name: category!.name },
+    actor_id: actorId,
+  });
+  backTo(returnTo, { ok: `Category updated to ${category!.name}.` });
+}
+
 export async function updateRegistrationSlotStatus(formData: FormData) {
   const registrationId = String(formData.get("registration_id") ?? "");
   const newStatus = String(formData.get("slot_status") ?? "");
