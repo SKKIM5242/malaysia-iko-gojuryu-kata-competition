@@ -6,9 +6,27 @@ import { createClient } from "@/lib/supabase/client";
 import { submitKataVideo } from "@/app/actions/account";
 import { extensionForMimeType, bareMimeType } from "@/lib/media-recording";
 import { getLocalRecording, clearLocalRecording } from "@/lib/local-recording-store";
+import { kataFamilyOf, type KataFamily } from "@/lib/kata-families";
+import { kataBaseOf } from "@/lib/division";
 
 const ATTESTATION_TEXT =
   "I confirm this is my own previously recorded kata video, submitted without any editing. Any editing is subject to disqualification.";
+
+/** A file made through the in-app recorder can never exceed these sizes —
+ * they come straight from its fixed recording bitrate (~8.22 MB/minute)
+ * times each family's own time limit (1.3 min for Elementary/Intermediate/
+ * Advance, 1.5 min for Mastery, 5 min for Kobudo). A file bigger than this
+ * was made some other way, almost always a phone camera app recording at a
+ * far higher bitrate (4K/60fps) than this footage ever needs — re-saving at
+ * 1080p/720p, 30fps brings it back under the limit without losing anything
+ * a judge needs to see. */
+const MAX_UPLOAD_MB: Record<KataFamily, number> = {
+  Elementary: 10.69,
+  Intermediate: 10.69,
+  Advance: 10.69,
+  Mastery: 12.33,
+  Kobudo: 41.1,
+};
 
 /** Best guess at a real video content-type from the file name, for when the
  * browser reports none. Storage needs a truthful Content-Type or the video
@@ -56,9 +74,16 @@ function looksLikeVideo(file: File): boolean {
  */
 export default function UploadSavedRecording({
   registrationId,
+  categoryName,
   onSubmitted,
 }: {
   registrationId: string;
+  /** Which kata this registration is for — used only to look up that kata's
+   * family (Elementary/Intermediate/Advance/Mastery/Kobudo) and therefore
+   * which MAX_UPLOAD_MB figure applies. A family that can't be resolved
+   * (should not happen for any of the 24 real kata) just skips the
+   * client-side size check rather than guessing a limit. */
+  categoryName?: string | null;
   /** Fired the moment the server accepts the upload, so the row can swap
    * straight to the submitted state. Without it the row would keep showing
    * "Start Recording" until the refreshed server data arrived — a window in
@@ -67,6 +92,9 @@ export default function UploadSavedRecording({
   onSubmitted?: () => void;
 }) {
   const router = useRouter();
+  const family = categoryName ? kataFamilyOf(kataBaseOf(categoryName)) : null;
+  const maxMB = family ? MAX_UPLOAD_MB[family] : null;
+  const maxBytes = maxMB != null ? maxMB * 1024 * 1024 : null;
   const [open, setOpen] = useState(false);
   const [cachedCopy, setCachedCopy] = useState<{ blob: Blob; mime: string } | null>(null);
   const [pickedFile, setPickedFile] = useState<File | null>(null);
@@ -135,8 +163,16 @@ export default function UploadSavedRecording({
         .from("kata-videos")
         .upload(path, blob, { contentType: bareMimeType(mime || "video/webm") });
       if (upErr) {
+        // Storage's own size-limit rejection reads e.g. "The object exceeded
+        // the maximum allowed size" — telling someone to get a better
+        // connection is actively wrong advice for that one, so it gets its
+        // own message. Everything else (a real network drop, timeout) keeps
+        // the original advice.
+        const sizeRelated = /size|large|payload/i.test(upErr.message || "");
         setError(
-          `Upload failed: ${upErr.message || "unknown error"} — please try again once you have a better connection.`,
+          sizeRelated
+            ? `Upload failed: ${upErr.message}. Re-save your recording at 1080p or 720p, 30fps, then try again.`
+            : `Upload failed: ${upErr.message || "unknown error"} — please try again once you have a better connection.`,
         );
         setStatus("error");
         return;
@@ -190,6 +226,13 @@ export default function UploadSavedRecording({
           <p className="text-xs text-amber-900">
             Choose the kata video you saved with &quot;Save to device&quot;. It is usually in your Downloads or
             Files, with a name ending in .webm or .mp4.
+            {maxMB != null && (
+              <>
+                {" "}
+                Keep it under <span className="font-semibold">{maxMB} MB</span> — if it&apos;s bigger, re-save it at
+                1080p or 720p, HD30/30fps first (4K or HD60/60fps is never necessary for this).
+              </>
+            )}
           </p>
 
           {/* Visually hidden, driven by the button below, and hidden by
@@ -210,6 +253,19 @@ export default function UploadSavedRecording({
             }}
             onChange={(e) => {
               const file = e.target.files?.[0] ?? null;
+              if (file && file.size === 0) {
+                setPickedFile(null);
+                setPickerReport("That file is 0 MB — it's empty, not your recording. Pick the actual saved video file.");
+                return;
+              }
+              if (file && maxBytes != null && file.size > maxBytes) {
+                setPickedFile(null);
+                setPickerReport(
+                  `That file is ${(file.size / (1024 * 1024)).toFixed(1)} MB, over the ${maxMB} MB limit for this ` +
+                    `kata. Re-save it at 1080p or 720p, 30fps, then choose it again.`,
+                );
+                return;
+              }
               setPickedFile(file);
               setPickerReport(
                 file

@@ -212,6 +212,7 @@ export default function PendingRecordingsList({ items }: { items: PendingRegistr
                     <div className="mt-2 flex flex-col items-end">
                       <UploadSavedRecording
                         registrationId={item.id}
+                        categoryName={item.categoryName}
                         onSubmitted={() =>
                           setSubmitted((prev) =>
                             new Map(prev).set(

@@ -88,17 +88,17 @@ function RecordingCard({
 }) {
   return (
     <div className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="flex items-start gap-2.5">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex min-w-0 items-start gap-2.5">
           <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-neutral-900 text-xs font-bold text-white">
             {number}
           </span>
-          <div>
+          <div className="min-w-0">
             <p className="font-bold text-neutral-900">{entry.participantName}</p>
-            <p className="text-sm text-neutral-500"><CategoryName name={entry.categoryName} /></p>
+            <p className="break-words text-sm text-neutral-500"><CategoryName name={entry.categoryName} /></p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           <StatusDot entry={entry} judgesRequired={judgesRequired} />
           <VideoWatchButton url={entry.playbackUrl} />
           {ownDelete && entry.playbackUrl && (
