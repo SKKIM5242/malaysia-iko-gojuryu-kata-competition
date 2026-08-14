@@ -219,6 +219,12 @@ function MediaTestimonialPanel({
   const [bannerRatio, setBannerRatio] = useState(0);
   const [footerRatio, setFooterRatio] = useState(0);
   const logoRef = useRef<HTMLImageElement | null>(null);
+  /** Front camera by default here, the opposite of the kata recorder: a
+   * testimonial is spoken TO the camera, so the speaker has to see
+   * themselves framed and read their script off the same screen. Rear is
+   * offered because it is the better sensor on every phone, and is the
+   * right choice when someone else is filming them. */
+  const [facing, setFacing] = useState<"user" | "environment">("user");
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // Tap-to-start countdown + clap-to-stop -- same hands-free flow as the
   // kata recorder (see components/KataRecorder.tsx and lib/clap-detector.ts
@@ -276,7 +282,7 @@ function MediaTestimonialPanel({
     };
   }, [isVideo, recordingLogoUrl]);
 
-  async function startLive() {
+  async function startLive(requestedFacing: "user" | "environment" = facing) {
     setError(null);
     try {
       // Same audio treatment as the kata recorder: the browser defaults are
@@ -295,6 +301,10 @@ function MediaTestimonialPanel({
               // HD 30fps, fixed -- matches the kata recorder so both
               // submissions arrive in one consistent format.
               video: {
+                // Not "exact": a laptop webcam reports no facing mode, and
+                // an exact constraint fails outright there instead of
+                // falling back to the only camera available.
+                facingMode: requestedFacing,
                 width: { ideal: 1280, max: 1280 },
                 height: { ideal: 720, max: 1280 },
                 frameRate: { ideal: 30, max: 30 },
@@ -309,6 +319,7 @@ function MediaTestimonialPanel({
         await videoRef.current.play().catch(() => {});
         rafRef.current = requestAnimationFrame(renderLoop);
       }
+      setFacing(requestedFacing);
       setPhase("live");
     } catch {
       setError("Could not access your camera/microphone. Check your browser permissions and try again.");
@@ -404,6 +415,21 @@ function MediaTestimonialPanel({
     drawRecordingChrome(ctx, canvas.width, canvas.height, bannerH, footerH, recordingAppearance, logoRef.current);
 
     rafRef.current = requestAnimationFrame(renderLoop);
+  }
+
+  /** facingMode cannot be changed on a running track, and applyConstraints
+   * with a different one is silently ignored on most phones — so the only
+   * reliable switch is to stop this stream and open the other camera. The
+   * canvas is re-sized from scratch afterwards because the two cameras
+   * rarely share a resolution. Live phase only: swapping the source
+   * mid-take would change the picture halfway through the testimonial. */
+  async function switchCamera() {
+    const next = facing === "user" ? "environment" : "user";
+    if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    chromeRef.current = null;
+    await startLive(next);
   }
 
   function startRecording() {
@@ -599,7 +625,7 @@ function MediaTestimonialPanel({
       </p>
 
       {phase === "idle" && (
-        <button type="button" onClick={startLive} className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-semibold text-white hover:bg-neutral-700">
+        <button type="button" onClick={() => void startLive()} className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-semibold text-white hover:bg-neutral-700">
           {isVideo ? "📷 Record now" : "🎙️ Turn on microphone"}
         </button>
       )}
@@ -636,6 +662,21 @@ function MediaTestimonialPanel({
               </div>
             </div>
           </div>
+          {phase === "live" && (
+            <div className="mb-3">
+              <button
+                type="button"
+                onClick={switchCamera}
+                className="rounded-full border border-neutral-300 bg-white px-3 py-1 text-xs font-semibold text-neutral-700 hover:bg-neutral-50"
+              >
+                {facing === "user" ? "📷 Switch to rear camera" : "🤳 Switch to front camera"}
+              </button>
+              <p className="mt-1 text-[11px] text-neutral-500">
+                Front camera lets you see yourself and read your script. Rear camera is sharper, and is the
+                right choice if someone else is filming you.
+              </p>
+            </div>
+          )}
           <div className="mb-3">
             <div className="flex flex-wrap items-center gap-1">
               <span className="mr-1 text-xs font-semibold text-neutral-600">💡 Screen light</span>

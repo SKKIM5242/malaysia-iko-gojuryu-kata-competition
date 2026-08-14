@@ -73,7 +73,36 @@ export default function UploadSavedRecording({
   const [agreed, setAgreed] = useState(false);
   const [status, setStatus] = useState<"idle" | "uploading" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
+  /** Last thing the browser actually told us when the picker closed. Shown
+   * on screen because "nothing happened" is unreportable — this turns it
+   * into a specific sentence a participant can read back to us. */
+  const [pickerReport, setPickerReport] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // iOS Safari frequently discards the page while the Photos/Files picker
+  // is open and reloads it on return — a low-memory eviction, not a crash.
+  // Every bit of React state goes with it, so the panel silently closed
+  // itself and the participant came back to a screen that looked like the
+  // button had done nothing at all. Remembering only that the panel was
+  // open (never the file, which cannot be serialised) makes the return trip
+  // land where they left off. sessionStorage, so it does not persist beyond
+  // the tab.
+  const openKey = `upload-panel-open:${registrationId}`;
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem(openKey) === "1") setOpen(true);
+    } catch {
+      // Private mode can refuse sessionStorage; the panel just won't reopen.
+    }
+  }, [openKey]);
+  useEffect(() => {
+    try {
+      if (open) sessionStorage.setItem(openKey, "1");
+      else sessionStorage.removeItem(openKey);
+    } catch {
+      // Ignored for the same reason.
+    }
+  }, [open, openKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -167,8 +196,11 @@ export default function UploadSavedRecording({
         ⬆ Upload previously saved file
       </button>
 
+      {/* The panel is `relative` so the visually-hidden, absolutely
+          positioned file input is anchored here rather than escaping to
+          the page. */}
       {open && (
-        <div className="mt-2 w-full rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm">
+        <div className="relative mt-2 w-full rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm">
           {localBlob ? (
             <p className="text-xs font-semibold text-amber-900">
               📼 A recording made on this device is still waiting to be submitted — upload that, or choose a file
@@ -198,18 +230,53 @@ export default function UploadSavedRecording({
            * The check below runs after the file is chosen instead, where a
            * wrong guess costs a warning rather than a file that cannot be
            * selected at all. */}
+          {/* Visually hidden, driven by the button below, and hidden by
+           * clipping rather than display:none — Safari has historically
+           * refused to open the picker for an input it considers not
+           * rendered. Programmatic .click() from inside a real click
+           * handler still counts as a user gesture, which is what Safari
+           * requires. */}
           <input
             ref={fileInputRef}
             type="file"
-            onChange={(e) => setPickedFile(e.target.files?.[0] ?? null)}
-            className="mt-2 block w-full text-xs text-amber-900"
+            className="absolute h-px w-px overflow-hidden opacity-0"
+            style={{ clip: "rect(0 0 0 0)" }}
+            onClick={(e) => {
+              // Clearing the value first means picking the SAME file twice
+              // still fires change. Without this, a participant who picks a
+              // file, cancels, then picks it again sees nothing happen.
+              (e.target as HTMLInputElement).value = "";
+            }}
+            onChange={(e) => {
+              const file = e.target.files?.[0] ?? null;
+              setPickedFile(file);
+              setPickerReport(
+                file
+                  ? `Received "${file.name}" — ${(file.size / (1024 * 1024)).toFixed(1)} MB, type "${file.type || "not reported by your browser"}".`
+                  : "Your browser closed the file picker without giving us a file. Try again, and if you are picking from Photos on an iPhone, give it a moment — a long video is converted before it is handed over.",
+              );
+            }}
           />
 
-          {pickedFile && (
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="mt-2 w-full rounded-md border border-amber-500 bg-white px-3 py-2 text-xs font-semibold text-amber-900 hover:bg-amber-100"
+          >
+            📁 {pickedFile ? "Choose a different file" : "Choose file from your device"}
+          </button>
+
+          {pickedFile ? (
             <p className="mt-1 text-xs text-amber-900">
               Chosen: <span className="font-semibold">{pickedFile.name}</span>{" "}
               <span className="text-amber-700">({(pickedFile.size / (1024 * 1024)).toFixed(1)} MB)</span>
             </p>
+          ) : (
+            <p className="mt-1 text-xs text-amber-700">No file chosen yet.</p>
+          )}
+
+          {pickerReport && !pickedFile && (
+            <p className="mt-1 text-xs font-semibold text-red-700">{pickerReport}</p>
           )}
 
           {pickedFile && !looksLikeVideo(pickedFile) && (

@@ -593,6 +593,13 @@ export default function KataRecorder({
   // (iOS Safari never can) rather than shown as a dead control.
   const [torchOn, setTorchOn] = useState(false);
   const [torchAvailable, setTorchAvailable] = useState(false);
+  /** Which camera is live. Rear by default for kata: the performer stands
+   * several metres from a propped-up phone, which is the rear camera's job
+   * -- it is the better sensor on every phone, and the front one cannot be
+   * aimed at the performer while the screen faces them. Switchable because
+   * a webcam-only laptop has no rear camera at all, and some participants
+   * film themselves at arm's length to check framing first. */
+  const [facing, setFacing] = useState<"user" | "environment">("environment");
   // iPhone/iPad get a written Control Centre hint instead of a light
   // button, because no browser on iOS can switch the camera flash on from a
   // web page at all -- there is no API to call, so there is nothing to put
@@ -919,7 +926,7 @@ export default function KataRecorder({
     scrollRecorderIntoView();
   }
 
-  async function startCamera() {
+  async function startCamera(requestedFacing: "user" | "environment" = facing) {
     setError(null);
     try {
       const { width, height } = idealVideoDimensions();
@@ -956,7 +963,11 @@ export default function KataRecorder({
       (audioConstraints as Record<string, unknown>).voiceIsolation = false;
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
-          facingMode: "environment",
+          // Not "exact": a laptop or desktop webcam reports no facing mode
+          // at all, and an exact constraint there fails outright with
+          // OverconstrainedError rather than falling back to the only
+          // camera present.
+          facingMode: requestedFacing,
           // HD, fixed: 1280 on the long edge (720p class) and 30fps, with
           // `max` alongside `ideal` so a phone that would otherwise hand
           // back 1080p60 is actually held to it. Every judge sees the same
@@ -974,6 +985,10 @@ export default function KataRecorder({
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
       }
+      setFacing(requestedFacing);
+      // Torch is a rear-camera feature on every phone that has one; a
+      // front camera reports no torch capability, so this re-checks per
+      // switch rather than assuming what was true for the other camera.
       setTorchAvailable(torchSupported(stream));
       setTorchOn(false);
       setPhase("live");
@@ -1517,6 +1532,30 @@ export default function KataRecorder({
       {torchOn ? "🔦 Light on" : "🔦 Light off"}
     </button>
   ) : null;
+
+  /** Switching cameras has to tear the stream down and open a new one:
+   * facingMode cannot be changed on a track that is already running, and
+   * applyConstraints() with a different facing mode is silently ignored on
+   * most phones. Only offered before recording starts -- swapping the
+   * source mid-take would change the picture halfway through a scored
+   * performance. */
+  async function switchCamera() {
+    const next = facing === "environment" ? "user" : "environment";
+    if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    await startCamera(next);
+  }
+
+  const cameraSwitchButton = (
+    <button
+      type="button"
+      onClick={switchCamera}
+      className="whitespace-nowrap rounded-full border border-white/50 bg-black/60 px-3 py-1 text-xs font-semibold text-white"
+    >
+      {facing === "environment" ? "🤳 Front camera" : "📷 Rear camera"}
+    </button>
+  );
 
   // Fit the box within a height and viewport-width-minus-margins budget
   // while preserving the real video's aspect ratio -- whichever dimension
@@ -2104,7 +2143,7 @@ export default function KataRecorder({
           <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center text-neutral-300">
             <p>Camera preview appears here once camera is enable — click below button.</p>
             <button
-              onClick={startCamera}
+              onClick={() => void startCamera()}
               className="w-full max-w-md rounded-lg bg-white px-6 py-4 text-lg font-bold text-neutral-900 shadow-lg hover:bg-neutral-100 sm:w-auto"
             >
               Enable camera
@@ -2153,13 +2192,16 @@ export default function KataRecorder({
                 from a live-but-not-recording session used to be leaving the
                 page entirely, since Exit full screen only drops the CSS
                 overlay and leaves the camera itself running underneath. */}
-            <button
-              type="button"
-              onClick={disableCamera}
-              className="rounded-full border border-white/50 bg-black/45 px-3 py-1 text-[11px] font-semibold text-white/90 hover:bg-black/65"
-            >
-              Disable camera
-            </button>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {cameraSwitchButton}
+              <button
+                type="button"
+                onClick={disableCamera}
+                className="rounded-full border border-white/50 bg-black/45 px-3 py-1 text-[11px] font-semibold text-white/90 hover:bg-black/65"
+              >
+                Disable camera
+              </button>
+            </div>
           </div>
         )}
         {phase === "countdown" && (
