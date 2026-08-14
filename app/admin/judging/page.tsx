@@ -87,7 +87,7 @@ export default async function AdminJudging({
       supabase
         .from("referees")
         .select(
-          "id, full_name, karate_rank, email, phone, home_country, user_id, unassigned_forfeit_count, unassigned_not_forfeit_count",
+          "id, full_name, karate_rank, email, phone, home_country, user_id, judge_title, unassigned_forfeit_count, unassigned_not_forfeit_count",
         )
         .eq("status", "approved")
         .order("full_name"),
@@ -110,6 +110,14 @@ export default async function AdminJudging({
   // and the dropdowns need a login (user_id) to key on, so those use the
   // linked subset.
   const directoryList = directory ?? [];
+  // Self-assignment used to be open to every referee; the organizer wants it
+  // narrowed to whichever referees carry a "Chief" title (Chief Referee,
+  // Chief Judge, or Chief Referee & Judge — judge_title is free text, so
+  // this is a substring check rather than an exact match against one of
+  // those three). Organizer/Admin/Staff are untouched — they already use
+  // the manager's own assign-anyone dropdown above, not this button.
+  const myJudgeTitle = user ? (directoryList.find((r) => r.user_id === user.id)?.judge_title ?? null) : null;
+  const isChiefJudge = /chief (referee|judge)/i.test(myJudgeTitle ?? "");
   const refereeList = directoryList
     .filter((r): r is typeof r & { user_id: string } => !!r.user_id)
     .map((r) => ({ user_id: r.user_id, full_name: r.full_name, email: r.email, country: r.home_country }));
@@ -426,8 +434,10 @@ export default async function AdminJudging({
         )}
         {/* A Referee/Judge can only assign THEMSELVES — never pick another
             referee — so this is a single fixed button, not the manager's
-            open dropdown above. */}
-        {!isJudgingManager && myRole === "referee" && user && available.some((r) => r.user_id === user.id) && (
+            open dropdown above. Narrowed to Chief Referee/Chief Judge only —
+            an ordinary referee no longer self-assigns; a manager routes them
+            in via the dropdown instead. */}
+        {!isJudgingManager && myRole === "referee" && isChiefJudge && user && available.some((r) => r.user_id === user.id) && (
           <div className="mt-3">
             <form action={assignRefereeToVideo}>
               <input type="hidden" name="video_id" value={v.id} />
@@ -471,7 +481,7 @@ export default async function AdminJudging({
         />
       </div>
 
-      <h2 className="mb-1 text-lg font-bold">Referee Workload</h2>
+      <h2 className="mb-1 text-lg font-bold">Referee/Judge Workload</h2>
       <p className="mb-3 text-sm text-neutral-500">
         Every <strong>Approved</strong> referee from the{" "}
         <a href="/admin/referees" className="font-semibold text-red-700 underline underline-offset-2">
