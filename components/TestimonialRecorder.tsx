@@ -21,7 +21,8 @@ import {
   type TestimonialScript,
 } from "@/lib/testimonial-scripts";
 import LockedVideo from "@/components/LockedVideo";
-import { RecordingBanner, RecordingFooterWatermark, PoseGuideOverlay } from "@/components/RecordingChrome";
+import { PoseGuideOverlay } from "@/components/RecordingChrome";
+import { chromeHeights, drawRecordingChrome } from "@/lib/recording-chrome-canvas";
 import { POSE_GUIDE_NOTE, type RecordingAppearance } from "@/lib/recording-appearance";
 
 const COUNTDOWN_CHOICES = [10, 15, 20, 25, 30] as const;
@@ -203,6 +204,21 @@ function MediaTestimonialPanel({
   const chunksRef = useRef<Blob[]>([]);
   const recordedBlobRef = useRef<Blob | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  // Video testimonials are recorded from a CANVAS, not straight off the
+  // camera: MediaRecorder can only capture a MediaStream, and the banner
+  // and watermark are DOM, which never reaches the file. Compositing the
+  // camera frame plus the chrome into a canvas each frame and recording
+  // canvas.captureStream() is the only way to get them into the video (see
+  // lib/recording-chrome-canvas.ts).
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const chromeRef = useRef<{ bannerH: number; footerH: number } | null>(null);
+  // The banner/watermark bands as a fraction of the composited frame, so
+  // the DOM framing guide can be inset to sit exactly over the picture
+  // area of the canvas rather than over the whole thing.
+  const [bannerRatio, setBannerRatio] = useState(0);
+  const [footerRatio, setFooterRatio] = useState(0);
+  const logoRef = useRef<HTMLImageElement | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // Tap-to-start countdown + clap-to-stop -- same hands-free flow as the
   // kata recorder (see components/KataRecorder.tsx and lib/clap-detector.ts
@@ -225,6 +241,7 @@ function MediaTestimonialPanel({
   useEffect(
     () => () => {
       streamRef.current?.getTracks().forEach((t) => t.stop());
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
       if (timerRef.current) clearInterval(timerRef.current);
       if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
       if (clapDetectorStopRef.current) clapDetectorStopRef.current();
@@ -233,6 +250,31 @@ function MediaTestimonialPanel({
     },
     [blobUrl],
   );
+
+  // Preloaded well before Start is pressed so the first recorded frame
+  // already has the logo in it. crossOrigin="anonymous" is mandatory, not
+  // cosmetic: without it the decoded image taints the canvas and
+  // captureStream() throws, which would break recording entirely rather
+  // than just dropping the logo.
+  useEffect(() => {
+    if (!isVideo || !recordingLogoUrl) {
+      logoRef.current = null;
+      return;
+    }
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      logoRef.current = img;
+    };
+    img.onerror = () => {
+      logoRef.current = null;
+    };
+    img.src = recordingLogoUrl;
+    return () => {
+      img.onload = null;
+      img.onerror = null;
+    };
+  }, [isVideo, recordingLogoUrl]);
 
   async function startLive() {
     setError(null);
@@ -265,6 +307,7 @@ function MediaTestimonialPanel({
       if (isVideo && videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play().catch(() => {});
+        rafRef.current = requestAnimationFrame(renderLoop);
       }
       setPhase("live");
     } catch {
@@ -327,11 +370,75 @@ function MediaTestimonialPanel({
     startRecording();
   }
 
+  /** Composites camera frame + banner + watermark into the canvas that is
+   * actually being recorded. Re-schedules itself, so it keeps the canvas
+   * live from the moment the camera starts through the whole take.
+   *
+   * The canvas is sized ONCE, the first time the camera reports real
+   * dimensions, and never resized afterwards: changing a canvas's size
+   * mid-recording disturbs the video track that captureStream() already
+   * handed to MediaRecorder, which is a corrupted take rather than a
+   * cosmetic glitch. */
+  function renderLoop() {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas || video.videoWidth === 0 || video.videoHeight === 0) {
+      rafRef.current = requestAnimationFrame(renderLoop);
+      return;
+    }
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    if (!chromeRef.current) {
+      const width = video.videoWidth;
+      const { bannerH, footerH } = chromeHeights(width, recordingAppearance);
+      chromeRef.current = { bannerH, footerH };
+      canvas.width = width;
+      canvas.height = video.videoHeight + bannerH + footerH;
+    }
+    const { bannerH, footerH } = chromeRef.current;
+
+    ctx.fillStyle = "#000000";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(video, 0, bannerH, canvas.width, canvas.height - bannerH - footerH);
+    drawRecordingChrome(ctx, canvas.width, canvas.height, bannerH, footerH, recordingAppearance, logoRef.current);
+
+    rafRef.current = requestAnimationFrame(renderLoop);
+  }
+
   function startRecording() {
     const stream = streamRef.current;
     if (!stream) return;
     const mimeType = isVideo ? pickVideoMimeType() : pickAudioMimeType();
-    const recorder = new MediaRecorder(stream, { mimeType });
+
+    // Voice takes have no picture to composite, so they still record the
+    // microphone stream directly. Video takes record the CANVAS instead, so
+    // the banner and watermark end up in the file and not just on screen.
+    let recordStream: MediaStream = stream;
+    if (isVideo) {
+      const canvas = canvasRef.current;
+      if (!canvas || typeof canvas.captureStream !== "function") {
+        setError("Your browser doesn't support in-app recording — please update it, or try the latest Chrome or Safari.");
+        return;
+      }
+      const canvasStream = canvas.captureStream(30);
+      const audioTrack = stream.getAudioTracks()[0];
+      // Built as ONE stream carrying both tracks rather than addTrack()-ing
+      // the microphone on afterwards: several WebKit/iOS versions only mux
+      // the tracks a MediaStream was CONSTRUCTED with and silently drop
+      // later additions, which records perfect picture with no sound (the
+      // same trap already documented in KataRecorder).
+      recordStream = new MediaStream(
+        audioTrack ? [...canvasStream.getVideoTracks(), audioTrack] : canvasStream.getVideoTracks(),
+      );
+      // A track that arrives disabled records as pure silence.
+      if (audioTrack) audioTrack.enabled = true;
+    }
+
+    const recorder = new MediaRecorder(
+      recordStream,
+      isVideo ? { mimeType, videoBitsPerSecond: 1_000_000, audioBitsPerSecond: 96_000 } : { mimeType },
+    );
     chunksRef.current = [];
     recorder.ondataavailable = (e) => {
       if (e.data.size > 0) chunksRef.current.push(e.data);
@@ -499,19 +606,35 @@ function MediaTestimonialPanel({
 
       {isVideo && (phase === "live" || phase === "countdown" || phase === "recording") && (
         <>
-          {/* Banner, camera view, framing guide and footer watermark are one
-              stacked block so the guide lines up with the picture rather
-              than with the panel around it. The banner and watermark come
-              from Recording Appearance (Admin → Competitions). */}
+          {/* What is shown here is the CANVAS being recorded, not the raw
+              camera — banner and watermark included — so the preview is
+              literally the frame that lands in the file. The <video> is
+              still needed as the pixel source for that canvas, but it is
+              never displayed; hidden with sizing rather than `display:none`,
+              which some mobile browsers treat as permission to stop
+              decoding frames altogether. */}
           <div className="mb-3 w-full max-w-md overflow-hidden rounded-md bg-black">
-            <RecordingBanner settings={recordingAppearance} logoUrl={recordingLogoUrl} />
             <div className="relative">
-              <video ref={videoRef} muted playsInline className="block w-full bg-black" />
-              {/* The instruction is printed inside the outline itself, so
-                  there is no separate caption under the picture. */}
-              <PoseGuideOverlay label="Testimonial" note={POSE_GUIDE_NOTE} />
+              <video
+                ref={videoRef}
+                muted
+                playsInline
+                className="pointer-events-none absolute h-px w-px opacity-0"
+                aria-hidden
+              />
+              <canvas ref={canvasRef} className="block w-full bg-black" />
+              {/* Overlaid on the DOM only, never drawn into the canvas: a
+                  framing aid burned across a winner's face for the life of
+                  the video would be a defect. Inset past the banner and
+                  watermark bands so the outline lines up with the picture
+                  rather than with the whole composited frame. */}
+              <div
+                className="absolute inset-x-0"
+                style={{ top: `${bannerRatio * 100}%`, bottom: `${footerRatio * 100}%` }}
+              >
+                <PoseGuideOverlay label="Testimonial" note={POSE_GUIDE_NOTE} />
+              </div>
             </div>
-            <RecordingFooterWatermark settings={recordingAppearance} />
           </div>
           <div className="mb-3">
             <div className="flex flex-wrap items-center gap-1">
@@ -605,15 +728,12 @@ function MediaTestimonialPanel({
       {phase === "review" && blobUrl && (
         <div>
           {isVideo ? (
-            // Replay keeps the banner and the footer watermark but drops the
-            // dotted guide and its instruction: there is nothing left to
-            // line up against once the take is recorded, and leaving the
-            // outline over a played-back person just obscures them.
-            <div className="mb-3 w-full max-w-md overflow-hidden rounded-md bg-black">
-              <RecordingBanner settings={recordingAppearance} logoUrl={recordingLogoUrl} />
-              <LockedVideo src={blobUrl} className="block w-full bg-black" />
-              <RecordingFooterWatermark settings={recordingAppearance} />
-            </div>
+            // No DOM banner or watermark here any more: they are baked into
+            // the recorded frames now, so drawing them again around the
+            // player would show each of them twice. The dotted guide is
+            // gone as intended — it was never recorded, and there is
+            // nothing left to line up against once the take exists.
+            <LockedVideo src={blobUrl} className="mb-3 block w-full max-w-md rounded-md bg-black" />
           ) : (
             <audio src={blobUrl} controls className="mb-3 w-full max-w-md" />
           )}
