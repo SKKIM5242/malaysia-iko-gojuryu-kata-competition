@@ -852,7 +852,7 @@ function ScoreRow({ item }: { item: ScoringItem }) {
       </p>
       {item.competitionName && <p className="text-xs text-neutral-500">{item.competitionName}</p>}
       {item.existingScore != null && (
-        <div className="mt-2">
+        <div className="mt-2 flex justify-end">
           <span className="rounded-full bg-neutral-900 px-2.5 py-1 text-xs font-semibold text-white">
             Total {item.existingScore.toFixed(2)}
           </span>
