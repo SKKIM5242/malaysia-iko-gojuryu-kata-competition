@@ -837,29 +837,27 @@ function ScoreRow({ item }: { item: ScoringItem }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <p className="font-bold text-neutral-900">{item.participantName}</p>
-          <p className="text-xs text-neutral-500">
-            {item.participantCountry ?? "—"} · <CategoryName name={item.categoryName} />
-            {item.competitionName ? ` · ${item.competitionName}` : ""}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {item.existingScore != null && (
-            <span className="rounded-full bg-neutral-900 px-2.5 py-1 text-xs font-semibold text-white">
-              Total {item.existingScore.toFixed(2)}
-            </span>
-          )}
-          <button
-            type="button"
-            onClick={() => setOpen(true)}
-            className="rounded-md bg-red-700 px-4 py-1.5 text-sm font-semibold text-white hover:bg-red-600"
-          >
-            {item.existingScore != null ? "Update score" : "Score this recording"}
-          </button>
-        </div>
+      <div className="flex items-start justify-between gap-2">
+        <p className="font-bold text-neutral-900">{item.participantName}</p>
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="shrink-0 rounded-md bg-red-700 px-4 py-1.5 text-sm font-semibold text-white hover:bg-red-600"
+        >
+          {item.existingScore != null ? "Update score" : "Score this recording"}
+        </button>
       </div>
+      <p className="mt-1 text-xs text-neutral-500">
+        {item.participantCountry ?? "—"} · <CategoryName name={item.categoryName} />
+      </p>
+      {item.competitionName && <p className="text-xs text-neutral-500">{item.competitionName}</p>}
+      {item.existingScore != null && (
+        <div className="mt-2">
+          <span className="rounded-full bg-neutral-900 px-2.5 py-1 text-xs font-semibold text-white">
+            Total {item.existingScore.toFixed(2)}
+          </span>
+        </div>
+      )}
       {open && <ScoreSession item={item} onExit={() => setOpen(false)} />}
     </div>
   );
