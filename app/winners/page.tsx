@@ -9,6 +9,8 @@ import FullViewButton, { type FullViewJudge } from "@/components/FullViewButton"
 import CertificatePreviewButton from "@/components/CertificatePreviewButton";
 import WinnerTestimonialInline, { type WinnerTestimonialInfo } from "@/components/WinnerTestimonialInline";
 import type { Competition } from "@/lib/types";
+import { getRecordingAppearance } from "@/lib/recording-appearance-server";
+import type { RecordingAppearance } from "@/lib/recording-appearance";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Winners" };
@@ -149,6 +151,8 @@ async function CompetitionWinners({
   canModerateTestimonials,
   canAssist,
   canToggleDeductions,
+  recordingAppearance,
+  recordingLogoUrl,
 }: {
   competition: Competition;
   supabase: Awaited<ReturnType<typeof createClient>>;
@@ -167,6 +171,10 @@ async function CompetitionWinners({
    * isManager, which excludes Referee/Judge) — gates the Show/Hide toggle
    * for the 5 "Reduce Score System" deduction columns in Full View. */
   canToggleDeductions: boolean;
+  /** Recording-screen branding, fetched once by the page and passed down
+   * so each tier does not re-query the same singleton row. */
+  recordingAppearance: RecordingAppearance | null;
+  recordingLogoUrl: string | null;
 }) {
   if (!competition.registration_deadline) {
     return (
@@ -272,6 +280,8 @@ async function CompetitionWinners({
                               canAssist={canAssist}
                               testimonial={w.testimonial}
                               editDeadlineISO={editDeadlineISO}
+                              recordingAppearance={recordingAppearance}
+                              recordingLogoUrl={recordingLogoUrl}
                             />
                             {myRegistrationIds.includes(w.registrationId) && (
                               <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5">
@@ -374,6 +384,9 @@ export default async function WinnersPage() {
     .select("*")
     .order("registration_fee_usd", { ascending: true, nullsFirst: true });
   const competitions = (competitionsData as Competition[]) ?? [];
+  // Fetched once here rather than per tier: it is a singleton row, and the
+  // testimonial recorder needs it before the camera view appears.
+  const { settings: recordingAppearance, logoUrl: recordingLogoUrl } = await getRecordingAppearance();
 
   const {
     data: { user },
@@ -453,6 +466,8 @@ export default async function WinnersPage() {
                 canModerateTestimonials={canModerateTestimonials}
                 canAssist={canAssist}
                 canToggleDeductions={canToggleDeductions}
+                recordingAppearance={recordingAppearance}
+                recordingLogoUrl={recordingLogoUrl}
               />
             ))}
           </div>

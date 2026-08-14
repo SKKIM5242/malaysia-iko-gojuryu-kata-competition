@@ -1795,6 +1795,94 @@ export async function saveSiteAppearance(formData: FormData) {
   backTo(returnTo, { ok: "Site appearance saved." });
 }
 
+/** Branding for the recording screens — the banner logo, its two lines, and
+ * the footer watermark that sit around a live camera view. Deliberately a
+ * separate row from site_appearance: see migration 0121 for why the
+ * website's chrome and a competitor's recording chrome must not share one
+ * set of fields. Leaving the logo field blank on re-save keeps whatever was
+ * uploaded before, same as every other branding upload here. */
+export async function saveRecordingAppearance(formData: FormData) {
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/competitions";
+  const { supabase, actorId } = await getActor();
+  await requireCompetitionManager(supabase, actorId, returnTo);
+
+  const logoPath = await uploadBrandingIfPresent(supabase, formData, "logo", "recording-logo", returnTo);
+
+  const update: Record<string, unknown> = {
+    line1_text: String(formData.get("line1_text") ?? "").trim() || null,
+    line1_align: readAlign(formData, "line1_align", "center"),
+    line1_line_height: readNumber(formData, "line1_line_height", 1.2),
+    line1_color: String(formData.get("line1_color") ?? "#ffffff").trim() || "#ffffff",
+    line1_font_size: readNumber(formData, "line1_font_size", 18),
+    line1_font_family: String(formData.get("line1_font_family") ?? "serif").trim() || "serif",
+    line1_bold: formData.get("line1_bold") === "on",
+
+    line2_text: String(formData.get("line2_text") ?? "").trim() || null,
+    line2_align: readAlign(formData, "line2_align", "center"),
+    line2_line_height: readNumber(formData, "line2_line_height", 1.2),
+    line2_color: String(formData.get("line2_color") ?? "#ffffff").trim() || "#ffffff",
+    line2_font_size: readNumber(formData, "line2_font_size", 11),
+    line2_font_family: String(formData.get("line2_font_family") ?? "sans").trim() || "sans",
+    line2_bold: formData.get("line2_bold") === "on",
+
+    footer_text: String(formData.get("footer_text") ?? "").trim() || null,
+    footer_align: readAlign(formData, "footer_align", "center"),
+    footer_line_height: readNumber(formData, "footer_line_height", 1.2),
+    footer_color: String(formData.get("footer_color") ?? "#ffffff").trim() || "#ffffff",
+    footer_font_size: readNumber(formData, "footer_font_size", 12),
+    footer_font_family: String(formData.get("footer_font_family") ?? "sans").trim() || "sans",
+    footer_bold: formData.get("footer_bold") === "on",
+
+    updated_at: new Date().toISOString(),
+  };
+  if (logoPath) update.logo_path = logoPath;
+
+  const { error } = await supabase.from("recording_appearance").update(update).eq("id", true);
+  if (error) backTo(returnTo, { error: "Could not save recording appearance settings." });
+
+  await writeAudit(supabase, {
+    table_name: "recording_appearance", record_id: null, action: "recording_appearance_updated",
+    new_value: update, actor_id: actorId,
+  });
+  revalidatePath("/winners");
+  revalidatePath("/account");
+  revalidatePath("/admin/competitions");
+  backTo(returnTo, { ok: "Recording appearance saved." });
+}
+
+/** Back to migration 0121's own defaults, including re-seeding the three
+ * texts with the organizer's wording rather than nulling them — a blank
+ * banner over a live camera is worse than the default one. */
+export async function resetRecordingAppearance(formData: FormData) {
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/competitions";
+  const { supabase, actorId } = await getActor();
+  await requireCompetitionManager(supabase, actorId, returnTo);
+
+  const update = {
+    logo_path: null,
+    line1_text: "MALAYSIA OPEN VIRTUAL KARATE-DO KATA COMPETITION",
+    line1_align: "center", line1_line_height: 1.2, line1_color: "#ffffff",
+    line1_font_size: 18, line1_font_family: "serif", line1_bold: true,
+    line2_text: "Organized by IKO GOJU-RYU KARATE-DO MALAYSIA SDN BHD",
+    line2_align: "center", line2_line_height: 1.2, line2_color: "#ffffff",
+    line2_font_size: 11, line2_font_family: "sans", line2_bold: false,
+    footer_text: "Malaysia Open Virtual Karate-do Kata Competition 2026",
+    footer_align: "center", footer_line_height: 1.2, footer_color: "#ffffff",
+    footer_font_size: 12, footer_font_family: "sans", footer_bold: true,
+    updated_at: new Date().toISOString(),
+  };
+  const { error } = await supabase.from("recording_appearance").update(update).eq("id", true);
+  if (error) backTo(returnTo, { error: "Could not reset recording appearance settings." });
+
+  await writeAudit(supabase, {
+    table_name: "recording_appearance", record_id: null, action: "recording_appearance_reset", actor_id: actorId,
+  });
+  revalidatePath("/winners");
+  revalidatePath("/account");
+  revalidatePath("/admin/competitions");
+  backTo(returnTo, { ok: "Recording appearance reset to defaults." });
+}
+
 /** Clears every field back to the table's own defaults — logo, title,
  * subtitle, and footer text all reset to null (falls back to the site's
  * hardcoded copy), every style knob back to its default, and every custom

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { TESTIMONIAL_KIND_LABEL, TESTIMONIAL_GATE_NOTE, TESTIMONIAL_VIDEO_GUIDANCE_NOTE, type TestimonialKind } from "@/lib/testimonials";
 import TestimonialRecorder from "@/components/TestimonialRecorder";
+import type { RecordingAppearance } from "@/lib/recording-appearance";
 import TestimonialDeleteButton from "@/components/TestimonialDeleteButton";
 import LockedVideo from "@/components/LockedVideo";
 import { formatDate } from "@/components/ui";
@@ -46,6 +47,8 @@ export default function WinnerTestimonialInline({
   canAssist,
   testimonial,
   editDeadlineISO,
+  recordingAppearance = null,
+  recordingLogoUrl = null,
 }: {
   /** Which registration this testimonial is for — a login linked to
    * several participants (a Sensei recording for several students) needs
@@ -75,6 +78,10 @@ export default function WinnerTestimonialInline({
    * their own testimonial, unlimited times, up until this date. Null if the
    * competition has no reveal date computed yet. */
   editDeadlineISO: string | null;
+  /** Recording-screen banner + footer watermark, from Recording
+   * Appearance on the admin Competitions page. */
+  recordingAppearance?: RecordingAppearance | null;
+  recordingLogoUrl?: string | null;
 }) {
   const [editing, setEditing] = useState(false);
   const [opened, setOpened] = useState(false);
@@ -116,7 +123,13 @@ export default function WinnerTestimonialInline({
               Cancel
             </button>
           </div>
-          <TestimonialRecorder mode="edit" registrationId={registrationId} onSaved={() => setEditing(false)} />
+          <TestimonialRecorder
+            mode="edit"
+            registrationId={registrationId}
+            onSaved={() => setEditing(false)}
+            recordingAppearance={recordingAppearance}
+            recordingLogoUrl={recordingLogoUrl}
+          />
         </div>
       );
     }
@@ -262,7 +275,11 @@ export default function WinnerTestimonialInline({
         </p>
       )}
       <div className="mt-2">
-        <TestimonialRecorder registrationId={registrationId} />
+        <TestimonialRecorder
+          registrationId={registrationId}
+          recordingAppearance={recordingAppearance}
+          recordingLogoUrl={recordingLogoUrl}
+        />
       </div>
     </div>
   );

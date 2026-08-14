@@ -20,6 +20,8 @@ import {
 } from "@/lib/watermark";
 import { getSiteAppearance } from "@/lib/site-appearance-server";
 import SiteAppearanceForm from "@/components/SiteAppearanceForm";
+import { getRecordingAppearance } from "@/lib/recording-appearance-server";
+import RecordingAppearanceForm from "@/components/RecordingAppearanceForm";
 import type { Category } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -153,6 +155,7 @@ export default async function AdminCompetitions({
   })();
   const editing = params.edit ? competitions.find((c) => c.id === params.edit) : undefined;
   const { settings: siteAppearance, logoUrl: siteLogoUrl } = await getSiteAppearance();
+  const { settings: recordingAppearance, logoUrl: recordingLogoUrl } = await getRecordingAppearance();
 
   return (
     <AdminShell
@@ -837,6 +840,18 @@ export default async function AdminCompetitions({
             text and style — on every page. Saving here updates the whole site immediately.
           </p>
           <SiteAppearanceForm settings={siteAppearance} logoUrl={siteLogoUrl} />
+        </div>
+      )}
+      {canManageCompetition && (
+        <div className="mt-10 border-t border-neutral-200 pt-8">
+          <h2 className="mb-1 text-lg font-bold">Recording Appearance</h2>
+          <p className="mb-3 max-w-3xl text-sm text-neutral-500">
+            Controls the banner logo, banner line 1 and line 2, and the footer watermark on the
+            recording screens — what a winner sees framing the camera while recording a video
+            testimonial. Separate from Site Appearance so a change to the website&apos;s own header
+            never silently changes what appears around a competitor&apos;s recording.
+          </p>
+          <RecordingAppearanceForm settings={recordingAppearance} logoUrl={recordingLogoUrl} />
         </div>
       )}
     </AdminShell>

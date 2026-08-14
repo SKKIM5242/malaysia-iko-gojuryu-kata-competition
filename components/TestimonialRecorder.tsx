@@ -21,6 +21,8 @@ import {
   type TestimonialScript,
 } from "@/lib/testimonial-scripts";
 import LockedVideo from "@/components/LockedVideo";
+import { RecordingBanner, RecordingFooterWatermark, PoseGuideOverlay } from "@/components/RecordingChrome";
+import { POSE_GUIDE_NOTE, type RecordingAppearance } from "@/lib/recording-appearance";
 
 const COUNTDOWN_CHOICES = [10, 15, 20, 25, 30] as const;
 
@@ -181,11 +183,15 @@ function MediaTestimonialPanel({
   mode,
   registrationId,
   onDone,
+  recordingAppearance,
+  recordingLogoUrl,
 }: {
   kind: "video" | "voice";
   mode: "submit" | "edit";
   registrationId: string;
   onDone: () => void;
+  recordingAppearance: RecordingAppearance | null;
+  recordingLogoUrl: string | null;
 }) {
   const [takeType, setTakeType] = useState<"practice" | "actual">("practice");
   const [phase, setPhase] = useState<Phase>("idle");
@@ -493,7 +499,20 @@ function MediaTestimonialPanel({
 
       {isVideo && (phase === "live" || phase === "countdown" || phase === "recording") && (
         <>
-          <video ref={videoRef} muted playsInline className="mb-3 w-full max-w-md rounded-md bg-black" />
+          {/* Banner, camera view, framing guide and footer watermark are one
+              stacked block so the guide lines up with the picture rather
+              than with the panel around it. The banner and watermark come
+              from Recording Appearance (Admin → Competitions). */}
+          <div className="mb-3 w-full max-w-md overflow-hidden rounded-md bg-black">
+            <RecordingBanner settings={recordingAppearance} logoUrl={recordingLogoUrl} />
+            <div className="relative">
+              <video ref={videoRef} muted playsInline className="block w-full bg-black" />
+              {/* The instruction is printed inside the outline itself, so
+                  there is no separate caption under the picture. */}
+              <PoseGuideOverlay label="Testimonial" note={POSE_GUIDE_NOTE} />
+            </div>
+            <RecordingFooterWatermark settings={recordingAppearance} />
+          </div>
           <div className="mb-3">
             <div className="flex flex-wrap items-center gap-1">
               <span className="mr-1 text-xs font-semibold text-neutral-600">💡 Screen light</span>
@@ -586,7 +605,15 @@ function MediaTestimonialPanel({
       {phase === "review" && blobUrl && (
         <div>
           {isVideo ? (
-            <LockedVideo src={blobUrl} className="mb-3 w-full max-w-md rounded-md bg-black" />
+            // Replay keeps the banner and the footer watermark but drops the
+            // dotted guide and its instruction: there is nothing left to
+            // line up against once the take is recorded, and leaving the
+            // outline over a played-back person just obscures them.
+            <div className="mb-3 w-full max-w-md overflow-hidden rounded-md bg-black">
+              <RecordingBanner settings={recordingAppearance} logoUrl={recordingLogoUrl} />
+              <LockedVideo src={blobUrl} className="block w-full bg-black" />
+              <RecordingFooterWatermark settings={recordingAppearance} />
+            </div>
           ) : (
             <audio src={blobUrl} controls className="mb-3 w-full max-w-md" />
           )}
@@ -844,6 +871,8 @@ export default function TestimonialRecorder({
   mode = "submit",
   registrationId,
   onSaved,
+  recordingAppearance = null,
+  recordingLogoUrl = null,
 }: {
   /** "edit" re-records/re-types an already-submitted testimonial (calls
    * editTestimonial, an UPDATE) instead of the default first-time "submit"
@@ -859,6 +888,13 @@ export default function TestimonialRecorder({
    * collapse back to the read-only view instead of showing the "thank you"
    * screen below (which only makes sense for a first submission). */
   onSaved?: () => void;
+  /** Banner + footer watermark for the recording screen, from the Recording
+   * Appearance section on the admin Competitions page. Passed down rather
+   * than fetched here: this is a client component, and one fetch per
+   * recorder mount would flash an unbranded header over the camera before
+   * it resolved. */
+  recordingAppearance?: RecordingAppearance | null;
+  recordingLogoUrl?: string | null;
 }) {
   const router = useRouter();
   const [chosen, setChosen] = useState<ChooserOption | null>(null);
@@ -912,13 +948,13 @@ export default function TestimonialRecorder({
       {chosen === "video" && (
         <div className="mt-3">
           <ScriptPicker />
-          <MediaTestimonialPanel kind="video" mode={mode} registrationId={registrationId} onDone={() => handleDone("video")} />
+          <MediaTestimonialPanel kind="video" mode={mode} registrationId={registrationId} onDone={() => handleDone("video")} recordingAppearance={recordingAppearance} recordingLogoUrl={recordingLogoUrl} />
         </div>
       )}
       {chosen === "voice" && (
         <div className="mt-3">
           <ScriptPicker />
-          <MediaTestimonialPanel kind="voice" mode={mode} registrationId={registrationId} onDone={() => handleDone("voice")} />
+          <MediaTestimonialPanel kind="voice" mode={mode} registrationId={registrationId} onDone={() => handleDone("voice")} recordingAppearance={recordingAppearance} recordingLogoUrl={recordingLogoUrl} />
         </div>
       )}
       {chosen === "message" && (
