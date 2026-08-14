@@ -22,3 +22,13 @@
 *.webm binary
 *.mp3 binary
 *.wav binary
+
+# Shell scripts must always check out with LF, never CRLF. A CRLF right
+# after the #!/usr/bin/env bash shebang line makes the interpreter line
+# unparsable on a real Linux/macOS shell (the shebang becomes
+# "#!/usr/bin/env bash\r", which most kernels fail to resolve) -- the same
+# class of corruption the PDF rule above exists for, just for text instead
+# of bytes. It happened to run fine under Git Bash on Windows in this repo
+# because that build tolerates a trailing \r, which is exactly what let a
+# CRLF checkout go unnoticed here before it broke somewhere stricter.
+*.sh text eol=lf
