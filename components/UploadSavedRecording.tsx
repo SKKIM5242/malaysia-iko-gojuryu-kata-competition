@@ -254,12 +254,20 @@ export default function UploadSavedRecording({
               is never a disabled button sitting there inviting a click. */}
           {pickedFile && (
             <>
-              <label className="mt-3 flex items-start gap-2 text-xs text-amber-900">
+              {/* The checkbox is the one thing standing between a chosen
+                  file and submitting it, so it has to be genuinely easy to
+                  hit with a thumb — the browser's own unstyled default
+                  renders at roughly 13px, which is smaller than Apple's and
+                  Google's own minimum recommended touch target. Sized
+                  explicitly here rather than left to the default, with the
+                  label itself still wrapping both so tapping the sentence
+                  works exactly like tapping the box. */}
+              <label className="mt-3 flex cursor-pointer items-start gap-2.5 text-sm text-amber-900">
                 <input
                   type="checkbox"
                   checked={agreed}
                   onChange={(e) => setAgreed(e.target.checked)}
-                  className="mt-0.5"
+                  className="mt-0.5 h-6 w-6 shrink-0 cursor-pointer accent-amber-600"
                 />
                 <span>{ATTESTATION_TEXT}</span>
               </label>

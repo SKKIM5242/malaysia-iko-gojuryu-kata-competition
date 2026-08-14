@@ -1676,10 +1676,16 @@ export default function KataRecorder({
         </p>
         <p>
           Recording is limited to <strong>5 minutes</strong> to perform{" "}
-          <strong>1 set of Kata only, from one angle</strong>. No file upload or editing is
-          allowed, and no recording on screen or screen recording is allowed — only the in-app
-          camera recorder, with the header on top and a watermark with the date and time of
+          <strong>1 set of Kata only, from one angle</strong>. Your kata must be recorded using{" "}
+          <strong>this in-app camera recorder</strong> — no screen recording, and no editing of the
+          footage afterward. It carries the header on top and a watermark with the date and time of
           recording at the footer.
+        </p>
+        <p>
+          If a recording made here could not be submitted at the time (a connection problem, for
+          example), you may upload that same, unedited file afterward using{" "}
+          <strong>&quot;Upload previously saved file&quot;</strong> next to Start Recording — it is
+          for retrying a submission, not for a video made outside this recorder.
         </p>
         <p>
           Recording opens as per your competition tier&apos;s event start date, and closes on its

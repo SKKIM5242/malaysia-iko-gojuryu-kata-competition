@@ -165,8 +165,23 @@ export default function PendingRecordingsList({ items }: { items: PendingRegistr
                   key={item.id}
                   className="rounded-md border border-amber-200 bg-white px-3 py-2 text-sm"
                 >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="min-w-0 flex-1 text-neutral-700">
+                  {/* Column below sm, row from sm up: on a phone-width
+                      screen the category text gets the FULL row to wrap in,
+                      with Start Recording on its own line underneath rather
+                      than squeezed into whatever space is left beside it.
+                      That squeeze is what made a long kata name (e.g. "Kata
+                      Nunchaku - Open Version - Subject to Weapons rules &
+                      regulations") crowd right up against the button. */}
+                  <div className="flex flex-col gap-1.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-2">
+                    {/* min-w-0 flex-1 is load-bearing, not decorative: flex-wrap
+                        groups items by their NATURAL (unshrunk) width before
+                        anything is allowed to shrink, so a long single line of
+                        text on its own already exceeds the row and pushes the
+                        button onto its own line even though there is plenty of
+                        room once the text is allowed to wrap. flex-1 gives the
+                        text a zero basis so both it and the button are judged
+                        to fit before shrinking/wrapping is even considered. */}
+                    <span className="min-w-0 flex-1 break-words text-neutral-700">
                       {item.participantName && (
                         <span className="font-semibold text-neutral-900">{item.participantName} — </span>
                       )}
@@ -180,7 +195,7 @@ export default function PendingRecordingsList({ items }: { items: PendingRegistr
                       <span className="shrink-0 text-xs font-semibold text-green-700">{SUBMITTED_NOTE}</span>
                     ) : (
                       status === "open" && (
-                        <form action={claimAndStartRecording} className="shrink-0">
+                        <form action={claimAndStartRecording} className="flex justify-end sm:block sm:shrink-0">
                           <input type="hidden" name="registration_id" value={item.id} />
                           <button className="rounded-md bg-red-700 px-4 py-1.5 text-xs font-semibold text-white hover:bg-red-600">
                             Start Recording
