@@ -152,54 +152,63 @@ export default function PendingRecordingsList({ items }: { items: PendingRegistr
             </p>
             <ul className="mt-2 space-y-1.5">
               {g.items.map((item) => (
+                // Two fixed rows rather than one wrapping line. Previously
+                // everything sat in a single flex-wrap row, so where each
+                // button landed depended on how long that kata's name
+                // happened to be: a short name put both buttons on the same
+                // line, a long one pushed them onto the next, and the list
+                // read as though the buttons were in different places for
+                // different kata. Row 1 is now always the name with Start
+                // Recording at its right end; row 2 is always the upload
+                // button at the right end.
                 <li
                   key={item.id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-200 bg-white px-3 py-2 text-sm"
+                  className="rounded-md border border-amber-200 bg-white px-3 py-2 text-sm"
                 >
-                  <span className="text-neutral-700">
-                    {item.participantName && (
-                      <span className="font-semibold text-neutral-900">{item.participantName} — </span>
-                    )}
-                    {item.categoryName ?? "Category not set"}
-                  </span>
-                  {submitted.has(item.id) ? (
-                    // Once a file has been accepted for this registration
-                    // there is nothing left to start: offering Start
-                    // Recording again would let a participant record over a
-                    // kata they have already submitted for judging.
-                    <span className="ml-auto self-center text-xs font-semibold text-green-700">
-                      {SUBMITTED_NOTE}
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="min-w-0 flex-1 text-neutral-700">
+                      {item.participantName && (
+                        <span className="font-semibold text-neutral-900">{item.participantName} — </span>
+                      )}
+                      {item.categoryName ?? "Category not set"}
                     </span>
-                  ) : (
-                    status === "open" && (
-                      <>
-                        <form action={claimAndStartRecording} className="ml-auto self-center">
+                    {submitted.has(item.id) ? (
+                      // Once a file has been accepted for this registration
+                      // there is nothing left to start: offering Start
+                      // Recording again would let a participant record over a
+                      // kata they have already submitted for judging.
+                      <span className="shrink-0 text-xs font-semibold text-green-700">{SUBMITTED_NOTE}</span>
+                    ) : (
+                      status === "open" && (
+                        <form action={claimAndStartRecording} className="shrink-0">
                           <input type="hidden" name="registration_id" value={item.id} />
                           <button className="rounded-md bg-red-700 px-4 py-1.5 text-xs font-semibold text-white hover:bg-red-600">
                             Start Recording
                           </button>
                         </form>
-                        {/* Sits right beside Start Recording and is ALWAYS
-                            offered -- it used to be a separate row that only
-                            appeared when this particular browser still held a
-                            cached copy, which is why it looked missing after
-                            recording on a different device. Its own panel
-                            explains which source it found. */}
-                        <UploadSavedRecording
-                          registrationId={item.id}
-                          onSubmitted={() =>
-                            setSubmitted((prev) =>
-                              new Map(prev).set(
-                                item.id,
-                                [item.participantName, item.categoryName ?? "Category not set"]
-                                  .filter(Boolean)
-                                  .join(" — "),
-                              ),
-                            )
-                          }
-                        />
-                      </>
-                    )
+                      )
+                    )}
+                  </div>
+
+                  {!submitted.has(item.id) && status === "open" && (
+                    // items-end right-aligns the button; the panel it opens
+                    // is w-full, so it still spans the whole row underneath
+                    // rather than being squeezed into the button's width.
+                    <div className="mt-2 flex flex-col items-end">
+                      <UploadSavedRecording
+                        registrationId={item.id}
+                        onSubmitted={() =>
+                          setSubmitted((prev) =>
+                            new Map(prev).set(
+                              item.id,
+                              [item.participantName, item.categoryName ?? "Category not set"]
+                                .filter(Boolean)
+                                .join(" — "),
+                            ),
+                          )
+                        }
+                      />
+                    </div>
                   )}
                 </li>
               ))}
