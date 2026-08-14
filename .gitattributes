@@ -32,3 +32,10 @@
 # because that build tolerates a trailing \r, which is exactly what let a
 # CRLF checkout go unnoticed here before it broke somewhere stricter.
 *.sh text eol=lf
+
+# Same reasoning as the shell-script rule above, applied preemptively rather
+# than after a real break: Postgres itself doesn't care about CRLF vs LF in
+# a .sql file, but 122 migrations checked out consistently as LF and one new
+# one silently flipping to CRLF on a Windows checkout is exactly the kind of
+# quiet inconsistency that's cheap to prevent and annoying to debug later.
+*.sql text eol=lf
