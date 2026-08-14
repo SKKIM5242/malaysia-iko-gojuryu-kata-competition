@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getAllCompetitions } from "@/lib/admin-data";
 import { schemaReady } from "@/lib/data";
@@ -221,12 +220,12 @@ export default async function AdminJudging({
     const fullVisibility = isJudgingManager || myRole !== "referee" || revealed;
     return (
       <Card key={v.id}>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
             <p className="font-bold text-neutral-900">{v.participant?.full_name ?? "Unknown participant"}</p>
-            <p className="text-sm text-neutral-500"><CategoryName name={v.registration?.category?.name} /></p>
+            <p className="break-words text-sm text-neutral-500"><CategoryName name={v.registration?.category?.name} /></p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             {dq ? (
               <span className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-bold text-red-800">
                 Disqualified
@@ -286,7 +285,12 @@ export default async function AdminJudging({
           </div>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-1.5">
+        {/* Average sits in its own shrink-0 column so it stays put at the
+            right, vertically centered against however many rows the judge
+            pills wrap onto — items-center (not items-start) is what centers
+            it rather than pinning it to the pills' first line. */}
+        <div className="mt-3 flex items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
           {assigned.length === 0 ? (
             <span className="text-xs text-neutral-400">No referees assigned yet</span>
           ) : (
@@ -362,7 +366,7 @@ export default async function AdminJudging({
             return (
               <span
                 key={uid}
-                className="flex items-center gap-1.5 rounded-full border border-purple-300 bg-purple-50 px-2.5 py-1 text-xs font-semibold text-purple-800"
+                className="flex items-center gap-1.5 rounded-full border border-neutral-300 bg-neutral-50 px-2.5 py-1 text-xs font-semibold text-neutral-700"
                 title="Admin/Organizer/Staff override — not counted toward Judges per recording"
               >
                 Override — {judgeName}
@@ -378,7 +382,7 @@ export default async function AdminJudging({
                         canToggleDeductions={isJudgingManager}
                       />
                     ) : (
-                      <span className={score === 0 ? "font-bold text-red-700" : "text-purple-700"}>
+                      <span className={score === 0 ? "font-bold text-red-700" : "text-green-700"}>
                         Total {score.toFixed(2)}
                       </span>
                     )
@@ -393,12 +397,13 @@ export default async function AdminJudging({
               </span>
             );
           })}
-          {final != null && (
-            <span className="rounded-full bg-neutral-900 px-2.5 py-1 text-xs font-semibold text-white">
-              Average {final.toFixed(2)} ({submittedScores.length}/{allScorers.length} scored
-              {trimmed ? ", high/low dropped" : ""})
-            </span>
-          )}
+        </div>
+        {final != null && (
+          <span className="shrink-0 rounded-full bg-neutral-900 px-2.5 py-1 text-xs font-semibold text-white">
+            Average {final.toFixed(2)} ({submittedScores.length}/{allScorers.length} scored
+            {trimmed ? ", high/low dropped" : ""})
+          </span>
+        )}
         </div>
 
         {isJudgingManager && available.length > 0 && (
@@ -676,20 +681,6 @@ export default async function AdminJudging({
                     <input type="hidden" name="competition_id" value={c.id} />
                     <button className={adminBtn}>Auto-assign referees</button>
                   </form>
-                  <Link
-                    href={`/admin/winners#${c.id}`}
-                    className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50"
-                    title="Preview how the Winners announcement will look for this tier, before the public reveal date"
-                  >
-                    Preview winners →
-                  </Link>
-                  <Link
-                    href="/admin/commissions#rewards"
-                    className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50"
-                    title="Mark Top-3 prize money as paid once transferred"
-                  >
-                    Reward payouts →
-                  </Link>
                 </div>
               ) : (
                 <span className="text-xs text-neutral-400">
