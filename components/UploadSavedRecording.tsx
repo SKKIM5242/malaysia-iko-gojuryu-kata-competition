@@ -7,6 +7,31 @@ import { submitKataVideo } from "@/app/actions/account";
 import { extensionForMimeType, bareMimeType } from "@/lib/media-recording";
 import { getLocalRecording, clearLocalRecording, onLocalRecordingChanged } from "@/lib/local-recording-store";
 
+/** Checked by extension as well as MIME type, because the type is the half
+ * that goes missing: a file saved out of a browser download frequently
+ * arrives with an empty `type`, and on iOS `.webm` has no registered video
+ * type at all. Used only to warn after the fact — never to filter the
+ * picker, which is what previously made those files unselectable. */
+/** Best guess at a real video content-type from the file name, for when the
+ * browser reports none. Storage needs a truthful Content-Type or the video
+ * will not play back in the arena later. */
+function mimeFromFileName(name: string): string {
+  const ext = name.toLowerCase().split(".").pop() ?? "";
+  if (ext === "mp4" || ext === "m4v") return "video/mp4";
+  if (ext === "mov") return "video/quicktime";
+  if (ext === "webm") return "video/webm";
+  if (ext === "ogv") return "video/ogg";
+  if (ext === "3gp") return "video/3gpp";
+  // Everything the recorder itself produces is webm or mp4, and webm is the
+  // commoner of the two, so it is the least-bad default for an unknown name.
+  return "video/webm";
+}
+
+function looksLikeVideo(file: File): boolean {
+  if (file.type.startsWith("video/")) return true;
+  return /\.(webm|mp4|m4v|mov|mkv|avi|3gp|ogv)$/i.test(file.name);
+}
+
 const ATTESTATION_TEXT =
   "I confirm this is my own previously recorded kata video, submitted without any editing. Any editing is subject to disqualification.";
 
@@ -120,7 +145,17 @@ export default function UploadSavedRecording({
   }
 
   const readyBlob: Blob | null = pickedFile ?? localBlob?.blob ?? null;
-  const readyMime = pickedFile?.type || localBlob?.mime || "";
+  // Falls back to the file's EXTENSION when the browser reports no type,
+  // which is common for a file that came from a download rather than from
+  // a camera roll. Without this an iPhone-saved .mp4 with a missing type
+  // was uploaded named .webm with a video/webm content-type — a file whose
+  // name, declared type and actual contents all disagreed, which is a
+  // playback failure later rather than an error at upload time.
+  const readyMime = pickedFile
+    ? pickedFile.type && pickedFile.type.startsWith("video/")
+      ? pickedFile.type
+      : mimeFromFileName(pickedFile.name)
+    : localBlob?.mime || "";
 
   return (
     <>
@@ -142,17 +177,50 @@ export default function UploadSavedRecording({
           ) : (
             <p className="text-xs text-amber-900">
               No unsent recording is stored in this browser. That is normal if you recorded on another device or
-              browser, or already submitted it. Choose the file you kept with &quot;Save to device&quot;.
+              browser, or already submitted it. Choose the file you kept with &quot;Save to device&quot; — it is
+              usually in your Downloads or Files, named ending in .webm or .mp4.
             </p>
           )}
 
+          {/* No `accept` filter, deliberately.
+           *
+           * It used to be accept="video/*", which is what made files
+           * impossible to select. That attribute filters on the MIME TYPE
+           * the operating system has recorded for the file, not on its
+           * contents, and a recording saved out of the browser very often
+           * reaches the disk with no type at all — at which point the
+           * picker greys it out and there is no way to pick it. It is worse
+           * on phones: iOS has no video type registered for .webm, so a
+           * kata saved on Android or a laptop is ALWAYS greyed out on an
+           * iPhone, and Android's video picker only lists files its media
+           * scanner has indexed, which usually excludes Downloads.
+           *
+           * The check below runs after the file is chosen instead, where a
+           * wrong guess costs a warning rather than a file that cannot be
+           * selected at all. */}
           <input
             ref={fileInputRef}
             type="file"
-            accept="video/*"
             onChange={(e) => setPickedFile(e.target.files?.[0] ?? null)}
             className="mt-2 block w-full text-xs text-amber-900"
           />
+
+          {pickedFile && (
+            <p className="mt-1 text-xs text-amber-900">
+              Chosen: <span className="font-semibold">{pickedFile.name}</span>{" "}
+              <span className="text-amber-700">({(pickedFile.size / (1024 * 1024)).toFixed(1)} MB)</span>
+            </p>
+          )}
+
+          {pickedFile && !looksLikeVideo(pickedFile) && (
+            // A warning, not a block. The test is a guess about a file the
+            // browser may know nothing about, and blocking on a guess is
+            // exactly the bug being fixed here.
+            <p className="mt-1 text-xs font-semibold text-amber-800">
+              ⚠️ This doesn&apos;t look like a video file. You can still upload it, but check you picked the
+              recording you saved and not something else.
+            </p>
+          )}
 
           <label className="mt-2 flex items-start gap-2 text-xs text-amber-900">
             <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} className="mt-0.5" />
