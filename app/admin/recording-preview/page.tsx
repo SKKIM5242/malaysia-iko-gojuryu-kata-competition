@@ -51,7 +51,7 @@ export default async function AdminRecordingPreview() {
           }`}>
             {canTest ? (
               <>
-                <strong>Admin / Organizer / Referee — full test access.</strong> This is the exact
+                <strong>Admin / Organizer / Judge — full test access.</strong> This is the exact
                 recording window a participant sees, using sample dates. You can test the camera,
                 timer, and delete-and-re-record flow. Final submission will show an expected error
                 since your staff account has no paid registration to attach it to.

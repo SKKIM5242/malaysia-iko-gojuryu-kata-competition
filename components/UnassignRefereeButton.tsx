@@ -63,9 +63,9 @@ export default function UnassignRefereeButton({
           onClick={() => setOpen(false)}
         >
           <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-sm font-bold uppercase tracking-wide text-neutral-700">Unassign referee</h3>
+            <h3 className="text-sm font-bold uppercase tracking-wide text-neutral-700">Unassign judge</h3>
             <p className="mt-2 text-sm text-neutral-600">
-              Should this removal count as a forfeited assignment for this referee?
+              Should this removal count as a forfeited assignment for this judge?
             </p>
             <div className="mt-4 flex flex-col gap-2">
               <UnassignForm videoId={videoId} refereeUserId={refereeUserId} returnTo={returnTo} forfeit="true">

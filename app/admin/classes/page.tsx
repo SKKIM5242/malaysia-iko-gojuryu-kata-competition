@@ -55,7 +55,7 @@ const KIND_LABEL: Record<string, string> = {
 const APPLIES_TO_OPTIONS = [
   "Competition Participant",
   "Competition School",
-  "Competition Referee/Judge",
+  "Competition Judge",
   "Competition Support",
   "Coach/Sensei/Master",
 ] as const;

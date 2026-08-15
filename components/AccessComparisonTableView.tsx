@@ -13,7 +13,7 @@ const COLUMNS: Array<{ key: string; label: string; width: number }> = [
   { key: "participant", label: "Participant", width: 260 },
   { key: "school", label: "School / Dojo", width: 260 },
   { key: "sensei", label: "Sensei / Coach", width: 260 },
-  { key: "referee", label: "Referee / Judge", width: 260 },
+  { key: "referee", label: "Judge", width: 260 },
   { key: "audience", label: "Audience", width: 260 },
   { key: "organizer", label: "Organizer", width: 260 },
   { key: "support", label: "Participant Support", width: 260 },

@@ -8,7 +8,7 @@ const ROLE_LABELS: Record<string, string> = {
   participant: "Participant",
   school: "School / Dojo",
   sensei: "Sensei / Coach",
-  referee: "Referee / Judge",
+  referee: "Judge",
   audience: "Audience / Spectator",
   customer_support: "Participant Support",
   organizer: "Organizer",

@@ -83,7 +83,7 @@ export default async function AdminTelegramLinks({
         Every registration category&apos;s dedicated Telegram group in one place.{" "}
         {canEdit
           ? "Add, edit, or delete groups directly here instead of changing a Vercel environment variable."
-          : "Participant Support and Referee/Judge accounts have read-only access here — only Admin/Organizer can add, edit, or delete a group."}
+          : "Participant Support and Judge accounts have read-only access here — only Admin/Organizer can add, edit, or delete a group."}
       </p>
       <p className="mb-6 text-xs text-neutral-400">
         <strong>Invite link</strong> (https://t.me/+...) is what notification emails use to let a

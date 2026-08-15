@@ -411,7 +411,7 @@ export default async function KataArenaPage({
             ? arena.filter((e) => e.schoolId != null && e.schoolId === profile.school_id)
             : profile.role === "sensei" && !revealed
               ? arena.filter((e) => e.senseiId != null && e.senseiId === profile.sensei_id)
-              : // A Referee/Judge sees only their own submitted score per
+              : // A Judge sees only their own submitted score per
                 // recording until winners are announced for this tier —
                 // full visibility of every judge's score (same as
                 // Admin/Organizer/Participant Support) opens up from that
@@ -481,7 +481,7 @@ export default async function KataArenaPage({
           </p>
           {showJudgeScores && (
             <p className="mb-4 text-xs font-semibold text-red-700">
-              A Referee/Judge&apos;s score is final once submitted — no appeal will be entertained.
+              A Judge&apos;s score is final once submitted — no appeal will be entertained.
             </p>
           )}
           <p className="mb-4 text-sm">

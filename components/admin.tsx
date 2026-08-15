@@ -16,7 +16,7 @@ const FULL_NAV: Array<[string, string]> = [
   ["Schools", "/admin/schools"],
   ["Senseis", "/admin/senseis"],
   ["Participants", "/admin/participants"],
-  ["Referees", "/admin/referees"],
+  ["Judges", "/admin/referees"],
   ["Audience", "/admin/audience"],
   ["Organizers", "/admin/organizers"],
   ["Support", "/admin/support"],

@@ -256,7 +256,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ kind
 
     const { data: refRow } = await supabase.from("referees").select("full_name").eq("user_id", refereeUserId).maybeSingle();
     const { data: profRow } = await supabase.from("profiles").select("full_name").eq("user_id", refereeUserId).maybeSingle();
-    const recipientName = (refRow?.full_name as string | null) ?? (profRow?.full_name as string | null) ?? "Referee / Judge";
+    const recipientName = (refRow?.full_name as string | null) ?? (profRow?.full_name as string | null) ?? "Judge";
 
     const { data: assignments } = await supabase.from("referee_assignments").select("video_id").eq("referee_user_id", refereeUserId);
     const videoIds = (assignments ?? []).map((a) => a.video_id as string);

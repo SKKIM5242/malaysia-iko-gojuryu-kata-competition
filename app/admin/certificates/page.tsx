@@ -22,10 +22,10 @@ const CERT_KINDS: Array<{ key: string; kind: string; label: string; note: string
   { key: "winner-2", kind: "winner", label: "Winner — 2nd Place", note: "Silver accent + silver medal.", query: "?rank=2" },
   { key: "winner-3", kind: "winner", label: "Winner — 3rd Place", note: "Bronze accent + bronze medal.", query: "?rank=3" },
   { key: "participant", kind: "participant", label: "Participant", note: "Every other paid, non-winning participant." },
-  { key: "referee", kind: "referee", label: "Referee / Judge", note: "For judging a competition tier." },
+  { key: "referee", kind: "referee", label: "Judge", note: "For judging a competition tier." },
   { key: "sensei", kind: "sensei", label: "Sensei", note: "For a sensei whose students competed." },
   { key: "school", kind: "school", label: "School / Dojo", note: "For a school whose students competed." },
-  { key: "support", kind: "support", label: "Support", note: "One per revealed tier, same as Referee/Sensei/School." },
+  { key: "support", kind: "support", label: "Support", note: "One per revealed tier, same as Judge/Sensei/School." },
 ];
 
 export default async function AdminCertificates({
@@ -70,7 +70,7 @@ export default async function AdminCertificates({
     <AdminShell title="Certificates" active="/admin/certificates" flash={{ ok: params.ok, error: params.error }}>
       <p className="mb-6 max-w-3xl text-sm text-neutral-500">
         The signature, stamp/seal, and signer name/title set here appear on every certificate the
-        system generates — Winner, Participant, Referee/Judge, Sensei, School, and Support. Nothing
+        system generates — Winner, Participant, Judge, Sensei, School, and Support. Nothing
         is pre-generated or stored: every download (from here or from a signed-in account&apos;s
         &quot;Your Certificate&quot; box) renders fresh from live data.
       </p>
@@ -108,13 +108,13 @@ export default async function AdminCertificates({
                   <label htmlFor="signer_title_2" className={adminLabel}>Signer 2 title</label>
                   <input
                     id="signer_title_2" name="signer_title_2" defaultValue={settings?.signer_title_2 ?? ""}
-                    className={adminInput} placeholder="e.g. Head Referee"
+                    className={adminInput} placeholder="e.g. Head Judge"
                   />
                 </div>
               </div>
               <p className="text-xs text-neutral-400">
                 Leave Signer 2 blank to show only one signer. When set, it appears bottom-right on every
-                certificate (Winner, Participant, Referee/Judge, Sensei, School/Dojo, Support), using the
+                certificate (Winner, Participant, Judge, Sensei, School/Dojo, Support), using the
                 same signature and stamp images above.
               </p>
               <div className="grid gap-4 sm:grid-cols-2">

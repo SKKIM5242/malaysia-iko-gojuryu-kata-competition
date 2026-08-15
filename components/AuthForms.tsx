@@ -22,7 +22,7 @@ const ROLE_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "school", label: "School / Dojo / Club" },
   { value: "sensei", label: "Sensei / Shihan / Hanshi" },
   { value: "participant", label: "Participant (record my kata)" },
-  { value: "referee", label: "Referee / Judge" },
+  { value: "referee", label: "Judge" },
   { value: "audience", label: "Audience / Spectator (view Kata Arena)" },
   { value: "customer_support", label: "Participant Support" },
   { value: "organizer", label: "Organizer" },
@@ -161,7 +161,7 @@ export default function AuthForms({ defaultMode = "signin" }: { defaultMode?: "s
               ))}
             </div>
             <p className="mt-1 text-xs text-neutral-400">
-              Tick every role that applies — one account covers all of them. Referee/Judge and
+              Tick every role that applies — one account covers all of them. Judge and
               Audience roles need the organizer&apos;s approval before they activate. Once
               approved, sign-in is unlimited and free.
             </p>

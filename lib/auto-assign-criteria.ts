@@ -1,13 +1,13 @@
 /** The auto-assign algorithm's actual rules (see autoAssignReferees() in
  * app/actions/admin.ts), spelled out as documentation -- shown (and
- * editable) on the Judging page under Referee Workload. Editing the rows
+ * editable) on the Judging page under Judge Workload. Editing the rows
  * seeded from this list only updates what's DISPLAYED; it doesn't change
  * the algorithm's real behavior. */
 export const DEFAULT_AUTO_ASSIGN_CRITERIA: Array<{ title: string; description: string }> = [
   {
     title: "Eligible pool",
     description:
-      "Approved referees (Referees page) with a linked login. A referee whose login isn't linked yet can't be assigned.",
+      "Approved judges (Judges page) with a linked login. A judge whose login isn't linked yet can't be assigned.",
   },
   {
     title: "Only fills empty slots",
@@ -16,12 +16,12 @@ export const DEFAULT_AUTO_ASSIGN_CRITERIA: Array<{ title: string; description: s
   },
   {
     title: "Load balancing",
-    description: "The least-loaded eligible referee (fewest current assignments across the whole competition) is always picked first.",
+    description: "The least-loaded eligible judge (fewest current assignments across the whole competition) is always picked first.",
   },
-  { title: "Tie-break", description: "If multiple referees are equally least-loaded, one is picked at random." },
+  { title: "Tie-break", description: "If multiple judges are equally least-loaded, one is picked at random." },
   {
     title: "Video processing order",
-    description: "Recordings are processed in random order each run, so a referee shortage doesn't always starve the same videos.",
+    description: "Recordings are processed in random order each run, so a judge shortage doesn't always starve the same videos.",
   },
-  { title: "Notification", description: "Each newly-assigned referee is notified automatically by email and Telegram." },
+  { title: "Notification", description: "Each newly-assigned judge is notified automatically by email and Telegram." },
 ];

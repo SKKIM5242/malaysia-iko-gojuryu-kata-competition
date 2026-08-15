@@ -36,7 +36,7 @@ export default async function AdminMobilePreview() {
             <strong>View access only.</strong> These frames load the real, live site at exact phone
             dimensions so you can check how any page looks and behaves on mobile — Portrait and
             Landscape, side by side — without needing an actual phone. Admin, Organizer,
-            Participant Support, and Referee/Judge can all view this page.
+            Participant Support, and Judge can all view this page.
           </div>
           <MobilePreviewFrames />
         </div>

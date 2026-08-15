@@ -135,8 +135,8 @@ export default async function AccessComparisonTable() {
       </div>
       <p className="mt-3 text-xs text-neutral-400">
         Why does Participant Support get view access that Schools, Senseis, Participants, Audience,
-        and Referees don&apos;t? Because they are the help desk: to answer a registrant&apos;s or
-        referee&apos;s question they must be able to see the same screens the person asking is
+        and Judges don&apos;t? Because they are the help desk: to answer a registrant&apos;s or
+        judge&apos;s question they must be able to see the same screens the person asking is
         looking at — payments, registrations, and judging status. They can look things up and mark
         payments, but they can&apos;t score, delete records, or change the competition setup.
       </p>

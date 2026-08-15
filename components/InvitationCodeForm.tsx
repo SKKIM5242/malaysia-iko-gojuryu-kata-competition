@@ -10,7 +10,7 @@ export const ROLE_LABELS: Record<string, string> = {
   school: "School / Dojo / Club",
   sensei: "Sensei / Shihan / Hanshi",
   participant: "Participant",
-  referee: "Referee / Judge",
+  referee: "Judge",
   audience: "Audience / Spectator",
   customer_support: "Participant Support",
   organizer: "Organizer",

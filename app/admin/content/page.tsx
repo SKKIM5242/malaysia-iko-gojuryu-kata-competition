@@ -55,7 +55,7 @@ function RoleKeySelect({ form, value = "", disabled = false }: { form: string; v
 /** One place for Admin/Organizer to publish everything readers see:
  * announcements, notes/messages (same mechanism — a note stays a draft, a
  * message is published), and new competition tiers, plus every editable
- * reference table. Participant Support and Referee/Judge can view all of
+ * reference table. Participant Support and Judge can view all of
  * it — every other admin-panel role is turned away. */
 export default async function AdminContent({
   searchParams,
@@ -127,7 +127,7 @@ export default async function AdminContent({
         ) : (
           <>
             <strong>View only.</strong> Admin and Organizer manage announcements, competition
-            tiers, and every reference table below — Participant Support and Referee/Judge can
+            tiers, and every reference table below — Participant Support and Judge can
             see all of it here but can&apos;t add, edit, or delete anything.
           </>
         )}
@@ -370,7 +370,7 @@ export default async function AdminContent({
               { key: "admin", label: "Admin", width: 160, wrap: true },
               { key: "organizer", label: "Organizer", width: 160, wrap: true },
               { key: "customer_support", label: "Participant Support", width: 160, wrap: true },
-              { key: "referee", label: "Referee", width: 160, wrap: true },
+              { key: "referee", label: "Judge", width: 160, wrap: true },
               { key: "note", label: "Note", width: 220, wrap: true },
               { key: "actions", label: "Actions", width: 150 },
             ]}
@@ -380,7 +380,7 @@ export default async function AdminContent({
               { key: "admin_csv", label: "Admin" },
               { key: "organizer_csv", label: "Organizer" },
               { key: "customer_support_csv", label: "Participant Support" },
-              { key: "referee_csv", label: "Referee" },
+              { key: "referee_csv", label: "Judge" },
               { key: "note_csv", label: "Note" },
             ]}
             rows={[
@@ -393,7 +393,7 @@ export default async function AdminContent({
                       admin: <input form="matrix-new" name="admin" list="access_choices" placeholder="Admin" className={cellInput} />,
                       organizer: <input form="matrix-new" name="organizer" list="access_choices" placeholder="Organizer" className={cellInput} />,
                       customer_support: <input form="matrix-new" name="customer_support" list="access_choices" placeholder="P. Support" className={cellInput} />,
-                      referee: <input form="matrix-new" name="referee" list="access_choices" placeholder="Referee" className={cellInput} />,
+                      referee: <input form="matrix-new" name="referee" list="access_choices" placeholder="Judge" className={cellInput} />,
                       note: <input form="matrix-new" name="note" placeholder="Note" className={cellInput} />,
                       actions: <span className="text-xs text-neutral-400">New row — Save above</span>,
                       position_csv: "", resource_csv: "", admin_csv: "", organizer_csv: "", customer_support_csv: "", referee_csv: "", note_csv: "",
@@ -470,7 +470,7 @@ export default async function AdminContent({
             <p className="mt-2 text-sm font-normal text-neutral-500">
               A multi-role account gets the <strong>sum</strong>{" "}
               of its roles&apos; allowances
-              (Referee/Judge + Participant = 1,000 + 250 = 1,250), and a window spanning every
+              (Judge + Participant = 1,000 + 250 = 1,250), and a window spanning every
               tier it holds — earliest start to latest end. The count and the window are
               enforced <strong>concurrently</strong>: whichever is reached first ends access. One
               unlimited role makes the whole account unlimited.
@@ -643,7 +643,7 @@ export default async function AdminContent({
         <h2 className="text-lg font-bold">&quot;What Your Payment Unlocks&quot; — Access Comparison {canManage ? "(Editable)" : "(View Only)"}</h2>
         <p className="text-sm text-neutral-500">
           These rows render on the public Registration page. Columns: Participant · School ·
-          Sensei · Referee · Audience · Organizer · Participant Support.
+          Sensei · Judge · Audience · Organizer · Participant Support.
         </p>
         {canManage && (
           <>
@@ -672,7 +672,7 @@ export default async function AdminContent({
             { key: "participant", label: "Participant", width: 140, wrap: true },
             { key: "school", label: "School", width: 140, wrap: true },
             { key: "sensei", label: "Sensei", width: 140, wrap: true },
-            { key: "referee", label: "Referee", width: 140, wrap: true },
+            { key: "referee", label: "Judge", width: 140, wrap: true },
             { key: "audience", label: "Audience", width: 140, wrap: true },
             { key: "organizer", label: "Organizer", width: 140, wrap: true },
             { key: "support", label: "P. Support", width: 140, wrap: true },
@@ -684,7 +684,7 @@ export default async function AdminContent({
             { key: "participant_csv", label: "Participant" },
             { key: "school_csv", label: "School" },
             { key: "sensei_csv", label: "Sensei" },
-            { key: "referee_csv", label: "Referee" },
+            { key: "referee_csv", label: "Judge" },
             { key: "audience_csv", label: "Audience" },
             { key: "organizer_csv", label: "Organizer" },
             { key: "support_csv", label: "P. Support" },
@@ -699,7 +699,7 @@ export default async function AdminContent({
                     participant: <input form="comparison-new" name="participant" list="access_choices" placeholder="Participant" className={cellInput} />,
                     school: <input form="comparison-new" name="school" list="access_choices" placeholder="School" className={cellInput} />,
                     sensei: <input form="comparison-new" name="sensei" list="access_choices" placeholder="Sensei" className={cellInput} />,
-                    referee: <input form="comparison-new" name="referee" list="access_choices" placeholder="Referee" className={cellInput} />,
+                    referee: <input form="comparison-new" name="referee" list="access_choices" placeholder="Judge" className={cellInput} />,
                     audience: <input form="comparison-new" name="audience" list="access_choices" placeholder="Audience" className={cellInput} />,
                     organizer: <input form="comparison-new" name="organizer" list="access_choices" placeholder="Organizer" className={cellInput} />,
                     support: <input form="comparison-new" name="support" list="access_choices" placeholder="P. Support" className={cellInput} />,

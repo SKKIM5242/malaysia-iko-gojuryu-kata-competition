@@ -69,7 +69,7 @@ export function RefereeForm({
   if (state.ok && state.referenceId) {
     return (
       <Success
-        what="Referee / judge registration"
+        what="Judge registration"
         refId={state.referenceId}
         telegramLink={telegramLink}
         note="The organizer will review your registration and contact you about the USD 100 deposit. Remember: the USD 100 is a deposit for participants — for non-participants it will be forfeited."
@@ -141,7 +141,7 @@ export function RefereeForm({
         </div>
         <div className="sm:col-span-2">
           <label htmlFor="international_certificates" className={labelCls}>
-            International certified Referee / Judge certificates{" "}
+            International certified Judge certificates{" "}
             <span className="font-normal text-neutral-400">(optional — unlimited uploads)</span>
           </label>
           <input id="international_certificates" name="international_certificates" type="file" accept="image/*,application/pdf" multiple
@@ -194,7 +194,7 @@ export function RefereeForm({
 
         <div className="sm:col-span-2 rounded-md border border-neutral-200 bg-neutral-50 p-4">
           <p className="text-sm font-bold text-neutral-800">
-            Bank details — for return of the USD 100 deposit &amp; referee/judge reward *
+            Bank details — for return of the USD 100 deposit &amp; judge reward *
           </p>
           <p className="mt-0.5 text-xs text-neutral-500">
             Note: participants outside Malaysia — please provide your IBAN, SWIFT code, BIC, BBAN, or

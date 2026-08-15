@@ -562,7 +562,7 @@ export default async function AccountPage({
     );
   }
 
-  // ── Referee / Judge ──────────────────────────────────────────────────────
+  // ── Judge ──────────────────────────────────────────────────────
   if (profile.role === "referee") {
     if (!profile.approved) {
       return (
@@ -576,11 +576,11 @@ export default async function AccountPage({
               validUntil={profile.sign_in_valid_until}
               className="mb-2"
             />
-            <h1 className="text-2xl font-bold">Referee / Judge</h1>
+            <h1 className="text-2xl font-bold">Judge</h1>
             <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-6">
               <p className="font-semibold text-amber-900">Waiting for approval.</p>
               <p className="mt-1 text-sm text-amber-800">
-                Your Referee / Judge account activates once the organizer confirms your USD 100
+                Your Judge account activates once the organizer confirms your USD 100
                 deposit.
               </p>
             </div>
@@ -649,7 +649,7 @@ export default async function AccountPage({
             validUntil={profile.sign_in_valid_until}
             className="mb-2"
           />
-          <h1 className="text-2xl font-bold">Referee / Judge Scoring</h1>
+          <h1 className="text-2xl font-bold">Judge Scoring</h1>
           <SignInInfoTables canManage={false} />
           <div className="mt-4 flex flex-wrap gap-2">
             <Link

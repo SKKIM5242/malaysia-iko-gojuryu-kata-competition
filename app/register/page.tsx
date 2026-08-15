@@ -37,17 +37,17 @@ const OPTIONS: Array<{
   {
     n: 3,
     title: "Sensei / Coach self-registration",
-    desc: `Senseis and coaches register themselves. ${TIER_FEE_NOTE} Senseis holding 3rd Dan and above are encouraged to also register as Referee/Judge to earn extra commission, and every sensei is warmly encouraged to join as Participant Support too.`,
+    desc: `Senseis and coaches register themselves. ${TIER_FEE_NOTE} Senseis holding 3rd Dan and above are encouraged to also register as Judge to earn extra commission, and every sensei is warmly encouraged to join as Participant Support too.`,
     href: "/register/sensei?by=self",
     cta: "Self-register as sensei",
   },
   {
     n: 4,
-    title: "Referee / Judges",
+    title: "Judges",
     desc:
-      "Register as a kata referee or judge. USD 100 deposit per competition tier. Referee/judge work starts after the event deadline: you have 2 weeks after the deadline to submit your scores — after the 2nd week, unscored recordings are re-assigned, and the re-assigned referee/judge gets 1 week. If a score is still missing, the organizer takes over in the 4th week, before the winner announcement date. Senseis holding 3rd Dan and above are encouraged to register as Referee/Judge.",
+      "Register as a kata judge. USD 100 deposit per competition tier. Judge work starts after the event deadline: you have 2 weeks after the deadline to submit your scores — after the 2nd week, unscored recordings are re-assigned, and the re-assigned judge gets 1 week. If a score is still missing, the organizer takes over in the 4th week, before the winner announcement date. Senseis holding 3rd Dan and above are encouraged to register as Judge.",
     href: "/register/referee",
-    cta: "Register as referee / judge",
+    cta: "Register as judge",
   },
   {
     n: 5,
@@ -61,7 +61,7 @@ const OPTIONS: Array<{
     n: 6,
     title: "Participant Support",
     desc:
-      "Apply to join the Participant Support team. Reviewed by the organizer. Each country is allocated only 1 Participant Support slot, so secure yours early. Why does Participant Support get view access that Schools, Senseis, Participants, Audience, and Referees don't? Because they are the help desk: to answer a registrant's or referee's question, they must be able to see the same screens the person asking is looking at — payments, registrations, and judging status. They can look things up and mark payments, but they can't score, delete records, or change the competition setup. This is a voluntary role with no guaranteed return from the USD 10 tier, since its margin is low — but it's a training ground for the USD 100 / USD 200 tiers. The organizer will try to allocate 20% of the Audience group's revenue to reward the Participant Support team, based on the number and complexity of tasks handled outside their own school or students. Good performance earns priority offers for the next competition. On top of that, you earn a 10% cut of every Audience sign-in made under your recommendation — the Audience member enters your Participant Support short name or initial at sign-in (e.g. Amy / KSK).",
+      "Apply to join the Participant Support team. Reviewed by the organizer. Each country is allocated only 1 Participant Support slot, so secure yours early. Why does Participant Support get view access that Schools, Senseis, Participants, Audience, and Judges don't? Because they are the help desk: to answer a registrant's or judge's question, they must be able to see the same screens the person asking is looking at — payments, registrations, and judging status. They can look things up and mark payments, but they can't score, delete records, or change the competition setup. This is a voluntary role with no guaranteed return from the USD 10 tier, since its margin is low — but it's a training ground for the USD 100 / USD 200 tiers. The organizer will try to allocate 20% of the Audience group's revenue to reward the Participant Support team, based on the number and complexity of tasks handled outside their own school or students. Good performance earns priority offers for the next competition. On top of that, you earn a 10% cut of every Audience sign-in made under your recommendation — the Audience member enters your Participant Support short name or initial at sign-in (e.g. Amy / KSK).",
     href: "/register/staff",
     cta: "Apply to the team",
   },

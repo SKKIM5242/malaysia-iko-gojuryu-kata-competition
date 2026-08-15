@@ -43,7 +43,7 @@ const ROLE_LABEL: Record<string, string> = {
   organizer: "Organizer",
   staff: "Admin / Organizer (legacy)",
   customer_support: "Participant Support",
-  referee: "Referee / Judge",
+  referee: "Judge",
   participant: "Participant",
   school: "School / Dojo",
   sensei: "Sensei / Coach",
@@ -66,11 +66,11 @@ const LINKED_BUTTONS: Array<{
     button: "“Connect Telegram for admin alerts”",
     where: "My Account → approved-staff panel",
     sends:
-      "New issue reports · testimonial removal notices · bulk upload results (Schools/Senseis/Referees/Audience/Participants) · sensei CSV received · bulk payment confirmed",
+      "New issue reports · testimonial removal notices · bulk upload results (Schools/Senseis/Judges/Audience/Participants) · sensei CSV received · bulk payment confirmed",
     kind: "dm",
   },
   {
-    who: "Referee / Judge",
+    who: "Judge",
     button: "“Connect Telegram for assignment notifications”",
     where: "My Account → referee panel",
     sends:
@@ -103,7 +103,7 @@ const LINKED_BUTTONS: Array<{
     who: "Anyone already connected",
     button: "“Send” (staff-initiated — no button on their side)",
     where: "Admin → Telegram DM",
-    sends: "A free-text direct message written by Admin, Organizer, Support or Referee",
+    sends: "A free-text direct message written by Admin, Organizer, Support or Judge",
     kind: "dm",
   },
   {
@@ -502,7 +502,7 @@ export default function TelegramBotGuide({
           <p className="font-bold text-neutral-800">7. Test it end to end</p>
           <p className="mt-1">
             Open <Code>/account</Code> as any account that has a “Connect Telegram” button (a
-            Referee is the easiest — theirs is always visible once approved). Press it: Telegram
+            Judge is the easiest — theirs is always visible once approved). Press it: Telegram
             opens on the bot with a <strong>Start</strong> button, and the bot should reply{" "}
             <em>“✅ Telegram connected”</em> straight away.
           </p>

@@ -149,7 +149,7 @@ async function blockReferee(
 ) {
   const role = await getActorRole(supabase, actorId);
   if (role === "referee") {
-    backTo(returnTo, { error: "Referee / Judge accounts cannot perform this action." });
+    backTo(returnTo, { error: "Judge accounts cannot perform this action." });
   }
 }
 
@@ -185,7 +185,7 @@ async function requireJudgingManager(
 ) {
   const role = await getActorRole(supabase, actorId);
   if (!["admin", "organizer", "staff", "referee"].includes(role ?? "")) {
-    backTo(returnTo, { error: "Only Admin / Organizer or a Referee/Judge can configure judging." });
+    backTo(returnTo, { error: "Only Admin / Organizer or a Judge can configure judging." });
   }
 }
 
@@ -2066,7 +2066,7 @@ export async function publishAccessMatrixAnnouncement() {
 const ADMIN_ADD_ROLE_LABEL: Record<string, string> = {
   school: "School / Dojo",
   sensei: "Sensei / Coach",
-  referee: "Referee / Judge",
+  referee: "Judge",
   audience: "Audience / Spectator",
   participant: "Participant",
 };
@@ -2627,7 +2627,7 @@ export async function saveReferee(formData: FormData) {
       .from("referees")
       .insert({ ...values, certificate_path: certificatePath })
       .select("id").single();
-    if (error) backTo(returnTo, { error: "Could not create referee." });
+    if (error) backTo(returnTo, { error: "Could not create judge." });
     await writeAudit(supabase, {
       table_name: "referees", record_id: data!.id, action: "referee_created_by_admin",
       new_value: values, actor_id: actorId,
@@ -2638,12 +2638,12 @@ export async function saveReferee(formData: FormData) {
     if (!values.invitation_code) {
       const url = await communityRecordCheckoutUrl(
         "referee", data!.id, values.full_name, REFEREE_DEPOSIT_USD,
-        "Referee / Judge deposit",
+        "Judge deposit",
       );
       if (url) redirect(url);
     }
   }
-  backTo(returnTo, { ok: "Referee saved." });
+  backTo(returnTo, { ok: "Judge saved." });
 }
 
 export async function deleteReferee(formData: FormData) {
@@ -2652,11 +2652,11 @@ export async function deleteReferee(formData: FormData) {
   const { supabase, actorId } = await getActor();
   await requireCommunityManager(supabase, actorId, returnTo);
   const { error } = await supabase.from("referees").delete().eq("id", id);
-  if (error) backTo(returnTo, { error: "Could not delete referee." });
+  if (error) backTo(returnTo, { error: "Could not delete judge." });
   await writeAudit(supabase, {
     table_name: "referees", record_id: id, action: "referee_deleted", actor_id: actorId,
   });
-  backTo(returnTo, { ok: "Referee deleted." });
+  backTo(returnTo, { ok: "Judge deleted." });
 }
 
 // ── Participants ─────────────────────────────────────────────────────────────

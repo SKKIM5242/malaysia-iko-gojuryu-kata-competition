@@ -167,8 +167,8 @@ async function CompetitionWinners({
   /** Signed in with any role except Audience — see WinnerTestimonialInline
    * for what this widens (button visibility, not submission attribution). */
   canAssist: boolean;
-  /** Admin/Super Admin/Organizer/Referee-Judge only (a superset of
-   * isManager, which excludes Referee/Judge) — gates the Show/Hide toggle
+  /** Admin/Super Admin/Organizer/Judge only (a superset of
+   * isManager, which excludes Judge) — gates the Show/Hide toggle
    * for the 5 "Reduce Score System" deduction columns in Full View. */
   canToggleDeductions: boolean;
   /** Recording-screen branding, fetched once by the page and passed down
@@ -422,7 +422,7 @@ export default async function WinnersPage() {
   // Everyone signed in except Audience — see WinnerTestimonialInline for
   // what this widens.
   const canAssist = !!user && (myProfile?.role as string | null) != null && myProfile?.role !== "audience";
-  // Admin/Super Admin/Organizer/Referee-Judge only, per the organizer's
+  // Admin/Super Admin/Organizer/Judge only, per the organizer's
   // explicit instruction — everyone else (including a signed-out public
   // visitor) still sees the collapsed per-row deduction total in Full View,
   // but never gets a way to expand it into the 5 individual checkboxes.

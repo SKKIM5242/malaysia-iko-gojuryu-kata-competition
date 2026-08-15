@@ -465,9 +465,9 @@ export default async function AdminJudging({
   return (
     <AdminShell title="Judging" active="/admin/judging" flash={{ ok: params.ok, error: params.error }}>
       <div className="mb-3 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
-        Every score a Referee/Judge submits is <strong>final — no appeal is available</strong>. A
+        Every score a Judge submits is <strong>final — no appeal is available</strong>. A
         judge&apos;s individual score is visible to Admin/Organizer/Participant Support as soon
-        as it&apos;s submitted; a Referee/Judge sees only their own score on a recording until
+        as it&apos;s submitted; a Judge sees only their own score on a recording until
         that competition&apos;s winners are announced, after which Full View opens to show every
         judge&apos;s score. The Average Score and standings stay hidden from the public until
         winners are announced. Only Admin/Organizer/Staff can override the score of any recording
@@ -486,25 +486,25 @@ export default async function AdminJudging({
         />
       </div>
 
-      <h2 className="mb-1 text-lg font-bold">Referee/Judge Workload</h2>
+      <h2 className="mb-1 text-lg font-bold">Judge Workload</h2>
       <p className="mb-3 text-sm text-neutral-500">
-        Every <strong>Approved</strong> referee from the{" "}
+        Every <strong>Approved</strong> judge from the{" "}
         <a href="/admin/referees" className="font-semibold text-red-700 underline underline-offset-2">
-          Referees page
+          Judges page
         </a>{" "}
         is listed here — this same list is the pool Auto-assign draws from, always picking the
-        least-loaded referee first. A referee whose login isn&apos;t linked yet shows &quot;No
-        login yet&quot; and can&apos;t be assigned until linked (Referees page → Link account).
+        least-loaded judge first. A judge whose login isn&apos;t linked yet shows &quot;No
+        login yet&quot; and can&apos;t be assigned until linked (Judges page → Link account).
       </p>
       {directoryList.length === 0 ? (
-        <EmptyState>No approved referees yet — approve some on the Referees page first.</EmptyState>
+        <EmptyState>No approved judges yet — approve some on the Judges page first.</EmptyState>
       ) : (
         <div className="mb-8">
           <FilterableTable
             rowKey="id"
-            downloadName="referee-workload"
+            downloadName="judge-workload"
             columns={[
-              { key: "referee", label: "Referee", width: 140, wrap: true },
+              { key: "referee", label: "Judge", width: 140, wrap: true },
               { key: "rank", label: "Rank", width: 90, wrap: true },
               { key: "email", label: "Email", width: 160, wrap: true },
               { key: "phone", label: "Mobile Phone", width: 110, wrap: true },
@@ -516,7 +516,7 @@ export default async function AdminJudging({
               { key: "unassigned_not_forfeit_count", label: "Unassigned Not Forfeit", width: 95, wrap: true },
             ]}
             csvColumns={[
-              { key: "referee", label: "Referee" },
+              { key: "referee", label: "Judge" },
               { key: "rank", label: "Rank" },
               { key: "email", label: "Email" },
               { key: "phone", label: "Mobile Phone" },
@@ -546,7 +546,7 @@ export default async function AdminJudging({
                     rel="noopener noreferrer"
                     className="font-semibold text-[#1c7fb5] underline underline-offset-2"
                   >
-                    Referee group
+                    Judge group
                   </a>
                 ) : (
                   ""
@@ -572,21 +572,21 @@ export default async function AdminJudging({
       )}
 
       <div className="mb-3 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
-        <strong>How to use Auto-assign referees:</strong> &quot;Judges per recording&quot; is a saved
+        <strong>How to use Auto-assign judges:</strong> &quot;Judges per recording&quot; is a saved
         setting per competition — set the number once and click Save; it stays in effect until you
-        change it again. Clicking <strong>Auto-assign referees</strong> is safe to click more than
+        change it again. Clicking <strong>Auto-assign judges</strong> is safe to click more than
         once: each click only fills that competition&apos;s currently-empty judge slots up to the
         saved target, and never touches an already-assigned judge or their score — so a 2nd or 3rd
         click when everything is already full simply reports &quot;Every recording already has its
         full panel of judges.&quot; It is <strong>not automatic</strong>, though — a newly-submitted
         recording starts with 0 judges, and stays that way until someone clicks Auto-assign
-        referees again. You don&apos;t need to re-save Judges per recording each time, only click
-        Auto-assign referees whenever new recordings come in.
+        judges again. You don&apos;t need to re-save Judges per recording each time, only click
+        Auto-assign judges whenever new recordings come in.
       </div>
 
-      <h2 className="mb-1 text-lg font-bold">Auto-Assign Referees — Criteria</h2>
+      <h2 className="mb-1 text-lg font-bold">Auto-Assign Judges — Criteria</h2>
       <p className="mb-3 text-sm text-neutral-500">
-        The rules Auto-assign referees currently follows, listed here for reference. Editing a row
+        The rules Auto-assign judges currently follows, listed here for reference. Editing a row
         below only updates this documentation for the team — it doesn&apos;t change the algorithm
         itself.
       </p>
@@ -679,7 +679,7 @@ export default async function AdminJudging({
                   </form>
                   <form action={autoAssignReferees}>
                     <input type="hidden" name="competition_id" value={c.id} />
-                    <button className={adminBtn}>Auto-assign referees</button>
+                    <button className={adminBtn}>Auto-assign judges</button>
                   </form>
                 </div>
               ) : (

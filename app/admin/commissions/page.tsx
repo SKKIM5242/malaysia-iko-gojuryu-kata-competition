@@ -27,7 +27,7 @@ const cellInput = "w-full rounded-md border border-neutral-300 px-2 py-1 text-xs
 
 export const dynamic = "force-dynamic";
 
-const TYPE_LABEL: Record<string, string> = { school: "School / Dojo", sensei: "Sensei", referee: "Referee / Judge" };
+const TYPE_LABEL: Record<string, string> = { school: "School / Dojo", sensei: "Sensei", referee: "Judge" };
 
 function PayoutButtons({
   recipientType, recipientId, current,
@@ -283,7 +283,7 @@ export default async function AdminCommissions({
         <strong> events</strong> by their students within one tier earns 10% of{" "}
         <strong>that tier&apos;s</strong> fees. A tier with 10 or fewer events earns nothing even
         when another tier qualifies, so the 10% is taken only from the qualifying tiers — see the
-        Events by Tier column, where ✓ marks a tier that pays. Referee/Judge earns 10% of every
+        Events by Tier column, where ✓ marks a tier that pays. Judge earns 10% of every
         judged student&apos;s fee with no minimum and no tier test — every tier they judged in
         shows ✓ in the same column, purely for the per-tier breakdown below.
         &quot;Paid&quot; below is just your own record of who you&apos;ve actually paid out via

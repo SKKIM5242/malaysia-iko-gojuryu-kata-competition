@@ -948,7 +948,7 @@ export default function RefereeScoring({
   return (
     <div className="space-y-4">
       <div className="rounded-md border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
-        Signed in as Referee/Judge <strong>{refereeName}</strong>
+        Signed in as Judge <strong>{refereeName}</strong>
         {refereeCountry ? ` (${refereeCountry})` : ""}. Only the recordings assigned to you by the
         organizer are listed (and filterable) below — to browse the whole competition, use the
         Kata Arena instead. Your score is final once submitted — no appeal is available. Click

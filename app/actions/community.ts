@@ -174,11 +174,11 @@ export async function registerReferee(
   await sendConfirmationEmail({
     toEmail: values.email,
     recipientName: values.full_name,
-    subject: "Referee / Judge registration received",
+    subject: "Judge registration received",
     referenceId,
     telegramCategory: "referee",
     bodyLines: [
-      "This confirms your Referee / Judge registration.",
+      "This confirms your Judge registration.",
       paymentStatus === "waived"
         ? "Your invitation code waived the USD 100 deposit — you're all set."
         : "The organizer will review your registration and contact you about the USD 100 deposit. Remember: the USD 100 is a deposit for participants — for non-participants it will be forfeited.",

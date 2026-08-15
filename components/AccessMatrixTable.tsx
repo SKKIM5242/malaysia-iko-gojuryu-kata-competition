@@ -17,7 +17,7 @@ export default function AccessMatrixTable({ rows }: { rows: AccessRow[] }) {
         { key: "admin", label: "Admin" },
         { key: "organizer", label: "Organizer / Staff" },
         { key: "customerSupport", label: "Participant Support" },
-        { key: "referee", label: "Referee / Judge" },
+        { key: "referee", label: "Judge" },
       ]}
       rows={rows.map((row) => ({
         resource: row.note ? (
@@ -39,7 +39,7 @@ export default function AccessMatrixTable({ rows }: { rows: AccessRow[] }) {
         { key: "admin", label: "Admin" },
         { key: "organizer", label: "Organizer / Staff" },
         { key: "customerSupport", label: "Participant Support" },
-        { key: "referee", label: "Referee / Judge" },
+        { key: "referee", label: "Judge" },
       ]}
     />
   );

@@ -7,7 +7,7 @@ export type TelegramCategory = "participant" | "school" | "referee" | "audience"
 const FALLBACK_LABELS: Record<TelegramCategory, string> = {
   participant: "Participants",
   school: "School / Dojo & Sensei / Coach",
-  referee: "Referees / Judges",
+  referee: "Judges",
   audience: "Audience / Spectators",
   staff: "Admin / Organizer / Participant Support",
   class: "Dojo Class Students",

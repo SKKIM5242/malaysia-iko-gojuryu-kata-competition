@@ -449,7 +449,7 @@ export default async function AdminParticipantRecords({
     <AdminShell title="Participant Records" active="/admin/records" flash={{ ok, error }}>
       <p className="mb-6 text-sm text-neutral-500">
         Every registrant type in one place, each with its own filterable table. Recordings and
-        certificates play/open in-page for Admin/Organizer, Referee/Judge, and Participant Support here, on{" "}
+        certificates play/open in-page for Admin/Organizer, Judge, and Participant Support here, on{" "}
         <a href="/kata-arena" className="underline">Kata Arena</a>, and on{" "}
         <a href="/admin/judging" className="underline">Judging</a>. Participants and Audience accounts
         continue watching recordings only via Kata Arena, per its existing access rules.
@@ -489,11 +489,11 @@ export default async function AdminParticipantRecords({
         <p className="mb-3 text-xs text-neutral-400">
           A participant who has not submitted a recording by their competition&apos;s deadline is
           automatically marked Unslotted and their payment Forfeited (checked daily). Admin,
-          Organizer, and Referee/Judge accounts can also set or reset Unslot / Forfeited / Give Up
+          Organizer, and Judge accounts can also set or reset Unslot / Forfeited / Give Up
           manually from the Slot Status column, to clean up the list at any time. The Account Link
           column shows whether the participant has actually claimed their registration with a login
           — if they can&apos;t (wrong reference ID, signed up with a different email, etc.), Admin,
-          Organizer, Participant Support, or Referee/Judge can link it for them from that column
+          Organizer, Participant Support, or Judge can link it for them from that column
           instead of asking a developer to fix it manually.
         </p>
         {participantRows.length === 0 ? (
@@ -558,7 +558,7 @@ export default async function AdminParticipantRecords({
         )}
         <p className="mt-2 text-xs text-neutral-400">
           Fulfil a request by setting the sign-in limit, competition tier, and/or valid date range
-          on that person&apos;s own Sign-in Control box (Schools/Senseis/Referees/Audience/Support
+          on that person&apos;s own Sign-in Control box (Schools/Senseis/Judges/Audience/Support
           admin pages), then mark it fulfilled here.
         </p>
       </Section>
@@ -739,7 +739,7 @@ export default async function AdminParticipantRecords({
         )}
       </Section>
 
-      <Section id="referees" title="Referees / Judges">
+      <Section id="referees" title="Judges">
         {refereeRows.length === 0 ? (
           <EmptyState>No referee registrations yet.</EmptyState>
         ) : (

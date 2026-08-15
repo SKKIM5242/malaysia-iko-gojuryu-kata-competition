@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 const RETURN_TO = "/admin/telegram-dm";
 
 /** Same "staff-tier" access as the rest of /admin — Admin, Organizer,
- * Support, and Referee/Judge can all send a direct Telegram message here,
+ * Support, and Judge can all send a direct Telegram message here,
  * matching who the organizer asked to be able to. */
 const SENDER_ROLES = ["admin", "organizer", "staff", "customer_support", "referee"];
 
@@ -19,7 +19,7 @@ const ROLE_LABEL: Record<string, string> = {
   organizer: "Organizer",
   staff: "Admin / Organizer (legacy)",
   customer_support: "Participant Support",
-  referee: "Referee / Judge",
+  referee: "Judge",
   participant: "Participant",
   school: "School / Dojo",
   sensei: "Sensei",
@@ -70,11 +70,11 @@ export default async function AdminTelegramDm({
     <AdminShell title="Telegram DM" active="/admin/telegram-dm" flash={{ ok: params.ok, error: params.error }}>
       <p className="mb-2 text-sm text-neutral-500">
         Send a direct Telegram message to anyone who has connected Telegram to their account —
-        available to Referee/Judge, Participant Support, Organizer, and Admin.
+        available to Judge, Participant Support, Organizer, and Admin.
       </p>
       <p className="mb-6 text-xs text-neutral-400">
         Only people who have actually pressed &quot;Connect Telegram&quot; on their own Account page
-        show up here — today that&apos;s just Referees (anytime) and Participants (once they&apos;ve
+        show up here — today that&apos;s just Judges (anytime) and Participants (once they&apos;ve
         submitted a recording). Everyone else has no way to connect yet, so there&apos;s nothing to
         DM them with — see the Telegram Link Reference table on the Content page for the full
         breakdown.
@@ -82,7 +82,7 @@ export default async function AdminTelegramDm({
 
       {(recipients ?? []).length === 0 ? (
         <EmptyState>
-          Nobody has connected Telegram yet. Once a Referee or Participant presses &quot;Connect
+          Nobody has connected Telegram yet. Once a Judge or Participant presses &quot;Connect
           Telegram&quot; on their Account page, they&apos;ll show up here.
         </EmptyState>
       ) : (

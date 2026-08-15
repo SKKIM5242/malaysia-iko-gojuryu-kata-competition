@@ -46,7 +46,7 @@ function subtitleLine1(input: CertificateInput): string {
     case "participant":
       return `for taking part in ${event} Event`;
     case "referee":
-      return "for serving as a Referee / Judge";
+      return "for serving as a Judge";
     case "sensei":
       return "for guiding your students' participation, as Sensei,";
     case "school":

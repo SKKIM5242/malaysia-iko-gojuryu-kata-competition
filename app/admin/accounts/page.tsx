@@ -114,23 +114,23 @@ async function ApprovalsTab({ supabase }: { supabase: Awaited<ReturnType<typeof 
     .order("created_at", { ascending: false });
   const profiles = (data as ProfileRow[]) ?? [];
   const roleLabel: Record<string, string> = {
-    referee: "Referee / Judge",
+    referee: "Judge",
     staff: "Admin / Organizer / Participant Support",
     admin: "Admin (owner)",
   };
 
   return (
     <div>
-      <h2 className="mb-1 text-lg font-bold">Referee &amp; Staff Accounts</h2>
+      <h2 className="mb-1 text-lg font-bold">Judge &amp; Staff Accounts</h2>
       <p className="mb-3 text-sm text-neutral-500">
-        Assigning referees to recordings and viewing scores now lives on the{" "}
+        Assigning judges to recordings and viewing scores now lives on the{" "}
         <Link href="/admin/judging" className="font-semibold text-red-700 underline underline-offset-2">
           Judging
         </Link>{" "}
         page.
       </p>
       {profiles.length === 0 ? (
-        <EmptyState>No referee or staff accounts have signed up yet.</EmptyState>
+        <EmptyState>No judge or staff accounts have signed up yet.</EmptyState>
       ) : (
         <FilterableTable
           rowKey="user_id"

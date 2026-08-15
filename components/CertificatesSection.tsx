@@ -89,7 +89,7 @@ async function refereeLinks(supabase: Awaited<ReturnType<typeof createClient>>, 
   return [...seen.entries()]
     .filter(([, c]) => winnersRevealed(c.registration_deadline, c.winners_announce_date))
     .map(([compId, c]) => ({
-      label: `Referee / Judge Certificate — ${c.name}`,
+      label: `Judge Certificate — ${c.name}`,
       href: `/api/certificates/referee/${userId}?competition_id=${compId}`,
       key: `referee-${userId}-${compId}`,
     }));

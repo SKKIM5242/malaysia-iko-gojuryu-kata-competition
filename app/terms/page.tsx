@@ -16,8 +16,8 @@ export default function TermsPage() {
           <section>
             <h2 className="mb-1 font-bold text-neutral-900">1. Who This Applies To</h2>
             <p>
-              These terms apply to anyone creating a Kata Arena account — Participants, Referees /
-              Judges, School / Sensei accounts, Audience, and Admin / Organizer / Participant
+              These terms apply to anyone creating a Kata Arena account — Participants, Judges,
+              School / Sensei accounts, Audience, and Admin / Organizer / Participant
               Support staff — to submit, judge, watch, or manage kata recordings for this
               competition.
             </p>
@@ -42,13 +42,13 @@ export default function TermsPage() {
           <section>
             <h2 className="mb-1 font-bold text-neutral-900">4. Judging</h2>
             <p>
-              Each recording is scored by a panel of Referees / Judges assigned by the organizer /
-              Chief Referee / Judge by clicking the Auto-assign referees button, which assigns
+              Each recording is scored by a panel of Judges assigned by the organizer /
+              Chief Judge by clicking the Auto-assign judges button, which assigns
               randomly according to the rules set (typically 3, 5, or 7 per recording). Where 5 or
               more judges score a recording, the highest and lowest scores are dropped and the
-              remaining scores are averaged for the final result. Referees may only view and score
+              remaining scores are averaged for the final result. Judges may only view and score
               recordings assigned to them, and scoring decisions are final. Full View — seeing every
-              judge&apos;s individual score side by side — is only available to a Referee / Judge
+              judge&apos;s individual score side by side — is only available to a Judge
               from that competition&apos;s winner announcement date onward.
             </p>
           </section>
@@ -60,10 +60,10 @@ export default function TermsPage() {
               status with its total score once every assigned judge has scored it, or a red
               &quot;Disqualified&quot; status if any one judge gave a Total Score of 0 — no score is
               shown for a disqualified entry. Until a competition&apos;s winners are announced, a
-              Referee / Judge sees only their own individual score per recording, and a School /
+              Judge sees only their own individual score per recording, and a School /
               Sensei account sees only their own students&apos; recordings; Admin / Organizer /
               Participant Support see every judge&apos;s individual score and every recording at all
-              times. From the winner announcement date onward, a Referee / Judge also sees every
+              times. From the winner announcement date onward, a Judge also sees every
               judge&apos;s individual score (via Full View), and School / Sensei accounts see every
               participant&apos;s recording. Official winners and standings are announced
               separately — see{" "}

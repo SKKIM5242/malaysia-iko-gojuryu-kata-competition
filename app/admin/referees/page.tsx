@@ -90,7 +90,7 @@ export default async function AdminReferees({
   const ready = await schemaReady();
   if (!ready) {
     return (
-      <AdminShell title="Referees / Judges" active="/admin/referees">
+      <AdminShell title="Judges" active="/admin/referees">
         <SetupNotice />
       </AdminShell>
     );
@@ -158,13 +158,13 @@ export default async function AdminReferees({
   }
 
   return (
-    <AdminShell title="Referees / Judges" active="/admin/referees" flash={{ ok: params.ok, error: params.error }}>
+    <AdminShell title="Judges" active="/admin/referees" flash={{ ok: params.ok, error: params.error }}>
       {canBulkUpload && (
         <div className="mb-8">
           <CsvUploadForm
             action={bulkUploadReferees}
             templateHref="/referees-template.csv"
-            entityLabel="referee"
+            entityLabel="judge"
             note={`Dates use DD/MM/YYYY format. Certificates can't be uploaded via CSV — add one later via Edit. ${IBAN_CSV_NOTE}`}
           />
         </div>
@@ -172,7 +172,7 @@ export default async function AdminReferees({
 
       <div className="space-y-8">
         <div>
-          <h2 className="mb-3 text-lg font-bold">{editing ? "Edit Referee/Judge" : "Add Referee/Judge"}</h2>
+          <h2 className="mb-3 text-lg font-bold">{editing ? "Edit Judge" : "Add Judge"}</h2>
           <Card>
             <form key={editing?.id ?? "new"} action={saveReferee} className="space-y-4">
               {editing && <input type="hidden" name="id" value={editing.id} />}
@@ -365,7 +365,7 @@ export default async function AdminReferees({
                 </p>
               )}
               <div className="flex gap-2">
-                <button type="submit" className={adminBtn}>{editing ? "Save changes" : "Add Referee/Judge"}</button>
+                <button type="submit" className={adminBtn}>{editing ? "Save changes" : "Add Judge"}</button>
                 {editing && (
                   <Link href="/admin/referees" className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-semibold text-neutral-600 hover:bg-neutral-50">
                     Cancel
@@ -404,7 +404,7 @@ export default async function AdminReferees({
         </div>
 
         <div>
-          <h2 className="mb-3 text-lg font-bold">Referees / Judges — USD 100 Deposit</h2>
+          <h2 className="mb-3 text-lg font-bold">Judges — USD 100 Deposit</h2>
           {refereeList.length === 0 ? (
             <EmptyState>No referee registrations yet.</EmptyState>
           ) : (
@@ -585,7 +585,7 @@ export default async function AdminReferees({
       </div>
       {isAdminTier && (
         <div className="mt-8 space-y-4">
-          <h2 className="text-lg font-bold">Auto-Assign Referee Terms &amp; Conditions</h2>
+          <h2 className="text-lg font-bold">Auto-Assign Judge Terms &amp; Conditions</h2>
           <Card>
             <form action={saveAutoAssignTerm} className="flex flex-wrap items-end gap-3">
               {editingTerm && <input type="hidden" name="id" value={editingTerm.id} />}
@@ -611,7 +611,7 @@ export default async function AdminReferees({
                   required
                   defaultValue={editingTerm?.content ?? ""}
                   className={adminInput}
-                  placeholder="e.g. Referees must declare a conflict of interest before judging their own student."
+                  placeholder="e.g. Judges must declare a conflict of interest before judging their own student."
                 />
               </div>
               <button type="submit" className={adminBtn}>{editingTerm ? "Save changes" : "Add term"}</button>
@@ -678,7 +678,7 @@ export default async function AdminReferees({
         <InvitationCodeForm
           role="referee"
           returnTo="/admin/referees"
-          title="Referee / Judge Invitation Code"
+          title="Judge Invitation Code"
           idPrefix="ref_code"
           codeExample="IKO-REFEREE-TIER-USD100-2026-00001"
           competitions={competitions}

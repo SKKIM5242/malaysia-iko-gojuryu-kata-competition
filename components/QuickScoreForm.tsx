@@ -38,7 +38,7 @@ export default function QuickScoreForm({
       {isZero && <input type="hidden" name="reason" value={finalReason} />}
       <div className="flex flex-wrap items-center gap-2">
         <label htmlFor={`score_${videoId}`} className="text-xs font-semibold text-neutral-500">
-          Organizer/Chief Referee/Judge take over or override score (0–10)
+          Organizer/Chief Judge take over or override score (0–10)
         </label>
         <input
           id={`score_${videoId}`}
