@@ -4,6 +4,7 @@ import { saveCertificateSettings, publishWinnersNow, saveCertificateDate } from 
 import { AdminShell, Card, adminBtn, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice, formatDate } from "@/components/ui";
 import CertificateUploadField from "@/components/CertificateUploadField";
+import CertificateTemplateForm, { type CertificateTemplateRow } from "@/components/CertificateTemplateForm";
 import DateField from "@/components/DateField";
 import { winnersRevealDate, winnersRevealDateFor } from "@/lib/winners";
 import type { Competition } from "@/lib/types";
@@ -26,6 +27,17 @@ const CERT_KINDS: Array<{ key: string; kind: string; label: string; note: string
   { key: "sensei", kind: "sensei", label: "Sensei", note: "For a sensei whose students competed." },
   { key: "school", kind: "school", label: "School / Dojo", note: "For a school whose students competed." },
   { key: "support", kind: "support", label: "Support", note: "One per revealed tier, same as Judge/Sensei/School." },
+];
+
+// One editable template per kind (unlike CERT_KINDS above, Winner isn't
+// split 3 ways here -- 1st/2nd/3rd share the one "winner" template row).
+const TEMPLATE_KIND_LABELS: Array<{ kind: string; label: string }> = [
+  { kind: "winner", label: "Winner (1st/2nd/3rd)" },
+  { kind: "participant", label: "Participant" },
+  { kind: "referee", label: "Judge" },
+  { kind: "sensei", label: "Sensei" },
+  { kind: "school", label: "School / Dojo" },
+  { kind: "support", label: "Support" },
 ];
 
 export default async function AdminCertificates({
@@ -51,6 +63,10 @@ export default async function AdminCertificates({
     ? await supabase.from("profiles").select("role").eq("user_id", user.id).maybeSingle()
     : { data: null };
   const canManage = ["admin", "organizer", "staff"].includes(myProfile?.role ?? "");
+  // Narrower than canManage (which, despite covering "settings", also lets
+  // Staff through) -- template *design* (wording, logos, medal) is Admin +
+  // Organizer only, per the organizer's own call; Staff keeps the preview.
+  const canEditTemplates = ["admin", "organizer"].includes(myProfile?.role ?? "");
 
   const { data: settings } = await supabase.from("certificate_settings").select("*").eq("id", true).maybeSingle();
   const signatureUrl = settings?.signature_path
@@ -65,6 +81,16 @@ export default async function AdminCertificates({
     .select("*")
     .order("registration_fee_usd", { ascending: true, nullsFirst: true });
   const competitions = (competitionsData as Competition[]) ?? [];
+
+  const { data: templatesData } = await supabase
+    .from("certificate_templates")
+    .select("*")
+    .order("kind");
+  const templates = (templatesData ?? []) as unknown as Array<
+    CertificateTemplateRow & { logo1_path: string | null; logo2_path: string | null; medal_path: string | null }
+  >;
+  const templateUrl = (path: string | null) =>
+    path ? supabase.storage.from("branding").getPublicUrl(path).data.publicUrl : null;
 
   return (
     <AdminShell title="Certificates" active="/admin/certificates" flash={{ ok: params.ok, error: params.error }}>
@@ -273,6 +299,39 @@ export default async function AdminCertificates({
         </>
       ) : (
         <p className="text-sm text-neutral-500">Only Admin / Organizer / Staff can preview certificate templates.</p>
+      )}
+
+      <h2 className="mt-10 mb-3 text-lg font-bold">Edit Templates</h2>
+      {canEditTemplates ? (
+        <>
+          <p className="mb-4 max-w-3xl text-sm text-neutral-500">
+            Wording, logos, and medal for each certificate kind — Winner covers all 3 medal ranks at
+            once (only the accent color and automatic gold/silver/bronze artwork differ by rank).
+            Body 1/2/3 accept the Insert buttons below each field; an unrecognized {"{token}"} is left
+            as typed rather than silently dropped, so a typo stays visible. Save reflects on the
+            Template Preview above after a refresh.
+          </p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {TEMPLATE_KIND_LABELS.map(({ kind, label }) => {
+              const t = templates.find((row) => row.kind === kind);
+              if (!t) return null;
+              return (
+                <CertificateTemplateForm
+                  key={kind}
+                  kind={kind}
+                  kindLabel={label}
+                  template={t}
+                  logo1Url={templateUrl(t.logo1_path)}
+                  logo2Url={templateUrl(t.logo2_path)}
+                  medalUrl={templateUrl(t.medal_path)}
+                  returnTo="/admin/certificates"
+                />
+              );
+            })}
+          </div>
+        </>
+      ) : (
+        <p className="text-sm text-neutral-500">Only Admin / Organizer can edit certificate templates.</p>
       )}
     </AdminShell>
   );

@@ -11,6 +11,28 @@ import path from "node:path";
 
 export type CertificateKind = "winner" | "participant" | "referee" | "sensei" | "school" | "support";
 
+/** The organizer-editable design for one certificate kind (certificate_templates
+ * table) -- header1/header2/body1/body2/body3 are plain text that may contain
+ * merge tokens (see substituteMergeTokens), resolved against this specific
+ * certificate's live data at render time. logo1Url/logo2Url/medalUrl are
+ * already-resolved public URLs (or null), not storage paths -- the caller
+ * (app/api/certificates/[kind]/[id]/route.tsx) resolves those, mirroring how
+ * signatureUrl/stampUrl already work, so this file stays free of any
+ * Supabase dependency. */
+export interface CertificateTemplate {
+  header1: string;
+  header2: string;
+  body1: string;
+  body2: string;
+  body3: string;
+  logoCount: 1 | 2;
+  logo1Url: string | null;
+  logo2Url: string | null;
+  showMedal: boolean;
+  medalPosition: "between" | "left" | "right";
+  medalUrl: string | null;
+}
+
 export interface CertificateInput {
   kind: CertificateKind;
   recipientName: string;
@@ -25,35 +47,20 @@ export interface CertificateInput {
   signerTitle2?: string | null;
   signatureUrl: string | null;
   stampUrl: string | null;
+  template: CertificateTemplate;
 }
 
 const ORDINAL: Record<1 | 2 | 3, string> = { 1: "1st", 2: "2nd", 3: "3rd" };
 
-const KIND_TITLE: Record<CertificateKind, string> = {
-  winner: "Certificate of Achievement",
-  participant: "Certificate of Participation",
-  referee: "Certificate of Appreciation",
-  sensei: "Certificate of Appreciation",
-  school: "Certificate of Appreciation",
-  support: "Certificate of Appreciation",
-};
-
-function subtitleLine1(input: CertificateInput): string {
-  const event = input.categoryName ?? input.kataName ?? "the event";
-  switch (input.kind) {
-    case "winner":
-      return `for placing ${ORDINAL[input.rank ?? 1]} PLACE in ${event} Event`;
-    case "participant":
-      return `for taking part in ${event} Event`;
-    case "referee":
-      return "for serving as a Judge";
-    case "sensei":
-      return "for guiding your students' participation, as Sensei,";
-    case "school":
-      return "for your students' participation, as a School / Dojo,";
-    case "support":
-      return "for supporting the organizing team";
-  }
+/** Fills {name}/{kata_category}/{competition_tier}/{rank} in an
+ * organizer-edited template string with this specific certificate's live
+ * data -- the same 3 data sources ("Participant field Name", "Kata Name &
+ * all categories available", "competition Tier") the organizer asked the
+ * Body fields to be able to pull from, plus {rank} for the Winner kind's
+ * ordinal. An unrecognized {token} is left as-is rather than silently
+ * dropped, so a typo is visible instead of vanishing text. */
+function substituteMergeTokens(template: string, ctx: Record<string, string>): string {
+  return template.replace(/\{(\w+)\}/g, (full, key) => (key in ctx ? ctx[key] : full));
 }
 
 /** Non-winner kinds keep one fixed accent; winner's accent is rank-based
@@ -346,6 +353,74 @@ function DateBlock({ dateLabel, caption, width }: { dateLabel: string; caption: 
   );
 }
 
+/** The logo/medal row at the top of the certificate, shaped by the
+ * organizer's template: Logo1 + Medal + Logo2 centered (logoCount 2,
+ * showMedal true -- today's fixed Winner layout, now available to any
+ * kind); Logo1 + Logo2 with no medal (logoCount 2, showMedal false --
+ * today's non-Winner default); or a single Logo1 with the medal to its
+ * left or right (logoCount 1). Winner's `medal` node is always the dynamic
+ * rank-colored artwork; every other kind's, when shown, is whatever plain
+ * image the organizer uploaded -- either way this component only lays it
+ * out, it doesn't know which. */
+function LogoMedalRow({
+  logo1, logo2, logoSize, medal, template,
+}: {
+  logo1: string | null;
+  logo2: string | null;
+  logoSize: number;
+  medal: React.ReactNode | null;
+  template: CertificateTemplate;
+}) {
+  const showMedal = template.showMedal && !!medal;
+  const logoImg = (src: string, extraMarginLeft?: number) => (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src} width={logoSize} height={logoSize}
+      style={{ objectFit: "contain", ...(extraMarginLeft ? { marginLeft: `${extraMarginLeft}px` } : {}) }}
+      alt=""
+    />
+  );
+  // Lifted so the (taller) medal artwork's top edge lines up with the logo
+  // row's top rather than sitting lower, per the row's own alignItems:
+  // "center" otherwise centering it against the shorter square logos.
+  const medalNode = medal && <div style={{ display: "flex", marginTop: "-28px" }}>{medal}</div>;
+  const rowStyle = {
+    display: "flex", flexDirection: "row" as const, alignItems: "center", justifyContent: "center", gap: "20px",
+    // marginBottom matches the breathing room a medal row gets "for free"
+    // below its taller medal -- a no-medal row needs it added explicitly so
+    // the title text underneath doesn't sit flush against the logos.
+    ...(showMedal ? {} : { marginBottom: "40px" }),
+  };
+
+  if (template.logoCount === 2) {
+    return (
+      <div style={rowStyle}>
+        {logo1 && logoImg(logo1)}
+        {showMedal && medalNode}
+        {logo2 && logoImg(logo2, showMedal ? 46 : undefined)}
+      </div>
+    );
+  }
+  if (!showMedal) {
+    return <div style={rowStyle}>{logo1 && logoImg(logo1)}</div>;
+  }
+  return (
+    <div style={rowStyle}>
+      {template.medalPosition === "left" ? (
+        <>
+          {medalNode}
+          {logo1 && logoImg(logo1, 20)}
+        </>
+      ) : (
+        <>
+          {logo1 && logoImg(logo1)}
+          {medalNode}
+        </>
+      )}
+    </div>
+  );
+}
+
 export async function renderCertificatePng(input: CertificateInput): Promise<ImageResponse> {
   // Certificates say "Competition" even though the competition record itself
   // is still named "...Championship..." elsewhere on the site — a wording
@@ -353,18 +428,39 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
   const competitionName = input.competitionName.replace(/Championship/g, "Competition");
   const isWinner = input.kind === "winner" && input.rank;
   const accent = isWinner ? RANK_ACCENT[input.rank!] : ACCENT[input.kind as Exclude<CertificateKind, "winner">];
-  const logo = logoDataUri();
-  const logo2 = logo2DataUri();
+  const template = input.template;
+  // A template's logo1Url/logo2Url is only set once an organizer uploads a
+  // replacement — null falls back to the original hardcoded /public crests,
+  // so an un-edited template renders exactly as it always has.
+  const logo1 = template.logo1Url ?? logoDataUri();
+  const logo2 = template.logo2Url ?? logo2DataUri();
+  // Both logos render at the same size (Logo 2's asset is cropped just as
+  // tightly as Logo 1's, see "IKO International Logo.png") -- an uploaded
+  // replacement is expected to follow the same convention.
   const GOLD_LOGO_SIZE = 420;
-  // Logo 2's own asset is now cropped just as tightly as Logo 1's (see
-  // "IKO International Logo.png"), so equal boxes now read as equal sizes
-  // — the old 1.25x bump was compensating for that asset's excess padding.
-  const LOGO2_SIZE = GOLD_LOGO_SIZE;
   // Now that the medal PNG is cropped tight (bounding box == visible
   // content, same convention as the two logos), this width IS the visible
   // ribbon+disc width. 307px reproduced the prior visible medal size
   // exactly; bumped another 20% per the organizer's follow-up request.
   const MEDAL_WIDTH = Math.round(307 * 1.2);
+  const medal = isWinner ? (
+    <Medal rank={input.rank!} width={MEDAL_WIDTH} />
+  ) : template.medalUrl ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={template.medalUrl} width={MEDAL_WIDTH} style={{ objectFit: "contain" }} alt="" />
+  ) : null;
+
+  const mergeCtx = {
+    name: input.recipientName,
+    kata_category: input.categoryName ?? input.kataName ?? "the event",
+    competition_tier: competitionName,
+    rank: isWinner ? ORDINAL[input.rank!] : "",
+  };
+  const header1 = substituteMergeTokens(template.header1, mergeCtx);
+  const header2 = substituteMergeTokens(template.header2, mergeCtx);
+  const body1 = substituteMergeTokens(template.body1, mergeCtx);
+  const body2 = substituteMergeTokens(template.body2, mergeCtx);
+  const body3 = substituteMergeTokens(template.body3, mergeCtx);
 
   return new ImageResponse(
     (
@@ -415,56 +511,7 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
             }}
           />
 
-          {isWinner ? (
-            <div style={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: "20px" }}>
-              {logo && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={logo} width={GOLD_LOGO_SIZE} height={GOLD_LOGO_SIZE} style={{ objectFit: "contain" }} alt="" />
-              )}
-              {/* Lifted so the ribbon tip touches the thin inner border
-                  line above (a deliberate "linked to the frame" look) --
-                  the row's own alignItems:"center" would otherwise keep it
-                  flush with the top of the (now taller) row, 24px below
-                  that line. */}
-              <div style={{ display: "flex", marginTop: "-28px" }}>
-                <Medal rank={input.rank!} width={MEDAL_WIDTH} />
-              </div>
-              {logo2 && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={logo2}
-                  width={LOGO2_SIZE}
-                  height={LOGO2_SIZE}
-                  style={{ objectFit: "contain", marginLeft: "46px" }}
-                  alt=""
-                />
-              )}
-            </div>
-          ) : (
-            // marginBottom matches the breathing room the winner row gets
-            // "for free" below its taller medal -- these certs have no
-            // medal, so the two same-height logos leave zero gap on their
-            // own before the title text starts right underneath.
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "20px",
-                marginBottom: "40px",
-              }}
-            >
-              {logo && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={logo} width={GOLD_LOGO_SIZE} height={GOLD_LOGO_SIZE} style={{ objectFit: "contain" }} alt="" />
-              )}
-              {logo2 && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={logo2} width={LOGO2_SIZE} height={LOGO2_SIZE} style={{ objectFit: "contain" }} alt="" />
-              )}
-            </div>
-          )}
+          <LogoMedalRow logo1={logo1} logo2={logo2} logoSize={GOLD_LOGO_SIZE} medal={medal} template={template} />
 
           <div
             style={{
@@ -514,7 +561,7 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
               color: accent,
             }}
           >
-            {KIND_TITLE[input.kind]}
+            {header1}
           </div>
 
           <div
@@ -536,7 +583,7 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
                 maxWidth: "1700px",
               }}
             >
-              This certificate is proudly presented to
+              {header2}
             </div>
             <div
               style={{
@@ -548,7 +595,7 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
                 padding: "0 40px 16px",
               }}
             >
-              {input.recipientName}
+              {body1}
             </div>
             <div
               style={{
@@ -560,7 +607,7 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
                 maxWidth: "1700px",
               }}
             >
-              {subtitleLine1(input)}
+              {body2}
             </div>
             <div
               style={{
@@ -572,7 +619,7 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
                 maxWidth: "1700px",
               }}
             >
-              at {competitionName}
+              {body3}
             </div>
           </div>
 

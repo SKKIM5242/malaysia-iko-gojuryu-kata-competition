@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { renderCertificatePng, type CertificateInput, type CertificateKind } from "@/lib/certificate-render";
+import { renderCertificatePng, type CertificateInput, type CertificateKind, type CertificateTemplate } from "@/lib/certificate-render";
 import { computeCategoryRankings } from "@/lib/winners-ranking";
 import { winnersRevealed } from "@/lib/winners";
 import { kataBaseOf } from "@/lib/division";
@@ -16,7 +16,7 @@ const VALID_KINDS: CertificateKind[] = ["winner", "participant", "referee", "sen
  * Requested via id="sample", gated to managers only (see GET below). */
 const SAMPLE_DATA: Record<
   CertificateKind,
-  Omit<CertificateInput, "signerName" | "signerTitle" | "signerName2" | "signerTitle2" | "signatureUrl" | "stampUrl">
+  Omit<CertificateInput, "signerName" | "signerTitle" | "signerName2" | "signerTitle2" | "signatureUrl" | "stampUrl" | "template">
 > = {
   winner: {
     kind: "winner", recipientName: "Jane Doe",
@@ -70,6 +70,35 @@ async function certificateSettings(supabase: Awaited<ReturnType<typeof createCli
   };
 }
 
+/** The organizer-edited design for one certificate kind (migration 0128) --
+ * resolves logo1_path/logo2_path/medal_path to public URLs here, same
+ * pattern as certificateSettings above, so lib/certificate-render.tsx never
+ * needs a Supabase client of its own. Falls back to a plain "everything
+ * off" template if the row is somehow missing (shouldn't happen -- all 6
+ * kinds are seeded by the migration -- but a missing template row should
+ * degrade to unbranded text, not a crash). */
+async function certificateTemplate(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  kind: CertificateKind,
+): Promise<CertificateTemplate> {
+  const { data } = await supabase.from("certificate_templates").select("*").eq("kind", kind).maybeSingle();
+  const urlFor = (path: string | null) =>
+    path ? supabase.storage.from("branding").getPublicUrl(path).data.publicUrl : null;
+  return {
+    header1: (data?.header1 as string | null) ?? "",
+    header2: (data?.header2 as string | null) ?? "",
+    body1: (data?.body1 as string | null) ?? "",
+    body2: (data?.body2 as string | null) ?? "",
+    body3: (data?.body3 as string | null) ?? "",
+    logoCount: (data?.logo_count as 1 | 2 | null) ?? 2,
+    logo1Url: urlFor((data?.logo1_path as string | null) ?? null),
+    logo2Url: urlFor((data?.logo2_path as string | null) ?? null),
+    showMedal: (data?.show_medal as boolean | null) ?? false,
+    medalPosition: (data?.medal_position as CertificateTemplate["medalPosition"] | null) ?? "between",
+    medalUrl: urlFor((data?.medal_path as string | null) ?? null),
+  };
+}
+
 /** `inline` (the "View" link) opens the PNG in the browser tab it's linked
  * from instead of forcing a download — everything else about the response
  * is identical, same live-rendered bytes as "Download". */
@@ -119,6 +148,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ kind
     : null;
   const isManager = ["admin", "organizer", "staff"].includes((myProfile?.role as string) ?? "");
   const settings = await certificateSettings(supabase);
+  const template = await certificateTemplate(supabase, kind as CertificateKind);
 
   if (registrationId === "sample") {
     if (!isManager) return new Response("Not authorized.", { status: 403 });
@@ -129,6 +159,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ kind
       ...sample,
       rank: kind === "winner" ? sampleRank : sample.rank,
       ...settings,
+      template,
     });
     return pngResponse(image, `${kind}-certificate-sample.png`, inline);
   }
@@ -232,6 +263,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ kind
       rank,
       dateLabel: formatDate(competition.certificate_date ?? competition.winners_announce_date ?? competition.event_date),
       ...settings,
+      template,
     });
     return pngResponse(image, `${kind}-certificate.png`, inline);
   }
@@ -281,6 +313,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ kind
       rank: null,
       dateLabel: formatDate((comp.certificate_date ?? comp.winners_announce_date ?? comp.event_date) as string | null),
       ...settings,
+      template,
     });
     return pngResponse(image, "referee-certificate.png", inline);
   }
@@ -332,6 +365,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ kind
       rank: null,
       dateLabel: formatDate((comp.certificate_date ?? comp.winners_announce_date ?? comp.event_date) as string | null),
       ...settings,
+      template,
     });
     return pngResponse(image, `${kind}-certificate.png`, inline);
   }
@@ -373,6 +407,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ kind
       rank: null,
       dateLabel: formatDate((comp.certificate_date ?? comp.winners_announce_date ?? comp.event_date) as string | null),
       ...settings,
+      template,
     });
     return pngResponse(image, "support-certificate.png", inline);
   }

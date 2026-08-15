@@ -1702,11 +1702,12 @@ async function uploadBrandingIfPresent(
   fieldName: string,
   prefix: string,
   returnTo: string,
+  label: string = prefix,
 ): Promise<string | null> {
   const file = formData.get(fieldName);
   if (!(file instanceof File) || file.size === 0) return null;
   if (file.size > 5 * 1024 * 1024) {
-    backTo(returnTo, { error: `${prefix === "signature" ? "Signature" : "Stamp"} image is too large (max 5 MB).` });
+    backTo(returnTo, { error: `${label} image is too large (max 5 MB).` });
   }
   const ext = (file.name.split(".").pop() || "png").toLowerCase().slice(0, 5);
   const path = `${prefix}-${crypto.randomUUID()}.${ext}`;
@@ -1714,7 +1715,7 @@ async function uploadBrandingIfPresent(
     .from("branding")
     .upload(path, file, { contentType: file.type || "image/png" });
   if (error) {
-    backTo(returnTo, { error: `Could not upload the ${prefix === "signature" ? "signature" : "stamp"} image. Please try again.` });
+    backTo(returnTo, { error: `Could not upload the ${label.toLowerCase()} image. Please try again.` });
   }
   return path;
 }
@@ -1733,8 +1734,8 @@ export async function saveCertificateSettings(formData: FormData) {
   const signerTitle = String(formData.get("signer_title") ?? "").trim() || null;
   const signerName2 = String(formData.get("signer_name_2") ?? "").trim() || null;
   const signerTitle2 = String(formData.get("signer_title_2") ?? "").trim() || null;
-  const signaturePath = await uploadBrandingIfPresent(supabase, formData, "signature", "signature", returnTo);
-  const stampPath = await uploadBrandingIfPresent(supabase, formData, "stamp", "stamp", returnTo);
+  const signaturePath = await uploadBrandingIfPresent(supabase, formData, "signature", "signature", returnTo, "Signature");
+  const stampPath = await uploadBrandingIfPresent(supabase, formData, "stamp", "stamp", returnTo, "Stamp");
 
   const update: Record<string, unknown> = {
     signer_name: signerName, signer_title: signerTitle,
@@ -1753,6 +1754,106 @@ export async function saveCertificateSettings(formData: FormData) {
   });
   revalidatePath("/admin/certificates");
   backTo(returnTo, { ok: "Certificate settings saved." });
+}
+
+// ── Certificate templates ────────────────────────────────────────────────────
+
+const CERTIFICATE_KINDS = ["winner", "participant", "referee", "sensei", "school", "support"] as const;
+type CertificateKindValue = (typeof CERTIFICATE_KINDS)[number];
+const MEDAL_POSITIONS = ["between", "left", "right"] as const;
+
+/** Deliberately narrower than requireCompetitionManager (which, despite the
+ * name, also lets Staff through) -- the organizer specifically asked for
+ * certificate *template design* (wording, logos, medal) to be Admin +
+ * Organizer only, unlike Settings/Publish on this same page which Staff can
+ * already touch. Mirrors is_certificate_template_manager() on the database
+ * side (migration 0128), which gates the row itself the same way. */
+async function requireCertificateTemplateManager(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  actorId: string | null,
+  returnTo: string,
+) {
+  const role = await getActorRole(supabase, actorId);
+  if (!["admin", "organizer"].includes(role ?? "")) {
+    backTo(returnTo, { error: "Only Admin / Organizer can edit certificate templates." });
+  }
+}
+
+/** Header1/Header2/Body1-3 text, logo count, and medal show/position for
+ * one certificate kind -- plus, same "leave blank to keep the existing
+ * image" convention as Certificate Settings above, an optional new
+ * logo1/logo2/medal upload right in the same form. Deleting an existing
+ * image is a separate action (deleteCertificateTemplateImage) so it has
+ * its own explicit confirm, rather than living inside this general save. */
+export async function saveCertificateTemplate(formData: FormData) {
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/certificates";
+  const kind = String(formData.get("kind") ?? "");
+  if (!(CERTIFICATE_KINDS as readonly string[]).includes(kind)) backTo(returnTo, { error: "Unknown certificate kind." });
+  const { supabase, actorId } = await getActor();
+  await requireCertificateTemplateManager(supabase, actorId, returnTo);
+
+  const logoCount = Number(formData.get("logo_count")) === 1 ? 1 : 2;
+  const medalPositionRaw = String(formData.get("medal_position") ?? "between");
+  const medalPosition = (MEDAL_POSITIONS as readonly string[]).includes(medalPositionRaw) ? medalPositionRaw : "between";
+
+  const logo1Path = await uploadBrandingIfPresent(supabase, formData, "logo1", `cert-${kind}-logo1`, returnTo, "Logo 1");
+  const logo2Path = await uploadBrandingIfPresent(supabase, formData, "logo2", `cert-${kind}-logo2`, returnTo, "Logo 2");
+  const medalPath = await uploadBrandingIfPresent(supabase, formData, "medal", `cert-${kind}-medal`, returnTo, "Medal");
+
+  const update: Record<string, unknown> = {
+    header1: String(formData.get("header1") ?? "").trim(),
+    header2: String(formData.get("header2") ?? "").trim(),
+    body1: String(formData.get("body1") ?? "").trim(),
+    body2: String(formData.get("body2") ?? "").trim(),
+    body3: String(formData.get("body3") ?? "").trim(),
+    logo_count: logoCount,
+    show_medal: formData.get("show_medal") === "on",
+    medal_position: medalPosition,
+    updated_at: new Date().toISOString(),
+    updated_by: actorId,
+  };
+  if (logo1Path) update.logo1_path = logo1Path;
+  if (logo2Path) update.logo2_path = logo2Path;
+  if (medalPath) update.medal_path = medalPath;
+
+  const { error } = await supabase.from("certificate_templates").update(update).eq("kind", kind);
+  if (error) backTo(returnTo, { error: "Could not save this certificate template." });
+
+  await writeAudit(supabase, {
+    table_name: "certificate_templates", record_id: kind, action: "certificate_template_updated",
+    new_value: update, actor_id: actorId,
+  });
+  revalidatePath("/admin/certificates");
+  backTo(returnTo, { ok: `${kind[0].toUpperCase()}${kind.slice(1)} certificate template saved.` });
+}
+
+/** Clears one uploaded image (logo1/logo2/medal) back to null, so
+ * rendering falls back to the built-in default (Logo 1/2) or simply stops
+ * showing a medal (medal has no built-in fallback for non-Winner kinds). */
+export async function deleteCertificateTemplateImage(formData: FormData) {
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/certificates";
+  const kind = String(formData.get("kind") ?? "");
+  const field = String(formData.get("field") ?? "");
+  const column = field === "logo1" ? "logo1_path" : field === "logo2" ? "logo2_path" : field === "medal" ? "medal_path" : null;
+  if (!(CERTIFICATE_KINDS as readonly string[]).includes(kind) || !column) {
+    backTo(returnTo, { error: "Nothing to delete." });
+  }
+  const { supabase, actorId } = await getActor();
+  await requireCertificateTemplateManager(supabase, actorId, returnTo);
+
+  const { data: before } = await supabase.from("certificate_templates").select(column!).eq("kind", kind).maybeSingle();
+  const oldPath = (before as Record<string, unknown> | null)?.[column!] as string | null;
+
+  const { error } = await supabase.from("certificate_templates").update({ [column!]: null }).eq("kind", kind);
+  if (error) backTo(returnTo, { error: "Could not remove this image." });
+  if (oldPath) await supabase.storage.from("branding").remove([oldPath]);
+
+  await writeAudit(supabase, {
+    table_name: "certificate_templates", record_id: kind, action: "certificate_template_image_deleted",
+    old_value: { [column!]: oldPath }, actor_id: actorId,
+  });
+  revalidatePath("/admin/certificates");
+  backTo(returnTo, { ok: "Image removed." });
 }
 
 // ── Site appearance ──────────────────────────────────────────────────────────
