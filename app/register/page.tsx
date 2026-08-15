@@ -45,7 +45,7 @@ const OPTIONS: Array<{
     n: 4,
     title: "Judges",
     desc:
-      "Register as a kata judge. USD 100 deposit per competition tier. Judge work starts after the event deadline: you have 2 weeks after the deadline to submit your scores — after the 2nd week, unscored recordings are re-assigned, and the re-assigned judge gets 1 week. If a score is still missing, the organizer takes over in the 4th week, before the winner announcement date. Senseis holding 3rd Dan and above are encouraged to register as Judge.",
+      "Register as a kata judge. USD 100 deposit per competition tier. Judge work starts after the event deadline: you have around 2 weeks after the deadline to submit your scores on the assigned participants — after the 2nd week, unscored recordings are re-assigned, and the re-assigned judge gets around 1 week. If a score is still missing, the Chief Judge takes over in the 4th week, before the winner announcement date. Black Belt 1st Dan onward and above are encouraged to register as Judge.",
     href: "/register/referee",
     cta: "Register as judge",
   },
