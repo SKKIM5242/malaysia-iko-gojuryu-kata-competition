@@ -572,17 +572,56 @@ export default async function AdminJudging({
       )}
 
       <div className="mb-3 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
-        <strong>How Auto-assign judges works:</strong> &quot;Judges per recording&quot; is a saved
-        setting per competition — set the number once and click Save; it stays in effect until you
-        change it again. Every recording now fills its judge panel <strong>automatically</strong>,
-        the moment it&apos;s submitted — no click needed for the normal case. The{" "}
-        <strong>Auto-assign judges</strong> button below is a catch-up tool for whatever that
-        couldn&apos;t fill at submission time (no eligible judge yet for that recording&apos;s kata
-        family, everyone eligible already excluded, or a recording submitted before this went
-        live) — safe to click more than once: each click only fills currently-empty slots up to
-        the saved target, and never touches an already-assigned judge or their score, so a 2nd or
-        3rd click when everything is already full simply reports &quot;Every recording already has
-        its full panel of judges.&quot;
+        <p className="font-bold">How Auto-assign judges works:</p>
+        <ol className="mt-2 list-decimal space-y-2 pl-5">
+          <li>
+            <strong>Automatic, by default</strong> — the moment a participant submits a recording,
+            the system immediately fills its judge panel on its own. No click needed. It picks the
+            least-loaded eligible judge each time, so no judge&apos;s workload runs far ahead of
+            another&apos;s, respecting any kata-family restriction or conflict-of-interest
+            exclusion set for that judge on the Judges page — repeating until &quot;Judges per
+            recording&quot; is met.
+          </li>
+          <li>
+            <strong>The button is a catch-up tool</strong> — clicking Auto-assign judges scans the
+            whole competition and tops up only currently-empty slots; it never touches an
+            already-assigned judge or their score. Reach for it whenever the automatic step above
+            couldn&apos;t fully fill a panel at submission time, or for older recordings it never
+            had a chance to run on:
+            <ul className="mt-1.5 list-disc space-y-1 pl-5">
+              <li>
+                <strong>No eligible judge yet for that kata family</strong> — e.g. the first
+                Kobudo recording comes in before any judge has been marked eligible for Kobudo on
+                the Judges page; the panel stays empty until a judge&apos;s kata families are set
+                to cover it.
+              </li>
+              <li>
+                <strong>Everyone eligible is excluded</strong> — e.g. only 2 approved judges cover
+                Advance kata, and both happen to have their own child competing in the exact
+                category just submitted; both are excluded from it, so no one is left even though
+                2 &quot;Advance&quot; judges exist overall.
+              </li>
+              <li>
+                <strong>Submitted before this went live</strong> — recordings uploaded before
+                today never got an automatic pass; run the button once to backfill all of them in
+                one click.
+              </li>
+              <li>
+                <strong>A slot reopens later</strong> — a judge already assigned is later
+                unassigned (e.g. a conflict of interest is discovered after the fact); that
+                recording now has an empty slot again, and nothing re-fills it automatically until
+                the button is clicked.
+              </li>
+            </ul>
+          </li>
+          <li>
+            <strong>Safe to click repeatedly</strong> — &quot;Judges per recording&quot; is a
+            saved setting per competition (set it once and click Save; it stays in effect until
+            changed again). A 2nd or 3rd click when everything is already full simply reports
+            &quot;Every recording already has its full panel of judges,&quot; without re-touching
+            a slot that&apos;s already filled.
+          </li>
+        </ol>
       </div>
 
       <h2 className="mb-1 text-lg font-bold">Auto-Assign Judges — Criteria</h2>
