@@ -37,7 +37,7 @@ const OPTIONS: Array<{
   {
     n: 3,
     title: "Sensei / Coach self-registration",
-    desc: `Senseis and coaches register themselves. ${TIER_FEE_NOTE} Senseis holding 3rd Dan and above are encouraged to also register as Judge to earn extra commission, and every sensei is warmly encouraged to join as Participant Support too.`,
+    desc: `Senseis and coaches register themselves. ${TIER_FEE_NOTE} Senseis holding Black Belt 1st Dan onward and above are encouraged to also register as Judge to earn extra commission, and every sensei is warmly encouraged to join as Participant Support too.`,
     href: "/register/sensei?by=self",
     cta: "Self-register as sensei",
   },
