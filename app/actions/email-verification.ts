@@ -6,7 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { sendVerificationEmail } from "@/lib/notify";
 
 function appUrl(): string {
-  return process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  return process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 }
 
 async function requireAdminTier(): Promise<boolean> {

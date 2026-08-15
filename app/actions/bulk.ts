@@ -285,7 +285,7 @@ export async function createBulkUploadCheckout(
   }
 
   const totalAmountUsd = rows.reduce((sum, r) => sum + Number(r.amount_usd), 0);
-  const origin = (await headers()).get("origin") ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const origin = (await headers()).get("origin") || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   try {
     const session = await getStripe().checkout.sessions.create({
       mode: "payment",

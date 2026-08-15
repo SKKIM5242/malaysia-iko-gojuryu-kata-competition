@@ -68,7 +68,7 @@ async function directoryCheckout(
 ): Promise<string | null> {
   if (!paymentsEnabled() || tier.fee <= 0) return null;
   const origin =
-    (await headers()).get("origin") ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+    (await headers()).get("origin") || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   try {
     const session = await getStripe().checkout.sessions.create({
       mode: "payment",

@@ -19,7 +19,7 @@ export async function createSampleStripeCheckout(): Promise<SampleCheckoutState>
     return { done: false, error: "Stripe isn't configured in this environment." };
   }
   const origin =
-    (await headers()).get("origin") ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+    (await headers()).get("origin") || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   try {
     const session = await getStripe().checkout.sessions.create({
       mode: "payment",

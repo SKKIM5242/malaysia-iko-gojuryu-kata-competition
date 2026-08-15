@@ -205,7 +205,7 @@ export default async function AdminTelegramLinks({
         botUsername={process.env.TELEGRAM_BOT_USERNAME?.trim() || null}
         tokenSet={Boolean(process.env.TELEGRAM_BOT_TOKEN?.trim())}
         webhookSecretSet={Boolean(process.env.TELEGRAM_WEBHOOK_SECRET?.trim())}
-        appUrl={process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}
+        appUrl={process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}
         connectedByRole={connectedByRole}
       />
     </AdminShell>

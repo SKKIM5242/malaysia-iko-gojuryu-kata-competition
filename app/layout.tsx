@@ -6,7 +6,7 @@ import MobilePageScrollbar from "@/components/MobilePageScrollbar";
 import TelegramWebApp from "@/components/TelegramWebApp";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"),
   title: {
     default: "Malaysia Open Virtual Karate-do Kata Competition - Goju-ryu or IKO Goju-ryu Version Only",
     template: "%s — Malaysia Open Virtual Karate-do Kata Competition - Goju-ryu or IKO Goju-ryu Version Only",

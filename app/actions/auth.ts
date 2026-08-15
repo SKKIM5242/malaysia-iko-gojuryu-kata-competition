@@ -57,7 +57,7 @@ export async function requestPasswordReset(
   const { data: email } = await supabase.rpc("find_email_for_identity", { p_identifier: identifier });
   if (typeof email === "string" && email) {
     const origin =
-      (await headers()).get("origin") ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+      (await headers()).get("origin") || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${origin}/account/reset-password`,
     });

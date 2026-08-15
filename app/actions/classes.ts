@@ -381,7 +381,7 @@ export async function generateInvoicePaymentLink(formData: FormData) {
   if (!invoice) backTo("invoices", { error: "Invoice not found." });
   if (invoice!.status !== "unpaid") backTo("invoices", { error: "Only unpaid invoices can be charged." });
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   try {
     const session = await getStripe().checkout.sessions.create({
       mode: "payment",
@@ -472,7 +472,7 @@ export async function emailAllUnpaidPaymentLinks() {
     .eq("status", "unpaid");
   const unpaid = (data as unknown as ClassInvoice[]) ?? [];
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   let sent = 0;
   let skippedNoEmail = 0;
 

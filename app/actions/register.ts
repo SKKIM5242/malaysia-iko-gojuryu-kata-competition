@@ -273,8 +273,8 @@ export async function submitRegistration(
     }
 
     const origin =
-      (await headers()).get("origin") ??
-      process.env.NEXT_PUBLIC_APP_URL ??
+      (await headers()).get("origin") ||
+      process.env.NEXT_PUBLIC_APP_URL ||
       "http://localhost:3000";
     let checkoutUrl: string | null = null;
     try {

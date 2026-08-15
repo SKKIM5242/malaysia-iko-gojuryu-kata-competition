@@ -692,7 +692,7 @@ export default async function AdminCommissions({
               : null
         }
         webhookSecretConfigured={Boolean(process.env.STRIPE_WEBHOOK_SECRET)}
-        webhookUrl={`${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/api/stripe/webhook`}
+        webhookUrl={`${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/stripe/webhook`}
       />
     </AdminShell>
   );
