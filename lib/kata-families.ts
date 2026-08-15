@@ -1,5 +1,5 @@
 import type { Category } from "@/lib/types";
-import { kataBaseOf, groupByKata } from "@/lib/division";
+import { kataBaseOf, groupByKata, kataBases } from "@/lib/division";
 import { KATA_FAMILY_BELT_GROUP_OPTIONS } from "@/lib/reference-data";
 
 /** The organizer's own grouping of the 24 kata events, independent of the
@@ -100,6 +100,17 @@ export function groupByFamily(
  * on. */
 export function categoriesInFamily(categories: Category[], family: KataFamily): Category[] {
   return categories.filter((c) => kataFamilyOf(kataBaseOf(c.name)) === family);
+}
+
+/** Unique kata event names for the given categories, in the organizer's
+ * canonical 1-24 numbered order (not kataBases' own "first seen in this
+ * array" order, which silently follows whatever order the caller's
+ * categories happened to be fetched in). Use this instead of kataBases()
+ * anywhere the result is shown to a person, e.g. a picker dropdown -- a
+ * kata whose name doesn't match any of the 24 (should only happen for a
+ * genuinely new/renamed kata) sorts to the end rather than disappearing. */
+export function orderedKataBases(categories: Category[]): string[] {
+  return kataBases(categories).sort((a, b) => (RANK_BY_KATA[a] ?? 999) - (RANK_BY_KATA[b] ?? 999));
 }
 
 /** The kata event immediately above/below the given one in the canonical

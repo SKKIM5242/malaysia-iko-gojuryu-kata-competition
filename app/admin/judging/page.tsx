@@ -4,9 +4,10 @@ import { schemaReady } from "@/lib/data";
 import {
   assignRefereeToVideo, setJudgesRequired, autoAssignReferees,
   resendRefereeNotification, seedAutoAssignCriteria, deleteAutoAssignCriterion,
-  saveRefereeKataFamilies, removeRefereeExclusion,
+  removeRefereeExclusion,
 } from "@/app/actions/admin";
-import { KATA_FAMILIES, describeKataFamilies } from "@/lib/kata-families";
+import { describeKataFamilies } from "@/lib/kata-families";
+import JudgeKataFamiliesForm from "@/components/JudgeKataFamiliesForm";
 import { AdminShell, Card, adminBtn, adminBtnSecondary, adminInput } from "@/components/admin";
 import { CategoryName, EmptyState, SetupNotice, formatDate } from "@/components/ui";
 import FullViewButton from "@/components/FullViewButton";
@@ -527,7 +528,7 @@ export default async function AdminJudging({
               { key: "phone", label: "Mobile Phone", width: 110, wrap: true },
               { key: "telegram", label: "Telegram", width: 110, wrap: true },
               { key: "country", label: "Country", width: 100, wrap: true },
-              { key: "kata_families", label: "Kata Families", width: 170, wrap: true },
+              { key: "kata_families", label: "Kata Families", width: 260, wrap: true },
               { key: "exclusions", label: "Exclusions", width: 220, wrap: true },
               { key: "assigned", label: "Assigned", width: 90, wrap: true },
               { key: "scored", label: "Scored", width: 110, wrap: true },
@@ -577,33 +578,13 @@ export default async function AdminJudging({
                   r.kata_families as string[] | null, r.kata_family_belt_groups as string[] | null,
                 ),
                 kata_families: canEditFamiliesExclusions ? (
-                  <form key="kata_families" action={saveRefereeKataFamilies} className="space-y-1.5">
-                    <input type="hidden" name="id" value={r.id} />
-                    <input type="hidden" name="return_to" value="/admin/judging" />
-                    {(r.kata_family_belt_groups as string[] | null ?? []).map((t) => (
-                      <input key={t} type="hidden" name="kata_family_belt_groups" value={t} />
-                    ))}
-                    <div className="flex flex-wrap gap-x-2 gap-y-1">
-                      {KATA_FAMILIES.map((f) => (
-                        <label key={f} className="flex items-center gap-1 text-xs">
-                          <input
-                            type="checkbox" name="kata_families" value={f}
-                            defaultChecked={(r.kata_families as string[] | null ?? []).includes(f)}
-                          />
-                          {f}
-                        </label>
-                      ))}
-                    </div>
-                    {(r.kata_family_belt_groups as string[] | null ?? []).length > 0 && (
-                      <p className="text-[11px] text-neutral-400">
-                        Belt-narrowed — {describeKataFamilies(r.kata_families as string[] | null, r.kata_family_belt_groups as string[] | null)}.{" "}
-                        Edit narrowing on the Judges page.
-                      </p>
-                    )}
-                    <button type="submit" className="rounded border border-neutral-300 px-2 py-0.5 text-xs font-semibold text-neutral-600 hover:bg-neutral-50">
-                      Save
-                    </button>
-                  </form>
+                  <JudgeKataFamiliesForm
+                    key="kata_families"
+                    refereeId={r.id}
+                    kataFamilies={r.kata_families as string[] | null}
+                    kataFamilyBeltGroups={r.kata_family_belt_groups as string[] | null}
+                    returnTo="/admin/judging"
+                  />
                 ) : (
                   describeKataFamilies(r.kata_families as string[] | null, r.kata_family_belt_groups as string[] | null)
                 ),

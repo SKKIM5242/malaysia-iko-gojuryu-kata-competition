@@ -2,7 +2,8 @@
 
 import { useActionState, useMemo, useState } from "react";
 import type { Category } from "@/lib/types";
-import { kataBaseOf, kataBases } from "@/lib/division";
+import { kataBaseOf } from "@/lib/division";
+import { orderedKataBases } from "@/lib/kata-families";
 import {
   addRefereeExclusion, addRefereeExclusions, removeRefereeExclusion,
   traceParticipantForExclusion, traceSchoolForExclusion, traceSenseiForExclusion,
@@ -142,7 +143,7 @@ export default function RefereeExclusionsPanel({
     () => categories.filter((c) => c.competition_id === competitionId),
     [categories, competitionId],
   );
-  const kataOptions = useMemo(() => kataBases(tierCategories), [tierCategories]);
+  const kataOptions = useMemo(() => orderedKataBases(tierCategories), [tierCategories]);
   const kataCategories = useMemo(
     () => tierCategories.filter((c) => kataBaseOf(c.name) === kata),
     [tierCategories, kata],

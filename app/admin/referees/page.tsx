@@ -5,11 +5,11 @@ import { getAllCompetitions } from "@/lib/admin-data";
 import {
   updateCommunityStatus, saveReferee, deleteReferee, linkRefereeAccount, bulkUploadReferees,
   saveAutoAssignTerm, deleteAutoAssignTerm, bulkUploadAutoAssignTerms, generateRecordInvitationCode,
-  linkRefereeToAccount, unlinkRefereeFromAccount, saveRefereeKataFamilies,
+  linkRefereeToAccount, unlinkRefereeFromAccount,
 } from "@/app/actions/admin";
-import { KATA_FAMILIES } from "@/lib/kata-families";
 import type { Category } from "@/lib/types";
 import RefereeExclusionsPanel from "@/components/RefereeExclusionsPanel";
+import JudgeKataFamiliesForm from "@/components/JudgeKataFamiliesForm";
 import { AdminShell, Card, CertificateField, adminBtn, adminBtnSecondary, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice, formatDOB } from "@/components/ui";
 import { shortTierName } from "@/lib/invitation-codes";
@@ -31,7 +31,7 @@ import { NoCommaInput } from "@/components/NoCommaAddressField";
 import DateOfBirthField from "@/components/DateOfBirthField";
 
 import {
-  REFERRAL_LABEL, REFERRAL_PLACEHOLDER, REFEREE_TITLE_OPTIONS, KATA_FAMILY_BELT_GROUP_OPTIONS,
+  REFERRAL_LABEL, REFERRAL_PLACEHOLDER, REFEREE_TITLE_OPTIONS,
 } from "@/lib/reference-data";
 import DateField from "@/components/DateField";
 
@@ -122,7 +122,7 @@ export default async function AdminReferees({
   // picker's cascading Tier/Kata/Belt/Gender/Age dropdowns are the only
   // thing that needs the full (~900-row) category set across all 3 tiers.
   const { data: categoriesData } = editing && isAdminTier
-    ? await supabase.from("categories").select("*")
+    ? await supabase.from("categories").select("*").order("sort_order")
     : { data: [] as Category[] };
   const categoriesList = (categoriesData as Category[]) ?? [];
   const categoryNameById = new Map(categoriesList.map((c) => [c.id, c.name]));
@@ -440,34 +440,12 @@ export default async function AdminReferees({
                   this judge eligible for merged categories in that family alone, not the separate
                   Color/Kyu Belt or Black Belt & Dan Holders ones.
                 </p>
-                <form action={saveRefereeKataFamilies} className="mt-2 space-y-2">
-                  <input type="hidden" name="id" value={editing.id} />
-                  <div className="space-y-2">
-                    {KATA_FAMILIES.map((f) => (
-                      <div key={f} className="rounded border border-neutral-200 bg-white p-2">
-                        <label className="flex items-center gap-1.5 text-sm font-medium">
-                          <input
-                            type="checkbox" name="kata_families" value={f}
-                            defaultChecked={(editing.kata_families ?? []).includes(f)}
-                          />
-                          {f}
-                        </label>
-                        <div className="mt-1 ml-5 flex flex-wrap gap-3">
-                          {KATA_FAMILY_BELT_GROUP_OPTIONS.map((b) => (
-                            <label key={b.key} className="flex items-center gap-1 text-xs text-neutral-500">
-                              <input
-                                type="checkbox" name="kata_family_belt_groups" value={`${f}:${b.key}`}
-                                defaultChecked={(editing.kata_family_belt_groups ?? []).includes(`${f}:${b.key}`)}
-                              />
-                              {b.label}
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <button type="submit" className={adminBtnSecondary}>Save kata families</button>
-                </form>
+                <JudgeKataFamiliesForm
+                  refereeId={editing.id}
+                  kataFamilies={editing.kata_families}
+                  kataFamilyBeltGroups={editing.kata_family_belt_groups}
+                  returnTo={`/admin/referees?editref=${editing.id}`}
+                />
               </div>
               <div className="border-t border-neutral-200 pt-4">
                 <RefereeExclusionsPanel
