@@ -44,7 +44,10 @@ function TraceBox({
       <form action={formAction} className="flex flex-wrap items-end gap-2">
         <div className="flex-1">
           <label htmlFor={name} className={adminLabel}>{label}</label>
-          <input id={name} name="name" className={adminInput} placeholder={placeholder} />
+          <textarea
+            id={name} name="name" rows={2} className={`${adminInput} resize-y`}
+            placeholder={`${placeholder} — paste several, one per line or comma-separated, no limit`}
+          />
         </div>
         <button type="submit" disabled={pending} className={adminBtnSecondary}>
           {pending ? "Tracing…" : "Trace"}

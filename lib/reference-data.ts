@@ -144,6 +144,20 @@ export const REFEREE_TITLE_OPTIONS = [
   "Team Kata Judge",
 ] as const;
 
+/** The 3 belt-group narrowing options for a judge's per-family kata
+ * eligibility (referees.kata_family_belt_groups, migration 0127) --
+ * narrows an already-checked kata family (referees.kata_families) down to
+ * specific belt group(s); leaving all 3 unticked for a checked family
+ * stays unrestricted-by-belt, same as today. "open" is a third,
+ * independent value alongside categories' own kyu/dan, for a belt-mixed
+ * category an organizer may create later (the same way a "mix" gender
+ * category can already be created manually). */
+export const KATA_FAMILY_BELT_GROUP_OPTIONS = [
+  { key: "kyu", label: "Color/Kyu Belt" },
+  { key: "dan", label: "Black Belt & Dan Holder" },
+  { key: "open", label: "Open" },
+] as const;
+
 /** Human label for a role key, for the Sign-in Access Matrix picker. */
 export const PROFILE_ROLE_KEY_LABELS: Record<ProfileRoleKey, string> = {
   participant: "Participant",

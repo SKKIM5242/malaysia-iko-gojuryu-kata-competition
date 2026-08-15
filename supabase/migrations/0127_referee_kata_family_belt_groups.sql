@@ -1,0 +1,17 @@
+-- Narrows a judge's per-family eligibility (referees.kata_families,
+-- migration 0124) down to specific belt group(s) within a family --
+-- e.g. "covers Elementary, but only the Color/Kyu Belt categories, not
+-- Black Belt & Dan Holders". A SEPARATE column rather than folding this
+-- into kata_families itself, so the existing family-only column and its
+-- existing "empty means every family" logic (autoAssignReferees,
+-- lib/auto-assign.ts) are untouched -- this is purely additive.
+--
+-- Stores "Family:belt" tokens (e.g. "Elementary:kyu", "Kobudo:open") only
+-- for the specific belt(s) an admin has deliberately ticked for that
+-- family; a family with NO tokens here is unrestricted by belt (today's
+-- behaviour), mirroring kata_families' own "empty means unrestricted"
+-- convention one level deeper. "open" is a third, independent value
+-- alongside "kyu"/"dan" (categories.belt_group is only ever kyu or dan
+-- today) for a belt-mixed category an organizer may create later, the
+-- same way a "mix" gender category can already be created manually.
+alter table referees add column if not exists kata_family_belt_groups text[] not null default '{}';

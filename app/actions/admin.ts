@@ -27,7 +27,7 @@ import { autoAssignForVideos } from "@/lib/auto-assign";
 import { applySubscriptionRenewalTerms } from "@/lib/finalize";
 import type { PaymentStatus, Category } from "@/lib/types";
 import { parseCsvWithHeader, parseDDMMYYYY, type CsvUploadResult } from "@/lib/csv-bulk";
-import { PROFILE_ROLE_KEYS } from "@/lib/reference-data";
+import { PROFILE_ROLE_KEYS, KATA_FAMILY_BELT_GROUP_OPTIONS } from "@/lib/reference-data";
 import { normalizeIban } from "@/lib/bank";
 import { codePrefix, nextSequentialCode, shortTierName } from "@/lib/invitation-codes";
 import { listTelegramGroups, type TelegramCategory } from "@/lib/telegram";
@@ -2699,7 +2699,10 @@ export async function deleteReferee(formData: FormData) {
 }
 
 /** Which of the 5 kata families (see lib/kata-families.ts) a judge is
- * eligible to be assigned into — feeds autoAssignReferees' eligible pool. */
+ * eligible to be assigned into, plus an optional per-family belt-group
+ * narrowing ("Elementary:kyu" — see migration 0127) — feeds
+ * autoAssignReferees' eligible pool. Saved together since they're one
+ * "how far does this judge's coverage go" decision on the same form. */
 export async function saveRefereeKataFamilies(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const returnTo =
@@ -2707,15 +2710,28 @@ export async function saveRefereeKataFamilies(formData: FormData) {
   if (!id) backTo("/admin/referees", { error: "Missing judge." });
   const families = formData.getAll("kata_families").map(String)
     .filter((f) => (KATA_FAMILIES as readonly string[]).includes(f));
+  const validBeltKeys = new Set<string>(KATA_FAMILY_BELT_GROUP_OPTIONS.map((o) => o.key));
+  const beltGroups = formData.getAll("kata_family_belt_groups").map(String)
+    .filter((token) => {
+      const [family, belt] = token.split(":");
+      return (KATA_FAMILIES as readonly string[]).includes(family) && validBeltKeys.has(belt);
+    });
   const { supabase, actorId } = await getActor();
   await requireRefereeConfigManager(supabase, actorId, returnTo);
 
-  const { data: before } = await supabase.from("referees").select("kata_families").eq("id", id).maybeSingle();
-  const { error } = await supabase.from("referees").update({ kata_families: families }).eq("id", id);
+  const { data: before } = await supabase
+    .from("referees")
+    .select("kata_families, kata_family_belt_groups")
+    .eq("id", id)
+    .maybeSingle();
+  const { error } = await supabase
+    .from("referees")
+    .update({ kata_families: families, kata_family_belt_groups: beltGroups })
+    .eq("id", id);
   if (error) backTo(returnTo, { error: "Could not update kata families." });
   await writeAudit(supabase, {
     table_name: "referees", record_id: id, action: "referee_kata_families_updated",
-    old_value: before, new_value: { kata_families: families }, actor_id: actorId,
+    old_value: before, new_value: { kata_families: families, kata_family_belt_groups: beltGroups }, actor_id: actorId,
   });
   backTo(returnTo, { ok: "Kata families updated." });
 }
@@ -2822,6 +2838,33 @@ export interface TraceParticipantState {
   matches?: ParticipantTraceMatch[];
 }
 
+/** Splits a trace box's raw input into individual search terms — one per
+ * line (a pasted spreadsheet column) and/or comma-separated on one line,
+ * trimmed, deduped, no cap on how many. */
+function parseNameList(raw: string): string[] {
+  return [...new Set(raw.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean))];
+}
+
+/** Runs one ILIKE search per name and merges the results by id, so a
+ * multi-name paste returns the union of every match instead of only ever
+ * searching the first name. */
+async function searchManyByName(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  table: string,
+  nameColumn: string,
+  names: string[],
+  limitPerName: number,
+): Promise<Array<{ id: string; name: string }>> {
+  const byId = new Map<string, string>();
+  for (const n of names) {
+    const { data } = await supabase.from(table).select(`id, ${nameColumn}`).ilike(nameColumn, `%${n}%`).limit(limitPerName);
+    for (const row of (data ?? []) as unknown as Array<Record<string, unknown>>) {
+      byId.set(row.id as string, row[nameColumn] as string);
+    }
+  }
+  return [...byId.entries()].map(([id, name]) => ({ id, name }));
+}
+
 /** Every category registration for the given participants, shared by all 3
  * trace-for-exclusion actions below — only HOW participantIds is resolved
  * (by their own name, or via their school/sensei) differs between them. */
@@ -2851,9 +2894,10 @@ async function participantTraceMatches(
     }));
 }
 
-/** Looks up a participant by name and returns every category registration
+/** Looks up participants by name — one, or several pasted as a column or
+ * comma-separated list, no limit — and returns every category registration
  * found, so the exclusion form's dropdowns can be filled from a real
- * registration instead of an admin re-typing a category by hand — or, with
+ * registration instead of an admin re-typing a category by hand, or, with
  * the trace box's tick boxes, several/all of them added as exclusions in
  * one go. Read-only, but gated the same as the mutations above since it's
  * part of the same restricted form. */
@@ -2861,29 +2905,28 @@ export async function traceParticipantForExclusion(
   _prev: TraceParticipantState,
   formData: FormData,
 ): Promise<TraceParticipantState> {
-  const name = String(formData.get("name") ?? "").trim();
-  if (!name) return { ok: false, error: "Enter a participant name to search." };
+  const names = parseNameList(String(formData.get("name") ?? ""));
+  if (names.length === 0) return { ok: false, error: "Enter at least one participant name to search." };
   const { supabase, actorId } = await getActor();
   if (!(await canConfigureReferees(supabase, actorId))) {
     return { ok: false, error: "Only Admin / Organizer or a Chief Judge can trace a participant." };
   }
 
-  const { data: participants } = await supabase
-    .from("participants")
-    .select("id, full_name")
-    .ilike("full_name", `%${name}%`)
-    .limit(25);
-  if (!participants || participants.length === 0) {
-    return { ok: false, error: `No participant found matching "${name}".` };
+  const participants = await searchManyByName(supabase, "participants", "full_name", names, 25);
+  if (participants.length === 0) {
+    return { ok: false, error: `No participant found matching ${names.length === 1 ? `"${names[0]}"` : "any of those names"}.` };
   }
-  const participantIds = participants.map((p) => p.id as string);
-  const nameById = new Map(participants.map((p) => [p.id as string, p.full_name as string]));
+  const participantIds = participants.map((p) => p.id);
+  const nameById = new Map(participants.map((p) => [p.id, p.name]));
 
   const matches = await participantTraceMatches(supabase, participantIds, nameById);
   if (matches.length === 0) {
     return {
       ok: false,
-      error: `${participants.length === 1 ? nameById.get(participantIds[0]) : "That name"} has no category registration yet.`,
+      error:
+        participants.length === 1
+          ? `${nameById.get(participantIds[0])} has no category registration yet.`
+          : "None of those participants have a category registration yet.",
     };
   }
   return { ok: true, matches };
@@ -2896,31 +2939,36 @@ export async function traceSchoolForExclusion(
   _prev: TraceParticipantState,
   formData: FormData,
 ): Promise<TraceParticipantState> {
-  const name = String(formData.get("name") ?? "").trim();
-  if (!name) return { ok: false, error: "Enter a school / dojo name to search." };
+  const names = parseNameList(String(formData.get("name") ?? ""));
+  if (names.length === 0) return { ok: false, error: "Enter at least one school / dojo name to search." };
   const { supabase, actorId } = await getActor();
   if (!(await canConfigureReferees(supabase, actorId))) {
     return { ok: false, error: "Only Admin / Organizer or a Chief Judge can trace a school." };
   }
 
-  const { data: schools } = await supabase.from("schools").select("id").ilike("name", `%${name}%`).limit(25);
-  if (!schools || schools.length === 0) return { ok: false, error: `No school found matching "${name}".` };
-  const schoolIds = schools.map((s) => s.id as string);
+  const schools = await searchManyByName(supabase, "schools", "name", names, 25);
+  if (schools.length === 0) {
+    return { ok: false, error: `No school found matching ${names.length === 1 ? `"${names[0]}"` : "any of those names"}.` };
+  }
+  const schoolIds = schools.map((s) => s.id);
 
-  const { data: participants } = await supabase
+  const { data: participantsData } = await supabase
     .from("participants")
     .select("id, full_name")
     .in("school_id", schoolIds)
-    .limit(500);
-  if (!participants || participants.length === 0) {
-    return { ok: false, error: `No participants found under a school matching "${name}".` };
+    .limit(2000);
+  if (!participantsData || participantsData.length === 0) {
+    return { ok: false, error: `No participants found under a school matching ${names.length === 1 ? `"${names[0]}"` : "those names"}.` };
   }
-  const participantIds = participants.map((p) => p.id as string);
-  const nameById = new Map(participants.map((p) => [p.id as string, p.full_name as string]));
+  const participantIds = participantsData.map((p) => p.id as string);
+  const nameById = new Map(participantsData.map((p) => [p.id as string, p.full_name as string]));
 
   const matches = await participantTraceMatches(supabase, participantIds, nameById);
   if (matches.length === 0) {
-    return { ok: false, error: `No category registrations found for participants under a school matching "${name}".` };
+    return {
+      ok: false,
+      error: `No category registrations found for participants under a school matching ${names.length === 1 ? `"${names[0]}"` : "those names"}.`,
+    };
   }
   return { ok: true, matches };
 }
@@ -2932,31 +2980,36 @@ export async function traceSenseiForExclusion(
   _prev: TraceParticipantState,
   formData: FormData,
 ): Promise<TraceParticipantState> {
-  const name = String(formData.get("name") ?? "").trim();
-  if (!name) return { ok: false, error: "Enter a sensei name to search." };
+  const names = parseNameList(String(formData.get("name") ?? ""));
+  if (names.length === 0) return { ok: false, error: "Enter at least one sensei name to search." };
   const { supabase, actorId } = await getActor();
   if (!(await canConfigureReferees(supabase, actorId))) {
     return { ok: false, error: "Only Admin / Organizer or a Chief Judge can trace a sensei." };
   }
 
-  const { data: senseis } = await supabase.from("senseis").select("id").ilike("name", `%${name}%`).limit(25);
-  if (!senseis || senseis.length === 0) return { ok: false, error: `No sensei found matching "${name}".` };
-  const senseiIds = senseis.map((s) => s.id as string);
+  const senseis = await searchManyByName(supabase, "senseis", "name", names, 25);
+  if (senseis.length === 0) {
+    return { ok: false, error: `No sensei found matching ${names.length === 1 ? `"${names[0]}"` : "any of those names"}.` };
+  }
+  const senseiIds = senseis.map((s) => s.id);
 
-  const { data: participants } = await supabase
+  const { data: participantsData } = await supabase
     .from("participants")
     .select("id, full_name")
     .in("sensei_id", senseiIds)
-    .limit(500);
-  if (!participants || participants.length === 0) {
-    return { ok: false, error: `No participants found under a sensei matching "${name}".` };
+    .limit(2000);
+  if (!participantsData || participantsData.length === 0) {
+    return { ok: false, error: `No participants found under a sensei matching ${names.length === 1 ? `"${names[0]}"` : "those names"}.` };
   }
-  const participantIds = participants.map((p) => p.id as string);
-  const nameById = new Map(participants.map((p) => [p.id as string, p.full_name as string]));
+  const participantIds = participantsData.map((p) => p.id as string);
+  const nameById = new Map(participantsData.map((p) => [p.id as string, p.full_name as string]));
 
   const matches = await participantTraceMatches(supabase, participantIds, nameById);
   if (matches.length === 0) {
-    return { ok: false, error: `No category registrations found for participants under a sensei matching "${name}".` };
+    return {
+      ok: false,
+      error: `No category registrations found for participants under a sensei matching ${names.length === 1 ? `"${names[0]}"` : "those names"}.`,
+    };
   }
   return { ok: true, matches };
 }

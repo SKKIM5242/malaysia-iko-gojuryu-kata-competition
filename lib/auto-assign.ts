@@ -11,9 +11,12 @@ export interface AutoAssignOutcome {
  * Fills judge slots (up to the competition's judges_required) for exactly
  * the given videos, picking the least-loaded eligible referee each time —
  * eligible meaning approved with a linked login, whose kata_families
- * (empty = every family) includes the video's family, and who isn't
- * excluded from the video's exact category (see referee_category_exclusions,
- * migration 0124). "Least-loaded" is measured across every video in the
+ * (empty = every family) includes the video's family, whose optional
+ * per-family belt-group narrowing (kata_family_belt_groups, migration
+ * 0127 — empty for a given family means every belt within it) covers the
+ * video's belt group, and who isn't excluded from the video's exact
+ * category (see referee_category_exclusions, migration 0124). "Least-loaded"
+ * is measured across every video in the
  * competition, not just the ones passed in here, so a single
  * just-submitted video and a full manual catch-up run balance load the
  * same way. Existing assignments are left alone — this only fills gaps.
@@ -68,26 +71,33 @@ export async function autoAssignForVideos(
   const distinctCategoryIds = [...new Set([...categoryIdByVideo.values()].filter((id): id is string => !!id))];
   const { data: videoCategories } =
     distinctCategoryIds.length > 0
-      ? await supabase.from("categories").select("id, name").in("id", distinctCategoryIds)
-      : { data: [] as Array<{ id: string; name: string }> };
+      ? await supabase.from("categories").select("id, name, belt_group").in("id", distinctCategoryIds)
+      : { data: [] as Array<{ id: string; name: string; belt_group: string | null }> };
   const familyByCategoryId = new Map(
     (videoCategories ?? []).map((c) => [c.id as string, kataFamilyOf(kataBaseOf(c.name as string))]),
+  );
+  const beltGroupByCategoryId = new Map(
+    (videoCategories ?? []).map((c) => [c.id as string, c.belt_group as string | null]),
   );
 
   const { data: referees } = await supabase
     .from("referees")
-    .select("id, user_id, kata_families")
+    .select("id, user_id, kata_families, kata_family_belt_groups")
     .eq("status", "approved")
     .not("user_id", "is", null);
   const refereeIds = [...new Set((referees ?? []).map((r) => r.user_id as string))];
   if (refereeIds.length === 0) return [];
 
   const familiesByUser = new Map<string, Set<string>>();
+  const beltNarrowingByUser = new Map<string, Set<string>>();
   for (const r of referees ?? []) {
     const uid = r.user_id as string;
     const fams = familiesByUser.get(uid) ?? new Set<string>();
     for (const f of (r.kata_families as string[] | null) ?? []) fams.add(f);
     familiesByUser.set(uid, fams);
+    const narrowing = beltNarrowingByUser.get(uid) ?? new Set<string>();
+    for (const token of (r.kata_family_belt_groups as string[] | null) ?? []) narrowing.add(token);
+    beltNarrowingByUser.set(uid, narrowing);
   }
   const refereeRowIds = (referees ?? []).map((r) => r.id as string);
   const { data: exclusionsData } =
@@ -128,11 +138,21 @@ export async function autoAssignForVideos(
     let slotsLeft = needed - already.size;
     const videoCategoryId = categoryIdByVideo.get(videoId) ?? null;
     const videoFamily = videoCategoryId ? (familyByCategoryId.get(videoCategoryId) ?? null) : null;
+    const videoBeltGroup = videoCategoryId ? (beltGroupByCategoryId.get(videoCategoryId) ?? null) : null;
     while (slotsLeft > 0) {
       const eligible = refereeIds.filter((id) => {
         if (already.has(id)) return false;
         const fams = familiesByUser.get(id);
         if (fams && fams.size > 0 && videoFamily && !fams.has(videoFamily)) return false;
+        if (videoFamily && videoBeltGroup) {
+          const narrowing = beltNarrowingByUser.get(id);
+          const narrowingForFamily = narrowing
+            ? [...narrowing].filter((t) => t.startsWith(`${videoFamily}:`))
+            : [];
+          if (narrowingForFamily.length > 0 && !narrowingForFamily.includes(`${videoFamily}:${videoBeltGroup}`)) {
+            return false;
+          }
+        }
         const excluded = excludedCategoriesByUser.get(id);
         if (excluded && videoCategoryId && excluded.has(videoCategoryId)) return false;
         return true;

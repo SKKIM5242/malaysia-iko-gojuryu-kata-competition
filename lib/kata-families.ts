@@ -1,5 +1,6 @@
 import type { Category } from "@/lib/types";
 import { kataBaseOf, groupByKata } from "@/lib/division";
+import { KATA_FAMILY_BELT_GROUP_OPTIONS } from "@/lib/reference-data";
 
 /** The organizer's own grouping of the 24 kata events, independent of the
  * belt/age/gender sub-categorisation each one is further split into.
@@ -118,4 +119,33 @@ export function adjacentKataOf(kataBaseName: string, direction: "above" | "below
   if (!neighbor) return null;
   if (neighbor.family !== CANONICAL_KATA_ORDER[rank].family) return null;
   return neighbor.name;
+}
+
+const BELT_LABEL_BY_KEY = new Map<string, string>(
+  KATA_FAMILY_BELT_GROUP_OPTIONS.map((o) => [o.key, o.label]),
+);
+
+/** Human-readable summary of a judge's kata_families + optional per-family
+ * belt-group narrowing (kata_family_belt_groups, migration 0127) -- e.g.
+ * "Elementary (Color/Kyu Belt), Mastery". Used where there's room for a
+ * checkbox grid to edit these directly (e.g. the Judges page), only a
+ * compact read-only summary is wanted (e.g. the Judging page's Workload
+ * table). An empty families list reads as "All families" -- today's
+ * unrestricted default; a family with no narrowing tokens reads bare
+ * (unrestricted-by-belt within that family). */
+export function describeKataFamilies(
+  kataFamilies: string[] | null | undefined,
+  beltGroups: string[] | null | undefined,
+): string {
+  const families = kataFamilies ?? [];
+  if (families.length === 0) return "All families";
+  const tokens = beltGroups ?? [];
+  return families
+    .map((f) => {
+      const narrowLabels = tokens
+        .filter((t) => t.startsWith(`${f}:`))
+        .map((t) => BELT_LABEL_BY_KEY.get(t.split(":")[1]) ?? t.split(":")[1]);
+      return narrowLabels.length > 0 ? `${f} (${narrowLabels.join(", ")})` : f;
+    })
+    .join(", ");
 }

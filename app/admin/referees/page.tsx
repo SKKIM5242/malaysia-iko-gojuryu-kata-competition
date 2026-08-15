@@ -30,7 +30,9 @@ import { REFEREE_DEPOSIT_USD } from "@/lib/payments";
 import { NoCommaInput } from "@/components/NoCommaAddressField";
 import DateOfBirthField from "@/components/DateOfBirthField";
 
-import { REFERRAL_LABEL, REFERRAL_PLACEHOLDER, REFEREE_TITLE_OPTIONS } from "@/lib/reference-data";
+import {
+  REFERRAL_LABEL, REFERRAL_PLACEHOLDER, REFEREE_TITLE_OPTIONS, KATA_FAMILY_BELT_GROUP_OPTIONS,
+} from "@/lib/reference-data";
 import DateField from "@/components/DateField";
 
 export const dynamic = "force-dynamic";
@@ -40,6 +42,7 @@ interface Referee {
   gender: string | null; karate_rank: string | null; judge_title: string | null;
   judging_experience_count: number | null;
   kata_families: string[] | null;
+  kata_family_belt_groups: string[] | null;
   school: string | null;
   email: string | null; phone: string | null; home_address: string | null;
   city_town: string | null; postcode: string | null; home_country: string | null;
@@ -430,19 +433,34 @@ export default async function AdminReferees({
                 </p>
                 <p className="mt-1 text-xs text-neutral-400">
                   Leave all unchecked to keep this judge eligible for every family (today&apos;s default) —
-                  check specific families to narrow which recordings auto-assign can give them.
+                  check specific families to narrow which recordings auto-assign can give them. Within a
+                  checked family, leave its 3 belt options unchecked to cover every belt, or tick specific
+                  ones (e.g. Color/Kyu Belt only) to narrow further.
                 </p>
                 <form action={saveRefereeKataFamilies} className="mt-2 space-y-2">
                   <input type="hidden" name="id" value={editing.id} />
-                  <div className="flex flex-wrap gap-3">
+                  <div className="space-y-2">
                     {KATA_FAMILIES.map((f) => (
-                      <label key={f} className="flex items-center gap-1.5 text-sm">
-                        <input
-                          type="checkbox" name="kata_families" value={f}
-                          defaultChecked={(editing.kata_families ?? []).includes(f)}
-                        />
-                        {f}
-                      </label>
+                      <div key={f} className="rounded border border-neutral-200 bg-white p-2">
+                        <label className="flex items-center gap-1.5 text-sm font-medium">
+                          <input
+                            type="checkbox" name="kata_families" value={f}
+                            defaultChecked={(editing.kata_families ?? []).includes(f)}
+                          />
+                          {f}
+                        </label>
+                        <div className="mt-1 ml-5 flex flex-wrap gap-3">
+                          {KATA_FAMILY_BELT_GROUP_OPTIONS.map((b) => (
+                            <label key={b.key} className="flex items-center gap-1 text-xs text-neutral-500">
+                              <input
+                                type="checkbox" name="kata_family_belt_groups" value={`${f}:${b.key}`}
+                                defaultChecked={(editing.kata_family_belt_groups ?? []).includes(`${f}:${b.key}`)}
+                              />
+                              {b.label}
+                            </label>
+                          ))}
+                        </div>
+                      </div>
                     ))}
                   </div>
                   <button type="submit" className={adminBtnSecondary}>Save kata families</button>
