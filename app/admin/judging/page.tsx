@@ -440,7 +440,7 @@ export default async function AdminJudging({
                   defaultValue=""
                   className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm"
                 >
-                  <option value="" disabled>Add referee… (slot {slot + 1})</option>
+                  <option value="" disabled>Add Judge… (slot {slot + 1})</option>
                   {available.map((r) => (
                     <option key={r.user_id} value={r.user_id}>
                       {r.full_name || r.email || r.user_id.slice(0, 8)}{r.country ? ` (${r.country})` : ""}

@@ -11,7 +11,7 @@ import {
 import { adminBtn, adminBtnSecondary, adminInput, adminLabel } from "@/components/admin-styles";
 import { shortTierName } from "@/lib/invitation-codes";
 
-const BELT_LABELS: Record<string, string> = { kyu: "Color/Kyu Belt", dan: "Black Belt & Dan" };
+const BELT_LABELS: Record<string, string> = { kyu: "Color/Kyu Belt", dan: "Black Belt & Dan", open: "Open" };
 const traceInitial: TraceParticipantState = { ok: false };
 
 interface ExistingExclusion {

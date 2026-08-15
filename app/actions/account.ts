@@ -447,6 +447,25 @@ export async function submitKataVideo(
   if (!path.startsWith(`${user.id}/`)) {
     return { ok: false, error: "Invalid recording reference." };
   }
+  const admin = createAdminClient();
+
+  // A storage .upload() with no error does not guarantee a non-empty file —
+  // an interrupted recording (MediaRecorder handed back a 0-byte Blob before
+  // this ever reached the client-side upload) still uploads "successfully"
+  // as an empty object, and would otherwise be accepted here and silently
+  // hand judges an empty recording to score. Checked via the admin client
+  // against real storage metadata rather than trusting anything the client
+  // claims about its own upload.
+  const folder = path.split("/").slice(0, -1).join("/");
+  const filename = path.split("/").pop() ?? "";
+  const { data: listing } = await admin.storage.from("kata-videos").list(folder, { search: filename });
+  const uploadedSize = listing?.find((f) => f.name === filename)?.metadata?.size ?? 0;
+  if (uploadedSize < 1024) {
+    return {
+      ok: false,
+      error: "Your recording failed to upload properly (the file came through empty). Please try recording and submitting again.",
+    };
+  }
   const { data: profile } = await supabase
     .from("profiles")
     .select("registration_id, participant_id")
@@ -551,7 +570,6 @@ export async function submitKataVideo(
   // submission itself, which already succeeded.
   if (reg?.competition_id) {
     try {
-      const admin = createAdminClient();
       const newAssignments = await autoAssignForVideos(reg.competition_id, [inserted.id], (videoId, refereeUserId) =>
         admin.rpc("system_assign_referee", { p_video: videoId, p_referee: refereeUserId }),
       );

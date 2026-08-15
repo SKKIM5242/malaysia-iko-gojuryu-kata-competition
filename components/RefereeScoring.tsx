@@ -139,11 +139,11 @@ export function RubricTable({
   );
 
   const baseColumns = [
-    { key: "no", label: "No.", width: 40 },
-    { key: "criteria", label: "Criteria", width: 220 },
-    ...DEDUCTION_OPTIONS.map((opt, i) => ({ key: `ded${i}`, label: opt.label, width: 64, amount: opt.amount })),
-    { key: "score_range", label: "Score", width: 70 },
-    { key: "your_score", label: readOnly ? "Points" : "Your score", width: 100 },
+    { key: "no", label: "No.", width: 34 },
+    { key: "criteria", label: "Criteria", width: 125 },
+    ...DEDUCTION_OPTIONS.map((opt, i) => ({ key: `ded${i}`, label: opt.label, width: 48, amount: opt.amount })),
+    { key: "score_range", label: "Score", width: 46 },
+    { key: "your_score", label: readOnly ? "Points" : "Your score", width: 78 },
   ];
   const orderedColumns = readOnly ? baseColumns : t.orderColumnKeys(baseColumns.map((c) => c.key)).map((k) => baseColumns.find((c) => c.key === k)!).filter(Boolean);
   const orderedRows = readOnly ? rubric : t.orderRowKeys(rubric.map(rowKey)).map((k) => rubric.find((c) => rowKey(c) === k)).filter((c): c is RubricCriterion => !!c);
@@ -225,7 +225,7 @@ export function RubricTable({
         onChange={(e) => onChange?.(i, e.target.value)}
         onFocus={() => t.selectCell(rk, "your_score")}
         onContextMenu={t.getContextMenuHandler(String(values[i] ?? 0))}
-        className="w-20 rounded-md border border-neutral-300 px-2 py-1 text-sm"
+        className="w-16 rounded-md border border-neutral-300 px-1.5 py-1 text-sm"
       />
     );
   }

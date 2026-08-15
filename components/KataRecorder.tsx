@@ -1449,6 +1449,13 @@ export default function KataRecorder({
   async function handleSubmit() {
     const blob = recordedBlobRef.current;
     if (!blob) return;
+    if (blob.size < 1024) {
+      // A near-empty Blob (MediaRecorder handed back nothing usable) would
+      // otherwise upload "successfully" — no storage error — and only be
+      // caught later server-side, after already occupying a judge's slot.
+      setError("This recording came out empty. Please record again before submitting.");
+      return;
+    }
     setPhase("uploading");
     setError(null);
     try {

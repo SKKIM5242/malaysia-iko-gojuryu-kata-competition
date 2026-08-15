@@ -100,7 +100,7 @@ export function resolveCategory(
   const match = categories.find(
     (c) =>
       kataBaseOf(c.name) === kataBase &&
-      c.belt_group === grp &&
+      (c.belt_group === grp || c.belt_group === "open") &&
       c.gender === genderVal &&
       c.age_min != null &&
       c.age_max != null &&

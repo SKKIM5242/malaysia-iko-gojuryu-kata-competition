@@ -435,7 +435,10 @@ export default async function AdminReferees({
                   Leave all unchecked to keep this judge eligible for every family (today&apos;s default) —
                   check specific families to narrow which recordings auto-assign can give them. Within a
                   checked family, leave its 3 belt options unchecked to cover every belt, or tick specific
-                  ones (e.g. Color/Kyu Belt only) to narrow further.
+                  ones (e.g. Color/Kyu Belt only) to narrow further. Open means the merged Color/Kyu Belt +
+                  Black Belt & Dan Holders category on the Kata Categories page — ticking only Open makes
+                  this judge eligible for merged categories in that family alone, not the separate
+                  Color/Kyu Belt or Black Belt & Dan Holders ones.
                 </p>
                 <form action={saveRefereeKataFamilies} className="mt-2 space-y-2">
                   <input type="hidden" name="id" value={editing.id} />

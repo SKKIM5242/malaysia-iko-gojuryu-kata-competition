@@ -785,9 +785,8 @@ export default async function AdminCompetitions({
                 </div>
                 <div>
                   <label htmlFor="belt_group" className={adminLabel}>Belt group</label>
-                  <select id="belt_group" name="belt_group" defaultValue={editingCategory?.belt_group ?? ""} className={adminInput}>
-                    <option value="">Any</option>
-                    <option value="open">Open (divisions auto-split Color/Kyu Belt and Black Belt & Dan Holders)</option>
+                  <select id="belt_group" name="belt_group" defaultValue={editingCategory?.belt_group || "open"} className={adminInput}>
+                    <option value="open">Open (Merge of Color/Kyu Belt & Black Belt & Dan Holder)</option>
                     <option value="kyu">Color/Kyu Belt</option>
                     <option value="dan">Black Belt & Dan Holders</option>
                   </select>

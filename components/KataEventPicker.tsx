@@ -76,7 +76,7 @@ export default function KataEventPicker({
       const age = ageAt(dateOfBirth, c.event_date);
       const matching = categories.filter(
         (cat) =>
-          cat.belt_group === grp &&
+          (cat.belt_group === grp || cat.belt_group === "open") &&
           cat.gender === genderVal &&
           cat.age_min != null &&
           cat.age_max != null &&
