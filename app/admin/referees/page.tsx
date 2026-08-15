@@ -5,8 +5,11 @@ import { getAllCompetitions } from "@/lib/admin-data";
 import {
   updateCommunityStatus, saveReferee, deleteReferee, linkRefereeAccount, bulkUploadReferees,
   saveAutoAssignTerm, deleteAutoAssignTerm, bulkUploadAutoAssignTerms, generateRecordInvitationCode,
-  linkRefereeToAccount, unlinkRefereeFromAccount,
+  linkRefereeToAccount, unlinkRefereeFromAccount, saveRefereeKataFamilies,
 } from "@/app/actions/admin";
+import { KATA_FAMILIES } from "@/lib/kata-families";
+import type { Category } from "@/lib/types";
+import RefereeExclusionsPanel from "@/components/RefereeExclusionsPanel";
 import { AdminShell, Card, CertificateField, adminBtn, adminBtnSecondary, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice, formatDOB } from "@/components/ui";
 import { shortTierName } from "@/lib/invitation-codes";
@@ -36,6 +39,7 @@ interface Referee {
   id: string; full_name: string; ic_passport: string; date_of_birth: string | null;
   gender: string | null; karate_rank: string | null; judge_title: string | null;
   judging_experience_count: number | null;
+  kata_families: string[] | null;
   school: string | null;
   email: string | null; phone: string | null; home_address: string | null;
   city_town: string | null; postcode: string | null; home_country: string | null;
@@ -110,6 +114,23 @@ export default async function AdminReferees({
   const isAdminTier = ["admin", "organizer", "staff"].includes(myProfile?.role ?? "");
   const canBulkUpload = ["admin", "organizer"].includes(myProfile?.role ?? "");
   const canManageLink = ["admin", "organizer", "staff", "customer_support", "referee"].includes(myProfile?.role ?? "");
+
+  // Only fetched for the judge actually being edited — the exclusion
+  // picker's cascading Tier/Kata/Belt/Gender/Age dropdowns are the only
+  // thing that needs the full (~900-row) category set across all 3 tiers.
+  const { data: categoriesData } = editing && isAdminTier
+    ? await supabase.from("categories").select("*")
+    : { data: [] as Category[] };
+  const categoriesList = (categoriesData as Category[]) ?? [];
+  const categoryNameById = new Map(categoriesList.map((c) => [c.id, c.name]));
+  const { data: exclusionsData } = editing && isAdminTier
+    ? await supabase.from("referee_category_exclusions").select("id, category_id").eq("referee_id", editing.id)
+    : { data: [] as Array<{ id: string; category_id: string }> };
+  const existingExclusions = (exclusionsData ?? []).map((e) => ({
+    id: e.id as string,
+    categoryId: e.category_id as string,
+    categoryName: categoryNameById.get(e.category_id as string) ?? "(unknown category)",
+  }));
 
   const competitions = await getAllCompetitions();
   const refereeUserIds = refereeList.map((r) => r.user_id).filter((id): id is string => !!id);
@@ -399,6 +420,42 @@ export default async function AdminReferees({
                   </form>
                 </>
               )}
+            </div>
+          )}
+          {editing && isAdminTier && (
+            <div className="mt-4 space-y-4 rounded-md border border-neutral-200 bg-neutral-50 p-3">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-neutral-500">
+                  Kata families this judge covers
+                </p>
+                <p className="mt-1 text-xs text-neutral-400">
+                  Leave all unchecked to keep this judge eligible for every family (today&apos;s default) —
+                  check specific families to narrow which recordings auto-assign can give them.
+                </p>
+                <form action={saveRefereeKataFamilies} className="mt-2 space-y-2">
+                  <input type="hidden" name="id" value={editing.id} />
+                  <div className="flex flex-wrap gap-3">
+                    {KATA_FAMILIES.map((f) => (
+                      <label key={f} className="flex items-center gap-1.5 text-sm">
+                        <input
+                          type="checkbox" name="kata_families" value={f}
+                          defaultChecked={(editing.kata_families ?? []).includes(f)}
+                        />
+                        {f}
+                      </label>
+                    ))}
+                  </div>
+                  <button type="submit" className={adminBtnSecondary}>Save kata families</button>
+                </form>
+              </div>
+              <div className="border-t border-neutral-200 pt-4">
+                <RefereeExclusionsPanel
+                  refereeId={editing.id}
+                  categories={categoriesList}
+                  competitions={competitions.map((c) => ({ id: c.id, name: c.name }))}
+                  existingExclusions={existingExclusions}
+                />
+              </div>
             </div>
           )}
         </div>

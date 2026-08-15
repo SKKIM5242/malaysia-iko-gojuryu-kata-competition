@@ -8,7 +8,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { writeAudit } from "@/lib/audit";
 import { headers } from "next/headers";
 import { kataBaseOf, groupByKata, ageAt, resolveCategory, AGE_BRACKETS } from "@/lib/division";
-import { KATA_FAMILIES, categoriesInFamily, adjacentKataOf, type KataFamily } from "@/lib/kata-families";
+import { KATA_FAMILIES, categoriesInFamily, adjacentKataOf, kataFamilyOf, type KataFamily } from "@/lib/kata-families";
 import { WATERMARK_DIRECTIONS } from "@/lib/watermark";
 import {
   logCategoryMerge, snapshotRegistrationCategories, undoLastCategoryMerge,
@@ -25,7 +25,7 @@ import {
 import { applySubscriptionRenewalTerms } from "@/lib/finalize";
 import type { PaymentStatus, Category } from "@/lib/types";
 import { parseCsvWithHeader, parseDDMMYYYY, type CsvUploadResult } from "@/lib/csv-bulk";
-import { PROFILE_ROLE_KEYS } from "@/lib/reference-data";
+import { PROFILE_ROLE_KEYS, MAX_REFEREE_EXCLUSIONS } from "@/lib/reference-data";
 import { normalizeIban } from "@/lib/bank";
 import { codePrefix, nextSequentialCode, shortTierName } from "@/lib/invitation-codes";
 import { listTelegramGroups, type TelegramCategory } from "@/lib/telegram";
@@ -186,6 +186,24 @@ async function requireJudgingManager(
   const role = await getActorRole(supabase, actorId);
   if (!["admin", "organizer", "staff", "referee"].includes(role ?? "")) {
     backTo(returnTo, { error: "Only Admin / Organizer or a Judge can configure judging." });
+  }
+}
+
+/** A judge's kata-family eligibility and conflict-of-interest exclusions are
+ * organizer-configured, not self-service — unlike requireJudgingManager
+ * above (and requireCommunityManager, which the rest of /admin/referees
+ * uses), this deliberately excludes the "referee" role itself. The whole
+ * point of an exclusion list is a restriction a judge can't lift by editing
+ * their own — or a colleague's — record. Mirrors is_admin() at the RLS
+ * layer on referee_category_exclusions (see migration 0124). */
+async function requireRefereeConfigManager(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  actorId: string | null,
+  returnTo: string,
+) {
+  const role = await getActorRole(supabase, actorId);
+  if (!["admin", "organizer", "staff"].includes(role ?? "")) {
+    backTo(returnTo, { error: "Only Admin / Organizer can configure a judge's kata families or exclusions." });
   }
 }
 
@@ -2659,6 +2677,146 @@ export async function deleteReferee(formData: FormData) {
   backTo(returnTo, { ok: "Judge deleted." });
 }
 
+/** Which of the 5 kata families (see lib/kata-families.ts) a judge is
+ * eligible to be assigned into — feeds autoAssignReferees' eligible pool. */
+export async function saveRefereeKataFamilies(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const returnTo = id ? `/admin/referees?editref=${id}` : "/admin/referees";
+  if (!id) backTo("/admin/referees", { error: "Missing judge." });
+  const families = formData.getAll("kata_families").map(String)
+    .filter((f) => (KATA_FAMILIES as readonly string[]).includes(f));
+  const { supabase, actorId } = await getActor();
+  await requireRefereeConfigManager(supabase, actorId, returnTo);
+
+  const { data: before } = await supabase.from("referees").select("kata_families").eq("id", id).maybeSingle();
+  const { error } = await supabase.from("referees").update({ kata_families: families }).eq("id", id);
+  if (error) backTo(returnTo, { error: "Could not update kata families." });
+  await writeAudit(supabase, {
+    table_name: "referees", record_id: id, action: "referee_kata_families_updated",
+    old_value: before, new_value: { kata_families: families }, actor_id: actorId,
+  });
+  backTo(returnTo, { ok: "Kata families updated." });
+}
+
+/** Adds one conflict-of-interest exclusion (a specific kata+belt+age+gender
+ * category, capped at MAX_REFEREE_EXCLUSIONS) that autoAssignReferees and
+ * manual assignment must both treat this judge as ineligible for. */
+export async function addRefereeExclusion(formData: FormData) {
+  const refereeId = String(formData.get("referee_id") ?? "");
+  const categoryId = String(formData.get("category_id") ?? "");
+  const returnTo = refereeId ? `/admin/referees?editref=${refereeId}` : "/admin/referees";
+  if (!refereeId) backTo("/admin/referees", { error: "Missing judge." });
+  if (!categoryId) backTo(returnTo, { error: "Select a kata, belt group, gender, and age group first." });
+  const { supabase, actorId } = await getActor();
+  await requireRefereeConfigManager(supabase, actorId, returnTo);
+
+  const { data: existingRows } = await supabase
+    .from("referee_category_exclusions")
+    .select("id, category_id")
+    .eq("referee_id", refereeId);
+  if ((existingRows ?? []).some((r) => r.category_id === categoryId)) {
+    backTo(returnTo, { error: "That exact category is already excluded for this judge." });
+  }
+  if ((existingRows ?? []).length >= MAX_REFEREE_EXCLUSIONS) {
+    backTo(returnTo, { error: `A judge can have at most ${MAX_REFEREE_EXCLUSIONS} exclusions — remove one first.` });
+  }
+
+  const { error } = await supabase
+    .from("referee_category_exclusions")
+    .insert({ referee_id: refereeId, category_id: categoryId });
+  if (error) backTo(returnTo, { error: "Could not add exclusion." });
+  await writeAudit(supabase, {
+    table_name: "referee_category_exclusions", record_id: refereeId,
+    action: "referee_exclusion_added", new_value: { category_id: categoryId }, actor_id: actorId,
+  });
+  backTo(returnTo, { ok: "Exclusion added." });
+}
+
+export async function removeRefereeExclusion(formData: FormData) {
+  const exclusionId = String(formData.get("exclusion_id") ?? "");
+  const refereeId = String(formData.get("referee_id") ?? "");
+  const returnTo = refereeId ? `/admin/referees?editref=${refereeId}` : "/admin/referees";
+  if (!exclusionId) backTo(returnTo, { error: "Missing exclusion." });
+  const { supabase, actorId } = await getActor();
+  await requireRefereeConfigManager(supabase, actorId, returnTo);
+  const { error } = await supabase.from("referee_category_exclusions").delete().eq("id", exclusionId);
+  if (error) backTo(returnTo, { error: "Could not remove exclusion." });
+  await writeAudit(supabase, {
+    table_name: "referee_category_exclusions", record_id: refereeId,
+    action: "referee_exclusion_removed", new_value: { exclusion_id: exclusionId }, actor_id: actorId,
+  });
+  backTo(returnTo, { ok: "Exclusion removed." });
+}
+
+export interface ParticipantTraceMatch {
+  registrationId: string;
+  participantName: string;
+  categoryId: string;
+  categoryName: string;
+}
+
+export interface TraceParticipantState {
+  ok: boolean;
+  error?: string;
+  matches?: ParticipantTraceMatch[];
+}
+
+/** Looks up a participant by name and returns every category registration
+ * found, so the exclusion form's Kata/Belt/Gender/Age dropdowns can be
+ * filled from a real registration instead of an admin re-typing a category
+ * by hand. Read-only, but gated the same as the mutations above since it's
+ * part of the same restricted form. */
+export async function traceParticipantForExclusion(
+  _prev: TraceParticipantState,
+  formData: FormData,
+): Promise<TraceParticipantState> {
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) return { ok: false, error: "Enter a participant name to search." };
+  const { supabase, actorId } = await getActor();
+  const role = await getActorRole(supabase, actorId);
+  if (!["admin", "organizer", "staff"].includes(role ?? "")) {
+    return { ok: false, error: "Only Admin / Organizer can trace a participant." };
+  }
+
+  const { data: participants } = await supabase
+    .from("participants")
+    .select("id, full_name")
+    .ilike("full_name", `%${name}%`)
+    .limit(25);
+  if (!participants || participants.length === 0) {
+    return { ok: false, error: `No participant found matching "${name}".` };
+  }
+  const participantIds = participants.map((p) => p.id as string);
+  const nameById = new Map(participants.map((p) => [p.id as string, p.full_name as string]));
+
+  const { data: regs } = await supabase
+    .from("registrations")
+    .select("id, participant_id, category_id")
+    .in("participant_id", participantIds)
+    .not("category_id", "is", null);
+  const categoryIds = [...new Set((regs ?? []).map((r) => r.category_id as string))];
+  if (categoryIds.length === 0) {
+    return {
+      ok: false,
+      error: `${participants.length === 1 ? nameById.get(participantIds[0]) : "That name"} has no category registration yet.`,
+    };
+  }
+
+  const { data: categories } = await supabase.from("categories").select("id, name").in("id", categoryIds);
+  const categoryNameById = new Map((categories ?? []).map((c) => [c.id as string, c.name as string]));
+
+  const matches: ParticipantTraceMatch[] = (regs ?? [])
+    .filter((r) => r.category_id && categoryNameById.has(r.category_id as string))
+    .map((r) => ({
+      registrationId: r.id as string,
+      participantName: nameById.get(r.participant_id as string) ?? "",
+      categoryId: r.category_id as string,
+      categoryName: categoryNameById.get(r.category_id as string) ?? "",
+    }));
+
+  return { ok: true, matches };
+}
+
 // ── Participants ─────────────────────────────────────────────────────────────
 
 export async function saveParticipant(formData: FormData) {
@@ -4295,27 +4453,67 @@ export async function autoAssignReferees(formData: FormData) {
   if (!competition) backTo(returnTo, { error: "Competition not found." });
   const needed = competition!.judges_required ?? 3;
 
-  const { data: regs } = await supabase.from("registrations").select("id").eq("competition_id", competitionId);
+  const { data: regs } = await supabase.from("registrations").select("id, category_id").eq("competition_id", competitionId);
   const regIds = (regs ?? []).map((r) => r.id as string);
+  const categoryIdByReg = new Map((regs ?? []).map((r) => [r.id as string, r.category_id as string | null]));
   const { data: videos } =
     regIds.length > 0
-      ? await supabase.from("kata_videos").select("id").in("registration_id", regIds)
-      : { data: [] as Array<{ id: string }> };
+      ? await supabase.from("kata_videos").select("id, registration_id").in("registration_id", regIds)
+      : { data: [] as Array<{ id: string; registration_id: string }> };
   const videoIds = (videos ?? []).map((v) => v.id as string);
   if (videoIds.length === 0) backTo(returnTo, { ok: "No recordings submitted yet for this competition." });
+
+  // Each video's kata family (for the eligibility check below) is derived
+  // the same way the rest of the app derives it — via its category's name
+  // — rather than stored directly, so it never drifts from kata-families.ts.
+  const categoryIdByVideo = new Map(
+    (videos ?? []).map((v) => [v.id as string, categoryIdByReg.get(v.registration_id as string) ?? null]),
+  );
+  const distinctCategoryIds = [...new Set([...categoryIdByVideo.values()].filter((id): id is string => !!id))];
+  const { data: videoCategories } =
+    distinctCategoryIds.length > 0
+      ? await supabase.from("categories").select("id, name").in("id", distinctCategoryIds)
+      : { data: [] as Array<{ id: string; name: string }> };
+  const familyByCategoryId = new Map(
+    (videoCategories ?? []).map((c) => [c.id as string, kataFamilyOf(kataBaseOf(c.name as string))]),
+  );
 
   // Eligible pool = the Referee page's directory (approved records) that
   // have a linked login — the same list the Referee Workload table shows —
   // so auto-assign and the workload view can never disagree about who is
-  // assignable.
+  // assignable. kata_families/exclusions (set on /admin/referees) then
+  // narrow that pool per video below — an empty kata_families list means
+  // "not yet configured", so it stays eligible for every family (unchanged
+  // behaviour for every referee nobody has deliberately restricted yet).
   const { data: referees } = await supabase
     .from("referees")
-    .select("user_id")
+    .select("id, user_id, kata_families")
     .eq("status", "approved")
     .not("user_id", "is", null);
   const refereeIds = [...new Set((referees ?? []).map((r) => r.user_id as string))];
   if (refereeIds.length === 0) {
     backTo(returnTo, { error: "No approved referees with a linked login yet — link accounts on the Referees page first." });
+  }
+  const familiesByUser = new Map<string, Set<string>>();
+  for (const r of referees ?? []) {
+    const uid = r.user_id as string;
+    const fams = familiesByUser.get(uid) ?? new Set<string>();
+    for (const f of (r.kata_families as string[] | null) ?? []) fams.add(f);
+    familiesByUser.set(uid, fams);
+  }
+  const refereeRowIds = (referees ?? []).map((r) => r.id as string);
+  const { data: exclusionsData } =
+    refereeRowIds.length > 0
+      ? await supabase.from("referee_category_exclusions").select("referee_id, category_id").in("referee_id", refereeRowIds)
+      : { data: [] as Array<{ referee_id: string; category_id: string }> };
+  const rowIdToUser = new Map((referees ?? []).map((r) => [r.id as string, r.user_id as string]));
+  const excludedCategoriesByUser = new Map<string, Set<string>>();
+  for (const e of exclusionsData ?? []) {
+    const uid = rowIdToUser.get(e.referee_id as string);
+    if (!uid) continue;
+    const set = excludedCategoriesByUser.get(uid) ?? new Set<string>();
+    set.add(e.category_id as string);
+    excludedCategoriesByUser.set(uid, set);
   }
 
   const { data: existing } = await supabase
@@ -4339,8 +4537,17 @@ export async function autoAssignReferees(formData: FormData) {
   for (const videoId of shuffledVideos) {
     const already = assignedByVideo.get(videoId) ?? new Set<string>();
     let slotsLeft = needed - already.size;
+    const videoCategoryId = categoryIdByVideo.get(videoId) ?? null;
+    const videoFamily = videoCategoryId ? (familyByCategoryId.get(videoCategoryId) ?? null) : null;
     while (slotsLeft > 0) {
-      const eligible = refereeIds.filter((id) => !already.has(id));
+      const eligible = refereeIds.filter((id) => {
+        if (already.has(id)) return false;
+        const fams = familiesByUser.get(id);
+        if (fams && fams.size > 0 && videoFamily && !fams.has(videoFamily)) return false;
+        const excluded = excludedCategoriesByUser.get(id);
+        if (excluded && videoCategoryId && excluded.has(videoCategoryId)) return false;
+        return true;
+      });
       if (eligible.length === 0) break;
       const minLoad = Math.min(...eligible.map((id) => loadByReferee.get(id) ?? 0));
       const candidates = eligible.filter((id) => (loadByReferee.get(id) ?? 0) === minLoad);

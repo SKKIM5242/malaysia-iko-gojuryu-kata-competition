@@ -144,6 +144,12 @@ export const REFEREE_TITLE_OPTIONS = [
   "Team Kata Judge",
 ] as const;
 
+/** Cap on how many category-level conflict-of-interest exclusions
+ * (referee_category_exclusions) one judge can hold — enforced in
+ * addRefereeExclusion, not the database, matching how other "up to N"
+ * limits in this app are application-layer rules rather than DB checks. */
+export const MAX_REFEREE_EXCLUSIONS = 3;
+
 /** Human label for a role key, for the Sign-in Access Matrix picker. */
 export const PROFILE_ROLE_KEY_LABELS: Record<ProfileRoleKey, string> = {
   participant: "Participant",
