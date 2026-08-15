@@ -106,6 +106,55 @@ export async function notifyRefereeAssignment(notice: AssignmentNotice): Promise
   await Promise.allSettled([sendAssignmentEmail(notice), sendAssignmentTelegram(notice)]);
 }
 
+/** Looks up what an assignment/unassignment notice for one video+referee
+ * needs to say — shared by the admin-triggered assign/auto-assign flows and
+ * the automatic per-submission auto-assign, so both produce identical
+ * notices. Uses the service-role client since this fires from best-effort
+ * background code, including from a plain participant's own submit action,
+ * which has no RLS visibility into another user's profile. */
+export async function refereeVideoNotice(
+  videoId: string,
+  refereeUserId: string,
+): Promise<AssignmentNotice> {
+  const admin = createAdminClient();
+  const [{ data: referee }, { data: video }] = await Promise.all([
+    admin
+      .from("profiles")
+      .select("full_name, email, telegram_chat_id")
+      .eq("user_id", refereeUserId)
+      .maybeSingle(),
+    admin
+      .from("kata_videos")
+      .select("participant:participants(full_name), registration:registrations(category:categories(name))")
+      .eq("id", videoId)
+      .maybeSingle(),
+  ]);
+  const v = video as unknown as {
+    participant: { full_name: string } | null;
+    registration: { category: { name: string } | null } | null;
+  } | null;
+  return {
+    refereeEmail: referee?.email ?? null,
+    refereeName: referee?.full_name ?? null,
+    refereeTelegramChatId: referee?.telegram_chat_id ?? null,
+    participantName: v?.participant?.full_name ?? "a participant",
+    categoryName: v?.registration?.category?.name ?? null,
+  };
+}
+
+/** Fetches what the notification needs and fires it off (best-effort —
+ * never throws, so a notification hiccup can't undo a successful
+ * assignment). Shared by assignRefereeToVideo, resendRefereeNotification,
+ * autoAssignReferees (app/actions/admin.ts), and submitKataVideo's
+ * automatic auto-assign (app/actions/account.ts). */
+export async function notifyVideoAssignment(videoId: string, refereeUserId: string): Promise<void> {
+  try {
+    await notifyRefereeAssignment(await refereeVideoNotice(videoId, refereeUserId));
+  } catch {
+    // Best-effort — assignment already succeeded regardless.
+  }
+}
+
 interface UnassignedNotice extends AssignmentNotice {
   /** Optional context appended to the notice, e.g. why an automatic
    * reassignment happened — omitted for a plain admin-initiated removal. */

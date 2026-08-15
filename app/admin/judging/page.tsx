@@ -572,16 +572,17 @@ export default async function AdminJudging({
       )}
 
       <div className="mb-3 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
-        <strong>How to use Auto-assign judges:</strong> &quot;Judges per recording&quot; is a saved
+        <strong>How Auto-assign judges works:</strong> &quot;Judges per recording&quot; is a saved
         setting per competition — set the number once and click Save; it stays in effect until you
-        change it again. Clicking <strong>Auto-assign judges</strong> is safe to click more than
-        once: each click only fills that competition&apos;s currently-empty judge slots up to the
-        saved target, and never touches an already-assigned judge or their score — so a 2nd or 3rd
-        click when everything is already full simply reports &quot;Every recording already has its
-        full panel of judges.&quot; It is <strong>not automatic</strong>, though — a newly-submitted
-        recording starts with 0 judges, and stays that way until someone clicks Auto-assign
-        judges again. You don&apos;t need to re-save Judges per recording each time, only click
-        Auto-assign judges whenever new recordings come in.
+        change it again. Every recording now fills its judge panel <strong>automatically</strong>,
+        the moment it&apos;s submitted — no click needed for the normal case. The{" "}
+        <strong>Auto-assign judges</strong> button below is a catch-up tool for whatever that
+        couldn&apos;t fill at submission time (no eligible judge yet for that recording&apos;s kata
+        family, everyone eligible already excluded, or a recording submitted before this went
+        live) — safe to click more than once: each click only fills currently-empty slots up to
+        the saved target, and never touches an already-assigned judge or their score, so a 2nd or
+        3rd click when everything is already full simply reports &quot;Every recording already has
+        its full panel of judges.&quot;
       </div>
 
       <h2 className="mb-1 text-lg font-bold">Auto-Assign Judges — Criteria</h2>

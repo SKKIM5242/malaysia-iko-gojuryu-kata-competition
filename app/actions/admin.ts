@@ -8,7 +8,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { writeAudit } from "@/lib/audit";
 import { headers } from "next/headers";
 import { kataBaseOf, groupByKata, ageAt, resolveCategory, AGE_BRACKETS } from "@/lib/division";
-import { KATA_FAMILIES, categoriesInFamily, adjacentKataOf, kataFamilyOf, type KataFamily } from "@/lib/kata-families";
+import { KATA_FAMILIES, categoriesInFamily, adjacentKataOf, type KataFamily } from "@/lib/kata-families";
 import { WATERMARK_DIRECTIONS } from "@/lib/watermark";
 import {
   logCategoryMerge, snapshotRegistrationCategories, undoLastCategoryMerge,
@@ -16,12 +16,14 @@ import {
 } from "@/lib/category-merge";
 import { getStripe, paymentsEnabled, REFEREE_DEPOSIT_USD, AUDIENCE_FEE_USD } from "@/lib/payments";
 import {
-  notifyRefereeAssignment, notifyRefereeUnassigned, sendConfirmationEmail, notifyAnnouncementPublished,
+  notifyRefereeUnassigned, sendConfirmationEmail, notifyAnnouncementPublished,
   notifyCertificatesPublished, competitionCertificateRecipients, notifyInvitationCodeIssued, notifyStatusChanged,
   notifyOrganizersBulkPaymentConfirmed, notifyOrganizersBulkTallyDone, notifySenseiBulkPaymentConfirmed,
   notifySenseiBulkCsvConfirmed, notifyOrganizersDirectoryBulkUpload, sendAdminTelegramDM,
   notifyParticipantEmailChanged, notifyTestimonialDeleted, sendStaffEmail, sendStaffTelegramDM,
+  refereeVideoNotice, notifyVideoAssignment,
 } from "@/lib/notify";
+import { autoAssignForVideos } from "@/lib/auto-assign";
 import { applySubscriptionRenewalTerms } from "@/lib/finalize";
 import type { PaymentStatus, Category } from "@/lib/types";
 import { parseCsvWithHeader, parseDDMMYYYY, type CsvUploadResult } from "@/lib/csv-bulk";
@@ -4292,62 +4294,13 @@ export async function toggleInvitationCode(formData: FormData) {
   backTo(returnTo, { ok: "Invitation code updated." });
 }
 
-/** Looks up what any referee/video notification needs — shared by both the
- * assignment and unassignment notices below. */
-async function refereeVideoNotice(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  videoId: string,
-  refereeUserId: string,
-) {
-  const [{ data: referee }, { data: video }] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("full_name, email, telegram_chat_id")
-      .eq("user_id", refereeUserId)
-      .maybeSingle(),
-    supabase
-      .from("kata_videos")
-      .select("participant:participants(full_name), registration:registrations(category:categories(name))")
-      .eq("id", videoId)
-      .maybeSingle(),
-  ]);
-  const v = video as unknown as {
-    participant: { full_name: string } | null;
-    registration: { category: { name: string } | null } | null;
-  } | null;
-  return {
-    refereeEmail: referee?.email ?? null,
-    refereeName: referee?.full_name ?? null,
-    refereeTelegramChatId: referee?.telegram_chat_id ?? null,
-    participantName: v?.participant?.full_name ?? "a participant",
-    categoryName: v?.registration?.category?.name ?? null,
-  };
-}
-
-/** Fetches what the notification needs and fires it off (best-effort — never
- * throws, so a notification hiccup can't undo a successful assignment). */
-async function notifyVideoAssignment(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  videoId: string,
-  refereeUserId: string,
-) {
+/** Same lookup as notifyVideoAssignment (now in lib/notify.ts), for the
+ * referee losing the assignment instead — fired by unassignRefereeFromVideo.
+ * Best-effort — never throws, so a notification hiccup can't undo a
+ * successful removal. */
+async function notifyVideoUnassignment(videoId: string, refereeUserId: string) {
   try {
-    await notifyRefereeAssignment(await refereeVideoNotice(supabase, videoId, refereeUserId));
-  } catch {
-    // Best-effort — assignment already succeeded regardless.
-  }
-}
-
-/** Same lookup as notifyVideoAssignment, for the referee losing the
- * assignment instead — fired by unassignRefereeFromVideo. Best-effort —
- * never throws, so a notification hiccup can't undo a successful removal. */
-async function notifyVideoUnassignment(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  videoId: string,
-  refereeUserId: string,
-) {
-  try {
-    await notifyRefereeUnassigned(await refereeVideoNotice(supabase, videoId, refereeUserId));
+    await notifyRefereeUnassigned(await refereeVideoNotice(videoId, refereeUserId));
   } catch {
     // Best-effort — removal already succeeded regardless.
   }
@@ -4366,7 +4319,7 @@ export async function assignRefereeToVideo(formData: FormData) {
     table_name: "referee_assignments", record_id: videoId,
     action: "referee_assigned", new_value: { referee_user_id: refereeUserId }, actor_id: actorId,
   });
-  await notifyVideoAssignment(supabase, videoId, refereeUserId);
+  await notifyVideoAssignment(videoId, refereeUserId);
   backTo(returnTo, { ok: "Referee assigned." });
 }
 
@@ -4380,7 +4333,7 @@ export async function resendRefereeNotification(formData: FormData) {
   const returnTo = String(formData.get("return_to") ?? "/admin/judging");
   if (!videoId || !refereeUserId) backTo(returnTo, { error: "Missing video or referee." });
   const { supabase } = await getActor();
-  await notifyVideoAssignment(supabase, videoId, refereeUserId);
+  await notifyVideoAssignment(videoId, refereeUserId);
   backTo(returnTo, { ok: "Notification sent." });
 }
 
@@ -4406,7 +4359,7 @@ export async function unassignRefereeFromVideo(formData: FormData) {
     table_name: "referee_assignments", record_id: videoId,
     action: "referee_unassigned", new_value: { referee_user_id: refereeUserId, forfeit: forfeitRaw }, actor_id: actorId,
   });
-  await notifyVideoUnassignment(supabase, videoId, refereeUserId);
+  await notifyVideoUnassignment(videoId, refereeUserId);
   backTo(returnTo, { ok: "Referee removed." });
 }
 
@@ -4433,10 +4386,17 @@ export async function setJudgesRequired(formData: FormData) {
 }
 
 /**
- * Tops up every under-assigned recording in a competition to its
- * judges_required target, picking the least-loaded eligible referee each
- * time (random tie-break) so workload stays roughly even across the panel.
- * Existing assignments are left alone — this only fills gaps.
+ * Catch-up tool: tops up every under-assigned recording in a competition to
+ * its judges_required target. Every recording submitted through
+ * submitKataVideo already gets this automatically the instant it's
+ * uploaded (see app/actions/account.ts) — this button exists for whatever
+ * that automatic pass couldn't fill at the time (no eligible referee yet,
+ * a recording submitted before auto-fire existed, or a slot opened up
+ * later by unassigning someone). Shares its eligibility/fill algorithm
+ * with the automatic path via lib/auto-assign.ts; only the actual
+ * assignment call differs — this one runs as the clicking admin/organizer/
+ * referee via assign_referee, which still enforces a referee may only
+ * assign themselves, exactly as before this was extracted.
  */
 export async function autoAssignReferees(formData: FormData) {
   const competitionId = String(formData.get("competition_id") ?? "");
@@ -4445,129 +4405,34 @@ export async function autoAssignReferees(formData: FormData) {
   const { supabase, actorId } = await getActor();
   await requireJudgingManager(supabase, actorId, returnTo);
 
-  const { data: competition } = await supabase
-    .from("competitions")
-    .select("id, judges_required")
-    .eq("id", competitionId)
-    .maybeSingle();
-  if (!competition) backTo(returnTo, { error: "Competition not found." });
-  const needed = competition!.judges_required ?? 3;
-
-  const { data: regs } = await supabase.from("registrations").select("id, category_id").eq("competition_id", competitionId);
+  const { data: regs } = await supabase.from("registrations").select("id").eq("competition_id", competitionId);
   const regIds = (regs ?? []).map((r) => r.id as string);
-  const categoryIdByReg = new Map((regs ?? []).map((r) => [r.id as string, r.category_id as string | null]));
   const { data: videos } =
     regIds.length > 0
-      ? await supabase.from("kata_videos").select("id, registration_id").in("registration_id", regIds)
-      : { data: [] as Array<{ id: string; registration_id: string }> };
+      ? await supabase.from("kata_videos").select("id").in("registration_id", regIds)
+      : { data: [] as Array<{ id: string }> };
   const videoIds = (videos ?? []).map((v) => v.id as string);
   if (videoIds.length === 0) backTo(returnTo, { ok: "No recordings submitted yet for this competition." });
 
-  // Each video's kata family (for the eligibility check below) is derived
-  // the same way the rest of the app derives it — via its category's name
-  // — rather than stored directly, so it never drifts from kata-families.ts.
-  const categoryIdByVideo = new Map(
-    (videos ?? []).map((v) => [v.id as string, categoryIdByReg.get(v.registration_id as string) ?? null]),
-  );
-  const distinctCategoryIds = [...new Set([...categoryIdByVideo.values()].filter((id): id is string => !!id))];
-  const { data: videoCategories } =
-    distinctCategoryIds.length > 0
-      ? await supabase.from("categories").select("id, name").in("id", distinctCategoryIds)
-      : { data: [] as Array<{ id: string; name: string }> };
-  const familyByCategoryId = new Map(
-    (videoCategories ?? []).map((c) => [c.id as string, kataFamilyOf(kataBaseOf(c.name as string))]),
-  );
-
-  // Eligible pool = the Referee page's directory (approved records) that
-  // have a linked login — the same list the Referee Workload table shows —
-  // so auto-assign and the workload view can never disagree about who is
-  // assignable. kata_families/exclusions (set on /admin/referees) then
-  // narrow that pool per video below — an empty kata_families list means
-  // "not yet configured", so it stays eligible for every family (unchanged
-  // behaviour for every referee nobody has deliberately restricted yet).
-  const { data: referees } = await supabase
+  const { data: anyReferees } = await supabase
     .from("referees")
-    .select("id, user_id, kata_families")
+    .select("user_id")
     .eq("status", "approved")
-    .not("user_id", "is", null);
-  const refereeIds = [...new Set((referees ?? []).map((r) => r.user_id as string))];
-  if (refereeIds.length === 0) {
+    .not("user_id", "is", null)
+    .limit(1);
+  if (!anyReferees || anyReferees.length === 0) {
     backTo(returnTo, { error: "No approved referees with a linked login yet — link accounts on the Referees page first." });
   }
-  const familiesByUser = new Map<string, Set<string>>();
-  for (const r of referees ?? []) {
-    const uid = r.user_id as string;
-    const fams = familiesByUser.get(uid) ?? new Set<string>();
-    for (const f of (r.kata_families as string[] | null) ?? []) fams.add(f);
-    familiesByUser.set(uid, fams);
-  }
-  const refereeRowIds = (referees ?? []).map((r) => r.id as string);
-  const { data: exclusionsData } =
-    refereeRowIds.length > 0
-      ? await supabase.from("referee_category_exclusions").select("referee_id, category_id").in("referee_id", refereeRowIds)
-      : { data: [] as Array<{ referee_id: string; category_id: string }> };
-  const rowIdToUser = new Map((referees ?? []).map((r) => [r.id as string, r.user_id as string]));
-  const excludedCategoriesByUser = new Map<string, Set<string>>();
-  for (const e of exclusionsData ?? []) {
-    const uid = rowIdToUser.get(e.referee_id as string);
-    if (!uid) continue;
-    const set = excludedCategoriesByUser.get(uid) ?? new Set<string>();
-    set.add(e.category_id as string);
-    excludedCategoriesByUser.set(uid, set);
-  }
 
-  const { data: existing } = await supabase
-    .from("referee_assignments")
-    .select("video_id, referee_user_id")
-    .in("video_id", videoIds);
-  const assignedByVideo = new Map<string, Set<string>>();
-  const loadByReferee = new Map<string, number>(refereeIds.map((id) => [id, 0]));
-  for (const a of existing ?? []) {
-    const set = assignedByVideo.get(a.video_id) ?? new Set<string>();
-    set.add(a.referee_user_id);
-    assignedByVideo.set(a.video_id, set);
-    loadByReferee.set(a.referee_user_id, (loadByReferee.get(a.referee_user_id) ?? 0) + 1);
-  }
+  const newAssignments = await autoAssignForVideos(competitionId, videoIds, (videoId, refereeUserId) =>
+    supabase.rpc("assign_referee", { p_video: videoId, p_referee: refereeUserId }),
+  );
 
-  // Randomise video order so a shortage of referees doesn't systematically
-  // starve whichever videos happen to sort last.
-  const shuffledVideos = [...videoIds].sort(() => Math.random() - 0.5);
-  const newAssignments: Array<{ videoId: string; refereeUserId: string }> = [];
-
-  for (const videoId of shuffledVideos) {
-    const already = assignedByVideo.get(videoId) ?? new Set<string>();
-    let slotsLeft = needed - already.size;
-    const videoCategoryId = categoryIdByVideo.get(videoId) ?? null;
-    const videoFamily = videoCategoryId ? (familyByCategoryId.get(videoCategoryId) ?? null) : null;
-    while (slotsLeft > 0) {
-      const eligible = refereeIds.filter((id) => {
-        if (already.has(id)) return false;
-        const fams = familiesByUser.get(id);
-        if (fams && fams.size > 0 && videoFamily && !fams.has(videoFamily)) return false;
-        const excluded = excludedCategoriesByUser.get(id);
-        if (excluded && videoCategoryId && excluded.has(videoCategoryId)) return false;
-        return true;
-      });
-      if (eligible.length === 0) break;
-      const minLoad = Math.min(...eligible.map((id) => loadByReferee.get(id) ?? 0));
-      const candidates = eligible.filter((id) => (loadByReferee.get(id) ?? 0) === minLoad);
-      const pick = candidates[Math.floor(Math.random() * candidates.length)];
-      const { error } = await supabase.rpc("assign_referee", { p_video: videoId, p_referee: pick });
-      if (!error) {
-        already.add(pick);
-        loadByReferee.set(pick, (loadByReferee.get(pick) ?? 0) + 1);
-        newAssignments.push({ videoId, refereeUserId: pick });
-      }
-      slotsLeft--;
-    }
-    assignedByVideo.set(videoId, already);
-  }
-
-  await Promise.all(newAssignments.map((a) => notifyVideoAssignment(supabase, a.videoId, a.refereeUserId)));
+  await Promise.all(newAssignments.map((a) => notifyVideoAssignment(a.videoId, a.refereeUserId)));
 
   await writeAudit(supabase, {
     table_name: "referee_assignments", record_id: null, action: "referees_auto_assigned",
-    new_value: { competition_id: competitionId, judges_required: needed, new_assignments: newAssignments.length },
+    new_value: { competition_id: competitionId, new_assignments: newAssignments.length },
     actor_id: actorId,
   });
   revalidatePath("/admin/judging");

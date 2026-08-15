@@ -7,7 +7,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { writeAudit } from "@/lib/audit";
 import { getStripe, paymentsEnabled } from "@/lib/payments";
-import { notifyParticipantScored } from "@/lib/notify";
+import { notifyParticipantScored, notifyVideoAssignment } from "@/lib/notify";
+import { autoAssignForVideos } from "@/lib/auto-assign";
 import { isWithinSignInQuota } from "@/lib/sign-in-quota";
 import { computeCategoryRankings } from "@/lib/winners-ranking";
 import { winnersRevealDate, winnersRevealDateFor, testimonialEditDeadline } from "@/lib/winners";
@@ -480,11 +481,12 @@ export async function submitKataVideo(
   // using their own correct local time is never wrongly rejected here.
   const { data: regRow } = await supabase
     .from("registrations")
-    .select("payment_status, competition:competitions(event_date, registration_deadline)")
+    .select("payment_status, competition_id, competition:competitions(event_date, registration_deadline)")
     .eq("id", registrationId)
     .maybeSingle();
   const reg = regRow as unknown as {
     payment_status: string;
+    competition_id: string | null;
     competition: { event_date: string | null; registration_deadline: string | null } | null;
   } | null;
 
@@ -516,13 +518,17 @@ export async function submitKataVideo(
     return { ok: false, error: "The recording window for your competition tier has closed." };
   }
 
-  const { error } = await supabase.from("kata_videos").insert({
-    registration_id: registrationId,
-    participant_id: participantId,
-    user_id: user.id,
-    storage_path: path,
-    mime,
-  });
+  const { data: inserted, error } = await supabase
+    .from("kata_videos")
+    .insert({
+      registration_id: registrationId,
+      participant_id: participantId,
+      user_id: user.id,
+      storage_path: path,
+      mime,
+    })
+    .select("id")
+    .single();
   if (error) {
     return { ok: false, error: "Could not submit — you may already have a submitted recording." };
   }
@@ -533,6 +539,28 @@ export async function submitKataVideo(
     new_value: { storage_path: path },
     actor_id: user.id,
   });
+
+  // Fill this recording's judge panel immediately, using the same
+  // family/exclusion-aware pool the admin "Auto-assign judges" button uses
+  // (see lib/auto-assign.ts) — an organizer no longer has to remember to
+  // click it after every single submission; that button becomes a catch-up
+  // tool for whatever this couldn't fill (no eligible referee yet, etc.).
+  // Runs via the service-role client + system_assign_referee (migration
+  // 0125), since this participant's own session has no judging permission
+  // to assign anyone. Best-effort — a failure here must never fail the
+  // submission itself, which already succeeded.
+  if (reg?.competition_id) {
+    try {
+      const admin = createAdminClient();
+      const newAssignments = await autoAssignForVideos(reg.competition_id, [inserted.id], (videoId, refereeUserId) =>
+        admin.rpc("system_assign_referee", { p_video: videoId, p_referee: refereeUserId }),
+      );
+      await Promise.all(newAssignments.map((a) => notifyVideoAssignment(a.videoId, a.refereeUserId)));
+    } catch {
+      // Best-effort — the catch-up button on /admin/judging covers this.
+    }
+  }
+
   revalidatePath("/account");
   return { ok: true };
 }
