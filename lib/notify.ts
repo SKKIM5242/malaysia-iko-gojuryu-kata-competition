@@ -1253,10 +1253,12 @@ export async function notifyParticipantEmailChanged(input: {
       sendEmail(
         oldEmail,
         subject,
-        `Hi,\n\nThe email address on ${participantName}'s Kata Competition registration was just changed ` +
-          `${who}, from this address (${oldEmail}) to ${newEmail ?? "(removed)"}.\n\n` +
-          `If you did not request this, please contact the organizer immediately — reply to this email or ` +
-          `reach out via Telegram.\n\n— Malaysia Open Virtual Karate-do Kata Competition`,
+        withStagingNotice(
+          `Hi,\n\nThe email address on ${participantName}'s Kata Competition registration was just changed ` +
+            `${who}, from this address (${oldEmail}) to ${newEmail ?? "(removed)"}.\n\n` +
+            `If you did not request this, please contact the organizer immediately — reply to this email or ` +
+            `reach out via Telegram.\n\n— Malaysia Open Virtual Karate-do Kata Competition`,
+        ),
       ),
     );
   }
@@ -1265,10 +1267,12 @@ export async function notifyParticipantEmailChanged(input: {
       sendEmail(
         newEmail,
         subject,
-        `Hi,\n\n${participantName}'s Kata Competition registration is now associated with this email address ` +
-          `(changed ${who}${oldEmail ? ` from ${oldEmail}` : ""}).\n\n` +
-          `If you did not request this, please contact the organizer immediately.\n\n` +
-          `Sign in to Kata Arena: ${appUrl()}/account\n\n— Malaysia Open Virtual Karate-do Kata Competition`,
+        withStagingNotice(
+          `Hi,\n\n${participantName}'s Kata Competition registration is now associated with this email address ` +
+            `(changed ${who}${oldEmail ? ` from ${oldEmail}` : ""}).\n\n` +
+            `If you did not request this, please contact the organizer immediately.\n\n` +
+            `Sign in to Kata Arena: ${appUrl()}/account\n\n— Malaysia Open Virtual Karate-do Kata Competition`,
+        ),
       ),
     );
   }
