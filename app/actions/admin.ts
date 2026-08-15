@@ -27,7 +27,7 @@ import { autoAssignForVideos } from "@/lib/auto-assign";
 import { applySubscriptionRenewalTerms } from "@/lib/finalize";
 import type { PaymentStatus, Category } from "@/lib/types";
 import { parseCsvWithHeader, parseDDMMYYYY, type CsvUploadResult } from "@/lib/csv-bulk";
-import { PROFILE_ROLE_KEYS, MAX_REFEREE_EXCLUSIONS } from "@/lib/reference-data";
+import { PROFILE_ROLE_KEYS } from "@/lib/reference-data";
 import { normalizeIban } from "@/lib/bank";
 import { codePrefix, nextSequentialCode, shortTierName } from "@/lib/invitation-codes";
 import { listTelegramGroups, type TelegramCategory } from "@/lib/telegram";
@@ -198,22 +198,33 @@ async function requireJudgingManager(
  * isChiefJudge does in app/admin/judging/page.tsx) gets the same access as
  * Admin/Organizer/Staff here, including editing their OWN row — a plain
  * (non-Chief) judge still gets none. Mirrors is_admin() OR is_chief_judge()
- * at the RLS layer on referee_category_exclusions (see migration 0126). */
-async function requireRefereeConfigManager(
+ * at the RLS layer on referee_category_exclusions (see migration 0126).
+ * Shared by the redirect-based mutations (via requireRefereeConfigManager
+ * below) and the state-returning trace actions (which can't redirect, so
+ * they call this directly). */
+async function canConfigureReferees(
   supabase: Awaited<ReturnType<typeof createClient>>,
   actorId: string | null,
-  returnTo: string,
-) {
+): Promise<boolean> {
   const role = await getActorRole(supabase, actorId);
-  if (["admin", "organizer", "staff"].includes(role ?? "")) return;
+  if (["admin", "organizer", "staff"].includes(role ?? "")) return true;
   if (role === "referee") {
     // .maybeSingle() would error out (not just miss) if this login owns more
     // than one referees row — e.g. a Sensei who is also independently
     // registered as a judge under a second record — so this checks every
     // row for a Chief title rather than assuming exactly one.
     const { data } = await supabase.from("referees").select("judge_title").eq("user_id", actorId);
-    if ((data ?? []).some((r) => /chief (referee|judge)/i.test(r.judge_title ?? ""))) return;
+    if ((data ?? []).some((r) => /chief (referee|judge)/i.test(r.judge_title ?? ""))) return true;
   }
+  return false;
+}
+
+async function requireRefereeConfigManager(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  actorId: string | null,
+  returnTo: string,
+) {
+  if (await canConfigureReferees(supabase, actorId)) return;
   backTo(returnTo, { error: "Only Admin / Organizer or a Chief Judge can configure a judge's kata families or exclusions." });
 }
 
@@ -2710,8 +2721,9 @@ export async function saveRefereeKataFamilies(formData: FormData) {
 }
 
 /** Adds one conflict-of-interest exclusion (a specific kata+belt+age+gender
- * category, capped at MAX_REFEREE_EXCLUSIONS) that autoAssignReferees and
- * manual assignment must both treat this judge as ineligible for. */
+ * category) that autoAssignReferees and manual assignment must both treat
+ * this judge as ineligible for. No cap — a judge can be excluded from as
+ * many categories as needed. */
 export async function addRefereeExclusion(formData: FormData) {
   const refereeId = String(formData.get("referee_id") ?? "");
   const categoryId = String(formData.get("category_id") ?? "");
@@ -2729,9 +2741,6 @@ export async function addRefereeExclusion(formData: FormData) {
   if ((existingRows ?? []).some((r) => r.category_id === categoryId)) {
     backTo(returnTo, { error: "That exact category is already excluded for this judge." });
   }
-  if ((existingRows ?? []).length >= MAX_REFEREE_EXCLUSIONS) {
-    backTo(returnTo, { error: `A judge can have at most ${MAX_REFEREE_EXCLUSIONS} exclusions — remove one first.` });
-  }
 
   const { error } = await supabase
     .from("referee_category_exclusions")
@@ -2742,6 +2751,45 @@ export async function addRefereeExclusion(formData: FormData) {
     action: "referee_exclusion_added", new_value: { category_id: categoryId }, actor_id: actorId,
   });
   backTo(returnTo, { ok: "Exclusion added." });
+}
+
+/** Bulk version of addRefereeExclusion, for the trace boxes' tick-several-
+ * then-add-once flow (a participant competing in several kata categories no
+ * longer has to be added one at a time). Silently skips any category_id
+ * already excluded for this judge rather than erroring the whole batch. */
+export async function addRefereeExclusions(formData: FormData) {
+  const refereeId = String(formData.get("referee_id") ?? "");
+  const categoryIds = [...new Set(formData.getAll("category_ids").map(String).filter(Boolean))];
+  const returnTo =
+    String(formData.get("return_to") ?? "") || (refereeId ? `/admin/referees?editref=${refereeId}` : "/admin/referees");
+  if (!refereeId) backTo("/admin/referees", { error: "Missing judge." });
+  if (categoryIds.length === 0) backTo(returnTo, { error: "Tick at least one category first." });
+  const { supabase, actorId } = await getActor();
+  await requireRefereeConfigManager(supabase, actorId, returnTo);
+
+  const { data: existingRows } = await supabase
+    .from("referee_category_exclusions")
+    .select("category_id")
+    .eq("referee_id", refereeId);
+  const existingIds = new Set((existingRows ?? []).map((r) => r.category_id as string));
+  const newIds = categoryIds.filter((id) => !existingIds.has(id));
+  if (newIds.length === 0) {
+    backTo(returnTo, { error: "Every ticked category is already excluded for this judge." });
+  }
+
+  const { error } = await supabase
+    .from("referee_category_exclusions")
+    .insert(newIds.map((category_id) => ({ referee_id: refereeId, category_id })));
+  if (error) backTo(returnTo, { error: "Could not add exclusions." });
+  await writeAudit(supabase, {
+    table_name: "referee_category_exclusions", record_id: refereeId,
+    action: "referee_exclusions_bulk_added", new_value: { category_ids: newIds }, actor_id: actorId,
+  });
+  const skipped = categoryIds.length - newIds.length;
+  backTo(returnTo, {
+    ok: `${newIds.length} exclusion${newIds.length === 1 ? "" : "s"} added` +
+      (skipped > 0 ? ` (${skipped} already excluded, skipped).` : "."),
+  });
 }
 
 export async function removeRefereeExclusion(formData: FormData) {
@@ -2774,10 +2822,40 @@ export interface TraceParticipantState {
   matches?: ParticipantTraceMatch[];
 }
 
+/** Every category registration for the given participants, shared by all 3
+ * trace-for-exclusion actions below — only HOW participantIds is resolved
+ * (by their own name, or via their school/sensei) differs between them. */
+async function participantTraceMatches(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  participantIds: string[],
+  nameById: Map<string, string>,
+): Promise<ParticipantTraceMatch[]> {
+  const { data: regs } = await supabase
+    .from("registrations")
+    .select("id, participant_id, category_id")
+    .in("participant_id", participantIds)
+    .not("category_id", "is", null);
+  const categoryIds = [...new Set((regs ?? []).map((r) => r.category_id as string))];
+  if (categoryIds.length === 0) return [];
+
+  const { data: categories } = await supabase.from("categories").select("id, name").in("id", categoryIds);
+  const categoryNameById = new Map((categories ?? []).map((c) => [c.id as string, c.name as string]));
+
+  return (regs ?? [])
+    .filter((r) => r.category_id && categoryNameById.has(r.category_id as string))
+    .map((r) => ({
+      registrationId: r.id as string,
+      participantName: nameById.get(r.participant_id as string) ?? "",
+      categoryId: r.category_id as string,
+      categoryName: categoryNameById.get(r.category_id as string) ?? "",
+    }));
+}
+
 /** Looks up a participant by name and returns every category registration
- * found, so the exclusion form's Kata/Belt/Gender/Age dropdowns can be
- * filled from a real registration instead of an admin re-typing a category
- * by hand. Read-only, but gated the same as the mutations above since it's
+ * found, so the exclusion form's dropdowns can be filled from a real
+ * registration instead of an admin re-typing a category by hand — or, with
+ * the trace box's tick boxes, several/all of them added as exclusions in
+ * one go. Read-only, but gated the same as the mutations above since it's
  * part of the same restricted form. */
 export async function traceParticipantForExclusion(
   _prev: TraceParticipantState,
@@ -2786,9 +2864,8 @@ export async function traceParticipantForExclusion(
   const name = String(formData.get("name") ?? "").trim();
   if (!name) return { ok: false, error: "Enter a participant name to search." };
   const { supabase, actorId } = await getActor();
-  const role = await getActorRole(supabase, actorId);
-  if (!["admin", "organizer", "staff"].includes(role ?? "")) {
-    return { ok: false, error: "Only Admin / Organizer can trace a participant." };
+  if (!(await canConfigureReferees(supabase, actorId))) {
+    return { ok: false, error: "Only Admin / Organizer or a Chief Judge can trace a participant." };
   }
 
   const { data: participants } = await supabase
@@ -2802,31 +2879,85 @@ export async function traceParticipantForExclusion(
   const participantIds = participants.map((p) => p.id as string);
   const nameById = new Map(participants.map((p) => [p.id as string, p.full_name as string]));
 
-  const { data: regs } = await supabase
-    .from("registrations")
-    .select("id, participant_id, category_id")
-    .in("participant_id", participantIds)
-    .not("category_id", "is", null);
-  const categoryIds = [...new Set((regs ?? []).map((r) => r.category_id as string))];
-  if (categoryIds.length === 0) {
+  const matches = await participantTraceMatches(supabase, participantIds, nameById);
+  if (matches.length === 0) {
     return {
       ok: false,
       error: `${participants.length === 1 ? nameById.get(participantIds[0]) : "That name"} has no category registration yet.`,
     };
   }
+  return { ok: true, matches };
+}
 
-  const { data: categories } = await supabase.from("categories").select("id, name").in("id", categoryIds);
-  const categoryNameById = new Map((categories ?? []).map((c) => [c.id as string, c.name as string]));
+/** Same as traceParticipantForExclusion, but searching by the participants'
+ * School / Dojo name instead — for excluding a judge from every category a
+ * whole school's roster competes in (e.g. the judge coaches there). */
+export async function traceSchoolForExclusion(
+  _prev: TraceParticipantState,
+  formData: FormData,
+): Promise<TraceParticipantState> {
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) return { ok: false, error: "Enter a school / dojo name to search." };
+  const { supabase, actorId } = await getActor();
+  if (!(await canConfigureReferees(supabase, actorId))) {
+    return { ok: false, error: "Only Admin / Organizer or a Chief Judge can trace a school." };
+  }
 
-  const matches: ParticipantTraceMatch[] = (regs ?? [])
-    .filter((r) => r.category_id && categoryNameById.has(r.category_id as string))
-    .map((r) => ({
-      registrationId: r.id as string,
-      participantName: nameById.get(r.participant_id as string) ?? "",
-      categoryId: r.category_id as string,
-      categoryName: categoryNameById.get(r.category_id as string) ?? "",
-    }));
+  const { data: schools } = await supabase.from("schools").select("id").ilike("name", `%${name}%`).limit(25);
+  if (!schools || schools.length === 0) return { ok: false, error: `No school found matching "${name}".` };
+  const schoolIds = schools.map((s) => s.id as string);
 
+  const { data: participants } = await supabase
+    .from("participants")
+    .select("id, full_name")
+    .in("school_id", schoolIds)
+    .limit(500);
+  if (!participants || participants.length === 0) {
+    return { ok: false, error: `No participants found under a school matching "${name}".` };
+  }
+  const participantIds = participants.map((p) => p.id as string);
+  const nameById = new Map(participants.map((p) => [p.id as string, p.full_name as string]));
+
+  const matches = await participantTraceMatches(supabase, participantIds, nameById);
+  if (matches.length === 0) {
+    return { ok: false, error: `No category registrations found for participants under a school matching "${name}".` };
+  }
+  return { ok: true, matches };
+}
+
+/** Same as traceParticipantForExclusion, but searching by the participants'
+ * Sensei name instead — for excluding a judge from every category their
+ * own sensei's students compete in. */
+export async function traceSenseiForExclusion(
+  _prev: TraceParticipantState,
+  formData: FormData,
+): Promise<TraceParticipantState> {
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) return { ok: false, error: "Enter a sensei name to search." };
+  const { supabase, actorId } = await getActor();
+  if (!(await canConfigureReferees(supabase, actorId))) {
+    return { ok: false, error: "Only Admin / Organizer or a Chief Judge can trace a sensei." };
+  }
+
+  const { data: senseis } = await supabase.from("senseis").select("id").ilike("name", `%${name}%`).limit(25);
+  if (!senseis || senseis.length === 0) return { ok: false, error: `No sensei found matching "${name}".` };
+  const senseiIds = senseis.map((s) => s.id as string);
+
+  const { data: participants } = await supabase
+    .from("participants")
+    .select("id, full_name")
+    .in("sensei_id", senseiIds)
+    .limit(500);
+  if (!participants || participants.length === 0) {
+    return { ok: false, error: `No participants found under a sensei matching "${name}".` };
+  }
+  const participantIds = participants.map((p) => p.id as string);
+  const nameById = new Map(participants.map((p) => [p.id as string, p.full_name as string]));
+
+  const matches = await participantTraceMatches(supabase, participantIds, nameById);
+  if (matches.length === 0) {
+    return { ok: false, error: `No category registrations found for participants under a sensei matching "${name}".` };
+  }
   return { ok: true, matches };
 }
 
