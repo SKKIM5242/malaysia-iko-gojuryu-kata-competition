@@ -192,21 +192,29 @@ async function requireJudgingManager(
 }
 
 /** A judge's kata-family eligibility and conflict-of-interest exclusions are
- * organizer-configured, not self-service — unlike requireJudgingManager
- * above (and requireCommunityManager, which the rest of /admin/referees
- * uses), this deliberately excludes the "referee" role itself. The whole
- * point of an exclusion list is a restriction a judge can't lift by editing
- * their own — or a colleague's — record. Mirrors is_admin() at the RLS
- * layer on referee_category_exclusions (see migration 0124). */
+ * organizer-configured, not open to every judge — confirmed with the
+ * organizer, a Chief-titled judge (Chief Referee / Chief Judge / Chief
+ * Referee & Judge — judge_title is free text, matched the same way
+ * isChiefJudge does in app/admin/judging/page.tsx) gets the same access as
+ * Admin/Organizer/Staff here, including editing their OWN row — a plain
+ * (non-Chief) judge still gets none. Mirrors is_admin() OR is_chief_judge()
+ * at the RLS layer on referee_category_exclusions (see migration 0126). */
 async function requireRefereeConfigManager(
   supabase: Awaited<ReturnType<typeof createClient>>,
   actorId: string | null,
   returnTo: string,
 ) {
   const role = await getActorRole(supabase, actorId);
-  if (!["admin", "organizer", "staff"].includes(role ?? "")) {
-    backTo(returnTo, { error: "Only Admin / Organizer can configure a judge's kata families or exclusions." });
+  if (["admin", "organizer", "staff"].includes(role ?? "")) return;
+  if (role === "referee") {
+    // .maybeSingle() would error out (not just miss) if this login owns more
+    // than one referees row — e.g. a Sensei who is also independently
+    // registered as a judge under a second record — so this checks every
+    // row for a Chief title rather than assuming exactly one.
+    const { data } = await supabase.from("referees").select("judge_title").eq("user_id", actorId);
+    if ((data ?? []).some((r) => /chief (referee|judge)/i.test(r.judge_title ?? ""))) return;
   }
+  backTo(returnTo, { error: "Only Admin / Organizer or a Chief Judge can configure a judge's kata families or exclusions." });
 }
 
 function backTo(path: string, params: Record<string, string>) {
@@ -2683,7 +2691,8 @@ export async function deleteReferee(formData: FormData) {
  * eligible to be assigned into — feeds autoAssignReferees' eligible pool. */
 export async function saveRefereeKataFamilies(formData: FormData) {
   const id = String(formData.get("id") ?? "");
-  const returnTo = id ? `/admin/referees?editref=${id}` : "/admin/referees";
+  const returnTo =
+    String(formData.get("return_to") ?? "") || (id ? `/admin/referees?editref=${id}` : "/admin/referees");
   if (!id) backTo("/admin/referees", { error: "Missing judge." });
   const families = formData.getAll("kata_families").map(String)
     .filter((f) => (KATA_FAMILIES as readonly string[]).includes(f));
@@ -2706,7 +2715,8 @@ export async function saveRefereeKataFamilies(formData: FormData) {
 export async function addRefereeExclusion(formData: FormData) {
   const refereeId = String(formData.get("referee_id") ?? "");
   const categoryId = String(formData.get("category_id") ?? "");
-  const returnTo = refereeId ? `/admin/referees?editref=${refereeId}` : "/admin/referees";
+  const returnTo =
+    String(formData.get("return_to") ?? "") || (refereeId ? `/admin/referees?editref=${refereeId}` : "/admin/referees");
   if (!refereeId) backTo("/admin/referees", { error: "Missing judge." });
   if (!categoryId) backTo(returnTo, { error: "Select a kata, belt group, gender, and age group first." });
   const { supabase, actorId } = await getActor();
@@ -2737,7 +2747,8 @@ export async function addRefereeExclusion(formData: FormData) {
 export async function removeRefereeExclusion(formData: FormData) {
   const exclusionId = String(formData.get("exclusion_id") ?? "");
   const refereeId = String(formData.get("referee_id") ?? "");
-  const returnTo = refereeId ? `/admin/referees?editref=${refereeId}` : "/admin/referees";
+  const returnTo =
+    String(formData.get("return_to") ?? "") || (refereeId ? `/admin/referees?editref=${refereeId}` : "/admin/referees");
   if (!exclusionId) backTo(returnTo, { error: "Missing exclusion." });
   const { supabase, actorId } = await getActor();
   await requireRefereeConfigManager(supabase, actorId, returnTo);

@@ -4,7 +4,9 @@ import { schemaReady } from "@/lib/data";
 import {
   assignRefereeToVideo, setJudgesRequired, autoAssignReferees,
   resendRefereeNotification, seedAutoAssignCriteria, deleteAutoAssignCriterion,
+  saveRefereeKataFamilies, removeRefereeExclusion,
 } from "@/app/actions/admin";
+import { KATA_FAMILIES } from "@/lib/kata-families";
 import { AdminShell, Card, adminBtn, adminBtnSecondary, adminInput } from "@/components/admin";
 import { CategoryName, EmptyState, SetupNotice, formatDate } from "@/components/ui";
 import FullViewButton from "@/components/FullViewButton";
@@ -73,7 +75,7 @@ export default async function AdminJudging({
 
   const [
     competitions, { data: videos }, { data: directory }, { data: refereeProfiles }, { data: staffProfiles },
-    { data: assignments }, { data: scores }, { data: criteria },
+    { data: assignments }, { data: scores }, { data: criteria }, { data: exclusionsData },
   ] =
     await Promise.all([
       getAllCompetitions(),
@@ -86,7 +88,7 @@ export default async function AdminJudging({
       supabase
         .from("referees")
         .select(
-          "id, full_name, karate_rank, email, phone, home_country, user_id, judge_title, unassigned_forfeit_count, unassigned_not_forfeit_count",
+          "id, full_name, karate_rank, email, phone, home_country, user_id, judge_title, kata_families, unassigned_forfeit_count, unassigned_not_forfeit_count",
         )
         .eq("status", "approved")
         .order("full_name"),
@@ -100,8 +102,16 @@ export default async function AdminJudging({
         .from("video_scores")
         .select("video_id, referee_user_id, score, criteria, deductions, disqualification_reason"),
       supabase.from("auto_assign_criteria").select("*").order("position"),
+      supabase.from("referee_category_exclusions").select("id, referee_id, category_id, category:categories(name)"),
     ]);
   const criteriaRows = criteria ?? [];
+  const exclusionsByReferee = new Map<string, Array<{ id: string; categoryName: string }>>();
+  for (const e of exclusionsData ?? []) {
+    const list = exclusionsByReferee.get(e.referee_id as string) ?? [];
+    const categoryName = (e.category as unknown as { name: string } | null)?.name ?? "(unknown category)";
+    list.push({ id: e.id as string, categoryName });
+    exclusionsByReferee.set(e.referee_id as string, list);
+  }
 
   const videoList = (videos as unknown as VideoRow[]) ?? [];
   // The workload panel is the Referee page's directory: every APPROVED
@@ -117,6 +127,13 @@ export default async function AdminJudging({
   // the manager's own assign-anyone dropdown above, not this button.
   const myJudgeTitle = user ? (directoryList.find((r) => r.user_id === user.id)?.judge_title ?? null) : null;
   const isChiefJudge = /chief (referee|judge)/i.test(myJudgeTitle ?? "");
+  // Kata families / exclusions in the Judge Workload table below: confirmed
+  // with the organizer that a Chief Judge gets the same edit access as
+  // Admin/Organizer/Staff here (including their own row) — a plain judge
+  // sees the columns but can't change them. Mirrors requireRefereeConfigManager
+  // (app/actions/admin.ts) and is_admin() OR is_chief_judge() at the RLS
+  // layer (migration 0126).
+  const canEditFamiliesExclusions = isJudgingManager || isChiefJudge;
   const refereeList = directoryList
     .filter((r): r is typeof r & { user_id: string } => !!r.user_id)
     .map((r) => ({ user_id: r.user_id, full_name: r.full_name, email: r.email, country: r.home_country }));
@@ -510,6 +527,8 @@ export default async function AdminJudging({
               { key: "phone", label: "Mobile Phone", width: 110, wrap: true },
               { key: "telegram", label: "Telegram", width: 110, wrap: true },
               { key: "country", label: "Country", width: 100, wrap: true },
+              { key: "kata_families", label: "Kata Families", width: 170, wrap: true },
+              { key: "exclusions", label: "Exclusions", width: 220, wrap: true },
               { key: "assigned", label: "Assigned", width: 90, wrap: true },
               { key: "scored", label: "Scored", width: 110, wrap: true },
               { key: "unassigned_forfeit_count", label: "Unassigned - Forfeit", width: 95, wrap: true },
@@ -521,6 +540,8 @@ export default async function AdminJudging({
               { key: "email", label: "Email" },
               { key: "phone", label: "Mobile Phone" },
               { key: "country", label: "Country" },
+              { key: "kata_families_text", label: "Kata Families" },
+              { key: "exclusions_text", label: "Exclusions" },
               { key: "assigned", label: "Assigned" },
               { key: "scored_text", label: "Scored" },
               { key: "unassigned_forfeit_count", label: "Unassigned - Forfeit" },
@@ -552,6 +573,61 @@ export default async function AdminJudging({
                   ""
                 ),
                 country: r.home_country ?? "",
+                kata_families_text:
+                  (r.kata_families ?? []).length > 0 ? (r.kata_families as string[]).join(", ") : "All families",
+                kata_families: canEditFamiliesExclusions ? (
+                  <form key="kata_families" action={saveRefereeKataFamilies} className="space-y-1.5">
+                    <input type="hidden" name="id" value={r.id} />
+                    <input type="hidden" name="return_to" value="/admin/judging" />
+                    <div className="flex flex-wrap gap-x-2 gap-y-1">
+                      {KATA_FAMILIES.map((f) => (
+                        <label key={f} className="flex items-center gap-1 text-xs">
+                          <input
+                            type="checkbox" name="kata_families" value={f}
+                            defaultChecked={(r.kata_families as string[] | null ?? []).includes(f)}
+                          />
+                          {f}
+                        </label>
+                      ))}
+                    </div>
+                    <button type="submit" className="rounded border border-neutral-300 px-2 py-0.5 text-xs font-semibold text-neutral-600 hover:bg-neutral-50">
+                      Save
+                    </button>
+                  </form>
+                ) : (
+                  (r.kata_families ?? []).length > 0 ? (r.kata_families as string[]).join(", ") : "All families"
+                ),
+                exclusions_text: (exclusionsByReferee.get(r.id) ?? []).map((e) => e.categoryName).join(" | "),
+                exclusions: (
+                  <div key="exclusions" className="space-y-1">
+                    {(exclusionsByReferee.get(r.id) ?? []).length === 0 && (
+                      <span className="text-xs text-neutral-400">None</span>
+                    )}
+                    {(exclusionsByReferee.get(r.id) ?? []).map((e) => (
+                      <div key={e.id} className="flex items-start justify-between gap-1.5 text-xs">
+                        <span className="min-w-0 break-words">{e.categoryName}</span>
+                        {canEditFamiliesExclusions && (
+                          <form action={removeRefereeExclusion}>
+                            <input type="hidden" name="exclusion_id" value={e.id} />
+                            <input type="hidden" name="referee_id" value={r.id} />
+                            <input type="hidden" name="return_to" value="/admin/judging" />
+                            <button type="submit" className="shrink-0 font-semibold text-red-600 hover:underline">
+                              Remove
+                            </button>
+                          </form>
+                        )}
+                      </div>
+                    ))}
+                    {canEditFamiliesExclusions && (
+                      <a
+                        href={`/admin/referees?editref=${r.id}`}
+                        className="block text-xs font-semibold text-red-700 underline underline-offset-2"
+                      >
+                        Add / trace on Judges page →
+                      </a>
+                    )}
+                  </div>
+                ),
                 assigned: r.user_id ? String(assignedCount) : "No login yet",
                 scored:
                   r.user_id && assignedCount > scoredCount ? (
