@@ -17,7 +17,10 @@ interface AssignmentNotice {
 }
 
 function appUrl(): string {
-  return process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  // "||" (not "??") deliberately -- an env var set to "" in Vercel is still
+  // a string, not null/undefined, so "??" would silently keep it and every
+  // link below would come out domain-less instead of falling back.
+  return process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 }
 
 /** Vercel sets VERCEL_ENV="preview" for the staging deployment (and any
@@ -76,10 +79,12 @@ async function sendAssignmentEmail(notice: AssignmentNotice): Promise<void> {
   await sendEmail(
     notice.refereeEmail,
     "New kata recording assigned for you to judge",
-    `Hi ${notice.refereeName ?? "Judge"},\n\n` +
-      `You've been assigned a new recording to score: ${notice.participantName} — ${notice.categoryName ?? "Kata"}.\n\n` +
-      `Sign in to Kata Arena to watch and submit your score: ${appUrl()}/account\n\n` +
-      `— Malaysia Open Virtual Karate-do Kata Competition`,
+    withStagingNotice(
+      `Hi ${notice.refereeName ?? "Judge"},\n\n` +
+        `You've been assigned a new recording to score: ${notice.participantName} — ${notice.categoryName ?? "Kata"}.\n\n` +
+        `Sign in to Kata Arena to watch and submit your score: ${appUrl()}/account\n\n` +
+        `— Malaysia Open Virtual Karate-do Kata Competition`,
+    ),
   );
 }
 
@@ -92,9 +97,10 @@ async function sendAssignmentTelegram(notice: AssignmentNotice): Promise<void> {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         chat_id: notice.refereeTelegramChatId,
-        text:
+        text: withStagingNotice(
           `🥋 New kata recording assigned for you to judge: ${notice.participantName} — ${notice.categoryName ?? "Kata"}.\n` +
-          `Sign in to Kata Arena to watch and score it: ${appUrl()}/account`,
+            `Sign in to Kata Arena to watch and score it: ${appUrl()}/account`,
+        ),
       }),
     });
   } catch {
