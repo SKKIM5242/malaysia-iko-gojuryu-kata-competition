@@ -158,18 +158,20 @@ function TextStyleControls({
           className={smallInput}
         />
       </div>
-      <div className="flex items-end gap-3 pb-1 text-xs">
-        <label className="flex items-center gap-1">
-          <input type="checkbox" checked={!!value.italic} onChange={(e) => set("italic", e.target.checked)} />
-          Italic
-        </label>
-        <label className="flex items-center gap-1">
-          <input type="checkbox" checked={!!value.tightSpacing} onChange={(e) => set("tightSpacing", e.target.checked)} />
-          No spacing between line
-        </label>
-      </div>
-      <div className="flex items-end gap-2 pb-1 text-xs">
-        <label className="flex items-center gap-1">
+      {/* Each on its own full-width row (col-span-full) rather than sharing
+          a cell with its neighbors -- "No spacing between line" is long
+          enough that packed side-by-side with Italic/Underline it wrapped
+          into an unreadable stack instead of just breaking cleanly. */}
+      <label className="col-span-2 flex items-center gap-1.5 pb-1 text-xs sm:col-span-4">
+        <input type="checkbox" checked={!!value.italic} onChange={(e) => set("italic", e.target.checked)} />
+        Italic
+      </label>
+      <label className="col-span-2 flex items-center gap-1.5 pb-1 text-xs sm:col-span-4">
+        <input type="checkbox" checked={!!value.tightSpacing} onChange={(e) => set("tightSpacing", e.target.checked)} />
+        No spacing between line
+      </label>
+      <div className="col-span-2 flex items-center gap-2 pb-1 text-xs sm:col-span-4">
+        <label className="flex items-center gap-1.5">
           <input type="checkbox" checked={!!value.underline} onChange={(e) => set("underline", e.target.checked)} />
           Underline
         </label>
