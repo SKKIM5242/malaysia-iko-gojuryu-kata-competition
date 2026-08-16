@@ -83,11 +83,21 @@ export interface CertificateTemplate {
   dateColor: string;
   dateSize: number;
   dateAlignment: "left" | "center" | "right";
+  dateDescription: string;
+  dateLineStyle: "solid" | "dashed";
+  dateLineWidth: number;
   signerNameSize: number;
   signerTitleSize: number;
   signerNameBold: boolean;
   signerTitleBold: boolean;
   signerPosition: "left" | "center" | "right";
+  signerLineStyle: "solid" | "dashed";
+  signerLineWidth: number;
+  frameOuterWidth: number;
+  frameInnerWidth: number;
+  /** null preserves today's automatic kind/rank accent color on both
+   * border rings; set, it overrides both uniformly. */
+  frameColor: string | null;
   header1Style: TextStyle;
   header2Style: TextStyle;
   body1Style: TextStyle;
@@ -367,6 +377,7 @@ function SignerBlock({
   sigH,
   stampSize,
   hrWidth,
+  hrStyle,
   nameSize,
   titleSize,
   nameBold,
@@ -381,6 +392,7 @@ function SignerBlock({
   sigH: number;
   stampSize: number;
   hrWidth: number;
+  hrStyle: "solid" | "dashed";
   nameSize: number;
   titleSize: number;
   nameBold: boolean;
@@ -409,7 +421,7 @@ function SignerBlock({
           />
         )}
       </div>
-      <div style={{ display: "flex", width: `${hrWidth}px`, borderTop: "3px solid #a8a29e", marginTop: "18px" }} />
+      <div style={{ display: "flex", width: `${hrWidth}px`, borderTop: `3px ${hrStyle} #a8a29e`, marginTop: "18px" }} />
       <div style={{ display: "flex", flexDirection: "column", alignItems: edge, marginTop: "12px" }}>
         <div style={{ display: "flex", fontSize: nameSize, fontWeight: nameBold ? 700 : 400, color: "#1c1917" }}>
           {name ?? "Organizer"}
@@ -432,7 +444,7 @@ function SignerBlock({
 /** The date column: mirrors SignerBlock's structure (fixed-height top
  * zone, hr, caption below) so its hr lines up with both signers'. */
 function DateBlock({
-  dateLabel, caption, width, color, size, alignment,
+  dateLabel, caption, width, color, size, alignment, lineStyle,
 }: {
   dateLabel: string;
   caption: string;
@@ -440,6 +452,7 @@ function DateBlock({
   color: string;
   size: number;
   alignment: "left" | "center" | "right";
+  lineStyle: "solid" | "dashed";
 }) {
   const edge = edgeFor(alignment);
   return (
@@ -447,9 +460,16 @@ function DateBlock({
       <div style={{ display: "flex", height: `${FOOTER_TOP_H}px`, alignItems: "flex-end", justifyContent: edge }}>
         <div style={{ display: "flex", fontSize: size, fontWeight: 800, color }}>{dateLabel}</div>
       </div>
-      <div style={{ display: "flex", width: "100%", borderTop: "3px solid #a8a29e", marginTop: "18px" }} />
-      <div style={{ marginTop: "12px", display: "flex", width: "100%", justifyContent: edge, fontSize: 33, fontWeight: 600, color: "#78716c" }}>
-        {caption}
+      <div style={{ display: "flex", width: "100%", borderTop: `3px ${lineStyle} #a8a29e`, marginTop: "18px" }} />
+      {/* textAlign on its own inner block (not just the outer row's
+          justifyContent) is what makes long descriptions -- "Winner
+          Announcement Date" and anything an organizer types that's
+          longer -- wrap onto multiple lines and stay centered, the same
+          fix StyledText already relies on for the header/body fields. */}
+      <div style={{ marginTop: "12px", display: "flex", width: "100%", justifyContent: edge }}>
+        <div style={{ display: "flex", fontSize: 33, fontWeight: 600, color: "#78716c", textAlign: alignment, maxWidth: `${width}px` }}>
+          {caption}
+        </div>
       </div>
     </div>
   );
@@ -587,6 +607,10 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
   const isWinner = input.kind === "winner" && input.rank;
   const accent = isWinner ? RANK_ACCENT[input.rank!] : ACCENT[input.kind as Exclude<CertificateKind, "winner">];
   const template = input.template;
+  // The frame (the two border rings) defaults to the same automatic kind/
+  // rank accent as everything else -- frameColor only overrides it when an
+  // organizer has explicitly set one.
+  const frameColor = template.frameColor ?? accent;
   // A template's logo1Url/logo2Url is only set once an organizer uploads a
   // replacement — null falls back to the original hardcoded /public crests,
   // so an un-edited template renders exactly as it always has.
@@ -637,7 +661,7 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            border: `14px solid ${accent}`,
+            border: `${template.frameOuterWidth}px solid ${frameColor}`,
             borderRadius: "18px",
             // Top padding trimmed from the original 60px, but kept well
             // clear of the inner double-border overlay below (a fixed 20px
@@ -657,7 +681,7 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
               left: "20px",
               right: "20px",
               bottom: "20px",
-              border: `3px solid ${accent}`,
+              border: `${template.frameInnerWidth}px solid ${frameColor}`,
               borderRadius: "8px",
               display: "flex",
             }}
@@ -761,11 +785,12 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
           >
             <DateBlock
               dateLabel={input.dateLabel}
-              caption={input.kind === "winner" ? "Winner Announcement Date" : "Announcement Date"}
-              width={380}
+              caption={template.dateDescription}
+              width={template.dateLineWidth}
               color={template.dateColor}
               size={template.dateSize}
               alignment={template.dateAlignment}
+              lineStyle={template.dateLineStyle}
             />
 
             <SignerBlock
@@ -776,7 +801,8 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
               sigW={240}
               sigH={90}
               stampSize={140}
-              hrWidth={500}
+              hrWidth={template.signerLineWidth}
+              hrStyle={template.signerLineStyle}
               nameSize={template.signerNameSize}
               titleSize={template.signerTitleSize}
               nameBold={template.signerNameBold}
@@ -793,7 +819,8 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
                 sigW={220}
                 sigH={84}
                 stampSize={130}
-                hrWidth={460}
+                hrWidth={template.signerLineWidth}
+                hrStyle={template.signerLineStyle}
                 nameSize={template.signerNameSize}
                 titleSize={template.signerTitleSize}
                 nameBold={template.signerNameBold}

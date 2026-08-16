@@ -28,6 +28,10 @@ function align3(v: unknown, fallback: "left" | "center" | "right"): "left" | "ce
   return v === "left" || v === "center" || v === "right" ? v : fallback;
 }
 
+function lineStyle3(v: unknown, fallback: "solid" | "dashed"): "solid" | "dashed" {
+  return v === "solid" || v === "dashed" ? v : fallback;
+}
+
 export async function POST(request: Request, { params }: { params: Promise<{ kind: string }> }) {
   const { kind } = await params;
   if (!VALID_KINDS.includes(kind as CertificateKind)) {
@@ -72,11 +76,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ kin
     dateColor: typeof b.date_color === "string" ? b.date_color : saved.dateColor,
     dateSize: num(b.date_size, saved.dateSize),
     dateAlignment: align3(b.date_alignment, saved.dateAlignment),
+    dateDescription: typeof b.date_description === "string" ? b.date_description : saved.dateDescription,
+    dateLineStyle: lineStyle3(b.date_line_style, saved.dateLineStyle),
+    dateLineWidth: num(b.date_line_width, saved.dateLineWidth),
     signerNameSize: num(b.signer_name_size, saved.signerNameSize),
     signerTitleSize: num(b.signer_title_size, saved.signerTitleSize),
     signerNameBold: b.signer_name_bold === true,
     signerTitleBold: b.signer_title_bold === true,
     signerPosition: align3(b.signer_position, saved.signerPosition),
+    signerLineStyle: lineStyle3(b.signer_line_style, saved.signerLineStyle),
+    signerLineWidth: num(b.signer_line_width, saved.signerLineWidth),
+    frameOuterWidth: num(b.frame_outer_width, saved.frameOuterWidth),
+    frameInnerWidth: num(b.frame_inner_width, saved.frameInnerWidth),
+    frameColor: b.frame_color_override === true ? (typeof b.frame_color === "string" ? b.frame_color : null) : null,
     header1Style: sanitizeTextStyle(b.header1_style),
     header2Style: sanitizeTextStyle(b.header2_style),
     body1Style: sanitizeTextStyle(b.body1_style),
@@ -84,11 +96,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ kin
     body3Style: sanitizeTextStyle(b.body3_style),
   };
 
+  // Winner's row covers all 3 medal ranks -- the caller picks which one to
+  // render a sample of (see the 3 "Preview 1st/2nd/3rd" buttons for Winner
+  // in CertificateTemplateForm); every other kind ignores this.
+  const rankParam = Number(b.rank);
+  const rank = ([1, 2, 3] as const).includes(rankParam as 1 | 2 | 3) ? (rankParam as 1 | 2 | 3) : 1;
+
   const settings = await certificateSettings(supabase);
   const sample = SAMPLE_DATA[kind as CertificateKind];
   const image = await renderCertificatePng({
     ...sample,
-    rank: kind === "winner" ? 1 : sample.rank,
+    rank: kind === "winner" ? rank : sample.rank,
     ...settings,
     template,
   });

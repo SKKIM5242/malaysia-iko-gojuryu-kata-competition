@@ -1787,6 +1787,7 @@ async function requireCertificateTemplateManager(
  * image is a separate action (deleteCertificateTemplateImage) so it has
  * its own explicit confirm, rather than living inside this general save. */
 const ALIGN3 = ["left", "center", "right"] as const;
+const LINE_STYLES = ["solid", "dashed"] as const;
 
 function numField(formData: FormData, name: string, fallback: number): number {
   const n = Number(formData.get(name));
@@ -1796,6 +1797,11 @@ function numField(formData: FormData, name: string, fallback: number): number {
 function align3Field(formData: FormData, name: string, fallback: (typeof ALIGN3)[number]): (typeof ALIGN3)[number] {
   const v = String(formData.get(name) ?? "");
   return (ALIGN3 as readonly string[]).includes(v) ? (v as (typeof ALIGN3)[number]) : fallback;
+}
+
+function lineStyleField(formData: FormData, name: string, fallback: (typeof LINE_STYLES)[number]): (typeof LINE_STYLES)[number] {
+  const v = String(formData.get(name) ?? "");
+  return (LINE_STYLES as readonly string[]).includes(v) ? (v as (typeof LINE_STYLES)[number]) : fallback;
 }
 
 /** Each Header/Body field's typography (font size/color/alignment/weight/
@@ -1847,11 +1853,21 @@ export async function saveCertificateTemplate(formData: FormData) {
     date_color: String(formData.get("date_color") ?? "").trim() || "#44403c",
     date_size: numField(formData, "date_size", 55),
     date_alignment: align3Field(formData, "date_alignment", "center"),
+    date_description: String(formData.get("date_description") ?? "").trim() || "Announcement Date",
+    date_line_style: lineStyleField(formData, "date_line_style", "solid"),
+    date_line_width: numField(formData, "date_line_width", 380),
     signer_name_size: numField(formData, "signer_name_size", 28),
     signer_title_size: numField(formData, "signer_title_size", 22),
     signer_name_bold: formData.get("signer_name_bold") === "on",
     signer_title_bold: formData.get("signer_title_bold") === "on",
     signer_position: align3Field(formData, "signer_position", "center"),
+    signer_line_style: lineStyleField(formData, "signer_line_style", "solid"),
+    signer_line_width: numField(formData, "signer_line_width", 500),
+    frame_outer_width: numField(formData, "frame_outer_width", 14),
+    frame_inner_width: numField(formData, "frame_inner_width", 3),
+    frame_color: formData.get("frame_color_override") === "on"
+      ? (String(formData.get("frame_color") ?? "").trim() || null)
+      : null,
     header1_style: styleField(formData, "header1_style"),
     header2_style: styleField(formData, "header2_style"),
     body1_style: styleField(formData, "body1_style"),

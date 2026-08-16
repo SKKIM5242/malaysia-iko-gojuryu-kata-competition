@@ -90,6 +90,8 @@ export async function certificateTemplate(
     path ? supabase.storage.from("branding").getPublicUrl(path).data.publicUrl : null;
   const align3 = (v: unknown, fallback: "left" | "center" | "right"): "left" | "center" | "right" =>
     v === "left" || v === "center" || v === "right" ? v : fallback;
+  const lineStyle3 = (v: unknown, fallback: "solid" | "dashed"): "solid" | "dashed" =>
+    v === "solid" || v === "dashed" ? v : fallback;
   return {
     header1: (data?.header1 as string | null) ?? "",
     header2: (data?.header2 as string | null) ?? "",
@@ -110,11 +112,19 @@ export async function certificateTemplate(
     dateColor: (data?.date_color as string | null) ?? "#44403c",
     dateSize: (data?.date_size as number | null) ?? 55,
     dateAlignment: align3(data?.date_alignment, "center"),
+    dateDescription: (data?.date_description as string | null) ?? "Announcement Date",
+    dateLineStyle: lineStyle3(data?.date_line_style, "solid"),
+    dateLineWidth: (data?.date_line_width as number | null) ?? 380,
     signerNameSize: (data?.signer_name_size as number | null) ?? 28,
     signerTitleSize: (data?.signer_title_size as number | null) ?? 22,
     signerNameBold: (data?.signer_name_bold as boolean | null) ?? true,
     signerTitleBold: (data?.signer_title_bold as boolean | null) ?? false,
     signerPosition: align3(data?.signer_position, "center"),
+    signerLineStyle: lineStyle3(data?.signer_line_style, "solid"),
+    signerLineWidth: (data?.signer_line_width as number | null) ?? 500,
+    frameOuterWidth: (data?.frame_outer_width as number | null) ?? 14,
+    frameInnerWidth: (data?.frame_inner_width as number | null) ?? 3,
+    frameColor: (data?.frame_color as string | null) ?? null,
     header1Style: sanitizeTextStyle(data?.header1_style),
     header2Style: sanitizeTextStyle(data?.header2_style),
     body1Style: sanitizeTextStyle(data?.body1_style),

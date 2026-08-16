@@ -5,6 +5,8 @@ import { saveCertificateTemplate, deleteCertificateTemplateImage } from "@/app/a
 import { adminBtn, adminInput, adminLabel } from "@/components/admin-styles";
 
 type Align3 = "left" | "center" | "right";
+type LineStyle = "solid" | "dashed";
+const LINE_STYLE_OPTIONS: LineStyle[] = ["solid", "dashed"];
 
 export interface TextStyleValue {
   fontSize?: number;
@@ -37,11 +39,19 @@ export interface CertificateTemplateRow {
   date_color: string;
   date_size: number;
   date_alignment: Align3;
+  date_description: string;
+  date_line_style: LineStyle;
+  date_line_width: number;
   signer_name_size: number;
   signer_title_size: number;
   signer_name_bold: boolean;
   signer_title_bold: boolean;
   signer_position: Align3;
+  signer_line_style: LineStyle;
+  signer_line_width: number;
+  frame_outer_width: number;
+  frame_inner_width: number;
+  frame_color: string | null;
   header1_style: TextStyleValue;
   header2_style: TextStyleValue;
   body1_style: TextStyleValue;
@@ -59,6 +69,8 @@ const KIND_ACCENT: Record<string, string> = {
   winner: "#B8860B", participant: "#B91C1C", referee: "#1D4ED8",
   sensei: "#7C3AED", school: "#0F766E", support: "#B45309",
 };
+
+const ORDINAL_LABEL: Record<1 | 2 | 3, string> = { 1: "1st", 2: "2nd", 3: "3rd" };
 
 const MERGE_TOKENS = [
   { token: "{name}", label: "Name" },
@@ -346,12 +358,22 @@ export default function CertificateTemplateForm({
   const [dateColor, setDateColor] = useState(template.date_color);
   const [dateSize, setDateSize] = useState(template.date_size);
   const [dateAlignment, setDateAlignment] = useState<Align3>(template.date_alignment);
+  const [dateDescription, setDateDescription] = useState(template.date_description);
+  const [dateLineStyle, setDateLineStyle] = useState<LineStyle>(template.date_line_style);
+  const [dateLineWidth, setDateLineWidth] = useState(template.date_line_width);
 
   const [signerNameSize, setSignerNameSize] = useState(template.signer_name_size);
   const [signerTitleSize, setSignerTitleSize] = useState(template.signer_title_size);
   const [signerNameBold, setSignerNameBold] = useState(template.signer_name_bold);
   const [signerTitleBold, setSignerTitleBold] = useState(template.signer_title_bold);
   const [signerPosition, setSignerPosition] = useState<Align3>(template.signer_position);
+  const [signerLineStyle, setSignerLineStyle] = useState<LineStyle>(template.signer_line_style);
+  const [signerLineWidth, setSignerLineWidth] = useState(template.signer_line_width);
+
+  const [frameOuterWidth, setFrameOuterWidth] = useState(template.frame_outer_width);
+  const [frameInnerWidth, setFrameInnerWidth] = useState(template.frame_inner_width);
+  const [frameColorOverride, setFrameColorOverride] = useState(template.frame_color !== null);
+  const [frameColor, setFrameColor] = useState(template.frame_color ?? KIND_ACCENT[kind] ?? "#1c1917");
 
   const [header1Style, setHeader1Style] = useState<TextStyleValue>(template.header1_style ?? {});
   const [header2Style, setHeader2Style] = useState<TextStyleValue>(template.header2_style ?? {});
@@ -365,7 +387,7 @@ export default function CertificateTemplateForm({
   const isWinner = kind === "winner";
   const kindAccent = KIND_ACCENT[kind] ?? "#1c1917";
 
-  async function handlePreview() {
+  async function handlePreview(rank?: 1 | 2 | 3) {
     setPreviewing(true);
     setPreviewError(null);
     try {
@@ -377,10 +399,15 @@ export default function CertificateTemplateForm({
         logo1_size: logo1Size, logo2_size: logo2Size, medal_size: medalSize,
         logos_alignment: logosAlignment, logos_no_spacing: logosNoSpacing,
         date_color: dateColor, date_size: dateSize, date_alignment: dateAlignment,
+        date_description: dateDescription, date_line_style: dateLineStyle, date_line_width: dateLineWidth,
         signer_name_size: signerNameSize, signer_title_size: signerTitleSize,
         signer_name_bold: signerNameBold, signer_title_bold: signerTitleBold, signer_position: signerPosition,
+        signer_line_style: signerLineStyle, signer_line_width: signerLineWidth,
+        frame_outer_width: frameOuterWidth, frame_inner_width: frameInnerWidth,
+        frame_color_override: frameColorOverride, frame_color: frameColor,
         header1_style: header1Style, header2_style: header2Style,
         body1_style: body1Style, body2_style: body2Style, body3_style: body3Style,
+        rank,
       };
       const res = await fetch(`/api/certificates/${kind}/preview`, {
         method: "POST",
@@ -406,6 +433,47 @@ export default function CertificateTemplateForm({
       <input type="hidden" name="kind" value={kind} />
       <input type="hidden" name="return_to" value={returnTo} />
       <p className="text-sm font-bold text-neutral-800">{kindLabel}</p>
+
+      <div className="rounded border border-neutral-200 bg-neutral-50 p-2">
+        <p className="mb-1 text-xs font-semibold text-neutral-600">Frame</p>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div>
+            <label className={smallLabel}>Outer line boldness (px)</label>
+            <input
+              type="number" name="frame_outer_width" min={0} max={60} value={frameOuterWidth}
+              onChange={(e) => setFrameOuterWidth(Number(e.target.value) || 0)}
+              className={smallInput}
+            />
+          </div>
+          <div>
+            <label className={smallLabel}>Inner line boldness (px)</label>
+            <input
+              type="number" name="frame_inner_width" min={0} max={30} value={frameInnerWidth}
+              onChange={(e) => setFrameInnerWidth(Number(e.target.value) || 0)}
+              className={smallInput}
+            />
+          </div>
+          <label className="flex items-end gap-1 pb-1.5 text-xs">
+            <input type="checkbox" name="frame_color_override" checked={frameColorOverride} onChange={(e) => setFrameColorOverride(e.target.checked)} />
+            Override color
+          </label>
+          <div>
+            <label className={smallLabel}>Color</label>
+            {frameColorOverride ? (
+              <input
+                type="color" name="frame_color" value={frameColor}
+                onChange={(e) => setFrameColor(e.target.value)}
+                className="h-[26px] w-full rounded border border-neutral-300"
+              />
+            ) : (
+              <>
+                <input type="hidden" name="frame_color" value={frameColor} />
+                <p className="pt-1 text-[11px] text-neutral-400">Automatic (kind / rank color)</p>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
 
       <div>
         <label className={adminLabel}>Logos</label>
@@ -542,7 +610,15 @@ export default function CertificateTemplateForm({
 
       <div className="rounded border border-neutral-200 bg-neutral-50 p-2">
         <p className="mb-1 text-xs font-semibold text-neutral-600">Footer — Date</p>
-        <div className="grid grid-cols-3 gap-2">
+        <div>
+          <label className={smallLabel}>Description (below the date — wraps and stays centered if long)</label>
+          <input
+            type="text" name="date_description" value={dateDescription}
+            onChange={(e) => setDateDescription(e.target.value)}
+            className={smallInput}
+          />
+        </div>
+        <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-5">
           <div>
             <label className={smallLabel}>Color</label>
             <input
@@ -566,6 +642,22 @@ export default function CertificateTemplateForm({
               <option value="center">Center</option>
               <option value="right">Right</option>
             </select>
+          </div>
+          <div>
+            <label className={smallLabel}>Line type</label>
+            <select name="date_line_style" value={dateLineStyle} onChange={(e) => setDateLineStyle(e.target.value as LineStyle)} className={smallInput}>
+              {LINE_STYLE_OPTIONS.map((s) => (
+                <option key={s} value={s}>{s[0].toUpperCase() + s.slice(1)}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className={smallLabel}>Line length (px)</label>
+            <input
+              type="number" name="date_line_width" min={100} max={900} value={dateLineWidth}
+              onChange={(e) => setDateLineWidth(Number(e.target.value) || 380)}
+              className={smallInput}
+            />
           </div>
         </div>
       </div>
@@ -606,6 +698,24 @@ export default function CertificateTemplateForm({
             </select>
           </div>
         </div>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <div>
+            <label className={smallLabel}>Line type</label>
+            <select name="signer_line_style" value={signerLineStyle} onChange={(e) => setSignerLineStyle(e.target.value as LineStyle)} className={smallInput}>
+              {LINE_STYLE_OPTIONS.map((s) => (
+                <option key={s} value={s}>{s[0].toUpperCase() + s.slice(1)}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className={smallLabel}>Line length (px)</label>
+            <input
+              type="number" name="signer_line_width" min={100} max={900} value={signerLineWidth}
+              onChange={(e) => setSignerLineWidth(Number(e.target.value) || 500)}
+              className={smallInput}
+            />
+          </div>
+        </div>
         <p className="mt-1 text-[11px] text-neutral-400">Applies to both signers when a second signer is set in Certificate Settings above.</p>
       </div>
 
@@ -640,12 +750,25 @@ export default function CertificateTemplateForm({
 
       {previewError && <p className="text-xs font-semibold text-red-600">{previewError}</p>}
       <div className="flex items-center justify-between pt-1">
-        <button
-          type="button" onClick={handlePreview} disabled={previewing}
-          className="rounded bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
-        >
-          {previewing ? "Rendering…" : "Preview"}
-        </button>
+        {isWinner ? (
+          <div className="flex gap-1.5">
+            {([1, 2, 3] as const).map((rank) => (
+              <button
+                key={rank} type="button" onClick={() => handlePreview(rank)} disabled={previewing}
+                className="rounded bg-blue-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                {previewing ? "…" : `Preview ${ORDINAL_LABEL[rank]}`}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <button
+            type="button" onClick={() => handlePreview()} disabled={previewing}
+            className="rounded bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+          >
+            {previewing ? "Rendering…" : "Preview"}
+          </button>
+        )}
         <button type="submit" className={adminBtn}>Save {kindLabel} template</button>
       </div>
     </form>
