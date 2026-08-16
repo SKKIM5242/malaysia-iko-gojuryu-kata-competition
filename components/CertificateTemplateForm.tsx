@@ -8,6 +8,10 @@ type Align3 = "left" | "center" | "right";
 type LineStyle = "solid" | "dashed";
 const LINE_STYLE_OPTIONS: LineStyle[] = ["solid", "dashed"];
 
+type LineLengthMode = "auto" | "fixed";
+type LineColorMode = "frame" | "custom";
+type LineSpacingMode = "single" | "1.5" | "double" | "atLeast" | "exactly" | "multiple";
+
 export interface TextStyleValue {
   fontSize?: number;
   color?: string;
@@ -15,9 +19,17 @@ export interface TextStyleValue {
   weight?: number;
   italic?: boolean;
   underline?: boolean;
-  underlineWeight?: "thin" | "medium" | "thick";
-  lineHeight?: number;
-  tightSpacing?: boolean;
+  lineLengthMode?: LineLengthMode;
+  lineLength?: number;
+  lineAlignment?: Align3;
+  lineStyle?: LineStyle;
+  lineColorMode?: LineColorMode;
+  lineColor?: string;
+  lineThickness?: number;
+  lineNoGapToText?: boolean;
+  lineNoGapAbove?: boolean;
+  lineSpacingMode?: LineSpacingMode;
+  lineSpacingAt?: number;
   maxLines?: number;
 }
 
@@ -89,8 +101,27 @@ const FONT_WEIGHTS = [
   { value: 900, label: "Black" },
 ] as const;
 
-const LINE_HEIGHTS = [1, 1.1, 1.2, 1.4, 1.6, 1.8, 2] as const;
-const UNDERLINE_WEIGHTS = ["thin", "medium", "thick"] as const;
+const LINE_SPACING_MODES: Array<{ value: LineSpacingMode; label: string }> = [
+  { value: "single", label: "Single" },
+  { value: "1.5", label: "1.5 lines" },
+  { value: "double", label: "Double" },
+  { value: "atLeast", label: "At least" },
+  { value: "exactly", label: "Exactly" },
+  { value: "multiple", label: "Multiple" },
+];
+// Word's Single/Double etc. don't need a value typed in; the other 3 do.
+const LINE_SPACING_NEEDS_AT: Record<LineSpacingMode, boolean> = {
+  single: false, "1.5": false, double: false, atLeast: true, exactly: true, multiple: true,
+};
+// 5 preset choices rather than a free-number field, matching how thick a
+// hand-drawn underline reads at a glance rather than an exact pixel count.
+const LINE_THICKNESSES = [
+  { value: 1, label: "Hairline (1px)" },
+  { value: 2, label: "Thin (2px)" },
+  { value: 4, label: "Medium (4px)" },
+  { value: 7, label: "Thick (7px)" },
+  { value: 10, label: "Extra thick (10px)" },
+];
 
 const smallLabel = "block text-[11px] font-semibold text-neutral-500";
 const smallInput = "w-full rounded border border-neutral-300 px-1.5 py-1 text-xs";
@@ -102,13 +133,20 @@ const smallInput = "w-full rounded border border-neutral-300 px-1.5 py-1 text-xs
  * action re-validates the shape (sanitizeTextStyle) before it's saved, so
  * this is just a convenient wire format, not a trust boundary. */
 function TextStyleControls({
-  name, value, onChange, defaultFontSize, defaultColor,
+  name, value, onChange, defaultFontSize, defaultColor, defaultUnderline = false,
 }: {
   name: string;
   value: TextStyleValue;
   onChange: (v: TextStyleValue) => void;
   defaultFontSize: number;
   defaultColor: string;
+  /** Mirrors this field's own hardcoded `defaults.underline` in
+   * lib/certificate-render.tsx (true only for Body 1) -- without this, an
+   * as-yet-unedited Body 1 template would show its Underline box unchecked
+   * (nothing in `value` says otherwise) even though the certificate itself
+   * always renders it underlined, hiding the whole new Line panel below
+   * until the organizer happened to uncheck-then-recheck the box. */
+  defaultUnderline?: boolean;
 }) {
   const set = <K extends keyof TextStyleValue>(k: K, v: TextStyleValue[K]) => onChange({ ...value, [k]: v });
   return (
@@ -150,16 +188,25 @@ function TextStyleControls({
       </div>
       <div>
         <label className={smallLabel}>Line spacing</label>
-        <select
-          value={value.lineHeight ?? ""}
-          onChange={(e) => set("lineHeight", e.target.value ? Number(e.target.value) : undefined)}
-          className={smallInput}
-        >
-          <option value="">Default</option>
-          {LINE_HEIGHTS.map((lh) => (
-            <option key={lh} value={lh}>{lh.toFixed(1)}×</option>
-          ))}
-        </select>
+        <div className="flex gap-1">
+          <select
+            value={value.lineSpacingMode ?? "single"}
+            onChange={(e) => set("lineSpacingMode", e.target.value as LineSpacingMode)}
+            className={smallInput}
+          >
+            {LINE_SPACING_MODES.map((m) => (
+              <option key={m.value} value={m.value}>{m.label}</option>
+            ))}
+          </select>
+          {LINE_SPACING_NEEDS_AT[value.lineSpacingMode ?? "single"] && (
+            <input
+              type="number" min={0.1} step={0.1} placeholder="At"
+              value={value.lineSpacingAt ?? ""}
+              onChange={(e) => set("lineSpacingAt", e.target.value ? Number(e.target.value) : undefined)}
+              className={`${smallInput} w-14`}
+            />
+          )}
+        </div>
       </div>
       <div>
         <label className={smallLabel}>Max lines (wrap)</label>
@@ -172,34 +219,116 @@ function TextStyleControls({
         />
       </div>
       {/* Each on its own full-width row (col-span-full) rather than sharing
-          a cell with its neighbors -- "No spacing between line" is long
-          enough that packed side-by-side with Italic/Underline it wrapped
-          into an unreadable stack instead of just breaking cleanly. */}
+          a cell with its neighbors -- these labels are long enough that
+          packed side-by-side they wrapped into an unreadable stack instead
+          of just breaking cleanly. */}
       <label className="col-span-2 flex items-center gap-1.5 pb-1 text-xs sm:col-span-4">
         <input type="checkbox" checked={!!value.italic} onChange={(e) => set("italic", e.target.checked)} />
         Italic
       </label>
       <label className="col-span-2 flex items-center gap-1.5 pb-1 text-xs sm:col-span-4">
-        <input type="checkbox" checked={!!value.tightSpacing} onChange={(e) => set("tightSpacing", e.target.checked)} />
-        No spacing between line
+        <input type="checkbox" checked={value.underline ?? defaultUnderline} onChange={(e) => set("underline", e.target.checked)} />
+        Underline
       </label>
-      <div className="col-span-2 flex items-center gap-2 pb-1 text-xs sm:col-span-4">
-        <label className="flex items-center gap-1.5">
-          <input type="checkbox" checked={!!value.underline} onChange={(e) => set("underline", e.target.checked)} />
-          Underline
-        </label>
-        {value.underline && (
-          <select
-            value={value.underlineWeight ?? "medium"}
-            onChange={(e) => set("underlineWeight", e.target.value as TextStyleValue["underlineWeight"])}
-            className="rounded border border-neutral-300 px-1 py-1 text-[11px]"
-          >
-            {UNDERLINE_WEIGHTS.map((w) => (
-              <option key={w} value={w}>{w[0].toUpperCase() + w.slice(1)}</option>
-            ))}
-          </select>
-        )}
+      {(value.underline ?? defaultUnderline) && <UnderlineLineControls value={value} set={set} />}
+    </div>
+  );
+}
+
+/** The divider-line panel that appears once "Underline" is checked --
+ * richer than a plain underline: a length mode ("auto" hugs the text's own
+ * width via a border, e.g. matching a recipient's name exactly regardless
+ * of how long it is; "fixed" draws an independent line at a set px width,
+ * positioned by its own alignment), a color mode (follow the certificate's
+ * Frame color, or pick a custom one), a 5-tier thickness, and two spacing
+ * toggles -- one per length mode, since "gap to the text" only means
+ * something in auto mode and "gap above the line" only in fixed mode. Most
+ * visible on Body 1 (recipient), which defaults Underline on, but works
+ * identically for any Header/Body field that has it checked. */
+function UnderlineLineControls({
+  value, set,
+}: {
+  value: TextStyleValue;
+  set: <K extends keyof TextStyleValue>(k: K, v: TextStyleValue[K]) => void;
+}) {
+  const lengthMode = value.lineLengthMode ?? "auto";
+  const colorMode = value.lineColorMode ?? "frame";
+  return (
+    <div className="col-span-2 grid grid-cols-2 gap-x-3 gap-y-2 rounded border border-neutral-200 bg-white p-2 sm:col-span-4 sm:grid-cols-4">
+      <p className="col-span-2 text-[11px] font-semibold text-neutral-500 sm:col-span-4">Line</p>
+      <div>
+        <label className={smallLabel}>Line type</label>
+        <select value={value.lineStyle ?? "solid"} onChange={(e) => set("lineStyle", e.target.value as LineStyle)} className={smallInput}>
+          {LINE_STYLE_OPTIONS.map((s) => (
+            <option key={s} value={s}>{s[0].toUpperCase() + s.slice(1)}</option>
+          ))}
+        </select>
       </div>
+      <div>
+        <label className={smallLabel}>Line color</label>
+        <select value={colorMode} onChange={(e) => set("lineColorMode", e.target.value as LineColorMode)} className={smallInput}>
+          <option value="frame">As per frame</option>
+          <option value="custom">Choose a color</option>
+        </select>
+      </div>
+      {colorMode === "custom" && (
+        <div>
+          <label className={smallLabel}>Color</label>
+          <input
+            type="color" value={value.lineColor ?? "#1c1917"}
+            onChange={(e) => set("lineColor", e.target.value)}
+            className="h-[26px] w-full rounded border border-neutral-300"
+          />
+        </div>
+      )}
+      <div>
+        <label className={smallLabel}>Line thickness</label>
+        <select
+          value={value.lineThickness ?? 4}
+          onChange={(e) => set("lineThickness", Number(e.target.value))}
+          className={smallInput}
+        >
+          {LINE_THICKNESSES.map((t) => (
+            <option key={t.value} value={t.value}>{t.label}</option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label className={smallLabel}>Line length</label>
+        <select value={lengthMode} onChange={(e) => set("lineLengthMode", e.target.value as LineLengthMode)} className={smallInput}>
+          <option value="auto">As per text length</option>
+          <option value="fixed">Standard length</option>
+        </select>
+      </div>
+      {lengthMode === "fixed" ? (
+        <>
+          <div>
+            <label className={smallLabel}>Length (px)</label>
+            <input
+              type="number" min={40} max={1700} value={value.lineLength ?? 380}
+              onChange={(e) => set("lineLength", Number(e.target.value) || 380)}
+              className={smallInput}
+            />
+          </div>
+          <div>
+            <label className={smallLabel}>Line alignment</label>
+            <select value={value.lineAlignment ?? "center"} onChange={(e) => set("lineAlignment", e.target.value as Align3)} className={smallInput}>
+              <option value="left">Left</option>
+              <option value="center">Center</option>
+              <option value="right">Right</option>
+            </select>
+          </div>
+          <label className="col-span-2 flex items-center gap-1.5 pb-1 text-xs sm:col-span-4">
+            <input type="checkbox" checked={!!value.lineNoGapAbove} onChange={(e) => set("lineNoGapAbove", e.target.checked)} />
+            No spacing above line
+          </label>
+        </>
+      ) : (
+        <label className="col-span-2 flex items-center gap-1.5 pb-1 text-xs sm:col-span-4">
+          <input type="checkbox" checked={!!value.lineNoGapToText} onChange={(e) => set("lineNoGapToText", e.target.checked)} />
+          No spacing between line
+        </label>
+      )}
     </div>
   );
 }
@@ -234,7 +363,7 @@ function HeaderField({
  * rather than tracking cursor position, simple and predictable for a field
  * that's usually short -- plus its TextStyleControls panel. */
 function BodyField({
-  id, name, label, value, onChange, showRankToken, styleValue, onStyleChange, styleName, defaultFontSize, defaultColor,
+  id, name, label, value, onChange, showRankToken, styleValue, onStyleChange, styleName, defaultFontSize, defaultColor, defaultUnderline,
 }: {
   id: string;
   name: string;
@@ -247,6 +376,7 @@ function BodyField({
   styleName: string;
   defaultFontSize: number;
   defaultColor: string;
+  defaultUnderline?: boolean;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   function insert(token: string) {
@@ -279,7 +409,10 @@ function BodyField({
           </button>
         )}
       </div>
-      <TextStyleControls name={styleName} value={styleValue} onChange={onStyleChange} defaultFontSize={defaultFontSize} defaultColor={defaultColor} />
+      <TextStyleControls
+        name={styleName} value={styleValue} onChange={onStyleChange}
+        defaultFontSize={defaultFontSize} defaultColor={defaultColor} defaultUnderline={defaultUnderline}
+      />
     </div>
   );
 }
@@ -752,7 +885,7 @@ export default function CertificateTemplateForm({
       <BodyField
         id={`${kind}_body1`} name="body1" label="Body 1 (recipient)" value={body1} onChange={setBody1} showRankToken={isWinner}
         styleValue={body1Style} onStyleChange={setBody1Style} styleName="body1_style"
-        defaultFontSize={112} defaultColor="#1c1917"
+        defaultFontSize={112} defaultColor="#1c1917" defaultUnderline
       />
       <BodyField
         id={`${kind}_body2`} name="body2" label="Body 2 (reason)" value={body2} onChange={setBody2} showRankToken={isWinner}

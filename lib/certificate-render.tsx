@@ -15,9 +15,15 @@ export type CertificateKind = "winner" | "participant" | "referee" | "sensei" | 
  * 0129) -- every property is optional, and an unset one falls back to that
  * specific field's own built-in default (see the `defaults` each StyledText
  * call site passes below), which reproduces exactly what was hardcoded
- * before this became editable. `underlineWeight` only matters when
- * `underline` is true; `maxLines` is an approximation (see StyledText) since
- * Satori has no real multi-line text measurement to clamp against. */
+ * before this became editable. The `line*` fields only matter when
+ * `underline` is true -- they replace the old 3-tier `underlineWeight` with
+ * a full divider-line control (style/color/length/alignment/thickness/
+ * spacing), used most visibly on Body 1 (recipient), which defaults
+ * `underline: true`. `lineSpacingMode`/`lineSpacingAt` replace the old
+ * `lineHeight`/`tightSpacing` pair with the same Single/1.5/Double/At
+ * least/Exactly/Multiple control Word uses -- see resolveLineHeight below.
+ * `maxLines` is an approximation (see StyledText) since Satori has no real
+ * multi-line text measurement to clamp against. */
 export interface TextStyle {
   fontSize?: number;
   color?: string;
@@ -25,11 +31,32 @@ export interface TextStyle {
   weight?: number;
   italic?: boolean;
   underline?: boolean;
-  underlineWeight?: "thin" | "medium" | "thick";
-  lineHeight?: number;
-  tightSpacing?: boolean;
+  /** "auto" (default) draws the line as a border directly under the text,
+   * so it's always exactly as long as the text itself (e.g. the recipient's
+   * name); "fixed" draws an independent line of `lineLength` px instead,
+   * positioned by `lineAlignment`. */
+  lineLengthMode?: "auto" | "fixed";
+  lineLength?: number;
+  lineAlignment?: "left" | "center" | "right";
+  lineStyle?: "solid" | "dashed";
+  /** "frame" (default) follows the certificate's frame color (which itself
+   * follows the kind/rank accent unless overridden); "custom" uses
+   * `lineColor` instead. */
+  lineColorMode?: "frame" | "custom";
+  lineColor?: string;
+  lineThickness?: number;
+  /** Collapses the gap between the text and its line in "auto" length mode. */
+  lineNoGapToText?: boolean;
+  /** Collapses the margin above the line in "fixed" length mode. */
+  lineNoGapAbove?: boolean;
+  lineSpacingMode?: "single" | "1.5" | "double" | "atLeast" | "exactly" | "multiple";
+  /** The Word-style "At:" value -- px for atLeast/exactly, a raw multiplier
+   * for multiple; unused for single/1.5/double. */
+  lineSpacingAt?: number;
   maxLines?: number;
 }
+
+const LINE_SPACING_MODES = ["single", "1.5", "double", "atLeast", "exactly", "multiple"] as const;
 
 /** Narrows an arbitrary JSON value (as read back from the `*_style` jsonb
  * columns, or posted to the preview route) into a well-typed TextStyle,
@@ -47,13 +74,40 @@ export function sanitizeTextStyle(v: unknown): TextStyle {
   if (typeof o.weight === "number" && Number.isFinite(o.weight)) style.weight = o.weight;
   if (typeof o.italic === "boolean") style.italic = o.italic;
   if (typeof o.underline === "boolean") style.underline = o.underline;
-  if (o.underlineWeight === "thin" || o.underlineWeight === "medium" || o.underlineWeight === "thick") {
-    style.underlineWeight = o.underlineWeight;
+  if (o.lineLengthMode === "auto" || o.lineLengthMode === "fixed") style.lineLengthMode = o.lineLengthMode;
+  if (typeof o.lineLength === "number" && Number.isFinite(o.lineLength)) style.lineLength = o.lineLength;
+  if (o.lineAlignment === "left" || o.lineAlignment === "center" || o.lineAlignment === "right") {
+    style.lineAlignment = o.lineAlignment;
   }
-  if (typeof o.lineHeight === "number" && Number.isFinite(o.lineHeight)) style.lineHeight = o.lineHeight;
-  if (typeof o.tightSpacing === "boolean") style.tightSpacing = o.tightSpacing;
+  if (o.lineStyle === "solid" || o.lineStyle === "dashed") style.lineStyle = o.lineStyle;
+  if (o.lineColorMode === "frame" || o.lineColorMode === "custom") style.lineColorMode = o.lineColorMode;
+  if (typeof o.lineColor === "string") style.lineColor = o.lineColor;
+  if (typeof o.lineThickness === "number" && Number.isFinite(o.lineThickness)) style.lineThickness = o.lineThickness;
+  if (typeof o.lineNoGapToText === "boolean") style.lineNoGapToText = o.lineNoGapToText;
+  if (typeof o.lineNoGapAbove === "boolean") style.lineNoGapAbove = o.lineNoGapAbove;
+  if ((LINE_SPACING_MODES as readonly unknown[]).includes(o.lineSpacingMode)) {
+    style.lineSpacingMode = o.lineSpacingMode as TextStyle["lineSpacingMode"];
+  }
+  if (typeof o.lineSpacingAt === "number" && Number.isFinite(o.lineSpacingAt)) style.lineSpacingAt = o.lineSpacingAt;
   if (typeof o.maxLines === "number" && Number.isFinite(o.maxLines) && o.maxLines > 0) style.maxLines = o.maxLines;
   return style;
+}
+
+/** Word's Single/1.5 lines/Double/At least/Exactly/Multiple control, mapped
+ * onto CSS `line-height`. Satori (like CSS generally) has no true "at
+ * least" mode that grows only when content needs more -- both "atLeast" and
+ * "exactly" render as the same fixed px line-height here; the UI still
+ * offers both since that's what the organizer's reference (Word) shows. */
+function resolveLineHeight(mode: TextStyle["lineSpacingMode"], at?: number): string | undefined {
+  switch (mode) {
+    case "1.5": return "1.5";
+    case "double": return "2";
+    case "atLeast":
+    case "exactly": return at ? `${at}px` : undefined;
+    case "multiple": return at ? String(at) : undefined;
+    case "single":
+    default: return undefined;
+  }
 }
 
 /** The organizer-editable design for one certificate kind (certificate_templates
@@ -552,7 +606,7 @@ function LogoMedalRow({
   );
 }
 
-const UNDERLINE_PX: Record<"thin" | "medium" | "thick", number> = { thin: 2, medium: 4, thick: 7 };
+const LINE_THICKNESS_DEFAULT = 4;
 
 /** Renders one Header/Body text region: a full-width row whose
  * justifyContent (derived from the organizer's chosen alignment, default
@@ -563,46 +617,80 @@ const UNDERLINE_PX: Record<"thin" | "medium" | "thick", number> = { thin: 2, med
  * Header. `defaults` carries this specific field's own pre-existing
  * hardcoded look (the exact fontSize/weight/color/underline every kind
  * rendered before this became editable), so an empty style object ({}, i.e.
- * an as-yet-unedited template) renders pixel-identical to before. maxLines
- * clips via a computed height + overflow:hidden rather than a real
- * multi-line ellipsis -- Satori has no text-measurement API to lay out an
- * exact N-line truncation the way a browser's line-clamp does, so this is
- * an approximation, not a guarantee of exactly N visible lines. */
+ * an as-yet-unedited template) renders pixel-identical to before -- the new
+ * `line*` fields all default to reproducing the old hardcoded underline
+ * exactly (solid, frame-colored, 4px, flush under the text) until an
+ * organizer touches them. maxLines clips via a computed height +
+ * overflow:hidden rather than a real multi-line ellipsis -- Satori has no
+ * text-measurement API to lay out an exact N-line truncation the way a
+ * browser's line-clamp does, so this is an approximation, not a guarantee
+ * of exactly N visible lines.
+ *
+ * The underline itself comes in two length modes: "auto" (default) is a
+ * borderBottom on the text node itself, so it's always exactly as long as
+ * the text (e.g. the recipient's name, whatever its length) -- no
+ * measurement needed since the border just follows the text's own
+ * shrink-to-fit width. "fixed" instead renders a second, independent row
+ * below the text with an explicit width and its own alignment, the same
+ * pattern DateBlock/SignerBlock already use for their divider lines. */
 function StyledText({
-  text, style, defaults, accent,
+  text, style, defaults, accent, frameColor,
 }: {
   text: string;
   style: TextStyle;
   defaults: { fontSize: number; weight: number; color: string; underline?: boolean; maxWidth?: number; extra?: React.CSSProperties };
   accent: string;
+  frameColor: string;
 }) {
   if (!text) return null;
   const fontSize = style.fontSize ?? defaults.fontSize;
   const underline = style.underline ?? defaults.underline ?? false;
-  const lineHeight = style.tightSpacing ? 1 : style.lineHeight;
+  const lineHeightCss = resolveLineHeight(style.lineSpacingMode, style.lineSpacingAt);
+  const lineHeightMultiplier = lineHeightCss && !lineHeightCss.endsWith("px") ? Number(lineHeightCss) : 1.2;
+  const lineLengthMode = style.lineLengthMode ?? "auto";
+  const lineColor = style.lineColorMode === "custom" && style.lineColor ? style.lineColor : frameColor;
+  const lineStyleCss = style.lineStyle ?? "solid";
+  const thickness = style.lineThickness ?? LINE_THICKNESS_DEFAULT;
   return (
-    <div style={{ display: "flex", width: "100%", justifyContent: edgeFor(style.align ?? "center") }}>
-      <div
-        style={{
-          display: "flex",
-          fontSize,
-          fontWeight: style.weight ?? defaults.weight,
-          color: style.color ?? defaults.color,
-          textAlign: style.align ?? "center",
-          ...(defaults.maxWidth ? { maxWidth: `${defaults.maxWidth}px` } : {}),
-          ...(style.italic ? { fontStyle: "italic" } : {}),
-          ...(lineHeight ? { lineHeight: String(lineHeight) } : {}),
-          ...(underline
-            ? { borderBottom: `${UNDERLINE_PX[style.underlineWeight ?? "medium"]}px solid ${accent}`, padding: "0 40px 16px" }
-            : {}),
-          ...(style.maxLines
-            ? { height: `${Math.round(fontSize * (lineHeight ?? 1.2) * style.maxLines)}px`, overflow: "hidden" }
-            : {}),
-          ...defaults.extra,
-        }}
-      >
-        {text}
+    <div style={{ display: "flex", flexDirection: "column", width: "100%", alignItems: "center" }}>
+      <div style={{ display: "flex", width: "100%", justifyContent: edgeFor(style.align ?? "center") }}>
+        <div
+          style={{
+            display: "flex",
+            fontSize,
+            fontWeight: style.weight ?? defaults.weight,
+            color: style.color ?? defaults.color,
+            textAlign: style.align ?? "center",
+            ...(defaults.maxWidth ? { maxWidth: `${defaults.maxWidth}px` } : {}),
+            ...(style.italic ? { fontStyle: "italic" } : {}),
+            ...(lineHeightCss ? { lineHeight: lineHeightCss } : {}),
+            ...(underline && lineLengthMode === "auto"
+              ? {
+                  borderBottom: `${thickness}px ${lineStyleCss} ${lineColor}`,
+                  padding: `0 40px ${style.lineNoGapToText ? 0 : 16}px`,
+                }
+              : {}),
+            ...(style.maxLines
+              ? { height: `${Math.round(fontSize * lineHeightMultiplier * style.maxLines)}px`, overflow: "hidden" }
+              : {}),
+            ...defaults.extra,
+          }}
+        >
+          {text}
+        </div>
       </div>
+      {underline && lineLengthMode === "fixed" && (
+        <div
+          style={{
+            display: "flex",
+            width: "100%",
+            justifyContent: edgeFor(style.lineAlignment ?? "center"),
+            marginTop: style.lineNoGapAbove ? "0px" : "16px",
+          }}
+        >
+          <div style={{ width: `${style.lineLength ?? 380}px`, borderTop: `${thickness}px ${lineStyleCss} ${lineColor}` }} />
+        </div>
+      )}
     </div>
   );
 }
@@ -741,6 +829,7 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
               style={template.header1Style}
               defaults={{ fontSize: 112, weight: 900, color: accent, extra: { letterSpacing: 1 } }}
               accent={accent}
+              frameColor={frameColor}
             />
           </div>
 
@@ -759,24 +848,28 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
               style={template.header2Style}
               defaults={{ fontSize: 88, weight: 700, color: "#57534e", maxWidth: 1700 }}
               accent={accent}
+              frameColor={frameColor}
             />
             <StyledText
               text={body1}
               style={template.body1Style}
               defaults={{ fontSize: 112, weight: 700, color: "#1c1917", underline: true }}
               accent={accent}
+              frameColor={frameColor}
             />
             <StyledText
               text={body2}
               style={template.body2Style}
               defaults={{ fontSize: 46, weight: 700, color: "#57534e", maxWidth: 1700 }}
               accent={accent}
+              frameColor={frameColor}
             />
             <StyledText
               text={body3}
               style={template.body3Style}
               defaults={{ fontSize: 46, weight: 700, color: "#57534e", maxWidth: 1700 }}
               accent={accent}
+              frameColor={frameColor}
             />
           </div>
 
