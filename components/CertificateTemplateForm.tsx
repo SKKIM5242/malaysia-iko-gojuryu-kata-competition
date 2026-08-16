@@ -431,10 +431,19 @@ export default function CertificateTemplateForm({
 
       <div>
         {isWinner ? (
-          <p className="text-xs text-neutral-400">
-            Medal: uses the automatic gold / silver / bronze artwork, centered between Logo 1 and Logo 2 — not
-            an uploaded image.
-          </p>
+          <>
+            {/* Winner's medal is always on -- no checkbox is shown since
+                there's nothing to choose -- but saveCertificateTemplate
+                reads show_medal from the form regardless, so without this
+                hidden input every Winner save (for any reason, e.g. just a
+                color tweak) silently wrote show_medal=false and the medal
+                vanished from the rendered certificate. */}
+            <input type="hidden" name="show_medal" value="on" />
+            <p className="text-xs text-neutral-400">
+              Medal: uses the automatic gold / silver / bronze artwork, centered between Logo 1 and Logo 2 — not
+              an uploaded image.
+            </p>
+          </>
         ) : (
           <>
             <label className="flex items-center gap-1.5 text-sm font-medium text-neutral-700">
