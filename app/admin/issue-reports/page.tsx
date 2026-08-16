@@ -14,6 +14,7 @@ import {
 } from "@/lib/telegram";
 import {
   ISSUE_REPORT_NOTE,
+  issueTypeLabel,
   screenSpecLabel,
   statusLabel,
   viewTypeLabel,
@@ -164,6 +165,10 @@ export default async function AdminIssueReports() {
                 </div>
 
                 <dl className="mt-3 grid gap-x-4 gap-y-1 text-sm sm:grid-cols-2">
+                  <div>
+                    <dt className="inline font-semibold text-neutral-600">Type: </dt>
+                    <dd className="inline text-neutral-800">{issueTypeLabel(r.issue_type as string)}</dd>
+                  </div>
                   <div>
                     <dt className="inline font-semibold text-neutral-600">Page: </dt>
                     <dd className="inline text-neutral-800">{r.page as string}</dd>

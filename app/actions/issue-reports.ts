@@ -4,10 +4,12 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
+  ISSUE_TYPES,
   MAX_ISSUE_SCREENSHOTS,
   SCREEN_SPECS,
   STATUSES,
   VIEW_TYPES,
+  issueTypeLabel,
   viewTypeLabel,
   screenSpecLabel,
 } from "@/lib/issue-reports";
@@ -56,6 +58,7 @@ export async function submitIssueReport(
 
   const text = (key: string) => (formData.get(key) as string | null)?.trim() ?? "";
   const subject = text("subject");
+  const issueType = text("issue_type");
   const page = text("page");
   const section = text("section");
   const whatWrong = text("what_wrong");
@@ -70,6 +73,7 @@ export async function submitIssueReport(
   // difference between fixing it in one pass and hunting.
   const required: Array<[string, string]> = [
     [subject, "Subject that needs fixing"],
+    [issueType, "Type of issue"],
     [page, "At which page"],
     [section, "At which section"],
     [whatWrong, "What is wrong on your device"],
@@ -81,6 +85,9 @@ export async function submitIssueReport(
   const missing = required.find(([value]) => !value);
   if (missing) return { error: `Please fill in: ${missing[1]}.` };
 
+  if (!ISSUE_TYPES.includes(issueType as (typeof ISSUE_TYPES)[number])) {
+    return { error: "Please choose a valid type of issue." };
+  }
   if (!VIEW_TYPES.includes(viewType as (typeof VIEW_TYPES)[number])) {
     return { error: "Please choose a valid type of view." };
   }
@@ -127,6 +134,7 @@ export async function submitIssueReport(
       reporter_email: (profile?.email as string | null) ?? user.email ?? null,
       reporter_name: reporterName,
       subject,
+      issue_type: issueType,
       page,
       section,
       what_wrong: whatWrong,
@@ -149,6 +157,7 @@ export async function submitIssueReport(
     reportId: (inserted?.id as string) ?? "",
     reporterName,
     subject,
+    issueTypeLabel: issueTypeLabel(issueType),
     page,
     section,
     viewTypeLabel: viewTypeLabel(viewType),

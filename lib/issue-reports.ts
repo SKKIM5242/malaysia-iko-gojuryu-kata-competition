@@ -5,6 +5,36 @@
 
 export const MAX_ISSUE_SCREENSHOTS = 20;
 
+/** The 3-way "or" in the report form's own heading, turned into a pick --
+ * "viewing" covers the page/site/app-display case, "recording_window"
+ * covers the portrait/landscape recorder specifically, and "technical"
+ * covers everything else (login/access problems and similar). */
+export type IssueType = "viewing" | "recording_window" | "technical";
+
+export const ISSUE_TYPE_OPTIONS: Array<{ value: IssueType; label: string; hint: string }> = [
+  {
+    value: "viewing",
+    label: "Viewing the page, site, or app",
+    hint: "Something looks wrong or inconsistent on a page.",
+  },
+  {
+    value: "recording_window",
+    label: "Recording window (portrait/landscape)",
+    hint: "The kata recording screen itself, in either orientation.",
+  },
+  {
+    value: "technical",
+    label: "Other technical issue",
+    hint: "e.g. Sign In / Access Matrix on the Kata Arena log-in page.",
+  },
+];
+
+export const ISSUE_TYPES = ISSUE_TYPE_OPTIONS.map((o) => o.value);
+
+export function issueTypeLabel(value: string): string {
+  return ISSUE_TYPE_OPTIONS.find((o) => o.value === value)?.label ?? value;
+}
+
 export type IssueViewType = "portrait" | "landscape" | "both";
 
 export const VIEW_TYPE_OPTIONS: Array<{ value: IssueViewType; label: string }> = [

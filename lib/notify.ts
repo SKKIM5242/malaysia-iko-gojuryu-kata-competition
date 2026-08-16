@@ -40,6 +40,52 @@ export function withStagingNotice(text: string): string {
   return isStagingEnv() ? `🧪 Testing Environment — No action needed\n\n${text}` : text;
 }
 
+/** The organizer's standing branding block, appended to every automated
+ * Telegram DM below — replaces the old plain "— Malaysia Open Virtual
+ * Karate-do Kata Competition" sign-off with real clickable links (the org
+ * name links to the sign-in page, "Organizer" links to the org's own site),
+ * per the organizer's own copy. Uses appUrl() so staging and production
+ * each link to their own domain rather than a hardcoded one. */
+function telegramFooterHtml(): string {
+  const signInUrl = `${appUrl()}/account`;
+  return (
+    `<a href="${signInUrl}">Malaysia Open Virtual Karate-do Kata Competition</a> - Goju-ryu or IKO Goju-ryu Version Only\n` +
+    `Specially for all Goju-ryu Karateka to compete globally without leaving their beloved Country.\n` +
+    `Organizer: <a href="https://www.mixo.io/site/iko-goju-ryu-karate-do-m-sdn-bhd-wt9nk">IKO GOJU-RYU KARATE-DO Malaysia Sdn Bhd</a>`
+  );
+}
+
+/** Sends one Telegram DM with the standard branding footer appended, in
+ * HTML parse mode (so the footer's two links render as real hyperlinks
+ * instead of raw URLs) and with link previews disabled -- without that,
+ * Telegram auto-generates a preview card under the plain sign-in URL most
+ * callers also include in `bodyHtml`, showing the raw
+ * "...ikogojuryukaratedomalaysia.com" domain as its own line beneath the
+ * message, which is the "line" the organizer asked to have removed.
+ * `bodyHtml` is everything above the footer -- any dynamic value inside it
+ * (a participant/category/competition name, which can contain a literal
+ * "&") must already be escapeHtml()'d by the caller, since HTML parse mode
+ * treats unescaped "&"/"<"/">" as markup and Telegram will reject the
+ * message outright rather than just mis-rendering it. */
+async function sendTelegramHtml(chatId: string | null, bodyHtml: string): Promise<void> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token || !chatId) return;
+  try {
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: withStagingNotice(`${bodyHtml}\n\n${telegramFooterHtml()}`),
+        parse_mode: "HTML",
+        disable_web_page_preview: true,
+      }),
+    });
+  } catch {
+    // Best-effort
+  }
+}
+
 /** Sends one email via Resend, in plain text by default. Pass `html` for
  * the rare email (currently just the registration confirmation) that needs
  * inline styling Resend's plain `text` field can't carry — every email
@@ -89,23 +135,12 @@ async function sendAssignmentEmail(notice: AssignmentNotice): Promise<void> {
 }
 
 async function sendAssignmentTelegram(notice: AssignmentNotice): Promise<void> {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  if (!token || !notice.refereeTelegramChatId) return;
-  try {
-    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: notice.refereeTelegramChatId,
-        text: withStagingNotice(
-          `🥋 New kata recording assigned for you to judge: ${notice.participantName} — ${notice.categoryName ?? "Kata"}.\n` +
-            `Sign in to Kata Arena to watch and score it: ${appUrl()}/account`,
-        ),
-      }),
-    });
-  } catch {
-    // Best-effort
-  }
+  await sendTelegramHtml(
+    notice.refereeTelegramChatId,
+    `Dear ${escapeHtml(notice.refereeName ?? "Judge")},\n\n` +
+      `🥋 New kata recording assigned for you to judge: ${escapeHtml(notice.participantName)} — ${escapeHtml(notice.categoryName ?? "Kata")}.\n` +
+      `Sign in to Kata Arena to watch and score it: ${appUrl()}/account`,
+  );
 }
 
 export async function notifyRefereeAssignment(notice: AssignmentNotice): Promise<void> {
@@ -181,23 +216,13 @@ async function sendUnassignedEmail(notice: UnassignedNotice): Promise<void> {
 }
 
 async function sendUnassignedTelegram(notice: UnassignedNotice): Promise<void> {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  if (!token || !notice.refereeTelegramChatId) return;
-  try {
-    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: notice.refereeTelegramChatId,
-        text:
-          `🔔 You've been unassigned from judging: ${notice.participantName} — ${notice.categoryName ?? "Kata"}.` +
-          (notice.reason ? ` ${notice.reason}` : "") +
-          `\nNo action needed.`,
-      }),
-    });
-  } catch {
-    // Best-effort
-  }
+  await sendTelegramHtml(
+    notice.refereeTelegramChatId,
+    `Dear ${escapeHtml(notice.refereeName ?? "Judge")},\n\n` +
+      `🔔 You've been unassigned from judging: ${escapeHtml(notice.participantName)} — ${escapeHtml(notice.categoryName ?? "Kata")}.` +
+      (notice.reason ? ` ${escapeHtml(notice.reason)}` : "") +
+      `\nNo action needed.`,
+  );
 }
 
 /** Fires whenever a referee loses an assignment — an explicit admin removal
@@ -233,22 +258,12 @@ async function sendScoredEmail(notice: ScoredNotice): Promise<void> {
 }
 
 async function sendScoredTelegram(notice: ScoredNotice): Promise<void> {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  if (!token || !notice.participantTelegramChatId) return;
-  try {
-    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: notice.participantTelegramChatId,
-        text:
-          `✅ All judges have now scored your kata recording${notice.categoryName ? ` — ${notice.categoryName}` : ""}.\n` +
-          `Results are revealed on the Winners page once the organizer announces them: ${appUrl()}/winners`,
-      }),
-    });
-  } catch {
-    // Best-effort
-  }
+  await sendTelegramHtml(
+    notice.participantTelegramChatId,
+    `Dear ${escapeHtml(notice.participantName)},\n\n` +
+      `✅ All judges have now scored your kata recording${notice.categoryName ? ` — ${escapeHtml(notice.categoryName)}` : ""}.\n` +
+      `Results are revealed on the Winners page once the organizer announces them: ${appUrl()}/winners`,
+  );
 }
 
 /** Fires once per recording, the moment the last of the competition's
@@ -747,12 +762,16 @@ async function sendCertificatesAvailableTelegramDMs(
   recipients: CertificateEmailRecipient[],
   competitionName: string,
 ): Promise<void> {
-  const text =
-    `🎓 Certificates for ${competitionName} are now available — sign in to view and download yours: ${appUrl()}/account`;
   await Promise.allSettled(
     recipients
       .filter((r) => r.telegramChatId)
-      .map((r) => sendDirectTelegramDM(r.telegramChatId, text)),
+      .map((r) =>
+        sendTelegramHtml(
+          r.telegramChatId,
+          `Dear ${escapeHtml(r.name)},\n\n` +
+            `🎓 Certificates for ${escapeHtml(competitionName)} are now available — sign in to view and download yours: ${appUrl()}/account`,
+        ),
+      ),
   );
 }
 
@@ -830,22 +849,12 @@ async function sendStatusChangeEmail(notice: StatusChangeNotice): Promise<void> 
 }
 
 async function sendStatusChangeTelegram(notice: StatusChangeNotice): Promise<void> {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  if (!token || !notice.telegramChatId) return;
-  try {
-    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: notice.telegramChatId,
-        text:
-          `🔔 Your ${notice.fieldLabel.toLowerCase()} has been updated to: ${notice.valueLabel}.\n` +
-          `Sign in for details: ${appUrl()}/account`,
-      }),
-    });
-  } catch {
-    // Best-effort
-  }
+  await sendTelegramHtml(
+    notice.telegramChatId,
+    `Dear ${escapeHtml(notice.name)},\n\n` +
+      `🔔 Your ${escapeHtml(notice.fieldLabel.toLowerCase())} has been updated to: ${escapeHtml(notice.valueLabel)}.\n` +
+      `Sign in for details: ${appUrl()}/account`,
+  );
 }
 
 /** Fires whenever an admin clicks a status/payment button for a School,
@@ -963,6 +972,7 @@ export async function notifyStaffIssueReport(input: {
   reportId: string;
   reporterName: string;
   subject: string;
+  issueTypeLabel: string;
   page: string;
   section: string;
   viewTypeLabel: string;
@@ -983,6 +993,7 @@ export async function notifyStaffIssueReport(input: {
     `New technical issue report from ${input.reporterName}.`,
     "",
     `Subject: ${input.subject}`,
+    `Type: ${input.issueTypeLabel}`,
     `Page: ${input.page}`,
     `Section: ${input.section}`,
     `View affected: ${input.viewTypeLabel}`,
@@ -1313,9 +1324,10 @@ export async function notifySenseiBulkPaymentConfirmed(input: {
         "Go back to the Bulk registration page and upload your CSV or table using the same School and Sensei — no further payment needed for these participants.",
       ],
     }),
-    sendDirectTelegramDM(
+    sendTelegramHtml(
       input.telegramChatId,
-      `💳 Your bulk registration payment of ${input.totalAmountLabel} (${input.tierCount} tier${input.tierCount === 1 ? "" : "s"}) is confirmed — you can upload your CSV/table now.`,
+      `Dear ${escapeHtml(input.senseiName)},\n\n` +
+        `💳 Your bulk registration payment of ${escapeHtml(input.totalAmountLabel)} (${input.tierCount} tier${input.tierCount === 1 ? "" : "s"}) is confirmed — you can upload your CSV/table now.`,
     ),
   ]);
 }
@@ -1348,9 +1360,10 @@ export async function notifySubscriptionRenewed(input: {
     input.email
       ? sendEmail(input.email, `Your new subscription is confirmed — valid ${fromLabel} to ${untilLabel}`, text)
       : Promise.resolve(),
-    sendDirectTelegramDM(
+    sendTelegramHtml(
       input.telegramChatId,
-      `✅ Your new subscription is confirmed — valid ${fromLabel} to ${untilLabel}, ${input.signInLimit} sign-ins available. ` +
+      `Dear ${escapeHtml(input.name)},\n\n` +
+        `✅ Your new subscription is confirmed — valid ${fromLabel} to ${untilLabel}, ${input.signInLimit} sign-ins available. ` +
         `Whichever runs out first ends it; renew again or sign in as audience after that.`,
     ),
   ]);
@@ -1364,9 +1377,10 @@ export async function notifySubscriptionRenewed(input: {
  * day, so this can land anywhere from ~1 hour up to ~24 hours after
  * registration depending on when they signed up relative to the run. */
 export async function notifyParticipantTelegramWelcome(chatId: string, participantName: string): Promise<void> {
-  await sendDirectTelegramDM(
+  await sendTelegramHtml(
     chatId,
-    `🥋 Hi ${participantName}, thanks for registering for the Malaysia Open Virtual Karate-do Kata Competition! ` +
+    `Dear ${escapeHtml(participantName)},\n\n` +
+      `🥋 Thanks for registering for the Malaysia Open Virtual Karate-do Kata Competition! ` +
       `Glad you're connected here — this is where you'll hear about judging and results. ` +
       `Sign in any time to record your kata: ${appUrl()}/account`,
   );
@@ -1389,9 +1403,10 @@ export async function notifySenseiBulkCsvConfirmed(input: {
     `— Malaysia Open Virtual Karate-do Kata Competition`;
   await Promise.allSettled([
     input.email ? sendEmail(input.email, "Your bulk upload has been confirmed", text) : Promise.resolve(),
-    sendDirectTelegramDM(
+    sendTelegramHtml(
       input.telegramChatId,
-      `✅ Your bulk upload of ${input.rowCount} participant${input.rowCount === 1 ? "" : "s"} for ${input.competitionName} has been confirmed by the organizer.`,
+      `Dear ${escapeHtml(input.senseiName)},\n\n` +
+        `✅ Your bulk upload of ${input.rowCount} participant${input.rowCount === 1 ? "" : "s"} for ${escapeHtml(input.competitionName)} has been confirmed by the organizer.`,
     ),
   ]);
 }

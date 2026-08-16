@@ -4,6 +4,7 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { submitIssueReport, type IssueActionState } from "@/app/actions/issue-reports";
 import {
   ISSUE_REPORT_NOTE,
+  ISSUE_TYPE_OPTIONS,
   MAX_ISSUE_SCREENSHOTS,
   SCREEN_SPEC_OPTIONS,
   VIEW_TYPE_OPTIONS,
@@ -94,6 +95,25 @@ export default function IssueReportForm() {
             Subject that needs fixing
           </label>
           <input id="ir-subject" name="subject" required className={inputClass} placeholder="Short summary of the problem" />
+        </div>
+
+        <div>
+          <label className={labelClass} htmlFor="ir-issue-type">
+            Type of issue
+          </label>
+          <select id="ir-issue-type" name="issue_type" required defaultValue="" className={inputClass}>
+            <option value="" disabled>
+              Please choose…
+            </option>
+            {ISSUE_TYPE_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-neutral-500">
+            {ISSUE_TYPE_OPTIONS.map((o) => `${o.label}: ${o.hint}`).join(" · ")}
+          </p>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
