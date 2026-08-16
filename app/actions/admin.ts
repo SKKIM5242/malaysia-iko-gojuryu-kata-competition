@@ -21,7 +21,7 @@ import {
   notifyOrganizersBulkPaymentConfirmed, notifyOrganizersBulkTallyDone, notifySenseiBulkPaymentConfirmed,
   notifySenseiBulkCsvConfirmed, notifyOrganizersDirectoryBulkUpload, sendAdminTelegramDM,
   notifyParticipantEmailChanged, notifyTestimonialDeleted, sendStaffEmail, sendStaffTelegramDM,
-  refereeVideoNotice, notifyVideoAssignment,
+  refereeVideoNotice, notifyVideoAssignment, isStagingEnv,
 } from "@/lib/notify";
 import { autoAssignForVideos } from "@/lib/auto-assign";
 import { applySubscriptionRenewalTerms } from "@/lib/finalize";
@@ -517,6 +517,52 @@ export async function publishWinnersNow(formData: FormData) {
 
   revalidatePath("/");
   backTo(returnTo, { ok: `Winners published for “${before!.name}” -- live on the public Winners page and certificates now.` });
+}
+
+/**
+ * Reverses publishWinnersNow, for re-testing the publish/notify flow
+ * repeatedly without needing a fresh competition each time -- clears
+ * winners_announce_date back to unset (so winnersRevealed() reads false
+ * again, same as before anyone ever published) and clears
+ * certificates_notified_at so a later re-publish sends the notification
+ * again instead of staying silently guarded. Staging-only: refuses outright
+ * server-side (not just hidden client-side) unless isStagingEnv(), since
+ * this is a testing tool, not something a real production tier should ever
+ * have reversed on real registrants/referees who already got the "your
+ * certificate is ready" notice.
+ */
+export async function unpublishCertificates(formData: FormData) {
+  const competitionId = String(formData.get("competition_id") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/certificates";
+  const { supabase, actorId } = await getActor();
+  await requireCompetitionManager(supabase, actorId, returnTo);
+
+  if (!isStagingEnv()) {
+    backTo(returnTo, { error: "Unpublish is only available in the staging/testing environment." });
+  }
+
+  const { data: before } = await supabase
+    .from("competitions")
+    .select("name, winners_announce_date, certificates_notified_at")
+    .eq("id", competitionId)
+    .maybeSingle();
+  if (!before) backTo(returnTo, { error: "Competition not found." });
+
+  const { error } = await supabase
+    .from("competitions")
+    .update({ winners_announce_date: null, certificates_notified_at: null })
+    .eq("id", competitionId);
+  if (error) backTo(returnTo, { error: "Could not unpublish." });
+
+  await writeAudit(supabase, {
+    table_name: "competitions", record_id: competitionId, action: "winners_unpublished_manually_testing",
+    old_value: { winners_announce_date: before!.winners_announce_date, certificates_notified_at: before!.certificates_notified_at },
+    new_value: { winners_announce_date: null, certificates_notified_at: null },
+    actor_id: actorId,
+  });
+
+  revalidatePath("/");
+  backTo(returnTo, { ok: `Unpublished “${before!.name}” -- winners_announce_date and the notified flag are cleared for re-testing.` });
 }
 
 /**
@@ -1854,6 +1900,7 @@ export async function saveCertificateTemplate(formData: FormData) {
     date_size: numField(formData, "date_size", 55),
     date_alignment: align3Field(formData, "date_alignment", "center"),
     date_description: String(formData.get("date_description") ?? "").trim() || "Announcement Date",
+    date_description_alignment: align3Field(formData, "date_description_alignment", "center"),
     date_line_style: lineStyleField(formData, "date_line_style", "solid"),
     date_line_width: numField(formData, "date_line_width", 380),
     signer_name_size: numField(formData, "signer_name_size", 28),

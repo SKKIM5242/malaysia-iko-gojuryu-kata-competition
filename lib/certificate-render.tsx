@@ -84,6 +84,9 @@ export interface CertificateTemplate {
   dateSize: number;
   dateAlignment: "left" | "center" | "right";
   dateDescription: string;
+  /** Independent of dateAlignment -- that one positions the date number
+   * itself; this one positions the description text underneath it. */
+  dateDescriptionAlignment: "left" | "center" | "right";
   dateLineStyle: "solid" | "dashed";
   dateLineWidth: number;
   signerNameSize: number;
@@ -444,7 +447,7 @@ function SignerBlock({
 /** The date column: mirrors SignerBlock's structure (fixed-height top
  * zone, hr, caption below) so its hr lines up with both signers'. */
 function DateBlock({
-  dateLabel, caption, width, color, size, alignment, lineStyle,
+  dateLabel, caption, width, color, size, alignment, lineStyle, captionAlignment,
 }: {
   dateLabel: string;
   caption: string;
@@ -453,8 +456,10 @@ function DateBlock({
   size: number;
   alignment: "left" | "center" | "right";
   lineStyle: "solid" | "dashed";
+  captionAlignment: "left" | "center" | "right";
 }) {
   const edge = edgeFor(alignment);
+  const captionEdge = edgeFor(captionAlignment);
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: edge, width: `${width}px` }}>
       <div style={{ display: "flex", height: `${FOOTER_TOP_H}px`, alignItems: "flex-end", justifyContent: edge }}>
@@ -464,10 +469,13 @@ function DateBlock({
       {/* textAlign on its own inner block (not just the outer row's
           justifyContent) is what makes long descriptions -- "Winner
           Announcement Date" and anything an organizer types that's
-          longer -- wrap onto multiple lines and stay centered, the same
-          fix StyledText already relies on for the header/body fields. */}
-      <div style={{ marginTop: "12px", display: "flex", width: "100%", justifyContent: edge }}>
-        <div style={{ display: "flex", fontSize: 33, fontWeight: 600, color: "#78716c", textAlign: alignment, maxWidth: `${width}px` }}>
+          longer -- wrap onto multiple lines and stay aligned, the same
+          fix StyledText already relies on for the header/body fields.
+          Independent captionAlignment (not the block's own `alignment`,
+          which only positions the date number) so the description can be
+          aligned on its own. */}
+      <div style={{ marginTop: "12px", display: "flex", width: "100%", justifyContent: captionEdge }}>
+        <div style={{ display: "flex", fontSize: 33, fontWeight: 600, color: "#78716c", textAlign: captionAlignment, maxWidth: `${width}px` }}>
           {caption}
         </div>
       </div>
@@ -791,6 +799,7 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
               size={template.dateSize}
               alignment={template.dateAlignment}
               lineStyle={template.dateLineStyle}
+              captionAlignment={template.dateDescriptionAlignment}
             />
 
             <SignerBlock

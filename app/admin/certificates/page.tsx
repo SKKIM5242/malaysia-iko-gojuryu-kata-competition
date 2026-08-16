@@ -5,8 +5,10 @@ import { AdminShell, Card, adminBtn, adminInput, adminLabel } from "@/components
 import { EmptyState, SetupNotice, formatDate } from "@/components/ui";
 import CertificateUploadField from "@/components/CertificateUploadField";
 import CertificateTemplateForm, { type CertificateTemplateRow } from "@/components/CertificateTemplateForm";
+import UnpublishCertificatesButton from "@/components/UnpublishCertificatesButton";
 import DateField from "@/components/DateField";
 import { winnersRevealDate, winnersRevealDateFor } from "@/lib/winners";
+import { isStagingEnv } from "@/lib/notify";
 import type { Competition } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -231,6 +233,13 @@ export default async function AdminCertificates({
                               Publish all Certificates
                             </button>
                           </form>
+                        )}
+                        {isStagingEnv() && revealed && (
+                          <UnpublishCertificatesButton
+                            competitionId={c.id}
+                            returnTo="/admin/certificates"
+                            className="rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-sm font-semibold text-amber-900 hover:bg-amber-100"
+                          />
                         )}
                       </div>
                     </div>

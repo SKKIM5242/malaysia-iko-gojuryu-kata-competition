@@ -40,6 +40,7 @@ export interface CertificateTemplateRow {
   date_size: number;
   date_alignment: Align3;
   date_description: string;
+  date_description_alignment: Align3;
   date_line_style: LineStyle;
   date_line_width: number;
   signer_name_size: number;
@@ -359,6 +360,7 @@ export default function CertificateTemplateForm({
   const [dateSize, setDateSize] = useState(template.date_size);
   const [dateAlignment, setDateAlignment] = useState<Align3>(template.date_alignment);
   const [dateDescription, setDateDescription] = useState(template.date_description);
+  const [dateDescriptionAlignment, setDateDescriptionAlignment] = useState<Align3>(template.date_description_alignment);
   const [dateLineStyle, setDateLineStyle] = useState<LineStyle>(template.date_line_style);
   const [dateLineWidth, setDateLineWidth] = useState(template.date_line_width);
 
@@ -399,7 +401,8 @@ export default function CertificateTemplateForm({
         logo1_size: logo1Size, logo2_size: logo2Size, medal_size: medalSize,
         logos_alignment: logosAlignment, logos_no_spacing: logosNoSpacing,
         date_color: dateColor, date_size: dateSize, date_alignment: dateAlignment,
-        date_description: dateDescription, date_line_style: dateLineStyle, date_line_width: dateLineWidth,
+        date_description: dateDescription, date_description_alignment: dateDescriptionAlignment,
+        date_line_style: dateLineStyle, date_line_width: dateLineWidth,
         signer_name_size: signerNameSize, signer_title_size: signerTitleSize,
         signer_name_bold: signerNameBold, signer_title_bold: signerTitleBold, signer_position: signerPosition,
         signer_line_style: signerLineStyle, signer_line_width: signerLineWidth,
@@ -610,13 +613,27 @@ export default function CertificateTemplateForm({
 
       <div className="rounded border border-neutral-200 bg-neutral-50 p-2">
         <p className="mb-1 text-xs font-semibold text-neutral-600">Footer — Date</p>
-        <div>
-          <label className={smallLabel}>Description (below the date — wraps and stays centered if long)</label>
-          <input
-            type="text" name="date_description" value={dateDescription}
-            onChange={(e) => setDateDescription(e.target.value)}
-            className={smallInput}
-          />
+        <div className="grid grid-cols-3 gap-2">
+          <div className="col-span-2">
+            <label className={smallLabel}>Description (below the date — wraps if long)</label>
+            <input
+              type="text" name="date_description" value={dateDescription}
+              onChange={(e) => setDateDescription(e.target.value)}
+              className={smallInput}
+            />
+          </div>
+          <div>
+            <label className={smallLabel}>Description alignment</label>
+            <select
+              name="date_description_alignment" value={dateDescriptionAlignment}
+              onChange={(e) => setDateDescriptionAlignment(e.target.value as Align3)}
+              className={smallInput}
+            >
+              <option value="left">Left</option>
+              <option value="center">Center</option>
+              <option value="right">Right</option>
+            </select>
+          </div>
         </div>
         <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-5">
           <div>

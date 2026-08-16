@@ -77,6 +77,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ kin
     dateSize: num(b.date_size, saved.dateSize),
     dateAlignment: align3(b.date_alignment, saved.dateAlignment),
     dateDescription: typeof b.date_description === "string" ? b.date_description : saved.dateDescription,
+    dateDescriptionAlignment: align3(b.date_description_alignment, saved.dateDescriptionAlignment),
     dateLineStyle: lineStyle3(b.date_line_style, saved.dateLineStyle),
     dateLineWidth: num(b.date_line_width, saved.dateLineWidth),
     signerNameSize: num(b.signer_name_size, saved.signerNameSize),

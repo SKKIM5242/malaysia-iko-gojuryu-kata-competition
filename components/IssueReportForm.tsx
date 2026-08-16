@@ -98,22 +98,23 @@ export default function IssueReportForm() {
         </div>
 
         <div>
-          <label className={labelClass} htmlFor="ir-issue-type">
-            Type of issue
-          </label>
-          <select id="ir-issue-type" name="issue_type" required defaultValue="" className={inputClass}>
-            <option value="" disabled>
-              Please choose…
-            </option>
+          <p className={labelClass}>Type of issue</p>
+          {/* Every choice visible at once, no dropdown to open first —
+              tap/click anywhere on a card to pick it. */}
+          <div className="mt-1 space-y-2">
             {ISSUE_TYPE_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
+              <label
+                key={o.value}
+                className="flex cursor-pointer items-start gap-2.5 rounded-md border border-neutral-300 p-2.5 has-[:checked]:border-red-600 has-[:checked]:bg-red-50 hover:bg-neutral-50"
+              >
+                <input type="radio" name="issue_type" value={o.value} required className="mt-1 shrink-0" />
+                <span>
+                  <span className="block text-sm font-semibold text-neutral-800">{o.label}</span>
+                  <span className="block text-xs text-neutral-500">{o.hint}</span>
+                </span>
+              </label>
             ))}
-          </select>
-          <p className="mt-1 text-xs text-neutral-500">
-            {ISSUE_TYPE_OPTIONS.map((o) => `${o.label}: ${o.hint}`).join(" · ")}
-          </p>
+          </div>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">

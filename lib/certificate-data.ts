@@ -113,6 +113,7 @@ export async function certificateTemplate(
     dateSize: (data?.date_size as number | null) ?? 55,
     dateAlignment: align3(data?.date_alignment, "center"),
     dateDescription: (data?.date_description as string | null) ?? "Announcement Date",
+    dateDescriptionAlignment: align3(data?.date_description_alignment, "center"),
     dateLineStyle: lineStyle3(data?.date_line_style, "solid"),
     dateLineWidth: (data?.date_line_width as number | null) ?? 380,
     signerNameSize: (data?.signer_name_size as number | null) ?? 28,
