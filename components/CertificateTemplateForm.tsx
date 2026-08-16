@@ -4,6 +4,21 @@ import { useRef, useState } from "react";
 import { saveCertificateTemplate, deleteCertificateTemplateImage } from "@/app/actions/admin";
 import { adminBtn, adminInput, adminLabel } from "@/components/admin-styles";
 
+type Align3 = "left" | "center" | "right";
+
+export interface TextStyleValue {
+  fontSize?: number;
+  color?: string;
+  align?: Align3;
+  weight?: number;
+  italic?: boolean;
+  underline?: boolean;
+  underlineWeight?: "thin" | "medium" | "thick";
+  lineHeight?: number;
+  tightSpacing?: boolean;
+  maxLines?: number;
+}
+
 export interface CertificateTemplateRow {
   kind: string;
   header1: string;
@@ -14,20 +29,197 @@ export interface CertificateTemplateRow {
   logo_count: 1 | 2;
   show_medal: boolean;
   medal_position: "between" | "left" | "right";
+  logo1_size: number;
+  logo2_size: number;
+  medal_size: number;
+  logos_alignment: Align3;
+  logos_no_spacing: boolean;
+  date_color: string;
+  date_size: number;
+  date_alignment: Align3;
+  signer_name_size: number;
+  signer_title_size: number;
+  signer_name_bold: boolean;
+  signer_title_bold: boolean;
+  signer_position: Align3;
+  header1_style: TextStyleValue;
+  header2_style: TextStyleValue;
+  body1_style: TextStyleValue;
+  body2_style: TextStyleValue;
+  body3_style: TextStyleValue;
 }
+
+// A representative accent per kind, purely so the Header 1 color swatch
+// doesn't start on a meaningless black -- the real default (used whenever
+// the organizer never touches this picker) is the certificate's own dynamic
+// accent color (rank-colored for Winner), computed server-side; touching
+// the swatch is what actually locks in a fixed override. See
+// lib/certificate-render.tsx's ACCENT/RANK_ACCENT.
+const KIND_ACCENT: Record<string, string> = {
+  winner: "#B8860B", participant: "#B91C1C", referee: "#1D4ED8",
+  sensei: "#7C3AED", school: "#0F766E", support: "#B45309",
+};
 
 const MERGE_TOKENS = [
   { token: "{name}", label: "Name" },
-  { token: "{kata_category}", label: "Kata / Category" },
+  { token: "{kata_name}", label: "Kata Name" },
+  { token: "{category}", label: "Category (Belt/Gender/Age)" },
   { token: "{competition_tier}", label: "Competition Tier" },
 ] as const;
 
-/** One Body textarea plus small "insert" buttons for the 3 (4 for Winner)
- * merge tokens it can pull live data from -- clicking a button appends the
- * token at the end rather than tracking cursor position, simple and
- * predictable for a field that's usually short. */
+const FONT_WEIGHTS = [
+  { value: 400, label: "Regular" },
+  { value: 500, label: "Medium" },
+  { value: 600, label: "Semibold" },
+  { value: 700, label: "Bold" },
+  { value: 800, label: "Extra Bold" },
+  { value: 900, label: "Black" },
+] as const;
+
+const LINE_HEIGHTS = [1, 1.1, 1.2, 1.4, 1.6, 1.8, 2] as const;
+const UNDERLINE_WEIGHTS = ["thin", "medium", "thick"] as const;
+
+const smallLabel = "block text-[11px] font-semibold text-neutral-500";
+const smallInput = "w-full rounded border border-neutral-300 px-1.5 py-1 text-xs";
+
+/** Font size / color / alignment / boldness / italic / underline(+thickness)
+ * / line spacing / "no spacing between line" / approximate max-lines, for
+ * one Header or Body field. Bundled as one JSON object in a single hidden
+ * input (`name`) rather than ~10 separately-named fields -- the server
+ * action re-validates the shape (sanitizeTextStyle) before it's saved, so
+ * this is just a convenient wire format, not a trust boundary. */
+function TextStyleControls({
+  name, value, onChange, defaultFontSize, defaultColor,
+}: {
+  name: string;
+  value: TextStyleValue;
+  onChange: (v: TextStyleValue) => void;
+  defaultFontSize: number;
+  defaultColor: string;
+}) {
+  const set = <K extends keyof TextStyleValue>(k: K, v: TextStyleValue[K]) => onChange({ ...value, [k]: v });
+  return (
+    <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2 rounded border border-neutral-200 bg-neutral-50 p-2 sm:grid-cols-4">
+      <input type="hidden" name={name} value={JSON.stringify(value)} />
+      <div>
+        <label className={smallLabel}>Font size</label>
+        <input
+          type="number" min={8} max={300}
+          value={value.fontSize ?? defaultFontSize}
+          onChange={(e) => set("fontSize", Number(e.target.value) || defaultFontSize)}
+          className={smallInput}
+        />
+      </div>
+      <div>
+        <label className={smallLabel}>Color</label>
+        <input
+          type="color"
+          value={value.color ?? defaultColor}
+          onChange={(e) => set("color", e.target.value)}
+          className="h-[26px] w-full rounded border border-neutral-300"
+        />
+      </div>
+      <div>
+        <label className={smallLabel}>Align</label>
+        <select value={value.align ?? "center"} onChange={(e) => set("align", e.target.value as Align3)} className={smallInput}>
+          <option value="left">Left</option>
+          <option value="center">Center</option>
+          <option value="right">Right</option>
+        </select>
+      </div>
+      <div>
+        <label className={smallLabel}>Boldness</label>
+        <select value={value.weight ?? 700} onChange={(e) => set("weight", Number(e.target.value))} className={smallInput}>
+          {FONT_WEIGHTS.map((w) => (
+            <option key={w.value} value={w.value}>{w.label} ({w.value})</option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label className={smallLabel}>Line spacing</label>
+        <select
+          value={value.lineHeight ?? ""}
+          onChange={(e) => set("lineHeight", e.target.value ? Number(e.target.value) : undefined)}
+          className={smallInput}
+        >
+          <option value="">Default</option>
+          {LINE_HEIGHTS.map((lh) => (
+            <option key={lh} value={lh}>{lh.toFixed(1)}×</option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label className={smallLabel}>Max lines (wrap)</label>
+        <input
+          type="number" min={0} max={20}
+          value={value.maxLines ?? ""}
+          placeholder="No limit"
+          onChange={(e) => set("maxLines", e.target.value ? Number(e.target.value) : undefined)}
+          className={smallInput}
+        />
+      </div>
+      <div className="flex items-end gap-3 pb-1 text-xs">
+        <label className="flex items-center gap-1">
+          <input type="checkbox" checked={!!value.italic} onChange={(e) => set("italic", e.target.checked)} />
+          Italic
+        </label>
+        <label className="flex items-center gap-1">
+          <input type="checkbox" checked={!!value.tightSpacing} onChange={(e) => set("tightSpacing", e.target.checked)} />
+          No spacing between line
+        </label>
+      </div>
+      <div className="flex items-end gap-2 pb-1 text-xs">
+        <label className="flex items-center gap-1">
+          <input type="checkbox" checked={!!value.underline} onChange={(e) => set("underline", e.target.checked)} />
+          Underline
+        </label>
+        {value.underline && (
+          <select
+            value={value.underlineWeight ?? "medium"}
+            onChange={(e) => set("underlineWeight", e.target.value as TextStyleValue["underlineWeight"])}
+            className="rounded border border-neutral-300 px-1 py-1 text-[11px]"
+          >
+            {UNDERLINE_WEIGHTS.map((w) => (
+              <option key={w} value={w}>{w[0].toUpperCase() + w.slice(1)}</option>
+            ))}
+          </select>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Header 1 / Header 2: a plain text input plus its TextStyleControls
+ * panel. No merge-token buttons (Body fields only), matching today. */
+function HeaderField({
+  id, name, label, value, onChange, styleValue, onStyleChange, styleName, defaultFontSize, defaultColor,
+}: {
+  id: string;
+  name: string;
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  styleValue: TextStyleValue;
+  onStyleChange: (v: TextStyleValue) => void;
+  styleName: string;
+  defaultFontSize: number;
+  defaultColor: string;
+}) {
+  return (
+    <div>
+      <label htmlFor={id} className={adminLabel}>{label}</label>
+      <input id={id} name={name} value={value} onChange={(e) => onChange(e.target.value)} className={adminInput} />
+      <TextStyleControls name={styleName} value={styleValue} onChange={onStyleChange} defaultFontSize={defaultFontSize} defaultColor={defaultColor} />
+    </div>
+  );
+}
+
+/** One Body textarea plus small "insert" buttons for the merge tokens it
+ * can pull live data from -- clicking a button appends the token at the end
+ * rather than tracking cursor position, simple and predictable for a field
+ * that's usually short -- plus its TextStyleControls panel. */
 function BodyField({
-  id, name, label, value, onChange, showRankToken,
+  id, name, label, value, onChange, showRankToken, styleValue, onStyleChange, styleName, defaultFontSize, defaultColor,
 }: {
   id: string;
   name: string;
@@ -35,6 +227,11 @@ function BodyField({
   value: string;
   onChange: (v: string) => void;
   showRankToken: boolean;
+  styleValue: TextStyleValue;
+  onStyleChange: (v: TextStyleValue) => void;
+  styleName: string;
+  defaultFontSize: number;
+  defaultColor: string;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   function insert(token: string) {
@@ -67,6 +264,7 @@ function BodyField({
           </button>
         )}
       </div>
+      <TextStyleControls name={styleName} value={styleValue} onChange={onStyleChange} defaultFontSize={defaultFontSize} defaultColor={defaultColor} />
     </div>
   );
 }
@@ -136,7 +334,70 @@ export default function CertificateTemplateForm({
   const [body1, setBody1] = useState(template.body1);
   const [body2, setBody2] = useState(template.body2);
   const [body3, setBody3] = useState(template.body3);
+
+  const [logo1Size, setLogo1Size] = useState(template.logo1_size);
+  const [logo2Size, setLogo2Size] = useState(template.logo2_size);
+  const [medalSize, setMedalSize] = useState(template.medal_size);
+  const [logosAlignment, setLogosAlignment] = useState<Align3>(template.logos_alignment);
+  const [logosNoSpacing, setLogosNoSpacing] = useState(template.logos_no_spacing);
+
+  const [dateColor, setDateColor] = useState(template.date_color);
+  const [dateSize, setDateSize] = useState(template.date_size);
+  const [dateAlignment, setDateAlignment] = useState<Align3>(template.date_alignment);
+
+  const [signerNameSize, setSignerNameSize] = useState(template.signer_name_size);
+  const [signerTitleSize, setSignerTitleSize] = useState(template.signer_title_size);
+  const [signerNameBold, setSignerNameBold] = useState(template.signer_name_bold);
+  const [signerTitleBold, setSignerTitleBold] = useState(template.signer_title_bold);
+  const [signerPosition, setSignerPosition] = useState<Align3>(template.signer_position);
+
+  const [header1Style, setHeader1Style] = useState<TextStyleValue>(template.header1_style ?? {});
+  const [header2Style, setHeader2Style] = useState<TextStyleValue>(template.header2_style ?? {});
+  const [body1Style, setBody1Style] = useState<TextStyleValue>(template.body1_style ?? {});
+  const [body2Style, setBody2Style] = useState<TextStyleValue>(template.body2_style ?? {});
+  const [body3Style, setBody3Style] = useState<TextStyleValue>(template.body3_style ?? {});
+
+  const [previewing, setPreviewing] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+
   const isWinner = kind === "winner";
+  const kindAccent = KIND_ACCENT[kind] ?? "#1c1917";
+
+  async function handlePreview() {
+    setPreviewing(true);
+    setPreviewError(null);
+    try {
+      const payload = {
+        header1, header2, body1, body2, body3,
+        logo_count: logoCount,
+        show_medal: showMedal,
+        medal_position: medalPosition,
+        logo1_size: logo1Size, logo2_size: logo2Size, medal_size: medalSize,
+        logos_alignment: logosAlignment, logos_no_spacing: logosNoSpacing,
+        date_color: dateColor, date_size: dateSize, date_alignment: dateAlignment,
+        signer_name_size: signerNameSize, signer_title_size: signerTitleSize,
+        signer_name_bold: signerNameBold, signer_title_bold: signerTitleBold, signer_position: signerPosition,
+        header1_style: header1Style, header2_style: header2Style,
+        body1_style: body1Style, body2_style: body2Style, body3_style: body3Style,
+      };
+      const res = await fetch(`/api/certificates/${kind}/preview`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        setPreviewError((await res.text().catch(() => "")) || "Preview failed.");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+    } catch {
+      setPreviewError("Preview failed. Please try again.");
+    } finally {
+      setPreviewing(false);
+    }
+  }
 
   return (
     <form action={saveCertificateTemplate} className="space-y-3 rounded-lg border border-neutral-200 bg-white p-3 shadow-sm">
@@ -208,22 +469,174 @@ export default function CertificateTemplateForm({
         )}
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-2">
-        <div>
-          <label htmlFor={`${kind}_header1`} className={adminLabel}>Header 1 (title)</label>
-          <input id={`${kind}_header1`} name="header1" value={header1} onChange={(e) => setHeader1(e.target.value)} className={adminInput} />
+      <div>
+        <label className={adminLabel}>Logo / medal size, alignment &amp; spacing</label>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div>
+            <label className={smallLabel}>Logo 1 size (px)</label>
+            <input
+              type="number" name="logo1_size" min={40} max={800} value={logo1Size}
+              onChange={(e) => setLogo1Size(Number(e.target.value) || 420)}
+              className={smallInput}
+            />
+          </div>
+          <div>
+            <label className={smallLabel}>Logo 2 size (px)</label>
+            {logoCount === 2 ? (
+              <input
+                type="number" name="logo2_size" min={40} max={800} value={logo2Size}
+                onChange={(e) => setLogo2Size(Number(e.target.value) || 420)}
+                className={smallInput}
+              />
+            ) : (
+              <>
+                <input type="hidden" name="logo2_size" value={logo2Size} />
+                <input type="number" disabled value={logo2Size} className={`${smallInput} opacity-50`} />
+              </>
+            )}
+          </div>
+          <div>
+            <label className={smallLabel}>Medal size (px)</label>
+            {isWinner || showMedal ? (
+              <input
+                type="number" name="medal_size" min={40} max={800} value={medalSize}
+                onChange={(e) => setMedalSize(Number(e.target.value) || 368)}
+                className={smallInput}
+              />
+            ) : (
+              <>
+                <input type="hidden" name="medal_size" value={medalSize} />
+                <input type="number" disabled value={medalSize} className={`${smallInput} opacity-50`} />
+              </>
+            )}
+          </div>
+          <div>
+            <label className={smallLabel}>Logos alignment</label>
+            <select
+              name="logos_alignment" value={logosAlignment}
+              onChange={(e) => setLogosAlignment(e.target.value as Align3)}
+              className={smallInput}
+            >
+              <option value="left">Left</option>
+              <option value="center">Center</option>
+              <option value="right">Right</option>
+            </select>
+          </div>
         </div>
-        <div>
-          <label htmlFor={`${kind}_header2`} className={adminLabel}>Header 2 (intro line)</label>
-          <input id={`${kind}_header2`} name="header2" value={header2} onChange={(e) => setHeader2(e.target.value)} className={adminInput} />
+        <label className="mt-2 flex items-center gap-1.5 text-xs font-medium text-neutral-600">
+          <input type="checkbox" name="logos_no_spacing" checked={logosNoSpacing} onChange={(e) => setLogosNoSpacing(e.target.checked)} />
+          No spacing between logos
+        </label>
+      </div>
+
+      <div className="rounded border border-neutral-200 bg-neutral-50 p-2">
+        <p className="mb-1 text-xs font-semibold text-neutral-600">Footer — Date</p>
+        <div className="grid grid-cols-3 gap-2">
+          <div>
+            <label className={smallLabel}>Color</label>
+            <input
+              type="color" name="date_color" value={dateColor}
+              onChange={(e) => setDateColor(e.target.value)}
+              className="h-[26px] w-full rounded border border-neutral-300"
+            />
+          </div>
+          <div>
+            <label className={smallLabel}>Size</label>
+            <input
+              type="number" name="date_size" min={10} max={150} value={dateSize}
+              onChange={(e) => setDateSize(Number(e.target.value) || 55)}
+              className={smallInput}
+            />
+          </div>
+          <div>
+            <label className={smallLabel}>Alignment</label>
+            <select name="date_alignment" value={dateAlignment} onChange={(e) => setDateAlignment(e.target.value as Align3)} className={smallInput}>
+              <option value="left">Left</option>
+              <option value="center">Center</option>
+              <option value="right">Right</option>
+            </select>
+          </div>
         </div>
       </div>
 
-      <BodyField id={`${kind}_body1`} name="body1" label="Body 1 (recipient)" value={body1} onChange={setBody1} showRankToken={isWinner} />
-      <BodyField id={`${kind}_body2`} name="body2" label="Body 2 (reason)" value={body2} onChange={setBody2} showRankToken={isWinner} />
-      <BodyField id={`${kind}_body3`} name="body3" label="Body 3 (competition)" value={body3} onChange={setBody3} showRankToken={isWinner} />
+      <div className="rounded border border-neutral-200 bg-neutral-50 p-2">
+        <p className="mb-1 text-xs font-semibold text-neutral-600">Footer — Signer name &amp; title</p>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+          <div>
+            <label className={smallLabel}>Name size</label>
+            <input
+              type="number" name="signer_name_size" min={10} max={100} value={signerNameSize}
+              onChange={(e) => setSignerNameSize(Number(e.target.value) || 28)}
+              className={smallInput}
+            />
+          </div>
+          <div>
+            <label className={smallLabel}>Title size</label>
+            <input
+              type="number" name="signer_title_size" min={10} max={100} value={signerTitleSize}
+              onChange={(e) => setSignerTitleSize(Number(e.target.value) || 22)}
+              className={smallInput}
+            />
+          </div>
+          <label className="flex items-end gap-1 pb-1.5 text-xs">
+            <input type="checkbox" name="signer_name_bold" checked={signerNameBold} onChange={(e) => setSignerNameBold(e.target.checked)} />
+            Name bold
+          </label>
+          <label className="flex items-end gap-1 pb-1.5 text-xs">
+            <input type="checkbox" name="signer_title_bold" checked={signerTitleBold} onChange={(e) => setSignerTitleBold(e.target.checked)} />
+            Title bold
+          </label>
+          <div>
+            <label className={smallLabel}>Position</label>
+            <select name="signer_position" value={signerPosition} onChange={(e) => setSignerPosition(e.target.value as Align3)} className={smallInput}>
+              <option value="left">Left</option>
+              <option value="center">Center</option>
+              <option value="right">Right</option>
+            </select>
+          </div>
+        </div>
+        <p className="mt-1 text-[11px] text-neutral-400">Applies to both signers when a second signer is set in Certificate Settings above.</p>
+      </div>
 
-      <button type="submit" className={adminBtn}>Save {kindLabel} template</button>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <HeaderField
+          id={`${kind}_header1`} name="header1" label="Header 1 (title)" value={header1} onChange={setHeader1}
+          styleValue={header1Style} onStyleChange={setHeader1Style} styleName="header1_style"
+          defaultFontSize={112} defaultColor={kindAccent}
+        />
+        <HeaderField
+          id={`${kind}_header2`} name="header2" label="Header 2 (intro line)" value={header2} onChange={setHeader2}
+          styleValue={header2Style} onStyleChange={setHeader2Style} styleName="header2_style"
+          defaultFontSize={88} defaultColor="#57534e"
+        />
+      </div>
+
+      <BodyField
+        id={`${kind}_body1`} name="body1" label="Body 1 (recipient)" value={body1} onChange={setBody1} showRankToken={isWinner}
+        styleValue={body1Style} onStyleChange={setBody1Style} styleName="body1_style"
+        defaultFontSize={112} defaultColor="#1c1917"
+      />
+      <BodyField
+        id={`${kind}_body2`} name="body2" label="Body 2 (reason)" value={body2} onChange={setBody2} showRankToken={isWinner}
+        styleValue={body2Style} onStyleChange={setBody2Style} styleName="body2_style"
+        defaultFontSize={46} defaultColor="#57534e"
+      />
+      <BodyField
+        id={`${kind}_body3`} name="body3" label="Body 3 (competition)" value={body3} onChange={setBody3} showRankToken={isWinner}
+        styleValue={body3Style} onStyleChange={setBody3Style} styleName="body3_style"
+        defaultFontSize={46} defaultColor="#57534e"
+      />
+
+      {previewError && <p className="text-xs font-semibold text-red-600">{previewError}</p>}
+      <div className="flex items-center justify-between pt-1">
+        <button
+          type="button" onClick={handlePreview} disabled={previewing}
+          className="rounded bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+        >
+          {previewing ? "Rendering…" : "Preview"}
+        </button>
+        <button type="submit" className={adminBtn}>Save {kindLabel} template</button>
+      </div>
     </form>
   );
 }

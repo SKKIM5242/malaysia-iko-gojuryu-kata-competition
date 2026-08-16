@@ -35,6 +35,7 @@ import { ACCESS_MATRIX, accessMatrixAnnouncementIntro } from "@/lib/access-matri
 import { DEFAULT_COMPARISON_ROWS } from "@/components/AccessComparisonTable";
 import { DEFAULT_AUTO_ASSIGN_CRITERIA } from "@/lib/auto-assign-criteria";
 import { formatUSD, formatDate } from "@/components/ui";
+import { sanitizeTextStyle } from "@/lib/certificate-render";
 
 /**
  * Admin server actions. Sprint 3 runs these under the v1 open RLS policies;
@@ -1785,6 +1786,35 @@ async function requireCertificateTemplateManager(
  * logo1/logo2/medal upload right in the same form. Deleting an existing
  * image is a separate action (deleteCertificateTemplateImage) so it has
  * its own explicit confirm, rather than living inside this general save. */
+const ALIGN3 = ["left", "center", "right"] as const;
+
+function numField(formData: FormData, name: string, fallback: number): number {
+  const n = Number(formData.get(name));
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function align3Field(formData: FormData, name: string, fallback: (typeof ALIGN3)[number]): (typeof ALIGN3)[number] {
+  const v = String(formData.get(name) ?? "");
+  return (ALIGN3 as readonly string[]).includes(v) ? (v as (typeof ALIGN3)[number]) : fallback;
+}
+
+/** Each Header/Body field's typography (font size/color/alignment/weight/
+ * italic/underline+thickness/line spacing/max-lines) is managed client-side
+ * as one object and posted as a single JSON string in a hidden input (see
+ * components/CertificateTemplateForm.tsx's TextStyleControls) -- simpler
+ * than flattening ~10 style properties x 5 fields into 50 separate named
+ * inputs. sanitizeTextStyle re-validates the shape before it reaches the
+ * jsonb column, rather than trusting client JSON blindly. */
+function styleField(formData: FormData, name: string): ReturnType<typeof sanitizeTextStyle> {
+  const raw = String(formData.get(name) ?? "");
+  if (!raw) return sanitizeTextStyle(null);
+  try {
+    return sanitizeTextStyle(JSON.parse(raw));
+  } catch {
+    return sanitizeTextStyle(null);
+  }
+}
+
 export async function saveCertificateTemplate(formData: FormData) {
   const returnTo = String(formData.get("return_to") ?? "") || "/admin/certificates";
   const kind = String(formData.get("kind") ?? "");
@@ -1809,6 +1839,24 @@ export async function saveCertificateTemplate(formData: FormData) {
     logo_count: logoCount,
     show_medal: formData.get("show_medal") === "on",
     medal_position: medalPosition,
+    logo1_size: numField(formData, "logo1_size", 420),
+    logo2_size: numField(formData, "logo2_size", 420),
+    medal_size: numField(formData, "medal_size", 368),
+    logos_alignment: align3Field(formData, "logos_alignment", "center"),
+    logos_no_spacing: formData.get("logos_no_spacing") === "on",
+    date_color: String(formData.get("date_color") ?? "").trim() || "#44403c",
+    date_size: numField(formData, "date_size", 55),
+    date_alignment: align3Field(formData, "date_alignment", "center"),
+    signer_name_size: numField(formData, "signer_name_size", 28),
+    signer_title_size: numField(formData, "signer_title_size", 22),
+    signer_name_bold: formData.get("signer_name_bold") === "on",
+    signer_title_bold: formData.get("signer_title_bold") === "on",
+    signer_position: align3Field(formData, "signer_position", "center"),
+    header1_style: styleField(formData, "header1_style"),
+    header2_style: styleField(formData, "header2_style"),
+    body1_style: styleField(formData, "body1_style"),
+    body2_style: styleField(formData, "body2_style"),
+    body3_style: styleField(formData, "body3_style"),
     updated_at: new Date().toISOString(),
     updated_by: actorId,
   };

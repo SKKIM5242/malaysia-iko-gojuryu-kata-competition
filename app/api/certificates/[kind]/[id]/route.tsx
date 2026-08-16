@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { renderCertificatePng, type CertificateInput, type CertificateKind, type CertificateTemplate } from "@/lib/certificate-render";
+import { renderCertificatePng, type CertificateKind } from "@/lib/certificate-render";
+import { SAMPLE_DATA, certificateSettings, certificateTemplate } from "@/lib/certificate-data";
 import { computeCategoryRankings } from "@/lib/winners-ranking";
 import { winnersRevealed } from "@/lib/winners";
 import { kataBaseOf } from "@/lib/division";
@@ -9,95 +10,6 @@ import { formatDate } from "@/components/ui";
 export const dynamic = "force-dynamic";
 
 const VALID_KINDS: CertificateKind[] = ["winner", "participant", "referee", "sensei", "school", "support"];
-
-/** Placeholder data for the admin Template Preview page (app/admin/certificates)
- * — lets Admin/Organizer/Staff see exactly how every certificate kind looks
- * without needing a real qualifying registration/assignment on file yet.
- * Requested via id="sample", gated to managers only (see GET below). */
-const SAMPLE_DATA: Record<
-  CertificateKind,
-  Omit<CertificateInput, "signerName" | "signerTitle" | "signerName2" | "signerTitle2" | "signatureUrl" | "stampUrl" | "template">
-> = {
-  winner: {
-    kind: "winner", recipientName: "Jane Doe",
-    competitionName: "Malaysia Open Virtual Karate-do Kata Competition 2026 — USD 100 Tier",
-    categoryName: "Color/Kyu Belt — Age 15–40 — Male", kataName: "Kata Saifa", rank: 1,
-    dateLabel: "12/09/2026",
-  },
-  participant: {
-    kind: "participant", recipientName: "John Tan",
-    competitionName: "Malaysia Open Virtual Karate-do Kata Competition 2026 — USD 10 Tier",
-    categoryName: "Color/Kyu Belt — Age 4–14 — Female", kataName: "Kata Gekisai Dai Ichi", rank: null,
-    dateLabel: "12/09/2026",
-  },
-  referee: {
-    kind: "referee", recipientName: "Ahmad Zulkifli",
-    competitionName: "Malaysia Open Virtual Karate-do Kata Competition 2026 — USD 10 Tier",
-    categoryName: null, kataName: null, rank: null, dateLabel: "12/09/2026",
-  },
-  sensei: {
-    kind: "sensei", recipientName: "Sensei Lim Wei Chen",
-    competitionName: "Malaysia Open Virtual Karate-do Kata Competition 2026 — USD 10 Tier",
-    categoryName: null, kataName: null, rank: null, dateLabel: "12/09/2026",
-  },
-  school: {
-    kind: "school", recipientName: "Goju-ryu Karate Academy KL",
-    competitionName: "Malaysia Open Virtual Karate-do Kata Competition 2026 — USD 10 Tier",
-    categoryName: null, kataName: null, rank: null, dateLabel: "12/09/2026",
-  },
-  support: {
-    kind: "support", recipientName: "Nurul Huda",
-    competitionName: "Malaysia Open Virtual Karate-do Kata Competition 2026 — USD 10 Tier",
-    categoryName: null, kataName: null, rank: null, dateLabel: "12/09/2026",
-  },
-};
-
-async function certificateSettings(supabase: Awaited<ReturnType<typeof createClient>>) {
-  const { data } = await supabase.from("certificate_settings").select("*").eq("id", true).maybeSingle();
-  const signatureUrl = data?.signature_path
-    ? supabase.storage.from("branding").getPublicUrl(data.signature_path as string).data.publicUrl
-    : null;
-  const stampUrl = data?.stamp_path
-    ? supabase.storage.from("branding").getPublicUrl(data.stamp_path as string).data.publicUrl
-    : null;
-  return {
-    signerName: (data?.signer_name as string | null) ?? null,
-    signerTitle: (data?.signer_title as string | null) ?? null,
-    signerName2: (data?.signer_name_2 as string | null) ?? null,
-    signerTitle2: (data?.signer_title_2 as string | null) ?? null,
-    signatureUrl,
-    stampUrl,
-  };
-}
-
-/** The organizer-edited design for one certificate kind (migration 0128) --
- * resolves logo1_path/logo2_path/medal_path to public URLs here, same
- * pattern as certificateSettings above, so lib/certificate-render.tsx never
- * needs a Supabase client of its own. Falls back to a plain "everything
- * off" template if the row is somehow missing (shouldn't happen -- all 6
- * kinds are seeded by the migration -- but a missing template row should
- * degrade to unbranded text, not a crash). */
-async function certificateTemplate(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  kind: CertificateKind,
-): Promise<CertificateTemplate> {
-  const { data } = await supabase.from("certificate_templates").select("*").eq("kind", kind).maybeSingle();
-  const urlFor = (path: string | null) =>
-    path ? supabase.storage.from("branding").getPublicUrl(path).data.publicUrl : null;
-  return {
-    header1: (data?.header1 as string | null) ?? "",
-    header2: (data?.header2 as string | null) ?? "",
-    body1: (data?.body1 as string | null) ?? "",
-    body2: (data?.body2 as string | null) ?? "",
-    body3: (data?.body3 as string | null) ?? "",
-    logoCount: (data?.logo_count as 1 | 2 | null) ?? 2,
-    logo1Url: urlFor((data?.logo1_path as string | null) ?? null),
-    logo2Url: urlFor((data?.logo2_path as string | null) ?? null),
-    showMedal: (data?.show_medal as boolean | null) ?? false,
-    medalPosition: (data?.medal_position as CertificateTemplate["medalPosition"] | null) ?? "between",
-    medalUrl: urlFor((data?.medal_path as string | null) ?? null),
-  };
-}
 
 /** `inline` (the "View" link) opens the PNG in the browser tab it's linked
  * from instead of forcing a download — everything else about the response

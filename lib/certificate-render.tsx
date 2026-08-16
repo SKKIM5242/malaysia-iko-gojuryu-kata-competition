@@ -11,14 +11,58 @@ import path from "node:path";
 
 export type CertificateKind = "winner" | "participant" | "referee" | "sensei" | "school" | "support";
 
+/** Per-field typography/layout for one Header/Body text region (migration
+ * 0129) -- every property is optional, and an unset one falls back to that
+ * specific field's own built-in default (see the `defaults` each StyledText
+ * call site passes below), which reproduces exactly what was hardcoded
+ * before this became editable. `underlineWeight` only matters when
+ * `underline` is true; `maxLines` is an approximation (see StyledText) since
+ * Satori has no real multi-line text measurement to clamp against. */
+export interface TextStyle {
+  fontSize?: number;
+  color?: string;
+  align?: "left" | "center" | "right";
+  weight?: number;
+  italic?: boolean;
+  underline?: boolean;
+  underlineWeight?: "thin" | "medium" | "thick";
+  lineHeight?: number;
+  tightSpacing?: boolean;
+  maxLines?: number;
+}
+
+/** Narrows an arbitrary JSON value (as read back from the `*_style` jsonb
+ * columns, or posted to the preview route) into a well-typed TextStyle,
+ * dropping anything with the wrong shape rather than trusting it blindly --
+ * cheap defense-in-depth for a value that either came from the database or
+ * from a POST body, even though both paths are already gated to Admin/
+ * Organizer. */
+export function sanitizeTextStyle(v: unknown): TextStyle {
+  if (!v || typeof v !== "object") return {};
+  const o = v as Record<string, unknown>;
+  const style: TextStyle = {};
+  if (typeof o.fontSize === "number" && Number.isFinite(o.fontSize)) style.fontSize = o.fontSize;
+  if (typeof o.color === "string") style.color = o.color;
+  if (o.align === "left" || o.align === "center" || o.align === "right") style.align = o.align;
+  if (typeof o.weight === "number" && Number.isFinite(o.weight)) style.weight = o.weight;
+  if (typeof o.italic === "boolean") style.italic = o.italic;
+  if (typeof o.underline === "boolean") style.underline = o.underline;
+  if (o.underlineWeight === "thin" || o.underlineWeight === "medium" || o.underlineWeight === "thick") {
+    style.underlineWeight = o.underlineWeight;
+  }
+  if (typeof o.lineHeight === "number" && Number.isFinite(o.lineHeight)) style.lineHeight = o.lineHeight;
+  if (typeof o.tightSpacing === "boolean") style.tightSpacing = o.tightSpacing;
+  if (typeof o.maxLines === "number" && Number.isFinite(o.maxLines) && o.maxLines > 0) style.maxLines = o.maxLines;
+  return style;
+}
+
 /** The organizer-editable design for one certificate kind (certificate_templates
  * table) -- header1/header2/body1/body2/body3 are plain text that may contain
  * merge tokens (see substituteMergeTokens), resolved against this specific
  * certificate's live data at render time. logo1Url/logo2Url/medalUrl are
  * already-resolved public URLs (or null), not storage paths -- the caller
- * (app/api/certificates/[kind]/[id]/route.tsx) resolves those, mirroring how
- * signatureUrl/stampUrl already work, so this file stays free of any
- * Supabase dependency. */
+ * (lib/certificate-data.ts) resolves those, mirroring how signatureUrl/
+ * stampUrl already work, so this file stays free of any Supabase dependency. */
 export interface CertificateTemplate {
   header1: string;
   header2: string;
@@ -28,9 +72,27 @@ export interface CertificateTemplate {
   logoCount: 1 | 2;
   logo1Url: string | null;
   logo2Url: string | null;
+  logo1Size: number;
+  logo2Size: number;
+  logosAlignment: "left" | "center" | "right";
+  logosNoSpacing: boolean;
   showMedal: boolean;
   medalPosition: "between" | "left" | "right";
   medalUrl: string | null;
+  medalSize: number;
+  dateColor: string;
+  dateSize: number;
+  dateAlignment: "left" | "center" | "right";
+  signerNameSize: number;
+  signerTitleSize: number;
+  signerNameBold: boolean;
+  signerTitleBold: boolean;
+  signerPosition: "left" | "center" | "right";
+  header1Style: TextStyle;
+  header2Style: TextStyle;
+  body1Style: TextStyle;
+  body2Style: TextStyle;
+  body3Style: TextStyle;
 }
 
 export interface CertificateInput {
@@ -52,13 +114,16 @@ export interface CertificateInput {
 
 const ORDINAL: Record<1 | 2 | 3, string> = { 1: "1st", 2: "2nd", 3: "3rd" };
 
-/** Fills {name}/{kata_category}/{competition_tier}/{rank} in an
+/** Fills {name}/{kata_name}/{category}/{competition_tier}/{rank} in an
  * organizer-edited template string with this specific certificate's live
- * data -- the same 3 data sources ("Participant field Name", "Kata Name &
- * all categories available", "competition Tier") the organizer asked the
- * Body fields to be able to pull from, plus {rank} for the Winner kind's
- * ordinal. An unrecognized {token} is left as-is rather than silently
- * dropped, so a typo is visible instead of vanishing text. */
+ * data -- the same data sources ("Participant field Name", "Kata Name",
+ * "all categories available" i.e. belt rank/gender/age group, "competition
+ * Tier") the organizer asked the Body fields to be able to pull from, plus
+ * {rank} for the Winner kind's ordinal. {kata_category} is a deprecated
+ * alias for {category} (see migration 0129) kept for any template text that
+ * still has the old combined token in it. An unrecognized {token} is left
+ * as-is rather than silently dropped, so a typo is visible instead of
+ * vanishing text. */
 function substituteMergeTokens(template: string, ctx: Record<string, string>): string {
   return template.replace(/\{(\w+)\}/g, (full, key) => (key in ctx ? ctx[key] : full));
 }
@@ -280,10 +345,19 @@ function RankLabel3D({ rank, width }: { rank: 1 | 2 | 3; width: number }) {
  * regardless of how tall each column's own top content actually is. */
 const FOOTER_TOP_H = 140;
 
+/** left/center/right -> the flex alignItems/justifyContent value that pins a
+ * block to that edge of whatever full-width row/column it sits in. Shared
+ * by every new alignment/position control (logos, date, signer, and each
+ * text field). */
+function edgeFor(align: "left" | "center" | "right"): "flex-start" | "center" | "flex-end" {
+  return align === "left" ? "flex-start" : align === "right" ? "flex-end" : "center";
+}
+
 /** One signature block: signature image with the stamp overlapping its
  * trailing edge by ~10% (rather than sitting fully apart), an hr, then the
  * signer's name/title. Reused for both the primary and second signer, at
- * different scales. */
+ * different scales -- and, per the organizer's style controls, the same
+ * name/title size, boldness, and left/center/right position for both. */
 function SignerBlock({
   name,
   title,
@@ -293,6 +367,11 @@ function SignerBlock({
   sigH,
   stampSize,
   hrWidth,
+  nameSize,
+  titleSize,
+  nameBold,
+  titleBold,
+  position,
 }: {
   name: string | null;
   title: string | null;
@@ -302,11 +381,17 @@ function SignerBlock({
   sigH: number;
   stampSize: number;
   hrWidth: number;
+  nameSize: number;
+  titleSize: number;
+  nameBold: boolean;
+  titleBold: boolean;
+  position: "left" | "center" | "right";
 }) {
   const overlap = Math.round(sigW * 0.1);
+  const edge = edgeFor(position);
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-      <div style={{ display: "flex", height: `${FOOTER_TOP_H}px`, alignItems: "flex-end", justifyContent: "center" }}>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: edge }}>
+      <div style={{ display: "flex", height: `${FOOTER_TOP_H}px`, alignItems: "flex-end", justifyContent: edge }}>
         {signatureUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={signatureUrl} width={sigW} height={sigH} style={{ objectFit: "contain" }} alt="" />
@@ -325,10 +410,17 @@ function SignerBlock({
         )}
       </div>
       <div style={{ display: "flex", width: `${hrWidth}px`, borderTop: "3px solid #a8a29e", marginTop: "18px" }} />
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: "12px" }}>
-        <div style={{ display: "flex", fontSize: 28, fontWeight: 700, color: "#1c1917" }}>{name ?? "Organizer"}</div>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: edge, marginTop: "12px" }}>
+        <div style={{ display: "flex", fontSize: nameSize, fontWeight: nameBold ? 700 : 400, color: "#1c1917" }}>
+          {name ?? "Organizer"}
+        </div>
         {title && (
-          <div style={{ display: "flex", fontSize: 22, color: "#57534e", textAlign: "center", maxWidth: `${hrWidth + 60}px` }}>
+          <div
+            style={{
+              display: "flex", fontSize: titleSize, fontWeight: titleBold ? 700 : 400, color: "#57534e",
+              textAlign: position, maxWidth: `${hrWidth + 60}px`,
+            }}
+          >
             {title}
           </div>
         )}
@@ -339,14 +431,24 @@ function SignerBlock({
 
 /** The date column: mirrors SignerBlock's structure (fixed-height top
  * zone, hr, caption below) so its hr lines up with both signers'. */
-function DateBlock({ dateLabel, caption, width }: { dateLabel: string; caption: string; width: number }) {
+function DateBlock({
+  dateLabel, caption, width, color, size, alignment,
+}: {
+  dateLabel: string;
+  caption: string;
+  width: number;
+  color: string;
+  size: number;
+  alignment: "left" | "center" | "right";
+}) {
+  const edge = edgeFor(alignment);
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: `${width}px` }}>
-      <div style={{ display: "flex", height: `${FOOTER_TOP_H}px`, alignItems: "flex-end", justifyContent: "center" }}>
-        <div style={{ display: "flex", fontSize: 55, fontWeight: 800, color: "#44403c" }}>{dateLabel}</div>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: edge, width: `${width}px` }}>
+      <div style={{ display: "flex", height: `${FOOTER_TOP_H}px`, alignItems: "flex-end", justifyContent: edge }}>
+        <div style={{ display: "flex", fontSize: size, fontWeight: 800, color }}>{dateLabel}</div>
       </div>
       <div style={{ display: "flex", width: "100%", borderTop: "3px solid #a8a29e", marginTop: "18px" }} />
-      <div style={{ marginTop: "12px", display: "flex", fontSize: 33, fontWeight: 600, color: "#78716c" }}>
+      <div style={{ marginTop: "12px", display: "flex", width: "100%", justifyContent: edge, fontSize: 33, fontWeight: 600, color: "#78716c" }}>
         {caption}
       </div>
     </div>
@@ -363,19 +465,19 @@ function DateBlock({ dateLabel, caption, width }: { dateLabel: string; caption: 
  * image the organizer uploaded -- either way this component only lays it
  * out, it doesn't know which. */
 function LogoMedalRow({
-  logo1, logo2, logoSize, medal, template,
+  logo1, logo2, medal, template,
 }: {
   logo1: string | null;
   logo2: string | null;
-  logoSize: number;
   medal: React.ReactNode | null;
   template: CertificateTemplate;
 }) {
   const showMedal = template.showMedal && !!medal;
-  const logoImg = (src: string, extraMarginLeft?: number) => (
+  const gap = template.logosNoSpacing ? 0 : 20;
+  const logoImg = (src: string, size: number, extraMarginLeft?: number) => (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={src} width={logoSize} height={logoSize}
+      src={src} width={size} height={size}
       style={{ objectFit: "contain", ...(extraMarginLeft ? { marginLeft: `${extraMarginLeft}px` } : {}) }}
       alt=""
     />
@@ -385,7 +487,8 @@ function LogoMedalRow({
   // "center" otherwise centering it against the shorter square logos.
   const medalNode = medal && <div style={{ display: "flex", marginTop: "-28px" }}>{medal}</div>;
   const rowStyle = {
-    display: "flex", flexDirection: "row" as const, alignItems: "center", justifyContent: "center", gap: "20px",
+    display: "flex", flexDirection: "row" as const, alignItems: "center",
+    justifyContent: edgeFor(template.logosAlignment), gap: `${gap}px`, width: "100%",
     // marginBottom matches the breathing room a medal row gets "for free"
     // below its taller medal -- a no-medal row needs it added explicitly so
     // the title text underneath doesn't sit flush against the logos.
@@ -395,28 +498,83 @@ function LogoMedalRow({
   if (template.logoCount === 2) {
     return (
       <div style={rowStyle}>
-        {logo1 && logoImg(logo1)}
+        {logo1 && logoImg(logo1, template.logo1Size)}
         {showMedal && medalNode}
-        {logo2 && logoImg(logo2, showMedal ? 46 : undefined)}
+        {logo2 && logoImg(logo2, template.logo2Size, showMedal && !template.logosNoSpacing ? 46 : undefined)}
       </div>
     );
   }
   if (!showMedal) {
-    return <div style={rowStyle}>{logo1 && logoImg(logo1)}</div>;
+    return <div style={rowStyle}>{logo1 && logoImg(logo1, template.logo1Size)}</div>;
   }
   return (
     <div style={rowStyle}>
       {template.medalPosition === "left" ? (
         <>
           {medalNode}
-          {logo1 && logoImg(logo1, 20)}
+          {logo1 && logoImg(logo1, template.logo1Size, template.logosNoSpacing ? undefined : 20)}
         </>
       ) : (
         <>
-          {logo1 && logoImg(logo1)}
+          {logo1 && logoImg(logo1, template.logo1Size)}
           {medalNode}
         </>
       )}
+    </div>
+  );
+}
+
+const UNDERLINE_PX: Record<"thin" | "medium" | "thick", number> = { thin: 2, medium: 4, thick: 7 };
+
+/** Renders one Header/Body text region: a full-width row whose
+ * justifyContent (derived from the organizer's chosen alignment, default
+ * "center") positions the shrink-to-fit text block at the left/center/right
+ * edge -- textAlign alone wouldn't move a block that's centered by its
+ * flex-column parent unless the text actually wraps, so this wrapper row is
+ * what makes "left"/"right" visible even for a single short line like a
+ * Header. `defaults` carries this specific field's own pre-existing
+ * hardcoded look (the exact fontSize/weight/color/underline every kind
+ * rendered before this became editable), so an empty style object ({}, i.e.
+ * an as-yet-unedited template) renders pixel-identical to before. maxLines
+ * clips via a computed height + overflow:hidden rather than a real
+ * multi-line ellipsis -- Satori has no text-measurement API to lay out an
+ * exact N-line truncation the way a browser's line-clamp does, so this is
+ * an approximation, not a guarantee of exactly N visible lines. */
+function StyledText({
+  text, style, defaults, accent,
+}: {
+  text: string;
+  style: TextStyle;
+  defaults: { fontSize: number; weight: number; color: string; underline?: boolean; maxWidth?: number; extra?: React.CSSProperties };
+  accent: string;
+}) {
+  if (!text) return null;
+  const fontSize = style.fontSize ?? defaults.fontSize;
+  const underline = style.underline ?? defaults.underline ?? false;
+  const lineHeight = style.tightSpacing ? 1 : style.lineHeight;
+  return (
+    <div style={{ display: "flex", width: "100%", justifyContent: edgeFor(style.align ?? "center") }}>
+      <div
+        style={{
+          display: "flex",
+          fontSize,
+          fontWeight: style.weight ?? defaults.weight,
+          color: style.color ?? defaults.color,
+          textAlign: style.align ?? "center",
+          ...(defaults.maxWidth ? { maxWidth: `${defaults.maxWidth}px` } : {}),
+          ...(style.italic ? { fontStyle: "italic" } : {}),
+          ...(lineHeight ? { lineHeight: String(lineHeight) } : {}),
+          ...(underline
+            ? { borderBottom: `${UNDERLINE_PX[style.underlineWeight ?? "medium"]}px solid ${accent}`, padding: "0 40px 16px" }
+            : {}),
+          ...(style.maxLines
+            ? { height: `${Math.round(fontSize * (lineHeight ?? 1.2) * style.maxLines)}px`, overflow: "hidden" }
+            : {}),
+          ...defaults.extra,
+        }}
+      >
+        {text}
+      </div>
     </div>
   );
 }
@@ -434,25 +592,19 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
   // so an un-edited template renders exactly as it always has.
   const logo1 = template.logo1Url ?? logoDataUri();
   const logo2 = template.logo2Url ?? logo2DataUri();
-  // Both logos render at the same size (Logo 2's asset is cropped just as
-  // tightly as Logo 1's, see "IKO International Logo.png") -- an uploaded
-  // replacement is expected to follow the same convention.
-  const GOLD_LOGO_SIZE = 420;
-  // Now that the medal PNG is cropped tight (bounding box == visible
-  // content, same convention as the two logos), this width IS the visible
-  // ribbon+disc width. 307px reproduced the prior visible medal size
-  // exactly; bumped another 20% per the organizer's follow-up request.
-  const MEDAL_WIDTH = Math.round(307 * 1.2);
   const medal = isWinner ? (
-    <Medal rank={input.rank!} width={MEDAL_WIDTH} />
+    <Medal rank={input.rank!} width={template.medalSize} />
   ) : template.medalUrl ? (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={template.medalUrl} width={MEDAL_WIDTH} style={{ objectFit: "contain" }} alt="" />
+    <img src={template.medalUrl} width={template.medalSize} style={{ objectFit: "contain" }} alt="" />
   ) : null;
 
+  const category = input.categoryName ?? input.kataName ?? "the event";
   const mergeCtx = {
     name: input.recipientName,
-    kata_category: input.categoryName ?? input.kataName ?? "the event",
+    kata_name: input.kataName ?? "",
+    category,
+    kata_category: category, // deprecated alias -- see migration 0129
     competition_tier: competitionName,
     rank: isWinner ? ORDINAL[input.rank!] : "",
   };
@@ -511,7 +663,7 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
             }}
           />
 
-          <LogoMedalRow logo1={logo1} logo2={logo2} logoSize={GOLD_LOGO_SIZE} medal={medal} template={template} />
+          <LogoMedalRow logo1={logo1} logo2={logo2} medal={medal} template={template} />
 
           <div
             style={{
@@ -551,76 +703,49 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
             </div>
           </div>
 
-          <div
-            style={{
-              marginTop: "-6px",
-              display: "flex",
-              fontSize: 112,
-              fontWeight: 900,
-              letterSpacing: 1,
-              color: accent,
-            }}
-          >
-            {header1}
+          <div style={{ marginTop: "-6px", width: "100%", display: "flex" }}>
+            <StyledText
+              text={header1}
+              style={template.header1Style}
+              defaults={{ fontSize: 112, weight: 900, color: accent, extra: { letterSpacing: 1 } }}
+              accent={accent}
+            />
           </div>
 
           <div
             style={{
               marginTop: "-8px",
+              width: "100%",
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
               gap: "0px",
             }}
           >
-            <div
-              style={{
-                display: "flex",
-                fontSize: 88,
-                fontWeight: 700,
-                color: "#57534e",
-                textAlign: "center",
-                maxWidth: "1700px",
-              }}
-            >
-              {header2}
-            </div>
-            <div
-              style={{
-                display: "flex",
-                fontSize: 112,
-                fontWeight: 700,
-                color: "#1c1917",
-                borderBottom: `4px solid ${accent}`,
-                padding: "0 40px 16px",
-              }}
-            >
-              {body1}
-            </div>
-            <div
-              style={{
-                display: "flex",
-                fontSize: 46,
-                fontWeight: 700,
-                color: "#57534e",
-                textAlign: "center",
-                maxWidth: "1700px",
-              }}
-            >
-              {body2}
-            </div>
-            <div
-              style={{
-                display: "flex",
-                fontSize: 46,
-                fontWeight: 700,
-                color: "#57534e",
-                textAlign: "center",
-                maxWidth: "1700px",
-              }}
-            >
-              {body3}
-            </div>
+            <StyledText
+              text={header2}
+              style={template.header2Style}
+              defaults={{ fontSize: 88, weight: 700, color: "#57534e", maxWidth: 1700 }}
+              accent={accent}
+            />
+            <StyledText
+              text={body1}
+              style={template.body1Style}
+              defaults={{ fontSize: 112, weight: 700, color: "#1c1917", underline: true }}
+              accent={accent}
+            />
+            <StyledText
+              text={body2}
+              style={template.body2Style}
+              defaults={{ fontSize: 46, weight: 700, color: "#57534e", maxWidth: 1700 }}
+              accent={accent}
+            />
+            <StyledText
+              text={body3}
+              style={template.body3Style}
+              defaults={{ fontSize: 46, weight: 700, color: "#57534e", maxWidth: 1700 }}
+              accent={accent}
+            />
           </div>
 
           <div
@@ -638,6 +763,9 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
               dateLabel={input.dateLabel}
               caption={input.kind === "winner" ? "Winner Announcement Date" : "Announcement Date"}
               width={380}
+              color={template.dateColor}
+              size={template.dateSize}
+              alignment={template.dateAlignment}
             />
 
             <SignerBlock
@@ -649,6 +777,11 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
               sigH={90}
               stampSize={140}
               hrWidth={500}
+              nameSize={template.signerNameSize}
+              titleSize={template.signerTitleSize}
+              nameBold={template.signerNameBold}
+              titleBold={template.signerTitleBold}
+              position={template.signerPosition}
             />
 
             {input.signerName2 && (
@@ -661,6 +794,11 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
                 sigH={84}
                 stampSize={130}
                 hrWidth={460}
+                nameSize={template.signerNameSize}
+                titleSize={template.signerTitleSize}
+                nameBold={template.signerNameBold}
+                titleBold={template.signerTitleBold}
+                position={template.signerPosition}
               />
             )}
           </div>
