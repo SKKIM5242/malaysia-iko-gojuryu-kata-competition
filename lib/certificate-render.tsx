@@ -165,9 +165,12 @@ export interface CertificateTemplate {
   signerLineWidth: number;
   frameOuterWidth: number;
   frameInnerWidth: number;
-  /** null preserves today's automatic kind/rank accent color on both
-   * border rings; set, it overrides both uniformly. */
-  frameColor: string | null;
+  /** null on either preserves today's automatic kind/rank accent color for
+   * that ring; each overrides independently, so the outer and inner rings
+   * can differ. Body 1's "as per frame" line color (see StyledText) follows
+   * frameOuterColor specifically. */
+  frameOuterColor: string | null;
+  frameInnerColor: string | null;
   header1Style: TextStyle;
   header2Style: TextStyle;
   body1Style: TextStyle;
@@ -674,13 +677,13 @@ const LINE_THICKNESS_DEFAULT = 4;
  * below the text with an explicit width and its own alignment, the same
  * pattern DateBlock/SignerBlock already use for their divider lines. */
 function StyledText({
-  text, style, defaults, accent, frameColor,
+  text, style, defaults, accent, frameOuterColor,
 }: {
   text: string;
   style: TextStyle;
   defaults: { fontSize: number; weight: number; color: string; underline?: boolean; maxWidth?: number; extra?: React.CSSProperties };
   accent: string;
-  frameColor: string;
+  frameOuterColor: string;
 }) {
   if (!text) return null;
   const fontSize = style.fontSize ?? defaults.fontSize;
@@ -688,7 +691,7 @@ function StyledText({
   const lineHeightCss = resolveLineHeight(style.lineSpacingMode, style.lineSpacingAt);
   const lineHeightMultiplier = lineHeightCss && !lineHeightCss.endsWith("px") ? Number(lineHeightCss) : 1.2;
   const lineLengthMode = style.lineLengthMode ?? "auto";
-  const lineColor = style.lineColorMode === "custom" && style.lineColor ? style.lineColor : frameColor;
+  const lineColor = style.lineColorMode === "custom" && style.lineColor ? style.lineColor : frameOuterColor;
   const lineStyleCss = style.lineStyle ?? "solid";
   const thickness = style.lineThickness ?? LINE_THICKNESS_DEFAULT;
   return (
@@ -744,9 +747,10 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
   const accent = isWinner ? RANK_ACCENT[input.rank!] : ACCENT[input.kind as Exclude<CertificateKind, "winner">];
   const template = input.template;
   // The frame (the two border rings) defaults to the same automatic kind/
-  // rank accent as everything else -- frameColor only overrides it when an
-  // organizer has explicitly set one.
-  const frameColor = template.frameColor ?? accent;
+  // rank accent as everything else -- each ring's own color only overrides
+  // it when an organizer has explicitly set one, independently of the other.
+  const frameOuterColor = template.frameOuterColor ?? accent;
+  const frameInnerColor = template.frameInnerColor ?? accent;
   // A template's logo1Url/logo2Url is only set once an organizer uploads a
   // replacement — null falls back to the original hardcoded /public crests,
   // so an un-edited template renders exactly as it always has.
@@ -797,7 +801,7 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            border: `${template.frameOuterWidth}px solid ${frameColor}`,
+            border: `${template.frameOuterWidth}px solid ${frameOuterColor}`,
             borderRadius: "18px",
             // Top padding trimmed from the original 60px, but kept well
             // clear of the inner double-border overlay below (a fixed 20px
@@ -817,7 +821,7 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
               left: "20px",
               right: "20px",
               bottom: "20px",
-              border: `${template.frameInnerWidth}px solid ${frameColor}`,
+              border: `${template.frameInnerWidth}px solid ${frameInnerColor}`,
               borderRadius: "8px",
               display: "flex",
             }}
@@ -869,7 +873,7 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
               style={template.header1Style}
               defaults={{ fontSize: 112, weight: 900, color: accent, extra: { letterSpacing: 1 } }}
               accent={accent}
-              frameColor={frameColor}
+              frameOuterColor={frameOuterColor}
             />
           </div>
 
@@ -888,28 +892,28 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
               style={template.header2Style}
               defaults={{ fontSize: 88, weight: 700, color: "#57534e", maxWidth: 1700 }}
               accent={accent}
-              frameColor={frameColor}
+              frameOuterColor={frameOuterColor}
             />
             <StyledText
               text={body1}
               style={template.body1Style}
               defaults={{ fontSize: 112, weight: 700, color: "#1c1917", underline: true }}
               accent={accent}
-              frameColor={frameColor}
+              frameOuterColor={frameOuterColor}
             />
             <StyledText
               text={body2}
               style={template.body2Style}
               defaults={{ fontSize: 46, weight: 700, color: "#57534e", maxWidth: 1700 }}
               accent={accent}
-              frameColor={frameColor}
+              frameOuterColor={frameOuterColor}
             />
             <StyledText
               text={body3}
               style={template.body3Style}
               defaults={{ fontSize: 46, weight: 700, color: "#57534e", maxWidth: 1700 }}
               accent={accent}
-              frameColor={frameColor}
+              frameOuterColor={frameOuterColor}
             />
           </div>
 

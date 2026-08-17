@@ -1935,8 +1935,11 @@ export async function saveCertificateTemplate(formData: FormData) {
     signer_line_width: numField(formData, "signer_line_width", 500),
     frame_outer_width: numField(formData, "frame_outer_width", 14),
     frame_inner_width: numField(formData, "frame_inner_width", 3),
-    frame_color: formData.get("frame_color_override") === "on"
-      ? (String(formData.get("frame_color") ?? "").trim() || null)
+    frame_outer_color: formData.get("frame_outer_color_override") === "on"
+      ? (String(formData.get("frame_outer_color") ?? "").trim() || null)
+      : null,
+    frame_inner_color: formData.get("frame_inner_color_override") === "on"
+      ? (String(formData.get("frame_inner_color") ?? "").trim() || null)
       : null,
     header1_style: styleField(formData, "header1_style"),
     header2_style: styleField(formData, "header2_style"),

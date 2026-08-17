@@ -70,7 +70,8 @@ export interface CertificateTemplateRow {
   signer_line_width: number;
   frame_outer_width: number;
   frame_inner_width: number;
-  frame_color: string | null;
+  frame_outer_color: string | null;
+  frame_inner_color: string | null;
   header1_style: TextStyleValue;
   header2_style: TextStyleValue;
   body1_style: TextStyleValue;
@@ -550,8 +551,10 @@ export default function CertificateTemplateForm({
 
   const [frameOuterWidth, setFrameOuterWidth] = useState(template.frame_outer_width);
   const [frameInnerWidth, setFrameInnerWidth] = useState(template.frame_inner_width);
-  const [frameColorOverride, setFrameColorOverride] = useState(template.frame_color !== null);
-  const [frameColor, setFrameColor] = useState(template.frame_color ?? KIND_ACCENT[kind] ?? "#1c1917");
+  const [frameOuterColorOverride, setFrameOuterColorOverride] = useState(template.frame_outer_color !== null);
+  const [frameOuterColor, setFrameOuterColor] = useState(template.frame_outer_color ?? KIND_ACCENT[kind] ?? "#1c1917");
+  const [frameInnerColorOverride, setFrameInnerColorOverride] = useState(template.frame_inner_color !== null);
+  const [frameInnerColor, setFrameInnerColor] = useState(template.frame_inner_color ?? KIND_ACCENT[kind] ?? "#1c1917");
 
   const [header1Style, setHeader1Style] = useState<TextStyleValue>(template.header1_style ?? {});
   const [header2Style, setHeader2Style] = useState<TextStyleValue>(template.header2_style ?? {});
@@ -587,7 +590,8 @@ export default function CertificateTemplateForm({
         signer_title_line_spacing_mode: signerTitleLineSpacingMode, signer_title_line_spacing_at: signerTitleLineSpacingAt,
         signer_line_style: signerLineStyle, signer_line_width: signerLineWidth,
         frame_outer_width: frameOuterWidth, frame_inner_width: frameInnerWidth,
-        frame_color_override: frameColorOverride, frame_color: frameColor,
+        frame_outer_color_override: frameOuterColorOverride, frame_outer_color: frameOuterColor,
+        frame_inner_color_override: frameInnerColorOverride, frame_inner_color: frameInnerColor,
         header1_style: header1Style, header2_style: header2Style,
         body1_style: body1Style, body2_style: body2Style, body3_style: body3Style,
         rank,
@@ -636,21 +640,50 @@ export default function CertificateTemplateForm({
               className={smallInput}
             />
           </div>
+        </div>
+        {/* Outer and inner rings each get their own color override --
+            previously one "Frame color" applied to both. */}
+        <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
           <label className="flex items-end gap-1 pb-1.5 text-xs">
-            <input type="checkbox" name="frame_color_override" checked={frameColorOverride} onChange={(e) => setFrameColorOverride(e.target.checked)} />
-            Override color
+            <input
+              type="checkbox" name="frame_outer_color_override" checked={frameOuterColorOverride}
+              onChange={(e) => setFrameOuterColorOverride(e.target.checked)}
+            />
+            Override outer color
           </label>
           <div>
-            <label className={smallLabel}>Color</label>
-            {frameColorOverride ? (
+            <label className={smallLabel}>Outer color</label>
+            {frameOuterColorOverride ? (
               <input
-                type="color" name="frame_color" value={frameColor}
-                onChange={(e) => setFrameColor(e.target.value)}
+                type="color" name="frame_outer_color" value={frameOuterColor}
+                onChange={(e) => setFrameOuterColor(e.target.value)}
                 className="h-[26px] w-full rounded border border-neutral-300"
               />
             ) : (
               <>
-                <input type="hidden" name="frame_color" value={frameColor} />
+                <input type="hidden" name="frame_outer_color" value={frameOuterColor} />
+                <p className="pt-1 text-[11px] text-neutral-400">Automatic (kind / rank color)</p>
+              </>
+            )}
+          </div>
+          <label className="flex items-end gap-1 pb-1.5 text-xs">
+            <input
+              type="checkbox" name="frame_inner_color_override" checked={frameInnerColorOverride}
+              onChange={(e) => setFrameInnerColorOverride(e.target.checked)}
+            />
+            Override inner color
+          </label>
+          <div>
+            <label className={smallLabel}>Inner color</label>
+            {frameInnerColorOverride ? (
+              <input
+                type="color" name="frame_inner_color" value={frameInnerColor}
+                onChange={(e) => setFrameInnerColor(e.target.value)}
+                className="h-[26px] w-full rounded border border-neutral-300"
+              />
+            ) : (
+              <>
+                <input type="hidden" name="frame_inner_color" value={frameInnerColor} />
                 <p className="pt-1 text-[11px] text-neutral-400">Automatic (kind / rank color)</p>
               </>
             )}
