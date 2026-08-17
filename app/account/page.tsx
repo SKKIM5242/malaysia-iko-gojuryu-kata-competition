@@ -14,6 +14,7 @@ import DeleteRecordingControls from "@/components/DeleteRecordingControls";
 import RefereeScoring, { type ScoringItem } from "@/components/RefereeScoring";
 import CertificatesSection from "@/components/CertificatesSection";
 import IssueReportForm from "@/components/IssueReportForm";
+import TelegramConnectStatus from "@/components/TelegramConnectStatus";
 import {
   getAllTelegramLinks,
   getTelegramBotConnectUrl,
@@ -534,28 +535,17 @@ export default async function AccountPage({
                 </p>
                 <TelegramFullAccessLinks links={staffTelegramLinks} membership={staffTelegramMembership} />
               </div>
-              {(() => {
-                const connectUrl = getTelegramBotConnectUrl(user.id, botUsername);
-                if (profile.telegram_chat_id) {
-                  return (
-                    <p className="mt-3 text-sm font-semibold text-green-700">
-                      ✅ Telegram connected — you&apos;ll be notified here for issue reports, testimonial
-                      removals, and other admin alerts.
-                    </p>
-                  );
+              <TelegramConnectStatus
+                initiallyConnected={!!profile.telegram_chat_id}
+                connectUrl={getTelegramBotConnectUrl(user.id, botUsername)}
+                connectedMessage={
+                  <>
+                    ✅ Telegram connected — you&apos;ll be notified here for issue reports, testimonial
+                    removals, and other admin alerts.
+                  </>
                 }
-                if (!connectUrl) return null;
-                return (
-                  <a
-                    href={connectUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-3 inline-flex items-center gap-2 rounded-md border border-[#229ED9]/30 bg-[#229ED9]/5 px-4 py-2.5 text-sm font-semibold text-[#1c7fb5] hover:bg-[#229ED9]/10"
-                  >
-                    Connect Telegram for admin alerts
-                  </a>
-                );
-              })()}
+                label="Connect Telegram for admin alerts"
+              />
             </div>
           ) : (
             <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-6">
@@ -695,27 +685,14 @@ export default async function AccountPage({
             </p>
             <TelegramFullAccessLinks links={refereeTelegramLinks} membership={refereeTelegramMembership} />
           </div>
-          {(() => {
-            const connectUrl = getTelegramBotConnectUrl(user.id, botUsername);
-            if (profile.telegram_chat_id) {
-              return (
-                <p className="mt-3 text-sm font-semibold text-green-700">
-                  ✅ Telegram connected — you&apos;ll be notified here when you&apos;re assigned a new recording.
-                </p>
-              );
+          <TelegramConnectStatus
+            initiallyConnected={!!profile.telegram_chat_id}
+            connectUrl={getTelegramBotConnectUrl(user.id, botUsername)}
+            connectedMessage={
+              <>✅ Telegram connected — you&apos;ll be notified here when you&apos;re assigned a new recording.</>
             }
-            if (!connectUrl) return null;
-            return (
-              <a
-                href={connectUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-3 inline-flex items-center gap-2 rounded-md border border-[#229ED9]/30 bg-[#229ED9]/5 px-4 py-2.5 text-sm font-semibold text-[#1c7fb5] hover:bg-[#229ED9]/10"
-              >
-                Connect Telegram for assignment notifications
-              </a>
-            );
-          })()}
+            label="Connect Telegram for assignment notifications"
+          />
           <div className="mt-6">
             <RefereeScoring refereeName={profile.full_name ?? "Judge"} refereeCountry={profile.country} items={items} />
           </div>
@@ -769,27 +746,12 @@ export default async function AccountPage({
                   <TelegramGroupLink label={myTelegramGroup.label} url={myTelegramGroup.url} joined={audienceGroupJoined} />
                 </div>
               )}
-              {(() => {
-                const connectUrl = getTelegramBotConnectUrl(user.id, botUsername);
-                if (profile.telegram_chat_id) {
-                  return (
-                    <p className="mt-3 text-sm font-semibold text-green-700">
-                      ✅ Telegram connected.
-                    </p>
-                  );
-                }
-                if (!connectUrl) return null;
-                return (
-                  <a
-                    href={connectUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-3 inline-flex items-center gap-2 rounded-md border border-[#229ED9]/30 bg-[#229ED9]/5 px-4 py-2.5 text-sm font-semibold text-[#1c7fb5] hover:bg-[#229ED9]/10"
-                  >
-                    Connect Telegram
-                  </a>
-                );
-              })()}
+              <TelegramConnectStatus
+                initiallyConnected={!!profile.telegram_chat_id}
+                connectUrl={getTelegramBotConnectUrl(user.id, botUsername)}
+                connectedMessage={<>✅ Telegram connected.</>}
+                label="Connect Telegram"
+              />
             </div>
           ) : (
             <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-6">
@@ -871,29 +833,18 @@ export default async function AccountPage({
                   <TelegramGroupLink label={myTelegramGroup.label} url={myTelegramGroup.url} joined={schoolGroupJoined} />
                 </div>
               )}
-              {(() => {
-                const connectUrl = getTelegramBotConnectUrl(user.id, botUsername);
-                if (profile.telegram_chat_id) {
-                  return (
-                    <p className="mt-3 text-sm font-semibold text-green-700">
-                      ✅ Telegram connected — you&apos;ll be notified here
-                      {profile.role === "sensei" ? " for bulk upload confirmations and when" : " when"} certificates
-                      are published.
-                    </p>
-                  );
+              <TelegramConnectStatus
+                initiallyConnected={!!profile.telegram_chat_id}
+                connectUrl={getTelegramBotConnectUrl(user.id, botUsername)}
+                connectedMessage={
+                  <>
+                    ✅ Telegram connected — you&apos;ll be notified here
+                    {profile.role === "sensei" ? " for bulk upload confirmations and when" : " when"} certificates
+                    are published.
+                  </>
                 }
-                if (!connectUrl) return null;
-                return (
-                  <a
-                    href={connectUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-3 inline-flex items-center gap-2 rounded-md border border-[#229ED9]/30 bg-[#229ED9]/5 px-4 py-2.5 text-sm font-semibold text-[#1c7fb5] hover:bg-[#229ED9]/10"
-                  >
-                    Connect Telegram for {profile.role === "sensei" ? "bulk upload & certificate" : "certificate"} alerts
-                  </a>
-                );
-              })()}
+                label={`Connect Telegram for ${profile.role === "sensei" ? "bulk upload & certificate" : "certificate"} alerts`}
+              />
             </div>
           ) : (
             <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-6">
@@ -1023,27 +974,15 @@ export default async function AccountPage({
                 <p className="mt-2 text-sm font-semibold text-green-800">Your kata recording is submitted — waiting for judge to give score.</p>
               )}
             </div>
-            {(() => {
-              const connectUrl = getTelegramBotConnectUrl(user.id, botUsername);
-              if (profile.telegram_chat_id) {
-                return (
-                  <p className="text-sm font-semibold text-green-700">
-                    ✅ Telegram connected — you&apos;ll be notified here once all judges have scored your recording.
-                  </p>
-                );
+            <TelegramConnectStatus
+              initiallyConnected={!!profile.telegram_chat_id}
+              connectUrl={getTelegramBotConnectUrl(user.id, botUsername)}
+              connectedMessage={
+                <>✅ Telegram connected — you&apos;ll be notified here once all judges have scored your recording.</>
               }
-              if (!connectUrl) return null;
-              return (
-                <a
-                  href={connectUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 rounded-md border border-[#229ED9]/30 bg-[#229ED9]/5 px-4 py-2.5 text-sm font-semibold text-[#1c7fb5] hover:bg-[#229ED9]/10"
-                >
-                  Connect Telegram for judging alerts
-                </a>
-              );
-            })()}
+              label="Connect Telegram for judging alerts"
+              spacingClassName=""
+            />
             <div>
               <p className="mb-2 text-sm text-neutral-500">
                 Watch every participant&apos;s recording for this competition in Kata Arena. Final
