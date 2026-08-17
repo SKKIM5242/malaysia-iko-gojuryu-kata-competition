@@ -113,11 +113,30 @@ export async function getAllTelegramLinks(): Promise<Array<{ category: string; l
   return groups.map(({ category, label, url, memberUrl }) => ({ category, label, url, memberUrl }));
 }
 
+/** The bot's @username, stored in telegram_bot_settings (a DB singleton,
+ * same pattern as certificate_settings) rather than read from a Vercel env
+ * var directly -- so Admin/Organizer/Staff can change it from
+ * /admin/telegram without a redeploy. TELEGRAM_BOT_TOKEN and
+ * TELEGRAM_WEBHOOK_SECRET stay Vercel-only: real secrets that must never
+ * reach a page, unlike the username (exactly as visible to anyone who
+ * finds the bot on Telegram itself). Uses the service-role client since
+ * this is read from the public registration flow and /account, not just
+ * admin pages. */
+export async function getTelegramBotUsername(): Promise<string | null> {
+  const { data } = await createAdminClient()
+    .from("telegram_bot_settings")
+    .select("bot_username")
+    .eq("id", true)
+    .maybeSingle();
+  return (data?.bot_username as string | null)?.trim() || null;
+}
+
 /** Deep link that starts a chat with the assignment-notification bot and
  * links it to this user's account (see app/api/telegram-webhook/route.ts).
- * Returns null until the organizer sets TELEGRAM_BOT_USERNAME. */
-export function getTelegramBotConnectUrl(userId: string): string | null {
-  const username = process.env.TELEGRAM_BOT_USERNAME?.trim();
-  if (!username) return null;
-  return `https://t.me/${username}?start=${userId}`;
+ * Takes the bot username as a parameter (fetch once with
+ * getTelegramBotUsername() and pass it in) rather than re-reading it per
+ * call -- null until the organizer sets one. */
+export function getTelegramBotConnectUrl(userId: string, botUsername: string | null): string | null {
+  if (!botUsername) return null;
+  return `https://t.me/${botUsername}?start=${userId}`;
 }

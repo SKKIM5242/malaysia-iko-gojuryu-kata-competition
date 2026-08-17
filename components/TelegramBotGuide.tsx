@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import TelegramBotUsernameField from "@/components/TelegramBotUsernameField";
 
 /**
  * The Telegram BOT record — deliberately a sibling of the Telegram GROUPS
@@ -150,12 +151,16 @@ export default function TelegramBotGuide({
   webhookSecretSet,
   appUrl,
   connectedByRole,
+  canEdit,
+  returnTo,
 }: {
   botUsername: string | null;
   tokenSet: boolean;
   webhookSecretSet: boolean;
   appUrl: string;
   connectedByRole: Array<{ role: string; count: number }>;
+  canEdit: boolean;
+  returnTo: string;
 }) {
   const botLink = botUsername ? `https://t.me/${botUsername}` : null;
   const webhookUrl = `${appUrl.replace(/\/$/, "")}/api/telegram-webhook`;
@@ -189,7 +194,9 @@ export default function TelegramBotGuide({
           <div className="grid gap-1 px-3 py-2 sm:grid-cols-[200px_1fr]">
             <dt className="font-semibold text-neutral-600">Bot link</dt>
             <dd>
-              {botLink ? (
+              {canEdit ? (
+                <TelegramBotUsernameField botUsername={botUsername} returnTo={returnTo} />
+              ) : botLink ? (
                 <a
                   href={botLink}
                   target="_blank"
@@ -200,7 +207,7 @@ export default function TelegramBotGuide({
                 </a>
               ) : (
                 <span className="font-semibold text-red-600">
-                  Not set — add TELEGRAM_BOT_USERNAME (see step 3 below). Until then every
+                  Not set — ask Admin/Organizer to set it above. Until then every
                   “Connect Telegram” button is hidden site-wide.
                 </span>
               )}
@@ -394,11 +401,12 @@ export default function TelegramBotGuide({
         </li>
 
         <li>
-          <p className="font-bold text-neutral-800">3. Add three environment variables in Vercel</p>
+          <p className="font-bold text-neutral-800">3. Add two environment variables in Vercel</p>
           <p className="mt-1">
             Vercel → your project → <strong>Settings → Environment Variables</strong>. Add each
             one to <strong>both Production and Preview</strong>, otherwise staging silently has no
-            bot:
+            bot. The bot <strong>username</strong> is not one of these two — set it in the
+            &quot;Bot link&quot; field above instead, which saves immediately with no redeploy:
           </p>
           <div className="mt-2 overflow-x-auto rounded-md border border-neutral-200">
             <table className="w-full border-collapse text-[11px]" style={{ minWidth: 620 }}>
@@ -417,20 +425,6 @@ export default function TelegramBotGuide({
                   <td className={bodyCell}>The token BotFather gave you, pasted whole.</td>
                   <td className={bodyCell}>
                     <StatusChip ok={tokenSet}>{tokenSet ? "Set" : "Missing"}</StatusChip>
-                  </td>
-                </tr>
-                <tr>
-                  <td className={bodyCell}>
-                    <Code>TELEGRAM_BOT_USERNAME</Code>
-                  </td>
-                  <td className={bodyCell}>
-                    The username <strong>without the @</strong> — e.g.{" "}
-                    <Code>MalaysiaKataBot</Code>.
-                  </td>
-                  <td className={bodyCell}>
-                    <StatusChip ok={Boolean(botUsername)}>
-                      {botUsername ? botUsername : "Missing"}
-                    </StatusChip>
                   </td>
                 </tr>
                 <tr>
@@ -455,9 +449,11 @@ export default function TelegramBotGuide({
         <li>
           <p className="font-bold text-neutral-800">4. Redeploy</p>
           <p className="mt-1">
-            Environment variables only reach the running site on the next deployment. Vercel →{" "}
-            <strong>Deployments</strong> → latest → <strong>Redeploy</strong>. The status chips at
-            the top of this page turn green once it is live.
+            <Code>TELEGRAM_BOT_TOKEN</Code> and <Code>TELEGRAM_WEBHOOK_SECRET</Code> only reach the
+            running site on the next deployment. Vercel → <strong>Deployments</strong> → latest →{" "}
+            <strong>Redeploy</strong>. The status chips at the top of this page turn green once it
+            is live. (The bot username doesn&apos;t need this step — it took effect the moment you
+            saved it above.)
           </p>
         </li>
 
@@ -560,9 +556,10 @@ export default function TelegramBotGuide({
             <tr>
               <td className={bodyCell}>No “Connect Telegram” button anywhere on My Account</td>
               <td className={bodyCell}>
-                <Code>TELEGRAM_BOT_USERNAME</Code> is unset, so there is no link to build
+                The bot username is unset in the “Bot link” field above, so there is no link to
+                build
               </td>
-              <td className={bodyCell}>Step 3, then step 4</td>
+              <td className={bodyCell}>Set it above — takes effect immediately, no redeploy</td>
             </tr>
             <tr>
               <td className={bodyCell}>Button opens Telegram, but the bot never replies “connected”</td>
@@ -589,14 +586,22 @@ export default function TelegramBotGuide({
               <td className={bodyCell}>Step 8</td>
             </tr>
             <tr>
-              <td className={bodyCell}>Staging behaves differently from production</td>
               <td className={bodyCell}>
-                The three variables were added to Production only, and one webhook can point at
-                one URL at a time
+                Staging shows &quot;Connect Telegram&quot; but never confirms as connected
               </td>
               <td className={bodyCell}>
-                Add them to Preview too; use a second bot for staging if you need both live at
-                once
+                Both environments have the same bot configured now, but a bot has only one
+                webhook — it can point at just one deployment&apos;s URL at a time. Whichever
+                environment it&apos;s currently pointed at gets the confirmation; the other one
+                opens the right bot but the reply never lands in its own database. This doesn&apos;t
+                affect notifications already delivered via an existing telegram_chat_id (referee
+                assignments, certificates, etc.) — only brand-new &quot;Connect Telegram&quot; attempts.
+              </td>
+              <td className={bodyCell}>
+                Re-run <Code>setWebhook</Code> (step 5) pointed at staging&apos;s own URL when you
+                need to test connecting there, then point it back at production&apos;s URL
+                afterwards — or use a second, separate bot for staging so both stay connectable at
+                the same time
               </td>
             </tr>
           </tbody>

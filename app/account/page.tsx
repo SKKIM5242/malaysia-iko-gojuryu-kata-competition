@@ -14,7 +14,7 @@ import DeleteRecordingControls from "@/components/DeleteRecordingControls";
 import RefereeScoring, { type ScoringItem } from "@/components/RefereeScoring";
 import CertificatesSection from "@/components/CertificatesSection";
 import IssueReportForm from "@/components/IssueReportForm";
-import { getAllTelegramLinks, getTelegramBotConnectUrl } from "@/lib/telegram";
+import { getAllTelegramLinks, getTelegramBotConnectUrl, getTelegramBotUsername } from "@/lib/telegram";
 import { isWithinSignInQuota } from "@/lib/sign-in-quota";
 import SubscriptionBlocked from "@/components/SubscriptionBlocked";
 import EmailVerificationBlocked from "@/components/EmailVerificationBlocked";
@@ -365,6 +365,9 @@ export default async function AccountPage({
     .eq("user_id", user.id)
     .maybeSingle();
   const profile = (profileData as ProfileRow | null) ?? (await ensureProfile<ProfileRow>(user));
+  // Fetched once here rather than per role-branch below -- every "Connect
+  // Telegram" button on this page needs it.
+  const botUsername = await getTelegramBotUsername();
 
   const SignOutButton = (
     <div>
@@ -512,7 +515,7 @@ export default async function AccountPage({
                 <TelegramFullAccessLinks links={staffTelegramLinks} />
               </div>
               {(() => {
-                const connectUrl = getTelegramBotConnectUrl(user.id);
+                const connectUrl = getTelegramBotConnectUrl(user.id, botUsername);
                 if (profile.telegram_chat_id) {
                   return (
                     <p className="mt-3 text-sm font-semibold text-green-700">
@@ -672,7 +675,7 @@ export default async function AccountPage({
             <TelegramFullAccessLinks links={refereeTelegramLinks} />
           </div>
           {(() => {
-            const connectUrl = getTelegramBotConnectUrl(user.id);
+            const connectUrl = getTelegramBotConnectUrl(user.id, botUsername);
             if (profile.telegram_chat_id) {
               return (
                 <p className="mt-3 text-sm font-semibold text-green-700">
@@ -813,7 +816,7 @@ export default async function AccountPage({
                 <Link href="/kata-arena" className="underline font-semibold">Kata Arena</Link>.
               </p>
               {(() => {
-                const connectUrl = getTelegramBotConnectUrl(user.id);
+                const connectUrl = getTelegramBotConnectUrl(user.id, botUsername);
                 if (profile.telegram_chat_id) {
                   return (
                     <p className="mt-3 text-sm font-semibold text-green-700">
@@ -959,7 +962,7 @@ export default async function AccountPage({
               )}
             </div>
             {(() => {
-              const connectUrl = getTelegramBotConnectUrl(user.id);
+              const connectUrl = getTelegramBotConnectUrl(user.id, botUsername);
               if (profile.telegram_chat_id) {
                 return (
                   <p className="text-sm font-semibold text-green-700">

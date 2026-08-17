@@ -4341,6 +4341,46 @@ export async function deleteTelegramGroup(formData: FormData) {
   backTo(returnTo, { ok: "Telegram group deleted." });
 }
 
+/** Saves the bot's @username to telegram_bot_settings (see 0136_telegram_bot_settings.sql) --
+ * the one non-secret piece of the bot's identity, editable here instead of
+ * a Vercel redeploy. TELEGRAM_BOT_TOKEN and TELEGRAM_WEBHOOK_SECRET aren't
+ * touched by this page at all -- they stay Vercel-only. */
+export async function saveTelegramBotUsername(formData: FormData) {
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/telegram";
+  const { supabase, actorId } = await getActor();
+  await requireTelegramGroupEditor(supabase, actorId, returnTo);
+  const username = String(formData.get("bot_username") ?? "").trim().replace(/^@/, "");
+  if (!username) backTo(returnTo, { error: "Enter a bot username, or use Delete to clear it." });
+  const { error } = await supabase
+    .from("telegram_bot_settings")
+    .update({ bot_username: username, updated_at: new Date().toISOString() })
+    .eq("id", true);
+  if (error) backTo(returnTo, { error: "Could not save the bot username." });
+  await writeAudit(supabase, {
+    table_name: "telegram_bot_settings", record_id: null,
+    action: "telegram_bot_username_updated", new_value: { bot_username: username }, actor_id: actorId,
+  });
+  backTo(returnTo, { ok: "Bot username saved." });
+}
+
+/** Clears the bot username -- every "Connect Telegram" button site-wide
+ * hides itself until a new one is set (same as it never being configured
+ * at all). Doesn't touch the bot itself in Telegram, just this record. */
+export async function clearTelegramBotUsername(formData: FormData) {
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/telegram";
+  const { supabase, actorId } = await getActor();
+  await requireTelegramGroupEditor(supabase, actorId, returnTo);
+  const { error } = await supabase
+    .from("telegram_bot_settings")
+    .update({ bot_username: null, updated_at: new Date().toISOString() })
+    .eq("id", true);
+  if (error) backTo(returnTo, { error: "Could not clear the bot username." });
+  await writeAudit(supabase, {
+    table_name: "telegram_bot_settings", record_id: null, action: "telegram_bot_username_cleared", actor_id: actorId,
+  });
+  backTo(returnTo, { ok: "Bot username cleared." });
+}
+
 // ── Admin Telegram Direct Messages ──────────────────────────────────────────
 
 async function requireTelegramDmSender(

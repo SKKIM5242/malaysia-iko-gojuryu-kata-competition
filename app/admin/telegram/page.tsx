@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { schemaReady } from "@/lib/data";
 import { AdminShell } from "@/components/admin";
 import { SetupNotice, EmptyState } from "@/components/ui";
-import { listTelegramGroups } from "@/lib/telegram";
+import { listTelegramGroups, getTelegramBotUsername } from "@/lib/telegram";
 import { saveTelegramGroup, deleteTelegramGroup } from "@/app/actions/admin";
 import TelegramBotGuide from "@/components/TelegramBotGuide";
 
@@ -202,11 +202,13 @@ export default async function AdminTelegramLinks({
       )}
 
       <TelegramBotGuide
-        botUsername={process.env.TELEGRAM_BOT_USERNAME?.trim() || null}
+        botUsername={await getTelegramBotUsername()}
         tokenSet={Boolean(process.env.TELEGRAM_BOT_TOKEN?.trim())}
         webhookSecretSet={Boolean(process.env.TELEGRAM_WEBHOOK_SECRET?.trim())}
         appUrl={process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}
         connectedByRole={connectedByRole}
+        canEdit={canEdit}
+        returnTo={RETURN_TO}
       />
     </AdminShell>
   );
