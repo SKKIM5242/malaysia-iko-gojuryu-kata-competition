@@ -12,16 +12,32 @@
  * written to the database.
  */
 import { createClient } from "@/lib/supabase/server";
-import { renderCertificatePng, sanitizeTextStyle, type CertificateKind, type CertificateTemplate } from "@/lib/certificate-render";
+import {
+  renderCertificatePng,
+  sanitizeTextStyle,
+  type CertificateKind,
+  type CertificateTemplate,
+  type LineSpacingMode,
+} from "@/lib/certificate-render";
 import { SAMPLE_DATA, certificateSettings, certificateTemplate } from "@/lib/certificate-data";
 
 export const dynamic = "force-dynamic";
 
 const VALID_KINDS: CertificateKind[] = ["winner", "participant", "referee", "sensei", "school", "support"];
+const LINE_SPACING_MODES: readonly LineSpacingMode[] = ["single", "1.5", "double", "atLeast", "exactly", "multiple"];
 
 function num(v: unknown, fallback: number): number {
   const n = Number(v);
   return Number.isFinite(n) ? n : fallback;
+}
+
+/** Unlike num(), an absent/non-numeric value stays null -- the "At:" value
+ * is unused by resolveLineHeight for Single/1.5/Double, so those modes
+ * legitimately post nothing. */
+function nullableNum(v: unknown): number | null {
+  if (v === undefined || v === null || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
 }
 
 function align3(v: unknown, fallback: "left" | "center" | "right"): "left" | "center" | "right" {
@@ -30,6 +46,10 @@ function align3(v: unknown, fallback: "left" | "center" | "right"): "left" | "ce
 
 function lineStyle3(v: unknown, fallback: "solid" | "dashed"): "solid" | "dashed" {
   return v === "solid" || v === "dashed" ? v : fallback;
+}
+
+function lineSpacingMode6(v: unknown, fallback: LineSpacingMode): LineSpacingMode {
+  return (LINE_SPACING_MODES as readonly unknown[]).includes(v) ? (v as LineSpacingMode) : fallback;
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ kind: string }> }) {
@@ -78,12 +98,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ kin
     dateAlignment: align3(b.date_alignment, saved.dateAlignment),
     dateDescription: typeof b.date_description === "string" ? b.date_description : saved.dateDescription,
     dateDescriptionAlignment: align3(b.date_description_alignment, saved.dateDescriptionAlignment),
+    dateDescriptionLineSpacingMode: lineSpacingMode6(b.date_description_line_spacing_mode, saved.dateDescriptionLineSpacingMode),
+    dateDescriptionLineSpacingAt: b.date_description_line_spacing_at !== undefined ? nullableNum(b.date_description_line_spacing_at) : saved.dateDescriptionLineSpacingAt,
     dateLineStyle: lineStyle3(b.date_line_style, saved.dateLineStyle),
     dateLineWidth: num(b.date_line_width, saved.dateLineWidth),
     signerNameSize: num(b.signer_name_size, saved.signerNameSize),
     signerTitleSize: num(b.signer_title_size, saved.signerTitleSize),
     signerNameBold: b.signer_name_bold === true,
     signerTitleBold: b.signer_title_bold === true,
+    signerNameLineSpacingMode: lineSpacingMode6(b.signer_name_line_spacing_mode, saved.signerNameLineSpacingMode),
+    signerNameLineSpacingAt: b.signer_name_line_spacing_at !== undefined ? nullableNum(b.signer_name_line_spacing_at) : saved.signerNameLineSpacingAt,
+    signerTitleLineSpacingMode: lineSpacingMode6(b.signer_title_line_spacing_mode, saved.signerTitleLineSpacingMode),
+    signerTitleLineSpacingAt: b.signer_title_line_spacing_at !== undefined ? nullableNum(b.signer_title_line_spacing_at) : saved.signerTitleLineSpacingAt,
     signerPosition: align3(b.signer_position, saved.signerPosition),
     signerLineStyle: lineStyle3(b.signer_line_style, saved.signerLineStyle),
     signerLineWidth: num(b.signer_line_width, saved.signerLineWidth),

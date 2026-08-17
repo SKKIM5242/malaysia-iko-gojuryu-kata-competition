@@ -1834,10 +1834,22 @@ async function requireCertificateTemplateManager(
  * its own explicit confirm, rather than living inside this general save. */
 const ALIGN3 = ["left", "center", "right"] as const;
 const LINE_STYLES = ["solid", "dashed"] as const;
+const LINE_SPACING_MODES = ["single", "1.5", "double", "atLeast", "exactly", "multiple"] as const;
 
 function numField(formData: FormData, name: string, fallback: number): number {
   const n = Number(formData.get(name));
   return Number.isFinite(n) ? n : fallback;
+}
+
+/** Unlike numField, an absent/unparseable value stays null rather than
+ * falling back to a number -- the Word-style "At:" value is meaningless
+ * (and unused by resolveLineHeight) for Single/1.5/Double, so those modes
+ * legitimately post nothing here. */
+function nullableNumField(formData: FormData, name: string): number | null {
+  const raw = formData.get(name);
+  if (raw === null || raw === "") return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
 }
 
 function align3Field(formData: FormData, name: string, fallback: (typeof ALIGN3)[number]): (typeof ALIGN3)[number] {
@@ -1848,6 +1860,11 @@ function align3Field(formData: FormData, name: string, fallback: (typeof ALIGN3)
 function lineStyleField(formData: FormData, name: string, fallback: (typeof LINE_STYLES)[number]): (typeof LINE_STYLES)[number] {
   const v = String(formData.get(name) ?? "");
   return (LINE_STYLES as readonly string[]).includes(v) ? (v as (typeof LINE_STYLES)[number]) : fallback;
+}
+
+function lineSpacingModeField(formData: FormData, name: string): (typeof LINE_SPACING_MODES)[number] {
+  const v = String(formData.get(name) ?? "");
+  return (LINE_SPACING_MODES as readonly string[]).includes(v) ? (v as (typeof LINE_SPACING_MODES)[number]) : "single";
 }
 
 /** Each Header/Body field's typography (font size/color/alignment/weight/
@@ -1901,12 +1918,18 @@ export async function saveCertificateTemplate(formData: FormData) {
     date_alignment: align3Field(formData, "date_alignment", "center"),
     date_description: String(formData.get("date_description") ?? "").trim() || "Announcement Date",
     date_description_alignment: align3Field(formData, "date_description_alignment", "center"),
+    date_description_line_spacing_mode: lineSpacingModeField(formData, "date_description_line_spacing_mode"),
+    date_description_line_spacing_at: nullableNumField(formData, "date_description_line_spacing_at"),
     date_line_style: lineStyleField(formData, "date_line_style", "solid"),
     date_line_width: numField(formData, "date_line_width", 380),
     signer_name_size: numField(formData, "signer_name_size", 28),
     signer_title_size: numField(formData, "signer_title_size", 22),
     signer_name_bold: formData.get("signer_name_bold") === "on",
     signer_title_bold: formData.get("signer_title_bold") === "on",
+    signer_name_line_spacing_mode: lineSpacingModeField(formData, "signer_name_line_spacing_mode"),
+    signer_name_line_spacing_at: nullableNumField(formData, "signer_name_line_spacing_at"),
+    signer_title_line_spacing_mode: lineSpacingModeField(formData, "signer_title_line_spacing_mode"),
+    signer_title_line_spacing_at: nullableNumField(formData, "signer_title_line_spacing_at"),
     signer_position: align3Field(formData, "signer_position", "center"),
     signer_line_style: lineStyleField(formData, "signer_line_style", "solid"),
     signer_line_width: numField(formData, "signer_line_width", 500),

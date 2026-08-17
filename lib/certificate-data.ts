@@ -9,7 +9,15 @@
  * without duplicating it.
  */
 import type { createClient } from "@/lib/supabase/server";
-import { sanitizeTextStyle, type CertificateInput, type CertificateKind, type CertificateTemplate } from "@/lib/certificate-render";
+import {
+  sanitizeTextStyle,
+  type CertificateInput,
+  type CertificateKind,
+  type CertificateTemplate,
+  type LineSpacingMode,
+} from "@/lib/certificate-render";
+
+const LINE_SPACING_MODES: readonly LineSpacingMode[] = ["single", "1.5", "double", "atLeast", "exactly", "multiple"];
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 
@@ -92,6 +100,8 @@ export async function certificateTemplate(
     v === "left" || v === "center" || v === "right" ? v : fallback;
   const lineStyle3 = (v: unknown, fallback: "solid" | "dashed"): "solid" | "dashed" =>
     v === "solid" || v === "dashed" ? v : fallback;
+  const lineSpacingMode6 = (v: unknown): LineSpacingMode =>
+    (LINE_SPACING_MODES as readonly unknown[]).includes(v) ? (v as LineSpacingMode) : "single";
   return {
     header1: (data?.header1 as string | null) ?? "",
     header2: (data?.header2 as string | null) ?? "",
@@ -114,12 +124,18 @@ export async function certificateTemplate(
     dateAlignment: align3(data?.date_alignment, "center"),
     dateDescription: (data?.date_description as string | null) ?? "Announcement Date",
     dateDescriptionAlignment: align3(data?.date_description_alignment, "center"),
+    dateDescriptionLineSpacingMode: lineSpacingMode6(data?.date_description_line_spacing_mode),
+    dateDescriptionLineSpacingAt: (data?.date_description_line_spacing_at as number | null) ?? null,
     dateLineStyle: lineStyle3(data?.date_line_style, "solid"),
     dateLineWidth: (data?.date_line_width as number | null) ?? 380,
     signerNameSize: (data?.signer_name_size as number | null) ?? 28,
     signerTitleSize: (data?.signer_title_size as number | null) ?? 22,
     signerNameBold: (data?.signer_name_bold as boolean | null) ?? true,
     signerTitleBold: (data?.signer_title_bold as boolean | null) ?? false,
+    signerNameLineSpacingMode: lineSpacingMode6(data?.signer_name_line_spacing_mode),
+    signerNameLineSpacingAt: (data?.signer_name_line_spacing_at as number | null) ?? null,
+    signerTitleLineSpacingMode: lineSpacingMode6(data?.signer_title_line_spacing_mode),
+    signerTitleLineSpacingAt: (data?.signer_title_line_spacing_at as number | null) ?? null,
     signerPosition: align3(data?.signer_position, "center"),
     signerLineStyle: lineStyle3(data?.signer_line_style, "solid"),
     signerLineWidth: (data?.signer_line_width as number | null) ?? 500,

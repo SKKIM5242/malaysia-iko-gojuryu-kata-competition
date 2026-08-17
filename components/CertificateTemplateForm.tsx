@@ -53,12 +53,18 @@ export interface CertificateTemplateRow {
   date_alignment: Align3;
   date_description: string;
   date_description_alignment: Align3;
+  date_description_line_spacing_mode: LineSpacingMode;
+  date_description_line_spacing_at: number | null;
   date_line_style: LineStyle;
   date_line_width: number;
   signer_name_size: number;
   signer_title_size: number;
   signer_name_bold: boolean;
   signer_title_bold: boolean;
+  signer_name_line_spacing_mode: LineSpacingMode;
+  signer_name_line_spacing_at: number | null;
+  signer_title_line_spacing_mode: LineSpacingMode;
+  signer_title_line_spacing_at: number | null;
   signer_position: Align3;
   signer_line_style: LineStyle;
   signer_line_width: number;
@@ -113,6 +119,50 @@ const LINE_SPACING_MODES: Array<{ value: LineSpacingMode; label: string }> = [
 const LINE_SPACING_NEEDS_AT: Record<LineSpacingMode, boolean> = {
   single: false, "1.5": false, double: false, atLeast: true, exactly: true, multiple: true,
 };
+
+/** The Word-style Single/1.5/Double/At least/Exactly/Multiple + "At:" pair
+ * -- shared by every text region that can wrap (Header 1/2, Body 1/2/3 via
+ * TextStyleControls above, and the Date description / Signer name / Signer
+ * title below, each with their own plain useState instead of a TextStyle
+ * object since those live as individual saveCertificateTemplate columns,
+ * not inside a *_style jsonb blob). */
+function LineSpacingControl({
+  mode, at, onModeChange, onAtChange, modeName, atName,
+}: {
+  mode: LineSpacingMode;
+  at: number | null | undefined;
+  onModeChange: (m: LineSpacingMode) => void;
+  onAtChange: (v: number | undefined) => void;
+  /** Only needed when this control isn't already carried inside a
+   * TextStyleControls JSON blob (Date description / Signer name / Signer
+   * title, which save as their own plain columns) -- gives the <select>/
+   * <input> real `name`s so saveCertificateTemplate's formData.get() picks
+   * them up directly. */
+  modeName?: string;
+  atName?: string;
+}) {
+  return (
+    <div className="flex gap-1">
+      <select
+        name={modeName} value={mode}
+        onChange={(e) => onModeChange(e.target.value as LineSpacingMode)}
+        className={smallInput}
+      >
+        {LINE_SPACING_MODES.map((m) => (
+          <option key={m.value} value={m.value}>{m.label}</option>
+        ))}
+      </select>
+      {LINE_SPACING_NEEDS_AT[mode] && (
+        <input
+          type="number" name={atName} min={0.1} step={0.1} placeholder="At"
+          value={at ?? ""}
+          onChange={(e) => onAtChange(e.target.value ? Number(e.target.value) : undefined)}
+          className={`${smallInput} w-14`}
+        />
+      )}
+    </div>
+  );
+}
 // 5 preset choices rather than a free-number field, matching how thick a
 // hand-drawn underline reads at a glance rather than an exact pixel count.
 const LINE_THICKNESSES = [
@@ -188,25 +238,12 @@ function TextStyleControls({
       </div>
       <div>
         <label className={smallLabel}>Line spacing</label>
-        <div className="flex gap-1">
-          <select
-            value={value.lineSpacingMode ?? "single"}
-            onChange={(e) => set("lineSpacingMode", e.target.value as LineSpacingMode)}
-            className={smallInput}
-          >
-            {LINE_SPACING_MODES.map((m) => (
-              <option key={m.value} value={m.value}>{m.label}</option>
-            ))}
-          </select>
-          {LINE_SPACING_NEEDS_AT[value.lineSpacingMode ?? "single"] && (
-            <input
-              type="number" min={0.1} step={0.1} placeholder="At"
-              value={value.lineSpacingAt ?? ""}
-              onChange={(e) => set("lineSpacingAt", e.target.value ? Number(e.target.value) : undefined)}
-              className={`${smallInput} w-14`}
-            />
-          )}
-        </div>
+        <LineSpacingControl
+          mode={value.lineSpacingMode ?? "single"}
+          at={value.lineSpacingAt}
+          onModeChange={(m) => set("lineSpacingMode", m)}
+          onAtChange={(v) => set("lineSpacingAt", v)}
+        />
       </div>
       <div>
         <label className={smallLabel}>Max lines (wrap)</label>
@@ -494,6 +531,8 @@ export default function CertificateTemplateForm({
   const [dateAlignment, setDateAlignment] = useState<Align3>(template.date_alignment);
   const [dateDescription, setDateDescription] = useState(template.date_description);
   const [dateDescriptionAlignment, setDateDescriptionAlignment] = useState<Align3>(template.date_description_alignment);
+  const [dateDescriptionLineSpacingMode, setDateDescriptionLineSpacingMode] = useState<LineSpacingMode>(template.date_description_line_spacing_mode);
+  const [dateDescriptionLineSpacingAt, setDateDescriptionLineSpacingAt] = useState<number | undefined>(template.date_description_line_spacing_at ?? undefined);
   const [dateLineStyle, setDateLineStyle] = useState<LineStyle>(template.date_line_style);
   const [dateLineWidth, setDateLineWidth] = useState(template.date_line_width);
 
@@ -501,6 +540,10 @@ export default function CertificateTemplateForm({
   const [signerTitleSize, setSignerTitleSize] = useState(template.signer_title_size);
   const [signerNameBold, setSignerNameBold] = useState(template.signer_name_bold);
   const [signerTitleBold, setSignerTitleBold] = useState(template.signer_title_bold);
+  const [signerNameLineSpacingMode, setSignerNameLineSpacingMode] = useState<LineSpacingMode>(template.signer_name_line_spacing_mode);
+  const [signerNameLineSpacingAt, setSignerNameLineSpacingAt] = useState<number | undefined>(template.signer_name_line_spacing_at ?? undefined);
+  const [signerTitleLineSpacingMode, setSignerTitleLineSpacingMode] = useState<LineSpacingMode>(template.signer_title_line_spacing_mode);
+  const [signerTitleLineSpacingAt, setSignerTitleLineSpacingAt] = useState<number | undefined>(template.signer_title_line_spacing_at ?? undefined);
   const [signerPosition, setSignerPosition] = useState<Align3>(template.signer_position);
   const [signerLineStyle, setSignerLineStyle] = useState<LineStyle>(template.signer_line_style);
   const [signerLineWidth, setSignerLineWidth] = useState(template.signer_line_width);
@@ -535,9 +578,13 @@ export default function CertificateTemplateForm({
         logos_alignment: logosAlignment, logos_no_spacing: logosNoSpacing,
         date_color: dateColor, date_size: dateSize, date_alignment: dateAlignment,
         date_description: dateDescription, date_description_alignment: dateDescriptionAlignment,
+        date_description_line_spacing_mode: dateDescriptionLineSpacingMode,
+        date_description_line_spacing_at: dateDescriptionLineSpacingAt,
         date_line_style: dateLineStyle, date_line_width: dateLineWidth,
         signer_name_size: signerNameSize, signer_title_size: signerTitleSize,
         signer_name_bold: signerNameBold, signer_title_bold: signerTitleBold, signer_position: signerPosition,
+        signer_name_line_spacing_mode: signerNameLineSpacingMode, signer_name_line_spacing_at: signerNameLineSpacingAt,
+        signer_title_line_spacing_mode: signerTitleLineSpacingMode, signer_title_line_spacing_at: signerTitleLineSpacingAt,
         signer_line_style: signerLineStyle, signer_line_width: signerLineWidth,
         frame_outer_width: frameOuterWidth, frame_inner_width: frameInnerWidth,
         frame_color_override: frameColorOverride, frame_color: frameColor,
@@ -746,7 +793,7 @@ export default function CertificateTemplateForm({
 
       <div className="rounded border border-neutral-200 bg-neutral-50 p-2">
         <p className="mb-1 text-xs font-semibold text-neutral-600">Footer — Date</p>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <div className="col-span-2">
             <label className={smallLabel}>Description (below the date — wraps if long)</label>
             <input
@@ -766,6 +813,14 @@ export default function CertificateTemplateForm({
               <option value="center">Center</option>
               <option value="right">Right</option>
             </select>
+          </div>
+          <div>
+            <label className={smallLabel}>Description line spacing</label>
+            <LineSpacingControl
+              mode={dateDescriptionLineSpacingMode} at={dateDescriptionLineSpacingAt}
+              onModeChange={setDateDescriptionLineSpacingMode} onAtChange={setDateDescriptionLineSpacingAt}
+              modeName="date_description_line_spacing_mode" atName="date_description_line_spacing_at"
+            />
           </div>
         </div>
         <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-5">
@@ -846,6 +901,24 @@ export default function CertificateTemplateForm({
               <option value="center">Center</option>
               <option value="right">Right</option>
             </select>
+          </div>
+        </div>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <div>
+            <label className={smallLabel}>Name line spacing</label>
+            <LineSpacingControl
+              mode={signerNameLineSpacingMode} at={signerNameLineSpacingAt}
+              onModeChange={setSignerNameLineSpacingMode} onAtChange={setSignerNameLineSpacingAt}
+              modeName="signer_name_line_spacing_mode" atName="signer_name_line_spacing_at"
+            />
+          </div>
+          <div>
+            <label className={smallLabel}>Title line spacing</label>
+            <LineSpacingControl
+              mode={signerTitleLineSpacingMode} at={signerTitleLineSpacingAt}
+              onModeChange={setSignerTitleLineSpacingMode} onAtChange={setSignerTitleLineSpacingAt}
+              modeName="signer_title_line_spacing_mode" atName="signer_title_line_spacing_at"
+            />
           </div>
         </div>
         <div className="mt-2 grid grid-cols-2 gap-2">

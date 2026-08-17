@@ -24,6 +24,15 @@ export type CertificateKind = "winner" | "participant" | "referee" | "sensei" | 
  * least/Exactly/Multiple control Word uses -- see resolveLineHeight below.
  * `maxLines` is an approximation (see StyledText) since Satori has no real
  * multi-line text measurement to clamp against. */
+/** Word's Single/1.5 lines/Double/At least/Exactly/Multiple line-spacing
+ * control -- shared by every text region that can have one: TextStyle below
+ * (Header 1/2, Body 1/2/3) and, via CertificateTemplate's own
+ * dateDescriptionLineSpacingMode, signerNameLineSpacingMode, and
+ * signerTitleLineSpacingMode fields, the Date description and Signer
+ * name/title too. See resolveLineHeight for how each mode maps to CSS. */
+export type LineSpacingMode = "single" | "1.5" | "double" | "atLeast" | "exactly" | "multiple";
+const LINE_SPACING_MODES: readonly LineSpacingMode[] = ["single", "1.5", "double", "atLeast", "exactly", "multiple"];
+
 export interface TextStyle {
   fontSize?: number;
   color?: string;
@@ -49,14 +58,12 @@ export interface TextStyle {
   lineNoGapToText?: boolean;
   /** Collapses the margin above the line in "fixed" length mode. */
   lineNoGapAbove?: boolean;
-  lineSpacingMode?: "single" | "1.5" | "double" | "atLeast" | "exactly" | "multiple";
+  lineSpacingMode?: LineSpacingMode;
   /** The Word-style "At:" value -- px for atLeast/exactly, a raw multiplier
    * for multiple; unused for single/1.5/double. */
   lineSpacingAt?: number;
   maxLines?: number;
 }
-
-const LINE_SPACING_MODES = ["single", "1.5", "double", "atLeast", "exactly", "multiple"] as const;
 
 /** Narrows an arbitrary JSON value (as read back from the `*_style` jsonb
  * columns, or posted to the preview route) into a well-typed TextStyle,
@@ -98,7 +105,7 @@ export function sanitizeTextStyle(v: unknown): TextStyle {
  * least" mode that grows only when content needs more -- both "atLeast" and
  * "exactly" render as the same fixed px line-height here; the UI still
  * offers both since that's what the organizer's reference (Word) shows. */
-function resolveLineHeight(mode: TextStyle["lineSpacingMode"], at?: number): string | undefined {
+function resolveLineHeight(mode: LineSpacingMode | undefined, at?: number): string | undefined {
   switch (mode) {
     case "1.5": return "1.5";
     case "double": return "2";
@@ -141,12 +148,18 @@ export interface CertificateTemplate {
   /** Independent of dateAlignment -- that one positions the date number
    * itself; this one positions the description text underneath it. */
   dateDescriptionAlignment: "left" | "center" | "right";
+  dateDescriptionLineSpacingMode: LineSpacingMode;
+  dateDescriptionLineSpacingAt: number | null;
   dateLineStyle: "solid" | "dashed";
   dateLineWidth: number;
   signerNameSize: number;
   signerTitleSize: number;
   signerNameBold: boolean;
   signerTitleBold: boolean;
+  signerNameLineSpacingMode: LineSpacingMode;
+  signerNameLineSpacingAt: number | null;
+  signerTitleLineSpacingMode: LineSpacingMode;
+  signerTitleLineSpacingAt: number | null;
   signerPosition: "left" | "center" | "right";
   signerLineStyle: "solid" | "dashed";
   signerLineWidth: number;
@@ -439,6 +452,10 @@ function SignerBlock({
   titleSize,
   nameBold,
   titleBold,
+  nameLineSpacingMode,
+  nameLineSpacingAt,
+  titleLineSpacingMode,
+  titleLineSpacingAt,
   position,
 }: {
   name: string | null;
@@ -454,10 +471,16 @@ function SignerBlock({
   titleSize: number;
   nameBold: boolean;
   titleBold: boolean;
+  nameLineSpacingMode: LineSpacingMode;
+  nameLineSpacingAt: number | null;
+  titleLineSpacingMode: LineSpacingMode;
+  titleLineSpacingAt: number | null;
   position: "left" | "center" | "right";
 }) {
   const overlap = Math.round(sigW * 0.1);
   const edge = edgeFor(position);
+  const nameLineHeight = resolveLineHeight(nameLineSpacingMode, nameLineSpacingAt ?? undefined);
+  const titleLineHeight = resolveLineHeight(titleLineSpacingMode, titleLineSpacingAt ?? undefined);
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: edge }}>
       <div style={{ display: "flex", height: `${FOOTER_TOP_H}px`, alignItems: "flex-end", justifyContent: edge }}>
@@ -480,7 +503,13 @@ function SignerBlock({
       </div>
       <div style={{ display: "flex", width: `${hrWidth}px`, borderTop: `3px ${hrStyle} #a8a29e`, marginTop: "18px" }} />
       <div style={{ display: "flex", flexDirection: "column", alignItems: edge, marginTop: "12px" }}>
-        <div style={{ display: "flex", fontSize: nameSize, fontWeight: nameBold ? 700 : 400, color: "#1c1917" }}>
+        <div
+          style={{
+            display: "flex", fontSize: nameSize, fontWeight: nameBold ? 700 : 400, color: "#1c1917",
+            textAlign: position, maxWidth: `${hrWidth + 60}px`,
+            ...(nameLineHeight ? { lineHeight: nameLineHeight } : {}),
+          }}
+        >
           {name ?? "Organizer"}
         </div>
         {title && (
@@ -488,6 +517,7 @@ function SignerBlock({
             style={{
               display: "flex", fontSize: titleSize, fontWeight: titleBold ? 700 : 400, color: "#57534e",
               textAlign: position, maxWidth: `${hrWidth + 60}px`,
+              ...(titleLineHeight ? { lineHeight: titleLineHeight } : {}),
             }}
           >
             {title}
@@ -502,6 +532,7 @@ function SignerBlock({
  * zone, hr, caption below) so its hr lines up with both signers'. */
 function DateBlock({
   dateLabel, caption, width, color, size, alignment, lineStyle, captionAlignment,
+  captionLineSpacingMode, captionLineSpacingAt,
 }: {
   dateLabel: string;
   caption: string;
@@ -511,9 +542,12 @@ function DateBlock({
   alignment: "left" | "center" | "right";
   lineStyle: "solid" | "dashed";
   captionAlignment: "left" | "center" | "right";
+  captionLineSpacingMode: LineSpacingMode;
+  captionLineSpacingAt: number | null;
 }) {
   const edge = edgeFor(alignment);
   const captionEdge = edgeFor(captionAlignment);
+  const captionLineHeight = resolveLineHeight(captionLineSpacingMode, captionLineSpacingAt ?? undefined);
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: edge, width: `${width}px` }}>
       <div style={{ display: "flex", height: `${FOOTER_TOP_H}px`, alignItems: "flex-end", justifyContent: edge }}>
@@ -529,7 +563,13 @@ function DateBlock({
           which only positions the date number) so the description can be
           aligned on its own. */}
       <div style={{ marginTop: "12px", display: "flex", width: "100%", justifyContent: captionEdge }}>
-        <div style={{ display: "flex", fontSize: 33, fontWeight: 600, color: "#78716c", textAlign: captionAlignment, maxWidth: `${width}px` }}>
+        <div
+          style={{
+            display: "flex", fontSize: 33, fontWeight: 600, color: "#78716c",
+            textAlign: captionAlignment, maxWidth: `${width}px`,
+            ...(captionLineHeight ? { lineHeight: captionLineHeight } : {}),
+          }}
+        >
           {caption}
         </div>
       </div>
@@ -893,6 +933,8 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
               alignment={template.dateAlignment}
               lineStyle={template.dateLineStyle}
               captionAlignment={template.dateDescriptionAlignment}
+              captionLineSpacingMode={template.dateDescriptionLineSpacingMode}
+              captionLineSpacingAt={template.dateDescriptionLineSpacingAt}
             />
 
             <SignerBlock
@@ -909,6 +951,10 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
               titleSize={template.signerTitleSize}
               nameBold={template.signerNameBold}
               titleBold={template.signerTitleBold}
+              nameLineSpacingMode={template.signerNameLineSpacingMode}
+              nameLineSpacingAt={template.signerNameLineSpacingAt}
+              titleLineSpacingMode={template.signerTitleLineSpacingMode}
+              titleLineSpacingAt={template.signerTitleLineSpacingAt}
               position={template.signerPosition}
             />
 
@@ -927,6 +973,10 @@ export async function renderCertificatePng(input: CertificateInput): Promise<Ima
                 titleSize={template.signerTitleSize}
                 nameBold={template.signerNameBold}
                 titleBold={template.signerTitleBold}
+                nameLineSpacingMode={template.signerNameLineSpacingMode}
+                nameLineSpacingAt={template.signerNameLineSpacingAt}
+                titleLineSpacingMode={template.signerTitleLineSpacingMode}
+                titleLineSpacingAt={template.signerTitleLineSpacingAt}
                 position={template.signerPosition}
               />
             )}
