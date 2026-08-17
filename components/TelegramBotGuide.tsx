@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import TelegramBotUsernameField from "@/components/TelegramBotUsernameField";
+import TelegramSecretField from "@/components/TelegramSecretField";
 import { updateTelegramWebhook } from "@/app/actions/admin";
 
 /**
@@ -212,6 +213,41 @@ export default function TelegramBotGuide({
                   “Connect Telegram” button is hidden site-wide.
                 </span>
               )}
+            </dd>
+          </div>
+
+          <div className="grid gap-1 px-3 py-2 sm:grid-cols-[200px_1fr]">
+            <dt className="font-semibold text-neutral-600">Bot token</dt>
+            <dd>
+              {canEdit ? (
+                <TelegramSecretField varKey="TELEGRAM_BOT_TOKEN" label="bot token" isSet={tokenSet} returnTo={returnTo} />
+              ) : (
+                <StatusChip ok={tokenSet}>{tokenSet ? "Set" : "Not set"}</StatusChip>
+              )}
+              <p className="mt-1 text-neutral-500">
+                From @BotFather in Telegram. Never displayed here once saved — Edit replaces it
+                with a new value, it never shows the current one.
+              </p>
+            </dd>
+          </div>
+
+          <div className="grid gap-1 px-3 py-2 sm:grid-cols-[200px_1fr]">
+            <dt className="font-semibold text-neutral-600">Webhook secret</dt>
+            <dd>
+              {canEdit ? (
+                <TelegramSecretField
+                  varKey="TELEGRAM_WEBHOOK_SECRET"
+                  label="webhook secret"
+                  isSet={webhookSecretSet}
+                  returnTo={returnTo}
+                />
+              ) : (
+                <StatusChip ok={webhookSecretSet}>{webhookSecretSet ? "Set" : "Not set"}</StatusChip>
+              )}
+              <p className="mt-1 text-neutral-500">
+                Shown by Supabase in Authentication → Hooks → Send Email when you set or regenerate
+                that hook — must match exactly, verbatim, prefix included.
+              </p>
             </dd>
           </div>
 
