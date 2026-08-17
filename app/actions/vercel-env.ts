@@ -199,8 +199,17 @@ export async function updateAppUrl(formData: FormData) {
       error: `Saved NEXT_PUBLIC_APP_URL, but the automatic redeploy failed: ${redeploy.message} Redeploy by hand, then use "Update webhook now" below.`,
     });
   }
+  // Production's custom domain auto-tracks its newest Production deployment,
+  // but staging's does not -- it's a manually-set alias (see
+  // scripts/repoint-staging-alias.sh) that this redeploy never touches. Left
+  // silent, that's exactly the "fixed it, but the friendly URL still serves
+  // the old build" trap that cost hours earlier on this project.
+  const staleAliasNote =
+    target === "production"
+      ? ""
+      : ` This environment's domain doesn't auto-track new builds the way Production's does, though — it'll keep serving the previous build until the staging alias is re-pointed at the new one (bash scripts/repoint-staging-alias.sh).`;
   backTo(returnTo, {
-    ok: `Saved and redeploying now (usually 1-3 minutes). Once it's live, click "Update webhook now" below to point Telegram at the new address.`,
+    ok: `Saved and redeploying now (usually 1-3 minutes). Once it's live, click "Update webhook now" below to point Telegram at the new address.${staleAliasNote}`,
   });
 }
 
