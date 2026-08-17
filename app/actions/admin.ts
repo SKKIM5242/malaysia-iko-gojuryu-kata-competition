@@ -4381,6 +4381,60 @@ export async function clearTelegramBotUsername(formData: FormData) {
   backTo(returnTo, { ok: "Bot username cleared." });
 }
 
+/** Points this environment's bot at this environment's own webhook URL,
+ * using TELEGRAM_BOT_TOKEN and TELEGRAM_WEBHOOK_SECRET straight from the
+ * server's own runtime env -- neither secret is ever typed by a human or
+ * passed through this action's arguments. Replaces the manual "Step 5" curl
+ * command from the setup guide below with one click, which matters because
+ * a bot's webhook is a single pointer on Telegram's own servers: it silently
+ * keeps pointing at wherever it was last set even after NEXT_PUBLIC_APP_URL
+ * changes (a renamed or newly added custom domain) or a fresh bot token is
+ * dropped in, so this needs re-running at exactly those moments. */
+export async function updateTelegramWebhook(formData: FormData) {
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/telegram";
+  const { supabase, actorId } = await getActor();
+  await requireTelegramGroupEditor(supabase, actorId, returnTo);
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const secret = process.env.TELEGRAM_WEBHOOK_SECRET;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  if (!token || !secret || !appUrl) {
+    backTo(returnTo, {
+      error: "TELEGRAM_BOT_TOKEN, TELEGRAM_WEBHOOK_SECRET, and NEXT_PUBLIC_APP_URL must all be set in Vercel first.",
+    });
+  }
+  const webhookUrl = `${appUrl!.replace(/\/$/, "")}/api/telegram-webhook`;
+  let confirmedUrl: string | null = null;
+  try {
+    const setRes = await fetch(`https://api.telegram.org/bot${token}/setWebhook`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: webhookUrl, secret_token: secret }),
+      signal: AbortSignal.timeout(10000),
+    });
+    const setData = await setRes.json();
+    if (!setData.ok) {
+      backTo(returnTo, { error: `Telegram rejected the webhook update: ${setData.description ?? "unknown error"}` });
+    }
+    const infoRes = await fetch(`https://api.telegram.org/bot${token}/getWebhookInfo`, {
+      signal: AbortSignal.timeout(10000),
+    });
+    const infoData = await infoRes.json();
+    confirmedUrl = infoData.ok ? ((infoData.result?.url as string | undefined) ?? null) : null;
+  } catch {
+    backTo(returnTo, { error: "Could not reach Telegram to update the webhook." });
+  }
+  await writeAudit(supabase, {
+    table_name: "telegram_bot_settings", record_id: null,
+    action: "telegram_webhook_updated", new_value: { url: webhookUrl }, actor_id: actorId,
+  });
+  backTo(
+    returnTo,
+    confirmedUrl === webhookUrl
+      ? { ok: `Webhook confirmed pointed at ${webhookUrl}.` }
+      : { error: `Sent, but Telegram now reports a different URL (${confirmedUrl ?? "unknown"}) -- check step 6 below.` },
+  );
+}
+
 // ── Admin Telegram Direct Messages ──────────────────────────────────────────
 
 async function requireTelegramDmSender(

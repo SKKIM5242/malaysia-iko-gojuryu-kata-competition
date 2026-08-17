@@ -17,11 +17,13 @@ set -euo pipefail
 # nothing was re-running the repoint. Testing against the bookmarked link
 # kept showing old, already-fixed bugs.
 #
-# fockaratedokatacompetition.ikogojuryukaratedomalaysia.com is a real
-# custom domain added later for the same purpose, and it has the exact
-# same problem: `vercel alias set` snapshots the deployment it resolved to
-# at the moment the command ran, it does not keep following anything
-# afterward. Both aliases need the same repoint, every time.
+# testkatacompetition.ikogojuryukaratedomalaysia.com is a real custom
+# domain added later for the same purpose, and it has the exact same
+# problem: `vercel alias set` snapshots the deployment it resolved to at
+# the moment the command ran, it does not keep following anything
+# afterward. Both aliases need the same repoint, every time. (Previously
+# this was fockaratedokatacompetition.ikogojuryukaratedomalaysia.com,
+# renamed 2026-08-17 and released back to the Vercel account.)
 #
 # THE FIX
 #
@@ -53,7 +55,7 @@ AUTO_BRANCH_ALIAS="malaysia-iko-gojuryu-kata-git-baf997-kimsiewkiew-1251s-projec
 # build." Add new ones here -- this is the only place that needs to know.
 FRIENDLY_ALIASES=(
   "malaysia-iko-gojuryu-kata-competition-staging.vercel.app"
-  "fockaratedokatacompetition.ikogojuryukaratedomalaysia.com"
+  "testkatacompetition.ikogojuryukaratedomalaysia.com"
 )
 
 echo "==> Resolving the current staging build via Vercel's own branch alias..."

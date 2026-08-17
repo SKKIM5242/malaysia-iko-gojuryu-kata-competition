@@ -74,6 +74,72 @@ export function telegramGroupChatId(memberUrl: string | null): string | null {
   return match ? `-100${match[1]}` : null;
 }
 
+/** Whether a specific person has actually joined a specific group, via the
+ * Bot API's getChatMember -- distinct from the Bot DM connection
+ * (telegram_chat_id on profiles just means "has pressed Start with the
+ * bot"; it says nothing about which, if any, group rooms they've joined).
+ * Needs the bot to already be a member of that group (see /admin/telegram
+ * Step 8) and the person's own chat id (only known once they've connected
+ * the bot). Returns null -- not false -- whenever the question can't be
+ * answered at all (bot not configured, group has no chat id yet, request
+ * failed or timed out): callers should treat that the same as "not joined"
+ * for display purposes, but it's kept distinct from a real "not joined" so
+ * nothing ever claims someone definitely isn't in a group when the truth is
+ * just unknown. A 3s timeout keeps a slow/unreachable Telegram API from
+ * ever hanging the page that's asking. */
+export async function checkGroupMembership(personChatId: string, groupChatId: string): Promise<boolean | null> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) return null;
+  try {
+    const res = await fetch(
+      `https://api.telegram.org/bot${token}/getChatMember?chat_id=${encodeURIComponent(groupChatId)}&user_id=${encodeURIComponent(personChatId)}`,
+      { signal: AbortSignal.timeout(3000) },
+    );
+    const data = await res.json();
+    if (!data.ok) return null;
+    const status = data.result?.status as string | undefined;
+    return status === "member" || status === "administrator" || status === "creator";
+  } catch {
+    return null;
+  }
+}
+
+/** Checks membership across several groups at once, in parallel -- used
+ * for the "every group" view (Admin/Organizer/Staff, Judge). `groups`
+ * needing no member link set yet resolve to null automatically, same as
+ * any other unanswerable case. Returns a map keyed by category so the
+ * caller can look up "am I in the Judges group" without re-deriving chat
+ * ids itself. Skips entirely (empty map) when the person hasn't connected
+ * the bot yet -- there's no chat id to check membership *as*. */
+export async function checkGroupMemberships(
+  personChatId: string | null,
+  groups: Array<{ category: string; memberUrl: string | null }>,
+): Promise<Record<string, boolean | null>> {
+  if (!personChatId) return {};
+  const entries = await Promise.all(
+    groups.map(async (g) => {
+      const groupChatId = telegramGroupChatId(g.memberUrl);
+      if (!groupChatId) return [g.category, null] as const;
+      return [g.category, await checkGroupMembership(personChatId, groupChatId)] as const;
+    }),
+  );
+  return Object.fromEntries(entries);
+}
+
+/** Single-group convenience wrapper around checkGroupMembership, for the
+ * one-category-per-role sections of /account (Participant, School/Sensei,
+ * Audience) -- same null-means-unanswerable contract, extended to also
+ * cover "there's no such group configured at all" (group is null). */
+export async function checkOneGroupMembership(
+  personChatId: string | null,
+  group: { category: string; memberUrl: string | null } | null,
+): Promise<boolean | null> {
+  if (!personChatId || !group) return null;
+  const groupChatId = telegramGroupChatId(group.memberUrl);
+  if (!groupChatId) return null;
+  return checkGroupMembership(personChatId, groupChatId);
+}
+
 /** Which group a given account's own people are in, so a compose box can
  * default to the sensible one rather than making staff pick every time.
  * Mirrors the category split the registration flow already uses. */

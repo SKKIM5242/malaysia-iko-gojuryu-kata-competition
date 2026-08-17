@@ -113,10 +113,55 @@ export function TelegramJoinButton({ href, label = "Join Telegram Group" }: { hr
 
 /** Full access: every category's Telegram group, for approved Referee/Judge
  * and Admin/Organizer/Staff accounts. */
+/** One Telegram group's join status: a plain "join" link, or once actually
+ * verified as joined (via the Bot API, not just clicked), a green
+ * confirmation box matching the Bot DM connection's own "✅ connected"
+ * pattern elsewhere on /account. `joined` is `null` whenever it can't be
+ * determined (bot not connected yet, group has no chat id configured, or
+ * the check failed/timed out) -- treated the same as "not joined" for
+ * display (still just the plain join link), since there's nothing
+ * meaningful to report either way and the person can always just click
+ * through and join. */
+export function TelegramGroupLink({
+  label,
+  url,
+  joined,
+}: {
+  label: string;
+  url: string;
+  joined: boolean | null;
+}) {
+  if (joined) {
+    return (
+      <p className="flex items-center gap-2 rounded-md border border-green-300 bg-green-50 px-4 py-2.5 text-sm font-semibold text-green-800">
+        <span aria-hidden="true">✅</span>
+        You are connected to {label}
+      </p>
+    );
+  }
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center gap-2 rounded-md border border-[#229ED9]/30 bg-[#229ED9]/5 px-4 py-2.5 text-sm font-semibold text-[#1c7fb5] hover:bg-[#229ED9]/10"
+    >
+      <TelegramIcon className="h-4 w-4 shrink-0 fill-current" />
+      {label}
+    </a>
+  );
+}
+
 export function TelegramFullAccessLinks({
   links,
+  membership,
 }: {
   links: Array<{ category: string; label: string; url: string }>;
+  /** category -> joined, from lib/telegram.ts's checkGroupMemberships.
+   * Omitted entirely (not just empty) renders every row as a plain link,
+   * same as before this existed -- callers that haven't fetched membership
+   * yet don't need to pass anything. */
+  membership?: Record<string, boolean | null>;
 }) {
   if (links.length === 0) {
     return <p className="text-sm text-neutral-500">Telegram groups launching soon.</p>;
@@ -124,16 +169,7 @@ export function TelegramFullAccessLinks({
   return (
     <div className="space-y-2">
       {links.map((l) => (
-        <a
-          key={l.category}
-          href={l.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-2 rounded-md border border-[#229ED9]/30 bg-[#229ED9]/5 px-4 py-2.5 text-sm font-semibold text-[#1c7fb5] hover:bg-[#229ED9]/10"
-        >
-          <TelegramIcon className="h-4 w-4 shrink-0 fill-current" />
-          {l.label}
-        </a>
+        <TelegramGroupLink key={l.category} label={l.label} url={l.url} joined={membership?.[l.category] ?? null} />
       ))}
     </div>
   );

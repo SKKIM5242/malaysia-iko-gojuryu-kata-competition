@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ensureProfile } from "@/lib/ensure-profile";
 import { signOut } from "@/app/actions/auth";
 import { schemaReady } from "@/lib/data";
-import { SetupNotice, TelegramFullAccessLinks } from "@/components/ui";
+import { SetupNotice, TelegramFullAccessLinks, TelegramGroupLink } from "@/components/ui";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import AuthForms from "@/components/AuthForms";
 import ClaimForm from "@/components/ClaimForm";
@@ -14,7 +14,15 @@ import DeleteRecordingControls from "@/components/DeleteRecordingControls";
 import RefereeScoring, { type ScoringItem } from "@/components/RefereeScoring";
 import CertificatesSection from "@/components/CertificatesSection";
 import IssueReportForm from "@/components/IssueReportForm";
-import { getAllTelegramLinks, getTelegramBotConnectUrl, getTelegramBotUsername } from "@/lib/telegram";
+import {
+  getAllTelegramLinks,
+  getTelegramBotConnectUrl,
+  getTelegramBotUsername,
+  listTelegramGroups,
+  telegramCategoryForRole,
+  checkGroupMemberships,
+  checkOneGroupMembership,
+} from "@/lib/telegram";
 import { isWithinSignInQuota } from "@/lib/sign-in-quota";
 import SubscriptionBlocked from "@/components/SubscriptionBlocked";
 import EmailVerificationBlocked from "@/components/EmailVerificationBlocked";
@@ -401,6 +409,15 @@ export default async function AccountPage({
     );
   }
 
+  // The single group that matches this account's own role -- School and
+  // Sensei share the "school" category, everyone else maps 1:1. Staff and
+  // Judge don't use this (they get every group, via getAllTelegramLinks
+  // further down); this is for the other four roles' own one relevant
+  // group. Resolved once here rather than per role-branch for the same
+  // reason as botUsername above.
+  const myTelegramGroup =
+    (await listTelegramGroups()).find((g) => g.category === telegramCategoryForRole(profile.role)) ?? null;
+
   if (!(await isEmailVerified(user.id))) {
     return (
       <>
@@ -472,6 +489,9 @@ export default async function AccountPage({
   if (["staff", "admin", "organizer", "customer_support"].includes(profile.role)) {
     const recordingCtx = profile.registration_id ? await getRecordingContext(supabase, user.id, profile, requestedRegistrationId) : null;
     const staffTelegramLinks = profile.approved ? await getAllTelegramLinks() : [];
+    const staffTelegramMembership = profile.approved
+      ? await checkGroupMemberships(profile.telegram_chat_id, staffTelegramLinks)
+      : {};
     return (
       <>
         <SiteHeader />
@@ -512,7 +532,7 @@ export default async function AccountPage({
                 <p className="mb-2 text-sm font-semibold text-green-900">
                   Full access — every Telegram group:
                 </p>
-                <TelegramFullAccessLinks links={staffTelegramLinks} />
+                <TelegramFullAccessLinks links={staffTelegramLinks} membership={staffTelegramMembership} />
               </div>
               {(() => {
                 const connectUrl = getTelegramBotConnectUrl(user.id, botUsername);
@@ -596,6 +616,7 @@ export default async function AccountPage({
 
     const recordingCtx = profile.registration_id ? await getRecordingContext(supabase, user.id, profile, requestedRegistrationId) : null;
     const refereeTelegramLinks = await getAllTelegramLinks();
+    const refereeTelegramMembership = await checkGroupMemberships(profile.telegram_chat_id, refereeTelegramLinks);
 
     const { data: assignments } = await supabase
       .from("referee_assignments")
@@ -672,7 +693,7 @@ export default async function AccountPage({
             <p className="mb-2 text-sm font-semibold text-neutral-700">
               Full access — every Telegram group:
             </p>
-            <TelegramFullAccessLinks links={refereeTelegramLinks} />
+            <TelegramFullAccessLinks links={refereeTelegramLinks} membership={refereeTelegramMembership} />
           </div>
           {(() => {
             const connectUrl = getTelegramBotConnectUrl(user.id, botUsername);
@@ -720,6 +741,9 @@ export default async function AccountPage({
   // ── Audience / Spectator ─────────────────────────────────────────────────
   if (profile.role === "audience") {
     const recordingCtx = profile.registration_id ? await getRecordingContext(supabase, user.id, profile, requestedRegistrationId) : null;
+    const audienceGroupJoined = profile.approved
+      ? await checkOneGroupMembership(profile.telegram_chat_id, myTelegramGroup)
+      : null;
     return (
       <>
         <SiteHeader />
@@ -740,6 +764,32 @@ export default async function AccountPage({
                 Watch every submitted kata recording in{" "}
                 <Link href="/kata-arena" className="underline font-semibold">Kata Arena</Link>.
               </p>
+              {myTelegramGroup && (
+                <div className="mt-3">
+                  <TelegramGroupLink label={myTelegramGroup.label} url={myTelegramGroup.url} joined={audienceGroupJoined} />
+                </div>
+              )}
+              {(() => {
+                const connectUrl = getTelegramBotConnectUrl(user.id, botUsername);
+                if (profile.telegram_chat_id) {
+                  return (
+                    <p className="mt-3 text-sm font-semibold text-green-700">
+                      ✅ Telegram connected.
+                    </p>
+                  );
+                }
+                if (!connectUrl) return null;
+                return (
+                  <a
+                    href={connectUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-3 inline-flex items-center gap-2 rounded-md border border-[#229ED9]/30 bg-[#229ED9]/5 px-4 py-2.5 text-sm font-semibold text-[#1c7fb5] hover:bg-[#229ED9]/10"
+                  >
+                    Connect Telegram
+                  </a>
+                );
+              })()}
             </div>
           ) : (
             <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-6">
@@ -782,6 +832,7 @@ export default async function AccountPage({
     const label = profile.role === "sensei" ? "Sensei" : "School / Dojo";
     const recordingCtx = profile.registration_id ? await getRecordingContext(supabase, user.id, profile, requestedRegistrationId) : null;
     const paid = record?.payment_status === "paid" || record?.payment_status === "waived";
+    const schoolGroupJoined = paid ? await checkOneGroupMembership(profile.telegram_chat_id, myTelegramGroup) : null;
     return (
       <>
         <SiteHeader />
@@ -815,6 +866,11 @@ export default async function AccountPage({
                 Watch your students&apos; submitted kata recordings in{" "}
                 <Link href="/kata-arena" className="underline font-semibold">Kata Arena</Link>.
               </p>
+              {myTelegramGroup && (
+                <div className="mt-3">
+                  <TelegramGroupLink label={myTelegramGroup.label} url={myTelegramGroup.url} joined={schoolGroupJoined} />
+                </div>
+              )}
               {(() => {
                 const connectUrl = getTelegramBotConnectUrl(user.id, botUsername);
                 if (profile.telegram_chat_id) {
@@ -920,6 +976,7 @@ export default async function AccountPage({
     ownVideoUrl,
     registrationId,
   } = ctx;
+  const participantGroupJoined = await checkOneGroupMembership(profile.telegram_chat_id, myTelegramGroup);
 
   return (
     <>
@@ -939,6 +996,11 @@ export default async function AccountPage({
         <p className="mt-1 mb-6 text-sm text-neutral-500">
           Signed in as {profile.full_name ?? user.email}.
         </p>
+        {myTelegramGroup && (
+          <div className="mb-6">
+            <TelegramGroupLink label={myTelegramGroup.label} url={myTelegramGroup.url} joined={participantGroupJoined} />
+          </div>
+        )}
         {existingVideo ? (
           <div className="space-y-8">
             <div className="rounded-lg border border-green-300 bg-green-50 p-6">

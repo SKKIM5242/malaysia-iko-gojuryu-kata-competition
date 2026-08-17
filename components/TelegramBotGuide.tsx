@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import TelegramBotUsernameField from "@/components/TelegramBotUsernameField";
+import { updateTelegramWebhook } from "@/app/actions/admin";
 
 /**
  * The Telegram BOT record — deliberately a sibling of the Telegram GROUPS
@@ -459,10 +460,27 @@ export default function TelegramBotGuide({
 
         <li>
           <p className="font-bold text-neutral-800">5. Point Telegram at the webhook</p>
-          <p className="mt-1">
-            Telegram has to be told where to deliver messages. Run this once (replace{" "}
-            <Code>&lt;BOT_TOKEN&gt;</Code> and <Code>&lt;WEBHOOK_SECRET&gt;</Code> with the real
-            values):
+          <p className="mt-1">Telegram has to be told where to deliver messages.</p>
+          {canEdit && (
+            <form action={updateTelegramWebhook} className="mt-2">
+              <input type="hidden" name="return_to" value={returnTo} />
+              <button
+                type="submit"
+                className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-neutral-700"
+              >
+                Update webhook now
+              </button>
+              <span className="ml-2 text-neutral-500">
+                Reads <Code>TELEGRAM_BOT_TOKEN</Code> and <Code>TELEGRAM_WEBHOOK_SECRET</Code>{" "}
+                straight from Vercel and points this environment&apos;s bot at{" "}
+                <Code>{webhookUrl}</Code> above — neither secret is ever shown here. Re-run this
+                any time this environment&apos;s domain changes, or after rotating either secret.
+              </span>
+            </form>
+          )}
+          <p className="mt-2 text-neutral-600">
+            Or run it by hand instead (replace <Code>&lt;BOT_TOKEN&gt;</Code> and{" "}
+            <Code>&lt;WEBHOOK_SECRET&gt;</Code> with the real values):
           </p>
           <pre className="mt-1.5 overflow-x-auto rounded-md bg-neutral-900 px-3 py-2 font-mono text-[11px] leading-relaxed text-neutral-100">
 {`curl -X POST "https://api.telegram.org/bot<BOT_TOKEN>/setWebhook" \\
