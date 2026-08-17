@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { checkMyTelegramConnected } from "@/lib/telegram";
+import { checkMyTelegramConnected } from "@/app/actions/telegram-status";
 
 /**
  * The blue "Connect Telegram" link / green "✅ connected" message shown in

@@ -1,5 +1,4 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
 
 export type TelegramCategory = "participant" | "school" | "referee" | "audience" | "staff" | "class";
 
@@ -206,25 +205,4 @@ export async function getTelegramBotUsername(): Promise<string | null> {
 export function getTelegramBotConnectUrl(userId: string, botUsername: string | null): string | null {
   if (!botUsername) return null;
   return `https://t.me/${botUsername}?start=${userId}`;
-}
-
-/** Whether the signed-in caller's own Telegram DM connection is live right
- * now -- pressing Start happens entirely inside the Telegram app, outside
- * whatever browser tab is showing the "Connect Telegram" button, so there's
- * no way for that tab to know it happened without asking again. Called by
- * TelegramConnectStatus when the tab regains focus, so the button turns
- * green on its own instead of needing a manual page reload. */
-export async function checkMyTelegramConnected(): Promise<boolean> {
-  "use server";
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return false;
-  const { data } = await supabase
-    .from("profiles")
-    .select("telegram_chat_id")
-    .eq("user_id", user.id)
-    .maybeSingle();
-  return !!(data?.telegram_chat_id as string | null);
 }
