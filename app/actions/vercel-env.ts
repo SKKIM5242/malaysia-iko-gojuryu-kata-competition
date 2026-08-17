@@ -66,7 +66,7 @@ async function vercelFetch(path: string, init?: RequestInit) {
  * branch, one scoped to the environment generally, as this project's own
  * SEND_EMAIL_HOOK_SECRET has had) -- all of them need to go, or a stale one
  * could still win depending on how a future deployment resolves scope. */
-async function deleteExisting(key: EditableKey, target: "production" | "preview") {
+async function deleteExisting(key: string, target: "production" | "preview") {
   const listRes = await vercelFetch(`/v9/projects/${VERCEL_PROJECT_ID}/env`);
   if (!listRes.ok) throw new Error(`Could not list existing env vars (${listRes.status}).`);
   const { envs } = (await listRes.json()) as { envs: VercelEnvVar[] };
@@ -110,6 +110,92 @@ export async function updateTelegramSecret(formData: FormData) {
     actor_id: actorId,
   });
   backTo(returnTo, { ok: `${key} saved for ${target}. Takes effect after the next deployment.` });
+}
+
+/** Re-deploys whatever deployment is currently live for the given target,
+ * by asking Vercel to rebuild that exact deployment again rather than
+ * starting a new one from an ambiguous local checkout -- this is the fix
+ * for the exact bug that broke this project's build earlier: a manually
+ * triggered "vercel deploy" not tied to the right git branch silently used
+ * a stale, mismatched env var instead of the one just set. Asking Vercel to
+ * redeploy a known deployment ID preserves its git branch by construction,
+ * so there is nothing to get wrong here the way there was by hand.
+ * Fire-and-forget: a real deploy takes 1-3+ minutes, far longer than a
+ * server action should hold a request open, so this returns as soon as
+ * Vercel accepts the request, not once the deploy is actually live. */
+async function triggerRedeploy(target: "production" | "preview"): Promise<{ ok: boolean; message: string }> {
+  const branch = process.env.VERCEL_GIT_COMMIT_REF;
+  if (!branch) return { ok: false, message: "Could not determine the current git branch to redeploy." };
+
+  const listRes = await vercelFetch(`/v6/deployments?projectId=${VERCEL_PROJECT_ID}&limit=10`);
+  if (!listRes.ok) return { ok: false, message: `Could not list deployments (${listRes.status}).` };
+  const { deployments } = (await listRes.json()) as {
+    deployments: Array<{ uid: string; meta?: { githubCommitRef?: string } }>;
+  };
+  const current = deployments.find((d) => d.meta?.githubCommitRef === branch);
+  if (!current) return { ok: false, message: `Could not find a recent deployment for branch "${branch}" to redeploy.` };
+
+  const redeployRes = await vercelFetch(`/v13/deployments`, {
+    method: "POST",
+    body: JSON.stringify({
+      name: "malaysia-iko-gojuryu-kata-competition",
+      deploymentId: current.uid,
+      target,
+    }),
+  });
+  if (!redeployRes.ok) {
+    const body = await redeployRes.text();
+    return { ok: false, message: `Redeploy request failed (${redeployRes.status}): ${body.slice(0, 300)}` };
+  }
+  return { ok: true, message: "Redeploy triggered." };
+}
+
+/** NEXT_PUBLIC_APP_URL, not a secret -- shown and edited as plain text, not
+ * write-only like the two fields above. Feeds the webhook URL shown just
+ * below it, every outbound email link, and every certificate link, so a
+ * bad value here breaks far more than Telegram; validated loosely (must
+ * look like a real https URL, no trailing slash) before it's ever sent to
+ * Vercel. */
+export async function updateAppUrl(formData: FormData) {
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/telegram";
+  const { supabase, actorId } = await requireEditor(returnTo);
+  const value = String(formData.get("value") ?? "").trim().replace(/\/$/, "");
+  if (!/^https:\/\/[a-z0-9.-]+\.[a-z]{2,}$/i.test(value)) {
+    backTo(returnTo, { error: "Enter a real https:// address, e.g. https://example.com — no trailing slash, no path." });
+  }
+
+  const target = currentTarget();
+  try {
+    await deleteExisting("NEXT_PUBLIC_APP_URL", target);
+    const createRes = await vercelFetch(`/v10/projects/${VERCEL_PROJECT_ID}/env`, {
+      method: "POST",
+      body: JSON.stringify({ key: "NEXT_PUBLIC_APP_URL", value, type: "plain", target: [target] }),
+    });
+    if (!createRes.ok) {
+      const body = await createRes.text();
+      throw new Error(`Could not save NEXT_PUBLIC_APP_URL (${createRes.status}): ${body.slice(0, 300)}`);
+    }
+  } catch (err) {
+    backTo(returnTo, { error: err instanceof Error ? err.message : "Could not update Vercel." });
+  }
+
+  await writeAudit(supabase, {
+    table_name: "vercel_env",
+    record_id: null,
+    action: "app_url_updated",
+    new_value: { target, value },
+    actor_id: actorId,
+  });
+
+  const redeploy = await triggerRedeploy(target);
+  if (!redeploy.ok) {
+    backTo(returnTo, {
+      error: `Saved NEXT_PUBLIC_APP_URL, but the automatic redeploy failed: ${redeploy.message} Redeploy by hand, then use "Update webhook now" below.`,
+    });
+  }
+  backTo(returnTo, {
+    ok: `Saved and redeploying now (usually 1-3 minutes). Once it's live, click "Update webhook now" below to point Telegram at the new address.`,
+  });
 }
 
 export async function clearTelegramSecret(formData: FormData) {

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import TelegramBotUsernameField from "@/components/TelegramBotUsernameField";
 import TelegramSecretField from "@/components/TelegramSecretField";
+import TelegramAppUrlField from "@/components/TelegramAppUrlField";
 import { updateTelegramWebhook } from "@/app/actions/admin";
 
 /**
@@ -256,9 +257,26 @@ export default function TelegramBotGuide({
             <dd>
               <Code>{botUsername ? `https://t.me/${botUsername}?start=<account id>` : "https://t.me/<bot username>?start=<account id>"}</Code>
               <p className="mt-1 text-neutral-500">
-                Built per person by every “Connect Telegram” button. The{" "}
-                <Code>?start=</Code> payload is that signed-in person’s own account id — it is how
-                the bot knows whose chat it is talking to.
+                Built per person by every “Connect Telegram” button, from the bot link above plus
+                that signed-in person’s own account id — not its own stored value, so there’s
+                nothing separate to edit here. Change the bot link above and this updates with it.
+              </p>
+            </dd>
+          </div>
+
+          <div className="grid gap-1 px-3 py-2 sm:grid-cols-[200px_1fr]">
+            <dt className="font-semibold text-neutral-600">App URL</dt>
+            <dd>
+              <div className="flex flex-wrap items-center gap-2">
+                <Code>{appUrl}</Code>
+                {canEdit && <TelegramAppUrlField currentUrl={appUrl} returnTo={returnTo} />}
+              </div>
+              <p className="mt-1 text-neutral-500">
+                This site’s own address (<Code>NEXT_PUBLIC_APP_URL</Code>) — feeds every outbound
+                email link, certificate link, and the Webhook URL below it. Saving here updates
+                Vercel and triggers a real redeploy automatically; once that finishes (usually
+                1–3 minutes), come back and run “Update webhook now” below to point Telegram at
+                the new address.
               </p>
             </dd>
           </div>
@@ -270,7 +288,8 @@ export default function TelegramBotGuide({
               <p className="mt-1 text-neutral-500">
                 Telegram POSTs here whenever someone messages the bot. It checks the{" "}
                 <Code>x-telegram-bot-api-secret-token</Code> header against{" "}
-                <Code>TELEGRAM_WEBHOOK_SECRET</Code> and rejects anything that doesn’t match.
+                <Code>TELEGRAM_WEBHOOK_SECRET</Code> and rejects anything that doesn’t match. Not
+                its own stored value either — built from App URL above, so edit that instead.
               </p>
             </dd>
           </div>
