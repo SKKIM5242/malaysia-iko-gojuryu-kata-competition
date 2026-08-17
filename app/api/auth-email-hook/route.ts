@@ -154,6 +154,14 @@ export async function POST(request: Request) {
     return errorResponse("500", "RESEND_API_KEY is not configured.", 500);
   }
 
+  // Temporary — Supabase silently substitutes the Site URL for redirect_to
+  // whenever it doesn't match the project's Redirect URLs allow list, with
+  // no error surfaced anywhere else. This is the only place that ever sees
+  // what Supabase actually sent, so it's the only way to confirm that's
+  // happening versus a bug in the link-building logic below. Remove once
+  // the redirect-URL investigation is resolved.
+  console.log("[auth-email-hook] redirect_to from Supabase:", payload.email_data?.redirect_to);
+
   const { subject, text } = buildEmail(payload.user, payload.email_data);
 
   try {
