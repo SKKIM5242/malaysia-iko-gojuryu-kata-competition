@@ -135,12 +135,18 @@ async function triggerRedeploy(target: "production" | "preview"): Promise<{ ok: 
   const current = deployments.find((d) => d.meta?.githubCommitRef === branch);
   if (!current) return { ok: false, message: `Could not find a recent deployment for branch "${branch}" to redeploy.` };
 
+  // The env-var API (/v9, /v10 above) and this deployments API use different
+  // vocabularies for "not production" -- env vars take "preview", but /v13
+  // deployments rejects that with "target should be 'production', 'staging',
+  // or a custom environment identifier" (confirmed live; this project has no
+  // custom environments configured, so "staging" is Vercel's own reserved
+  // name for the non-production bucket here, not something we defined).
   const redeployRes = await vercelFetch(`/v13/deployments`, {
     method: "POST",
     body: JSON.stringify({
       name: "malaysia-iko-gojuryu-kata-competition",
       deploymentId: current.uid,
-      target,
+      target: target === "production" ? "production" : "staging",
     }),
   });
   if (!redeployRes.ok) {
