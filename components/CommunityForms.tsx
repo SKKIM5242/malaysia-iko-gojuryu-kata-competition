@@ -10,6 +10,7 @@ import {
 import { TelegramJoinButton, formatUSD } from "@/components/ui";
 import { shortTierName } from "@/lib/invitation-codes";
 import CertificateUploadField from "@/components/CertificateUploadField";
+import PhotoUploadField from "@/components/PhotoUploadField";
 import IbanInput from "@/components/IbanInput";
 import IbanConfirmCheckbox from "@/components/IbanConfirmCheckbox";
 import { NoCommaTextarea } from "@/components/NoCommaAddressField";
@@ -138,6 +139,11 @@ export function RefereeForm({
           <label htmlFor="certificate" className={labelCls}>Latest rank certificate *</label>
           <CertificateUploadField id="certificate" name="certificate" required />
           <Err m={e.certificate} />
+        </div>
+        <div>
+          <label htmlFor="photo" className={labelCls}>Latest Passport Size Photo *</label>
+          <PhotoUploadField id="photo" name="photo" required />
+          <Err m={e.photo} />
         </div>
         <div className="sm:col-span-2">
           <label htmlFor="international_certificates" className={labelCls}>

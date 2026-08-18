@@ -102,6 +102,27 @@ export async function registerReferee(
     .upload(certificate_path, certificate, { contentType: certificate.type || "image/jpeg" });
   if (upErr) return { ok: false, error: "Could not upload the certificate. Please try again." };
 
+  // Passport-size photo -- required, same shape as the certificate above but
+  // in the public judge-photos bucket (must be viewable on /participants
+  // without a signed URL) and images only, no PDF.
+  const photo = formData.get("photo");
+  if (!(photo instanceof File) || photo.size === 0) {
+    return {
+      ok: false,
+      error: "Please fix the highlighted fields.",
+      fieldErrors: { photo: "Latest Passport Size Photo is required" },
+    };
+  }
+  if (photo.size > 5 * 1024 * 1024) {
+    return { ok: false, error: "Photo file is too large (max 5 MB)." };
+  }
+  const photoExt = (photo.name.split(".").pop() || "jpg").toLowerCase().slice(0, 5);
+  const photo_path = `referee-photo-${crypto.randomUUID()}.${photoExt}`;
+  const { error: photoUpErr } = await supabase.storage
+    .from("judge-photos")
+    .upload(photo_path, photo, { contentType: photo.type || "image/jpeg" });
+  if (photoUpErr) return { ok: false, error: "Could not upload the photo. Please try again." };
+
   // International certification records — optional, unlimited files.
   const internationalFiles = formData
     .getAll("international_certificates")
@@ -151,6 +172,7 @@ export async function registerReferee(
     bank_account_no: normalizeIban(values.bank_account_no),
     bank_account_name: values.bank_account_name,
     certificate_path,
+    photo_path,
     international_certificate_paths,
     invitation_code: invitation_code || null,
     referral_source: referral_source || null,

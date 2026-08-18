@@ -10,7 +10,7 @@ import {
 import type { Category } from "@/lib/types";
 import RefereeExclusionsPanel from "@/components/RefereeExclusionsPanel";
 import JudgeKataFamiliesForm from "@/components/JudgeKataFamiliesForm";
-import { AdminShell, Card, CertificateField, adminBtn, adminBtnSecondary, adminInput, adminLabel } from "@/components/admin";
+import { AdminShell, Card, CertificateField, PhotoField, adminBtn, adminBtnSecondary, adminInput, adminLabel } from "@/components/admin";
 import { EmptyState, SetupNotice, formatDOB } from "@/components/ui";
 import { shortTierName } from "@/lib/invitation-codes";
 import FilterableTable from "@/components/FilterableTable";
@@ -49,6 +49,7 @@ interface Referee {
   bank_name: string | null; bank_account_no: string | null; bank_account_name: string | null;
   unassigned_forfeit_count: number; unassigned_not_forfeit_count: number;
   certificate_path: string | null; international_certificate_paths: string[] | null;
+  photo_path: string | null;
   invitation_code: string | null;
   referral_source: string | null;
   participating_tier_1_id: string | null;
@@ -180,6 +181,11 @@ export default async function AdminReferees({
     const { data: signed } = await supabase.storage.from("certificates").createSignedUrls(certPaths, 3600);
     for (const s of signed ?? []) if (s.path && s.signedUrl) certUrls.set(s.path, s.signedUrl);
   }
+  // judge-photos is a public bucket, so the current photo's URL is a plain
+  // synchronous getPublicUrl() -- no signed-URL batch needed, unlike certs.
+  const photoUrl = editing?.photo_path
+    ? supabase.storage.from("judge-photos").getPublicUrl(editing.photo_path).data.publicUrl
+    : undefined;
 
   return (
     <AdminShell title="Judges" active="/admin/referees" flash={{ ok: params.ok, error: params.error }}>
@@ -189,7 +195,7 @@ export default async function AdminReferees({
             action={bulkUploadReferees}
             templateHref="/referees-template.csv"
             entityLabel="judge"
-            note={`Dates use DD/MM/YYYY format. Certificates can't be uploaded via CSV — add one later via Edit. ${IBAN_CSV_NOTE}`}
+            note={`Dates use DD/MM/YYYY format. Certificates and photos can't be uploaded via CSV — add them later via Edit. ${IBAN_CSV_NOTE}`}
           />
         </div>
       )}
@@ -251,6 +257,9 @@ export default async function AdminReferees({
                     required
                     currentUrl={editing?.certificate_path ? certUrls.get(editing.certificate_path) : undefined}
                   />
+                </div>
+                <div className="sm:col-span-2">
+                  <PhotoField required currentUrl={photoUrl} />
                 </div>
                 <div>
                   <label htmlFor="email" className={adminLabel}>Email *</label>

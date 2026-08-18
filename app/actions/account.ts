@@ -13,6 +13,7 @@ import { isWithinSignInQuota } from "@/lib/sign-in-quota";
 import { computeCategoryRankings } from "@/lib/winners-ranking";
 import { winnersRevealDate, winnersRevealDateFor, testimonialEditDeadline } from "@/lib/winners";
 import type { TestimonialKind } from "@/lib/testimonials";
+import { JUDGE_SELF_INTRO_MAX_WORDS, countWords } from "@/lib/text-limits";
 
 export interface AccountActionState {
   ok: boolean;
@@ -784,6 +785,56 @@ export async function editTestimonial(
   });
   revalidatePath("/account");
   revalidatePath("/winners");
+  return { ok: true };
+}
+
+/** A judge's own ≤200-word introduction, shown on the public Confirmed
+ * Judges section (see components/JudgeCard.tsx) -- only ever writable by
+ * that judge's own signed-in account, never by admin/staff on their behalf
+ * (confirmed with the organizer). The ownership check below is done
+ * explicitly, NOT left to RLS: referees' write policy is `is_staff_any()`
+ * (migration 0050), which grants ANY approved referee write access to the
+ * WHOLE referees table, not row-scoped -- exactly the same gap
+ * editTestimonial above works around for winner_testimonials. */
+export async function saveJudgeSelfIntro(
+  _prev: AccountActionState,
+  formData: FormData,
+): Promise<AccountActionState> {
+  const refereeId = String(formData.get("referee_id") ?? "");
+  const judge_self_intro = String(formData.get("judge_self_intro") ?? "").trim() || null;
+  if (!refereeId) return { ok: false, error: "Missing judge record." };
+
+  const wordCount = judge_self_intro ? countWords(judge_self_intro) : 0;
+  if (wordCount > JUDGE_SELF_INTRO_MAX_WORDS) {
+    return { ok: false, error: `Please keep your introduction to ${JUDGE_SELF_INTRO_MAX_WORDS} words or fewer (currently ${wordCount}).` };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sign in first." };
+
+  const { data: owned } = await supabase
+    .from("referees")
+    .select("id")
+    .eq("id", refereeId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (!owned) return { ok: false, error: "You can only edit your own introduction." };
+
+  const admin = createAdminClient();
+  const { error } = await admin.from("referees").update({ judge_self_intro }).eq("id", refereeId);
+  if (error) return { ok: false, error: "Could not save — please try again." };
+
+  await writeAudit(supabase, {
+    table_name: "referees",
+    record_id: refereeId,
+    action: "judge_self_intro_updated",
+    actor_id: user.id,
+  });
+  revalidatePath("/account");
+  revalidatePath("/participants");
   return { ok: true };
 }
 

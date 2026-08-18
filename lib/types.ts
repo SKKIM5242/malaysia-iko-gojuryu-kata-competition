@@ -44,6 +44,10 @@ export interface Competition {
   watermark_bold: boolean;
   watermark_color: string | null;
   watermark_direction: WatermarkDirection;
+  /** Whether this tier's approved judges are visible in the public
+   * Confirmed Judges section on /participants -- a manual per-tier gate
+   * (see setJudgesPublished), not automatic on judge approval. */
+  judges_published: boolean;
   created_at: string;
 }
 

@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { signOut } from "@/app/actions/auth";
 import { createClient } from "@/lib/supabase/server";
 import CertificateUploadField from "@/components/CertificateUploadField";
+import PhotoUploadField from "@/components/PhotoUploadField";
 import FlashToast from "@/components/FlashToast";
 import ClickAnchorCapture from "@/components/ClickAnchorCapture";
 import { adminInput, adminLabel, adminBtn, adminBtnSecondary, Card } from "@/components/admin-styles";
@@ -152,6 +153,29 @@ export function CertificateField({
           </a>
         )}
       </div>
+    </div>
+  );
+}
+
+/** Upload-or-take-a-picture field for a judge's passport-size photo. Unlike
+ * CertificateField, no separate "View current" link is needed -- the
+ * judge-photos bucket is public, so `currentUrl` is already a plain URL
+ * PhotoUploadField can show directly as the initial thumbnail. */
+export function PhotoField({
+  currentUrl,
+  required,
+}: {
+  currentUrl?: string | null;
+  required?: boolean;
+}) {
+  const mustUpload = required && !currentUrl;
+  return (
+    <div>
+      <label htmlFor="photo" className={adminLabel}>
+        Latest Passport Size Photo{mustUpload ? " *" : ""}
+      </label>
+      <PhotoUploadField id="photo" name="photo" required={mustUpload} previewUrl={currentUrl} />
+      <p className="mt-1 text-xs text-neutral-400">Leave blank to keep the existing photo.</p>
     </div>
   );
 }

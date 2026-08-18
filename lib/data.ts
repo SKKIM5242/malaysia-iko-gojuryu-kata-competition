@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type {
   Announcement,
   Category,
@@ -120,6 +121,53 @@ export async function getConfirmedRegistrations(
     rows = rows.filter((r) => r.participant?.school_id === filters.schoolId);
   }
   return { rows, total: count ?? rows.length };
+}
+
+export interface ConfirmedJudge {
+  id: string;
+  fullName: string;
+  judgeTitle: string | null;
+  karateRank: string | null;
+  photoUrl: string | null;
+  selfIntro: string | null;
+  kataFamilies: string[];
+  tierIds: string[];
+}
+
+/** Approved judges for the public Confirmed Judges section on
+ * /participants -- deliberately uses the service-role client, NOT the
+ * normal cookie-bound createClient(). referees' SELECT RLS is
+ * `to authenticated` only (migration 0050), so a signed-out visitor would
+ * get zero rows through the normal client, not an error. The obvious fix
+ * (an anon SELECT policy) is unsafe: referees still carries ic_passport,
+ * bank_name, bank_account_no, bank_account_name, home_address, email,
+ * phone, and date_of_birth on the SAME row as the public-safe fields below
+ * -- RLS is row-scoped, not column-scoped, so any anon policy on this table
+ * would expose all of that. Only ever select the narrow column list below,
+ * never select("*"). */
+export async function getConfirmedJudges(): Promise<ConfirmedJudge[]> {
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("referees")
+    .select(
+      "id, full_name, judge_title, karate_rank, photo_path, judge_self_intro, kata_families, participating_tier_1_id, participating_tier_2_id, participating_tier_3_id",
+    )
+    .eq("status", "approved")
+    .order("full_name");
+  return (data ?? []).map((r) => ({
+    id: r.id as string,
+    fullName: r.full_name as string,
+    judgeTitle: r.judge_title as string | null,
+    karateRank: r.karate_rank as string | null,
+    photoUrl: r.photo_path
+      ? admin.storage.from("judge-photos").getPublicUrl(r.photo_path as string).data.publicUrl
+      : null,
+    selfIntro: r.judge_self_intro as string | null,
+    kataFamilies: (r.kata_families as string[] | null) ?? [],
+    tierIds: [r.participating_tier_1_id, r.participating_tier_2_id, r.participating_tier_3_id].filter(
+      (x): x is string => !!x,
+    ),
+  }));
 }
 
 export async function getSchools(): Promise<School[]> {

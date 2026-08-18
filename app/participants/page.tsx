@@ -3,13 +3,16 @@ import {
   getOpenCompetitions,
   getCategories,
   getConfirmedRegistrations,
+  getConfirmedJudges,
   getSchools,
   schemaReady,
 } from "@/lib/data";
+import { createClient } from "@/lib/supabase/server";
 import { EmptyState, SetupNotice, formatUSD } from "@/components/ui";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { kataBases } from "@/lib/division";
 import ParticipantsTable from "@/components/ParticipantsTable";
+import ConfirmedJudgesSection from "@/components/ConfirmedJudgesSection";
 import { shortTierName } from "@/lib/invitation-codes";
 
 export const dynamic = "force-dynamic";
@@ -53,7 +56,7 @@ export default async function ParticipantsPage({
   const categories = await getCategories((selectedTier ?? openCompetitions[0].id));
 
   const page = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
-  const [schools, { rows, total }] = await Promise.all([
+  const [schools, { rows, total }, judges] = await Promise.all([
     getSchools(),
     getConfirmedRegistrations(competitionIds, {
       kataBase: params.kata || undefined,
@@ -61,9 +64,22 @@ export default async function ParticipantsPage({
       page,
       pageSize: PAGE_SIZE,
     }),
+    getConfirmedJudges(),
   ]);
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const bases = kataBases(categories);
+
+  // Confirmed Judges' Publish/Unpublish buttons are Admin/Organizer/Staff
+  // only -- this page otherwise does no auth lookup at all (fully public),
+  // so a signed-out visitor short-circuits below without an extra round trip.
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { data: myProfile } = user
+    ? await supabase.from("profiles").select("role").eq("user_id", user.id).maybeSingle()
+    : { data: null };
+  const canPublishJudges = ["admin", "organizer", "staff"].includes((myProfile?.role as string | null) ?? "");
 
   const filterHref = (overrides: Record<string, string | undefined>) => {
     const q = new URLSearchParams();
@@ -186,6 +202,8 @@ export default async function ParticipantsPage({
             )}
           </nav>
         )}
+
+        <ConfirmedJudgesSection judges={judges} tiers={openCompetitions} canPublish={canPublishJudges} />
       </main>
       <SiteFooter />
     </>

@@ -261,6 +261,31 @@ async function uploadCertificateIfPresent(
   return path;
 }
 
+/** Uploads an optional "photo" file field to the public judge-photos bucket;
+ * returns the new path, or null when no file was submitted (existing value
+ * untouched). Same shape as uploadCertificateIfPresent above, but images
+ * only and a smaller size cap -- this is a passport-style photo, not a
+ * document scan, and it must be publicly viewable without a signed URL. */
+async function uploadPhotoIfPresent(
+  supabase: SupabaseClient,
+  formData: FormData,
+  prefix: string,
+  returnTo: string,
+): Promise<string | null> {
+  const photo = formData.get("photo");
+  if (!(photo instanceof File) || photo.size === 0) return null;
+  if (photo.size > 5 * 1024 * 1024) {
+    backTo(returnTo, { error: "Photo file is too large (max 5 MB)." });
+  }
+  const ext = (photo.name.split(".").pop() || "jpg").toLowerCase().slice(0, 5);
+  const path = `${prefix}-${crypto.randomUUID()}.${ext}`;
+  const { error } = await supabase.storage
+    .from("judge-photos")
+    .upload(path, photo, { contentType: photo.type || "image/jpeg" });
+  if (error) backTo(returnTo, { error: "Could not upload the photo. Please try again." });
+  return path;
+}
+
 // ── Registrations ────────────────────────────────────────────────────────────
 
 /** Best-effort — never throws, so a notification hiccup can't undo a
@@ -2747,6 +2772,37 @@ export async function updateCommunityStatus(formData: FormData) {
   backTo(returnTo, { ok: "Updated." });
 }
 
+/** Per-tier publish gate for the public Confirmed Judges section on
+ * /participants -- deliberately manual, not automatic on judge approval
+ * (confirmed with the organizer): a tier's approved judges only become
+ * publicly visible once Admin/Organizer/Staff explicitly click Publish for
+ * that tier, and can be pulled back with Unpublish at any time. Which
+ * individual judges/kata-families show up WITHIN an already-published tier
+ * is still fully automatic (see getConfirmedJudges) -- this only gates the
+ * tier as a whole. */
+export async function setJudgesPublished(formData: FormData) {
+  const competitionId = String(formData.get("competition_id") ?? "");
+  const value = String(formData.get("value") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "") || "/participants";
+  if (!competitionId || !["true", "false"].includes(value)) {
+    backTo(returnTo, { error: "Invalid request." });
+  }
+  const { supabase, actorId } = await getActor();
+  await requireCompetitionManager(supabase, actorId, returnTo);
+  const judges_published = value === "true";
+  const { error } = await supabase
+    .from("competitions")
+    .update({ judges_published })
+    .eq("id", competitionId);
+  if (error) backTo(returnTo, { error: "Could not update — please try again." });
+  await writeAudit(supabase, {
+    table_name: "competitions", record_id: competitionId, action: "judges_published_changed",
+    new_value: { judges_published }, actor_id: actorId,
+  });
+  revalidatePath("/participants");
+  backTo(returnTo, { ok: judges_published ? "Confirmed Judges published for this tier." : "Confirmed Judges unpublished for this tier." });
+}
+
 /** Admin/Organizer/Participant Support/Referee directly adds an Audience /
  * Spectator (rather than the person self-registering) — e.g. someone paid
  * or was invited in person. An invitation code here waives the USD 10 fee
@@ -2887,12 +2943,20 @@ export async function saveReferee(formData: FormData) {
   if (!id && !certificatePath) {
     backTo(returnTo, { error: "Latest rank certificate is required." });
   }
+  const photoPath = await uploadPhotoIfPresent(supabase, formData, "referee-photo", returnTo);
+  if (!id && !photoPath) {
+    backTo(returnTo, { error: "Latest Passport Size Photo is required." });
+  }
 
   if (id) {
     const { data: before } = await supabase.from("referees").select("*").eq("id", id).maybeSingle();
     const { error } = await supabase
       .from("referees")
-      .update(certificatePath ? { ...values, certificate_path: certificatePath } : values)
+      .update({
+        ...values,
+        ...(certificatePath ? { certificate_path: certificatePath } : {}),
+        ...(photoPath ? { photo_path: photoPath } : {}),
+      })
       .eq("id", id);
     if (error) backTo(returnTo, { error: "Could not update referee." });
     await writeAudit(supabase, {
@@ -2902,7 +2966,7 @@ export async function saveReferee(formData: FormData) {
   } else {
     const { data, error } = await supabase
       .from("referees")
-      .insert({ ...values, certificate_path: certificatePath })
+      .insert({ ...values, certificate_path: certificatePath, photo_path: photoPath })
       .select("id").single();
     if (error) backTo(returnTo, { error: "Could not create judge." });
     await writeAudit(supabase, {

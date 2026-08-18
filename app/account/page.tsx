@@ -15,6 +15,7 @@ import RefereeScoring, { type ScoringItem } from "@/components/RefereeScoring";
 import CertificatesSection from "@/components/CertificatesSection";
 import IssueReportForm from "@/components/IssueReportForm";
 import TelegramConnectStatus from "@/components/TelegramConnectStatus";
+import JudgeSelfIntroForm from "@/components/JudgeSelfIntroForm";
 import {
   getAllTelegramLinks,
   getTelegramBotConnectUrl,
@@ -607,6 +608,13 @@ export default async function AccountPage({
     const recordingCtx = profile.registration_id ? await getRecordingContext(supabase, user.id, profile, requestedRegistrationId) : null;
     const refereeTelegramLinks = await getAllTelegramLinks();
     const refereeTelegramMembership = await checkGroupMemberships(profile.telegram_chat_id, refereeTelegramLinks);
+    // Rarely more than one row (a Sensei independently registered as a
+    // judge too), but never assume exactly one -- see canConfigureReferees'
+    // own comment on this same shape elsewhere in the app.
+    const { data: myRefereeRows } = await supabase
+      .from("referees")
+      .select("id, judge_self_intro")
+      .eq("user_id", user.id);
 
     const { data: assignments } = await supabase
       .from("referee_assignments")
@@ -701,6 +709,7 @@ export default async function AccountPage({
           ) : (
             <LinkRegistrationPrompt />
           )}
+          <JudgeSelfIntroForm referees={myRefereeRows ?? []} />
           <CertificatesSection
             userId={user.id}
             registrationIds={myRegistrationIds}
