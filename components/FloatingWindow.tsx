@@ -66,6 +66,7 @@ export default function FloatingWindow({
   headerExtra,
   boundsSignal,
   fitAspect,
+  maximizedHeight = "100vh",
 }: {
   title: string;
   onClose: () => void;
@@ -82,6 +83,14 @@ export default function FloatingWindow({
    * what's inside instead of leaving it letterboxed in a mismatched box.
    * Left undefined, placement is unchanged. */
   fitAspect?: number | null;
+  /** CSS height applied whenever this window is maximized -- both the
+   * `initial="max"` placement and the header's manual Maximize toggle, and
+   * the landscape-desktop fallback inside the fitAspect effect above, since
+   * all three just set the same `maximized` flag this height is read from.
+   * Defaults to the full viewport. No web page content can ever render over
+   * the browser's own chrome (tabs/address bar) regardless of this value --
+   * it only controls how much space is left visible below the window. */
+  maximizedHeight?: string;
 }) {
   const [bounds, setBounds] = useState<Bounds | null>(null);
   const [minimized, setMinimized] = useState(false);
@@ -252,7 +261,7 @@ export default function FloatingWindow({
   }
 
   const frame: React.CSSProperties = maximized
-    ? { left: 0, top: 0, width: "100vw", height: "100vh" }
+    ? { left: 0, top: 0, width: "100vw", height: maximizedHeight }
     : { left: bounds.x, top: bounds.y, width: bounds.w, height: minimized ? "auto" : bounds.h };
 
   const btn =

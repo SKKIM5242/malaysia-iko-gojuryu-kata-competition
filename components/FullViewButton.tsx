@@ -94,6 +94,7 @@ export default function FullViewButton({
           title={`Full View — ${participantName}`}
           onClose={() => setOpen(false)}
           initial="max"
+          maximizedHeight="90vh"
         >
           <div className="flex min-h-full flex-col">
             <div className="h-[45vh] shrink-0 bg-black">
