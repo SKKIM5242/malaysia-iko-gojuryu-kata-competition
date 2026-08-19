@@ -664,6 +664,13 @@ export default function KataRecorder({
   // of below the name/category text too.
   const [bannerOnlyRatio, setBannerOnlyRatio] = useState(0.08);
   const bannerOnlyRatioRef = useRef(0.08);
+  // The same two figures as drawFrame reported them -- still relative to the
+  // CANVAS, before the box conversion. Kept so the overlay offsets can be
+  // recomputed on a rotation after the camera has been released (a take
+  // ending shuts the camera off, so there are no new drawFrame results
+  // coming), which is what keeps the review controls pinned to the banner.
+  const rawBannerRatioRef = useRef(0.13);
+  const rawBannerOnlyRatioRef = useRef(0.08);
   // CSS `aspect-ratio` on a plain block element doesn't shrink-to-fit the
   // way it does on a replaced element (img/video) -- a statically-positioned
   // div with width:auto fills its container's full width first, THEN derives
@@ -1055,15 +1062,66 @@ export default function KataRecorder({
     else setTorchAvailable(false);
   }
 
-  function disableCamera() {
+  /** Stops the camera and microphone WITHOUT touching the phase, so the
+   * device's own camera/mic indicator goes out while whatever is on screen
+   * stays exactly where it is. Used the moment a take ends (see
+   * recorder.onstop) -- the organizer asked for the camera and mic to shut
+   * off by themselves as soon as recording stops, however it stopped: the
+   * clap detector, the Stop button, or the 5-minute cap. The review screen
+   * plays back the recorded FILE, never the live camera, so nothing on it
+   * needs the stream alive; re-recording re-opens it (see handleReRecord). */
+  function releaseCameraAndMic() {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
     setTorchOn(false);
     setTorchAvailable(false);
+  }
+
+  function disableCamera() {
+    releaseCameraAndMic();
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     exitFullscreen();
     setError(null);
     setPhase("idle");
+  }
+
+  /** Converts drawFrame's "fraction of the CANVAS's height" figures into
+   * "fraction of the BOX's height", which is what the DOM overlays' top:%
+   * actually needs -- the two differ whenever the canvas is letterboxed
+   * inside the box. Split out of renderLoop so it can also run on frames
+   * where there's no live video left to draw (the camera is released as
+   * soon as a take ends, but the review controls still have to stay pinned
+   * to the banner if the phone is rotated during playback). */
+  function applyOverlayOffsets(rawBannerRatio: number, rawBannerOnlyRatio: number) {
+    const canvas = canvasRef.current;
+    if (!canvas || canvas.width <= 0 || canvas.height <= 0) return;
+    const liveBoxRect = recordingBoxRef.current?.getBoundingClientRect();
+    let finalRatio = rawBannerRatio;
+    let finalBannerOnlyRatio = rawBannerOnlyRatio;
+    if (liveBoxRect && liveBoxRect.width > 0 && liveBoxRect.height > 0) {
+      const canvasAspect = canvas.width / canvas.height;
+      const boxAspect = liveBoxRect.width / liveBoxRect.height;
+      const contentHeightPx = canvasAspect > boxAspect ? liveBoxRect.width / canvasAspect : liveBoxRect.height;
+      const contentTopFraction = (liveBoxRect.height - contentHeightPx) / 2 / liveBoxRect.height;
+      const contentHeightFraction = contentHeightPx / liveBoxRect.height;
+      finalRatio = contentTopFraction + rawBannerRatio * contentHeightFraction;
+      finalBannerOnlyRatio = contentTopFraction + rawBannerOnlyRatio * contentHeightFraction;
+    }
+    if (Math.abs(bannerRatioRef.current - finalRatio) > 0.002) {
+      bannerRatioRef.current = finalRatio;
+      setBannerRatio(finalRatio);
+    }
+    if (Math.abs(bannerOnlyRatioRef.current - finalBannerOnlyRatio) > 0.002) {
+      bannerOnlyRatioRef.current = finalBannerOnlyRatio;
+      setBannerOnlyRatio(finalBannerOnlyRatio);
+    }
+    const dbg =
+      `canvas ${canvas.width}x${canvas.height} box ${Math.round(liveBoxRect?.width ?? 0)}x${Math.round(liveBoxRect?.height ?? 0)} ` +
+      `raw ${rawBannerRatio.toFixed(3)} final ${finalRatio.toFixed(3)} rec ${recorderRef.current?.state ?? "none"}`;
+    if (dbg !== debugBannerRef.current) {
+      debugBannerRef.current = dbg;
+      setDebugBanner(dbg);
+    }
   }
 
   function renderLoop() {
@@ -1075,6 +1133,13 @@ export default function KataRecorder({
     // then collapses the preview box's computed height to 0 (width /
     // Infinity) and makes the whole recording screen appear to vanish.
     if (!video || !canvas || video.videoWidth === 0 || video.videoHeight === 0) {
+      // No live frame to draw -- either a rotation is briefly reporting a 0
+      // dimension, or (the normal case now) the take has ended and the
+      // camera has been released. The canvas keeps its last painted frame
+      // either way, so the overlay offsets are still recomputed here off
+      // the box's CURRENT size: rotating the phone during playback would
+      // otherwise leave the review controls pinned to a stale position.
+      applyOverlayOffsets(rawBannerRatioRef.current, rawBannerOnlyRatioRef.current);
       rafRef.current = requestAnimationFrame(renderLoop);
       return;
     }
@@ -1147,6 +1212,8 @@ export default function KataRecorder({
         categoryName ?? "",
       );
       if (Number.isFinite(bannerRatioOfCanvas) && bannerRatioOfCanvas > 0) {
+        rawBannerRatioRef.current = bannerRatioOfCanvas;
+        rawBannerOnlyRatioRef.current = bannerOnlyRatioOfCanvas;
         // Converts "fraction of the CANVAS's own height" (what drawFrame
         // returns) into "fraction of the BOX's CURRENT height" (what the
         // DOM stack's top:% actually needs) -- these agree exactly when
@@ -1167,33 +1234,7 @@ export default function KataRecorder({
         // fresh every frame, recording or not, so it self-corrects the
         // instant the two next agree (recording stopping unfreezes canvas
         // sizing above) rather than only catching up once.
-        const liveBoxRect = recordingBoxRef.current?.getBoundingClientRect();
-        let finalRatio = bannerRatioOfCanvas;
-        let finalBannerOnlyRatio = bannerOnlyRatioOfCanvas;
-        if (liveBoxRect && liveBoxRect.width > 0 && liveBoxRect.height > 0 && canvas.width > 0 && canvas.height > 0) {
-          const canvasAspect = canvas.width / canvas.height;
-          const boxAspect = liveBoxRect.width / liveBoxRect.height;
-          const contentHeightPx = canvasAspect > boxAspect ? liveBoxRect.width / canvasAspect : liveBoxRect.height;
-          const contentTopFraction = (liveBoxRect.height - contentHeightPx) / 2 / liveBoxRect.height;
-          const contentHeightFraction = contentHeightPx / liveBoxRect.height;
-          finalRatio = contentTopFraction + bannerRatioOfCanvas * contentHeightFraction;
-          finalBannerOnlyRatio = contentTopFraction + bannerOnlyRatioOfCanvas * contentHeightFraction;
-        }
-        if (Math.abs(bannerRatioRef.current - finalRatio) > 0.002) {
-          bannerRatioRef.current = finalRatio;
-          setBannerRatio(finalRatio);
-        }
-        if (Math.abs(bannerOnlyRatioRef.current - finalBannerOnlyRatio) > 0.002) {
-          bannerOnlyRatioRef.current = finalBannerOnlyRatio;
-          setBannerOnlyRatio(finalBannerOnlyRatio);
-        }
-        const dbg =
-          `canvas ${canvas.width}x${canvas.height} box ${Math.round(liveBoxRect?.width ?? 0)}x${Math.round(liveBoxRect?.height ?? 0)} ` +
-          `raw ${bannerRatioOfCanvas.toFixed(3)} final ${finalRatio.toFixed(3)} rec ${recorderRef.current?.state ?? "none"}`;
-        if (dbg !== debugBannerRef.current) {
-          debugBannerRef.current = dbg;
-          setDebugBanner(dbg);
-        }
+        applyOverlayOffsets(bannerRatioOfCanvas, bannerOnlyRatioOfCanvas);
       }
     }
     rafRef.current = requestAnimationFrame(renderLoop);
@@ -1348,6 +1389,15 @@ export default function KataRecorder({
         setBlobUrl(url);
         setPhase("review");
         if (timerRef.current) clearInterval(timerRef.current);
+        // Camera and mic off the moment the take ends, on the organizer's
+        // instruction -- and this is the one place every way of ending a
+        // take converges on (the clap detector, the Stop button, and the
+        // 5-minute cap all reach here through recorder.stop()), so none of
+        // them can leave the camera running. Deliberately AFTER the poster
+        // grab above, which reads the canvas's last painted frame. The
+        // review screen plays the recorded file, not the camera, so nothing
+        // it shows needs the stream; handleReRecord re-opens it.
+        releaseCameraAndMic();
       };
       recorder.start(1000);
       recorderRef.current = recorder;
@@ -1451,7 +1501,21 @@ export default function KataRecorder({
     // sit in local storage and get submitted by mistake from the pending
     // list while a fresh one is being recorded here.
     void clearLocalRecording(registrationId);
-    setPhase("live");
+    // Drop to idle FIRST, then re-open the camera. The stream was released
+    // when the previous take ended (see recorder.onstop), so "live" on its
+    // own would show a frozen last frame and a Start button that records
+    // nothing -- startCamera sets the phase to live, restarts the render
+    // loop and re-enters full screen itself once it succeeds. Going through
+    // idle rather than straight to live is what makes the failure path
+    // recoverable: if the camera can't be re-opened (permission revoked in
+    // Settings between takes, or another app holding it), startCamera shows
+    // its error and the participant is left on the "Enable camera" screen
+    // they can retry from -- not on a review screen whose recording has
+    // just been cleared. Safe on iOS: this runs inside the Delete &
+    // re-record tap, a real user gesture, and permission already granted
+    // this session isn't re-prompted.
+    setPhase("idle");
+    await startCamera();
   }
 
   /** Puts a copy of the just-recorded take directly into the participant's
