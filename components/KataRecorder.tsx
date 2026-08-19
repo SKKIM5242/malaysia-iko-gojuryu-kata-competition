@@ -447,6 +447,24 @@ function daysBetween(from: Date, to: Date): number {
  * That's exactly what left desktop's fullscreen view heavily letterboxed
  * left/right even after the phone-orientation fix above. Desktop requests
  * the SAME shape as its own screen, never inverted. */
+/** Playback has effectively finished, whether or not the browser ever got
+ * around to saying so.
+ *
+ * A MediaRecorder blob routinely declares a duration slightly LONGER than
+ * its last decodable frame -- the container's duration is patched up from
+ * timestamps, and the tail can be a few hundred milliseconds of header with
+ * no picture behind it. Playback therefore runs out of frames just short of
+ * `duration`, and the element sits there with ended=false, paused=false and
+ * readyState dropping back to HAVE_METADATA, waiting for data that is never
+ * coming. Confirmed on a real take: frozen at 19.904s of a declared 20.304s,
+ * with the whole file buffered. Anything keyed purely off the "ended" event
+ * waits forever in that state. */
+function isEffectivelyEnded(v: HTMLVideoElement): boolean {
+  if (v.ended) return true;
+  const d = Number.isFinite(v.duration) ? v.duration : 0;
+  return d > 0 && v.currentTime >= d - 0.75;
+}
+
 /** Phone or tablet, as opposed to a desktop/laptop webcam. iPadOS 13+
  * reports itself as a Mac, so the touch-point count is what separates a
  * real iPad from desktop Safari. */
@@ -786,6 +804,51 @@ export default function KataRecorder({
       vv.removeEventListener("scroll", update);
     };
   }, []);
+
+  // Watchdog for a replay that stops advancing without ever firing "ended".
+  //
+  // This is the actual reason the Full screen / Save to device / Delete &
+  // re-record / Submit row "never popped up at the end of the replay, no
+  // matter how many times it was touched": those four are hidden while
+  // reviewPlaying is true, and reviewPlaying is cleared by onPause/onEnded.
+  // When a MediaRecorder blob stalls a few hundred milliseconds short of its
+  // declared duration (see isEffectivelyEnded), NEITHER event ever fires --
+  // the element reports paused=false, ended=false forever -- so the row had
+  // nothing to bring it back and the participant was left rotating to
+  // portrait hunting for buttons that were never going to appear.
+  //
+  // Polls only while a replay is actually running, and only acts once
+  // currentTime has genuinely stopped moving, so ordinary buffering on a
+  // slow device doesn't trip it.
+  const lastPlaybackProgressRef = useRef({ time: -1, at: 0 });
+  useEffect(() => {
+    if (!reviewPlaying) return;
+    lastPlaybackProgressRef.current = { time: -1, at: Date.now() };
+    const id = setInterval(() => {
+      const v = reviewVideoRef.current;
+      if (!v || v.paused) return;
+      const now = Date.now();
+      const last = lastPlaybackProgressRef.current;
+      if (last.time < 0 || Math.abs(v.currentTime - last.time) > 0.05) {
+        lastPlaybackProgressRef.current = { time: v.currentTime, at: now };
+        return;
+      }
+      // Stopped moving. Give it a beat in case this is a genuine stall it
+      // can recover from, then hand the controls back either way -- being
+      // stuck with no way to reach Submit is far worse than ending a replay
+      // a fraction of a second early.
+      if (now - last.at >= 1200) {
+        try {
+          v.pause();
+        } catch {
+          // Pausing is only to keep the element's own state honest; the
+          // state update below is what actually restores the controls.
+        }
+        setReviewPlaying(false);
+      }
+    }, 400);
+    return () => clearInterval(id);
+  }, [reviewPlaying]);
 
   // Take the site's fixed footer out of the page entirely while full
   // screen is up (see app/globals.css). Cleaned up on exit AND on unmount,
@@ -1439,7 +1502,7 @@ export default function KataRecorder({
   function toggleReviewPlayback() {
     const v = reviewVideoRef.current;
     if (!v) return;
-    if (v.ended) {
+    if (isEffectivelyEnded(v)) {
       // Calling play() while currentTime is still sitting at duration
       // doesn't restart playback -- most browsers just fire "play" once,
       // with nothing left to actually play, and never fire "ended" again
@@ -1978,7 +2041,7 @@ export default function KataRecorder({
           // rotating back to portrait. Scrolling this stack independently
           // keeps every case that already fit (most of them) pixel-identical
           // and just makes the cramped ones reachable instead of invisible.
-          className="absolute inset-x-0 z-20 flex flex-col overflow-y-auto"
+          className="absolute inset-x-0 z-30 flex transform-gpu flex-col overflow-y-auto"
           style={{
             // Straight off the burned-in banner's own measured height. The
             // canvas (and the recorded file the review <video> plays back)
@@ -2050,8 +2113,26 @@ export default function KataRecorder({
             playing. */}
         {(phase === "review" || phase === "uploading") && !reviewPlaying && (
           <div
-            className="absolute inset-x-0 z-20 flex flex-col gap-1.5 px-3 pt-2"
-            style={{ top: `calc(${bannerRatio * 100}% + 3.5rem)` }}
+            // z-30 + transform-gpu for the same iOS compositing reason as
+            // the bottom bar (see the video element's own comment).
+            //
+            // The overflow pair matters just as much: this stack is pinned
+            // a fixed 3.5rem below the banner, and in landscape on a phone
+            // -- especially once Safari's toolbars slide back in during
+            // playback and shrink the box -- Full screen / Save to device /
+            // Delete & re-record / Submit could be pushed past the bottom
+            // edge, where the box's own overflow-hidden simply clipped
+            // them. They were in the DOM, correct in every measurement, and
+            // unreachable without rotating to portrait. Bounding the height
+            // and letting this scroll keeps every case that already fitted
+            // pixel-identical and makes the cramped ones reachable instead
+            // of invisible -- the same treatment the live/recording stack
+            // above already had.
+            className="absolute inset-x-0 z-30 flex transform-gpu flex-col gap-1.5 overflow-y-auto px-3 pt-2"
+            style={{
+              top: `calc(${bannerRatio * 100}% + 3.5rem)`,
+              maxHeight: `calc(${100 - bannerRatio * 100}% - 3.5rem)`,
+            }}
           >
             <div className="flex items-center justify-between gap-2">
               {fullscreen ? (
@@ -2152,7 +2233,23 @@ export default function KataRecorder({
               preload="auto"
               disablePictureInPicture
               onClick={toggleReviewPlayback}
-              onPlay={() => setReviewPlaying(true)}
+              onPlay={() => {
+                setReviewPlaying(true);
+                // iOS Safari tends to slide its own toolbars back in when
+                // media starts playing, which is what turns the clean
+                // full-screen review into the shorter, chrome-framed one --
+                // the container tracks the visual viewport, so it correctly
+                // shrinks to stay above that chrome rather than hiding
+                // underneath it. Re-apply the same scroll nudge full screen
+                // and rotation already use, to re-collapse the toolbars as
+                // fast as possible. Best-effort by nature: there is no API
+                // on iPhone to keep browser chrome down, so this reduces how
+                // often it happens rather than preventing it outright.
+                if (fullscreenRef.current) {
+                  requestAnimationFrame(() => window.scrollTo(0, 1));
+                  setTimeout(() => window.scrollTo(0, 1), 350);
+                }
+              }}
               onPause={() => setReviewPlaying(false)}
               onEnded={() => setReviewPlaying(false)}
               onTimeUpdate={(e) => setReviewCurrentTime(e.currentTarget.currentTime)}
@@ -2186,7 +2283,20 @@ export default function KataRecorder({
                 v.addEventListener("timeupdate", onProbeTimeUpdate);
                 v.currentTime = Number.MAX_SAFE_INTEGER;
               }}
-              className="block h-full w-full object-contain"
+              // relative + z-0, not a bare block: iOS Safari promotes a
+              // PLAYING video to its own hardware compositing layer, and a
+              // promoted layer paints above ordinary siblings regardless of
+              // their z-index. That is why every control here was visible
+              // while the take sat paused on its poster, then disappeared
+              // behind the picture the moment Play was pressed -- the seek
+              // bar showing only in the letterbox margins either side of
+              // the video, and the Delete/Submit row never "popping up" at
+              // the end because it was rendering *underneath*. Giving the
+              // video a real stacking position of its own puts it in the
+              // same ordering system as the overlays, which are pinned
+              // above it (z-30) and given their own layers via transform-gpu
+              // so the compositor cannot reorder them either.
+              className="relative z-0 block h-full w-full object-contain"
             />
             {!reviewPlaying && (
               <button
@@ -2200,13 +2310,16 @@ export default function KataRecorder({
                 // sitting in front of Delete/Submit or the seek bar,
                 // including right as the replay ends and this button
                 // reappears.
-                className="absolute left-1/2 top-1/2 z-10 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-3xl text-white shadow-lg"
+                className="absolute left-1/2 top-1/2 z-10 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 transform-gpu items-center justify-center rounded-full bg-black/55 text-3xl text-white shadow-lg"
               >
                 ▶
               </button>
             )}
             <div
-              className="absolute inset-x-0 bottom-0 z-20 flex flex-col gap-1.5 bg-gradient-to-t from-black/75 to-transparent px-3 pb-3 pt-10"
+              // z-30 + transform-gpu: see the video element above -- a
+              // playing video gets its own compositing layer on iOS, and
+              // only another composited layer is reliably drawn over it.
+              className="absolute inset-x-0 bottom-0 z-30 flex transform-gpu flex-col gap-1.5 bg-gradient-to-t from-black/75 to-transparent px-3 pb-3 pt-10"
               // Clear of the iPhone home indicator, which is drawn over the
               // bottom edge and otherwise sits right on top of the
               // play/volume row. Resolves to 0 on devices without one.
