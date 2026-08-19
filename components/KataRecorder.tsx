@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRecordAttempt, submitKataVideo } from "@/app/actions/account";
 import BuyExtraAttemptsButton from "@/components/BuyExtraAttemptsButton";
@@ -15,6 +15,13 @@ import type { WatermarkSettings } from "@/lib/watermark";
 
 const MAX_SECONDS = 5 * 60;
 const COUNTDOWN_CHOICES = [10, 15, 20, 25, 30] as const;
+/** Digital zoom range. 1x is the camera's untouched field of view; the 4x
+ * ceiling is where a 720p-class frame starts visibly softening, since this
+ * scales a smaller crop up rather than reaching for optical detail that
+ * isn't there. */
+const ZOOM_MIN = 1;
+const ZOOM_MAX = 4;
+const ZOOM_STEP = 0.25;
 
 type Phase = "idle" | "live" | "countdown" | "recording" | "review" | "uploading" | "done";
 
@@ -240,6 +247,7 @@ function drawFrame(
   watermark: WatermarkSettings,
   participantName: string,
   categoryName: string,
+  zoom = 1,
 ): { bannerRatio: number; bannerOnlyRatio: number } {
   const srcW = video.videoWidth;
   const srcH = video.videoHeight;
@@ -255,6 +263,19 @@ function drawFrame(
     sw = srcW;
     sh = srcW / canvasAspect;
   }
+  // Digital zoom: take a smaller slice from the middle of the camera frame
+  // and let drawImage scale it up to fill the canvas. Done here, on the
+  // canvas, rather than through the camera's own zoom because a hardware
+  // zoom constraint exists on barely any of the devices this has to serve --
+  // no browser on iPhone or iPad exposes one at all, and almost no
+  // laptop/desktop webcam reports the capability either. Cropping the frame
+  // ourselves behaves identically everywhere, and because the canvas IS what
+  // gets recorded, what the performer frames is exactly what the judges see.
+  // zoom = 1 leaves the slice untouched, so the default is still the
+  // camera's full field of view.
+  const z = Number.isFinite(zoom) && zoom > 1 ? zoom : 1;
+  sw /= z;
+  sh /= z;
   ctx.drawImage(video, (srcW - sw) / 2, (srcH - sh) / 2, sw, sh, 0, 0, w, h);
 
   // The organizer's spec: row 1 fills 95% of the banner's width, row 2
@@ -606,6 +627,17 @@ export default function KataRecorder({
   // latest value without being re-bound on every change.
   const recordingStartMsRef = useRef(0);
   const measuredDurationRef = useRef(0);
+  // Digital zoom, 1x (full field of view) to 4x. Mirrored into a ref because
+  // renderLoop re-schedules itself through requestAnimationFrame and would
+  // otherwise keep drawing with whatever value it closed over on its first
+  // frame.
+  const [zoom, setZoom] = useState(1);
+  const zoomRef = useRef(1);
+  const applyZoom = useCallback((next: number) => {
+    const clamped = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(next * 100) / 100));
+    zoomRef.current = clamped;
+    setZoom(clamped);
+  }, []);
   // 0..1 while a submission is in flight, so a phone on a slow uplink shows
   // something moving instead of a "Submitting…" button that looks frozen for
   // a minute and invites the participant to leave the page.
@@ -864,6 +896,73 @@ export default function KataRecorder({
     }, 400);
     return () => clearInterval(id);
   }, [reviewPlaying]);
+
+  // Keyboard zoom, for laptop and desktop where there is no pinch gesture:
+  // + / = zooms in, - zooms out, 0 resets to the full field of view. Only
+  // while the camera is actually live, and never while the participant is
+  // typing in a field, so it can't hijack ordinary input elsewhere on the
+  // page.
+  useEffect(() => {
+    if (phase !== "live" && phase !== "countdown" && phase !== "recording") return;
+    function onKey(e: KeyboardEvent) {
+      const el = e.target as HTMLElement | null;
+      if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === "+" || e.key === "=") applyZoom(zoomRef.current + ZOOM_STEP);
+      else if (e.key === "-" || e.key === "_") applyZoom(zoomRef.current - ZOOM_STEP);
+      else if (e.key === "0") applyZoom(1);
+      else return;
+      e.preventDefault();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [phase, applyZoom]);
+
+  // Pinch to zoom, for phones and tablets. Tracks two pointers on the
+  // recording box and scales from the distance between them, so it behaves
+  // like the zoom gesture in any camera app rather than needing the buttons.
+  useEffect(() => {
+    const el = recordingBoxRef.current;
+    if (!el) return;
+    if (phase !== "live" && phase !== "countdown" && phase !== "recording") return;
+    const points = new Map<number, { x: number; y: number }>();
+    let startGap = 0;
+    let startZoom = 1;
+    const gap = () => {
+      const [a, b] = [...points.values()];
+      return Math.hypot(a.x - b.x, a.y - b.y);
+    };
+    function down(e: PointerEvent) {
+      if (e.pointerType !== "touch") return;
+      points.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (points.size === 2) {
+        startGap = gap();
+        startZoom = zoomRef.current;
+      }
+    }
+    function move(e: PointerEvent) {
+      if (!points.has(e.pointerId)) return;
+      points.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (points.size === 2 && startGap > 0) {
+        applyZoom(startZoom * (gap() / startGap));
+        e.preventDefault();
+      }
+    }
+    function up(e: PointerEvent) {
+      points.delete(e.pointerId);
+      if (points.size < 2) startGap = 0;
+    }
+    el.addEventListener("pointerdown", down);
+    el.addEventListener("pointermove", move);
+    el.addEventListener("pointerup", up);
+    el.addEventListener("pointercancel", up);
+    return () => {
+      el.removeEventListener("pointerdown", down);
+      el.removeEventListener("pointermove", move);
+      el.removeEventListener("pointerup", up);
+      el.removeEventListener("pointercancel", up);
+    };
+  }, [phase, applyZoom]);
 
   // Take the site's fixed footer out of the page entirely while full
   // screen is up (see app/globals.css). Cleaned up on exit AND on unmount,
@@ -1316,6 +1415,7 @@ export default function KataRecorder({
         watermark,
         participantName ?? "",
         categoryName ?? "",
+        zoomRef.current,
       );
       if (Number.isFinite(bannerRatioOfCanvas) && bannerRatioOfCanvas > 0) {
         rawBannerRatioRef.current = bannerRatioOfCanvas;
@@ -1804,6 +1904,42 @@ export default function KataRecorder({
       {torchOn ? "🔦 Light on" : "🔦 Light off"}
     </button>
   ) : null;
+
+  /** Zoom control, available before AND during a take -- framing is a camera
+   * adjustment like aiming the phone, not an edit of the footage. Buttons
+   * rather than a slider so it works the same under a fingertip and a mouse;
+   * pinch and the +/-/0 keys drive the same value (see the effects above). */
+  const zoomControls = (
+    <div className="flex items-center gap-1 rounded-full bg-black/55 px-1 py-0.5" data-no-drag>
+      <button
+        type="button"
+        onClick={() => applyZoom(zoomRef.current - ZOOM_STEP)}
+        disabled={zoom <= ZOOM_MIN}
+        aria-label="Zoom out"
+        className="flex h-7 w-7 items-center justify-center rounded-full text-base font-bold text-white disabled:opacity-40"
+      >
+        −
+      </button>
+      <button
+        type="button"
+        onClick={() => applyZoom(1)}
+        aria-label="Reset zoom to full view"
+        className="min-w-[3rem] rounded-full px-1 text-[11px] font-semibold text-white/90"
+        title="Tap to reset to the camera's full view"
+      >
+        {zoom.toFixed(2).replace(/\.?0+$/, "")}×
+      </button>
+      <button
+        type="button"
+        onClick={() => applyZoom(zoomRef.current + ZOOM_STEP)}
+        disabled={zoom >= ZOOM_MAX}
+        aria-label="Zoom in"
+        className="flex h-7 w-7 items-center justify-center rounded-full text-base font-bold text-white disabled:opacity-40"
+      >
+        +
+      </button>
+    </div>
+  );
 
   /** Backs all the way out to "Enable camera". Paired with the camera
    * switch below it: these two flank the round Start/Stop button, disable
@@ -2512,6 +2648,7 @@ export default function KataRecorder({
             the burned-in watermark text there. */}
         {phase === "live" && (
           <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 flex-col items-center gap-2">
+            {zoomControls}
             {/* Countdown length -- picked before Start, so a solo performer
                 gets long enough to walk into position and no unwanted
                 surprise silence during the wait. */}
@@ -2582,6 +2719,7 @@ export default function KataRecorder({
             performance that's being scored. */}
         {phase === "recording" && (
           <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 flex-col items-center gap-2">
+            {zoomControls}
             <div className="relative">
               <button
                 onClick={stopRecording}
