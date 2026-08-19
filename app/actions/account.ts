@@ -7,7 +7,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { writeAudit } from "@/lib/audit";
 import { getStripe, paymentsEnabled } from "@/lib/payments";
-import { notifyParticipantScored, notifyVideoAssignment } from "@/lib/notify";
+import { notifyParticipantScored, notifyVideoAssignment, sendStaffEmail, sendStaffTelegramDM } from "@/lib/notify";
+import { OVERRIDE_ROLES, resolveScoreOutcome, splitScoreRows } from "@/lib/scoring";
 import { autoAssignForVideos } from "@/lib/auto-assign";
 import { isWithinSignInQuota } from "@/lib/sign-in-quota";
 import { computeCategoryRankings } from "@/lib/winners-ranking";
@@ -903,6 +904,197 @@ async function maybeNotifyParticipantScored(videoId: string): Promise<void> {
   }
 }
 
+/** Two recordings in the same category must never finish on the same score:
+ * a placing has to be decidable, and the organizer's ruling is that a tie is
+ * resolved by an Admin/Organizer or Chief Judge overriding one of the
+ * scores. Nothing here changes a score by itself -- it finds the tie the
+ * moment it appears and tells the people who can settle it, by email and
+ * Telegram DM.
+ *
+ * Only SETTLED entries are compared (judging complete, or already
+ * overridden). Two half-judged recordings sitting on the same running
+ * average is not a tie, it is just an early coincidence, and alerting on it
+ * would train everyone to ignore the alert.
+ *
+ * Deduplicated through audit_logs: the Kata Arena re-fetches every 30s and a
+ * category can be re-scored many times, so the same tie must not be
+ * announced twice. Best-effort throughout -- the score itself has already
+ * saved, and no notification problem may undo that. */
+async function maybeNotifyScoreTie(videoId: string): Promise<void> {
+  try {
+    const admin = createAdminClient();
+    const { data: videoRow } = await admin
+      .from("kata_videos")
+      .select("registration:registrations(category_id, competition_id)")
+      .eq("id", videoId)
+      .maybeSingle();
+    const reg = (videoRow as unknown as {
+      registration: { category_id: string | null; competition_id: string | null } | null;
+    } | null)?.registration;
+    const categoryId = reg?.category_id ?? null;
+    const competitionId = reg?.competition_id ?? null;
+    if (!categoryId || !competitionId) return;
+
+    const [{ data: comp }, { data: cat }, { data: regs }] = await Promise.all([
+      admin.from("competitions").select("name, judges_required").eq("id", competitionId).maybeSingle(),
+      admin.from("categories").select("name").eq("id", categoryId).maybeSingle(),
+      admin
+        .from("registrations")
+        .select("id, participant:participants(full_name)")
+        .eq("category_id", categoryId)
+        .eq("payment_status", "paid"),
+    ]);
+    const judgesRequired = Number(comp?.judges_required ?? 3);
+    const regList = (regs as unknown as Array<{ id: string; participant: { full_name: string } | null }>) ?? [];
+    if (regList.length < 2) return;
+    const nameByReg = new Map(regList.map((r) => [r.id, r.participant?.full_name ?? "Unknown participant"]));
+
+    const { data: videos } = await admin
+      .from("kata_videos")
+      .select("id, registration_id")
+      .in("registration_id", regList.map((r) => r.id));
+    const videoList = (videos ?? []) as Array<{ id: string; registration_id: string }>;
+    if (videoList.length < 2) return;
+    const videoIds = videoList.map((v) => v.id);
+
+    const [{ data: scores }, { data: assignments }, { data: overrideProfiles }] = await Promise.all([
+      admin.from("video_scores").select("video_id, referee_user_id, score").in("video_id", videoIds),
+      admin.from("referee_assignments").select("video_id, referee_user_id").in("video_id", videoIds),
+      admin.from("profiles").select("user_id").in("role", OVERRIDE_ROLES as unknown as string[]),
+    ]);
+    const overrideUserIds = new Set((overrideProfiles ?? []).map((p) => p.user_id as string));
+    const assignedByVideo = new Map<string, string[]>();
+    for (const a of assignments ?? []) {
+      const list = assignedByVideo.get(a.video_id as string) ?? [];
+      list.push(a.referee_user_id as string);
+      assignedByVideo.set(a.video_id as string, list);
+    }
+    const rowsByVideo = new Map<string, Array<{ refereeUserId: string; score: number }>>();
+    for (const s of scores ?? []) {
+      const list = rowsByVideo.get(s.video_id as string) ?? [];
+      list.push({ refereeUserId: s.referee_user_id as string, score: Number(s.score) });
+      rowsByVideo.set(s.video_id as string, list);
+    }
+
+    // Group settled entries by the score as it is actually displayed, to two
+    // decimals -- two results that only differ in the 3rd decimal read as
+    // identical on every screen and would be argued over as a tie anyway.
+    const settled = new Map<string, Array<{ videoId: string; name: string }>>();
+    for (const v of videoList) {
+      const { assignedScores, overrideScores } = splitScoreRows(
+        rowsByVideo.get(v.id) ?? [],
+        assignedByVideo.get(v.id) ?? [],
+        overrideUserIds,
+      );
+      const outcome = resolveScoreOutcome(assignedScores, overrideScores, judgesRequired);
+      if (outcome.status !== "complete" && outcome.status !== "override") continue;
+      if (outcome.score == null) continue;
+      const key = outcome.score.toFixed(2);
+      const list = settled.get(key) ?? [];
+      list.push({ videoId: v.id, name: nameByReg.get(v.registration_id) ?? "Unknown participant" });
+      settled.set(key, list);
+    }
+    const tied = [...settled.entries()].filter(([, list]) => list.length > 1);
+    if (tied.length === 0) return;
+
+    for (const [score, list] of tied) {
+      // One announcement per distinct tie: same category, same score, same
+      // recordings. A later score that pulls a third entry into the same tie
+      // changes this key, so that genuinely new situation is announced again.
+      const tieKey = `${score}|${list.map((e) => e.videoId).sort().join(",")}`;
+      const { data: already } = await admin
+        .from("audit_logs")
+        .select("id")
+        .eq("table_name", "video_scores")
+        .eq("action", "score_tie_detected")
+        .eq("record_id", categoryId)
+        .contains("new_value", { tieKey })
+        .maybeSingle();
+      if (already) continue;
+      await admin.from("audit_logs").insert({
+        table_name: "video_scores",
+        record_id: categoryId,
+        action: "score_tie_detected",
+        new_value: { tieKey, score, participants: list.map((e) => e.name) },
+        actor_id: null,
+      });
+
+      const names = list.map((e) => e.name).join(" and ");
+      const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/$/, "");
+      const subject = `Tied score needs a decision — ${cat?.name ?? "a category"}`;
+      const body =
+        `Two or more recordings have finished judging on exactly the same score, ` +
+        `so their placing cannot be decided automatically.\n\n` +
+        `Competition: ${comp?.name ?? "—"}\n` +
+        `Category: ${cat?.name ?? "—"}\n` +
+        `Score: ${score}\n` +
+        `Tied: ${names}\n\n` +
+        `An Admin/Organizer or Chief Judge needs to override one of these scores to separate them.\n` +
+        (appUrl ? `Open the Judging page: ${appUrl}/admin/judging\n` : "");
+
+      for (const r of await tieResolvers(admin)) {
+        if (r.email) await sendStaffEmail(r.email, subject, body).catch(() => ({ ok: false }));
+        if (r.telegramChatId) await sendStaffTelegramDM(r.telegramChatId, `⚖️ ${subject}\n\n${body}`).catch(() => ({ ok: false }));
+      }
+    }
+  } catch {
+    // Best-effort — the score itself already saved successfully regardless.
+  }
+}
+
+/** Who can actually settle a tie: the Organizers, plus any Chief-titled
+ * judge (judge_title is free text, matched the same way the Judging page
+ * does). Falls back to Admins when neither exists, so an alert is never
+ * simply dropped for want of a recipient. */
+async function tieResolvers(
+  admin: ReturnType<typeof createAdminClient>,
+): Promise<Array<{ email: string | null; telegramChatId: string | null }>> {
+  const out = new Map<string, { email: string | null; telegramChatId: string | null }>();
+  const { data: organizers } = await admin
+    .from("profiles")
+    .select("user_id, email, telegram_chat_id")
+    .eq("role", "organizer")
+    .eq("approved", true);
+  for (const p of organizers ?? []) {
+    out.set(p.user_id as string, {
+      email: (p.email as string | null) ?? null,
+      telegramChatId: (p.telegram_chat_id as string | null) ?? null,
+    });
+  }
+  const { data: chiefs } = await admin
+    .from("referees")
+    .select("user_id, email, judge_title")
+    .eq("status", "approved")
+    .not("user_id", "is", null);
+  const chiefUserIds = (chiefs ?? [])
+    .filter((r) => /chief (referee|judge)/i.test((r.judge_title as string | null) ?? ""))
+    .map((r) => ({ userId: r.user_id as string, email: (r.email as string | null) ?? null }));
+  if (chiefUserIds.length > 0) {
+    const { data: chiefProfiles } = await admin
+      .from("profiles")
+      .select("user_id, telegram_chat_id")
+      .in("user_id", chiefUserIds.map((c) => c.userId));
+    const chatByUser = new Map((chiefProfiles ?? []).map((p) => [p.user_id as string, (p.telegram_chat_id as string | null) ?? null]));
+    for (const c of chiefUserIds) {
+      out.set(c.userId, { email: c.email, telegramChatId: chatByUser.get(c.userId) ?? null });
+    }
+  }
+  if (out.size === 0) {
+    const { data: admins } = await admin
+      .from("profiles")
+      .select("user_id, email, telegram_chat_id")
+      .eq("role", "admin")
+      .eq("approved", true);
+    for (const p of admins ?? []) {
+      out.set(p.user_id as string, {
+        email: (p.email as string | null) ?? null,
+        telegramChatId: (p.telegram_chat_id as string | null) ?? null,
+      });
+    }
+  }
+  return [...out.values()];
+}
+
 /** Referee: save a 0.0–10.0 score for an assigned video — the sum of the
  * official rubric's 7 criteria (1+1+1+1+1+3+3 = 11 max). */
 export async function submitScore(formData: FormData) {
@@ -996,6 +1188,8 @@ export async function submitScore(formData: FormData) {
       actor_id: user.id,
     });
     await maybeNotifyParticipantScored(videoId);
+    await maybeNotifyScoreTie(videoId);
   }
   revalidatePath("/account");
+  revalidatePath("/kata-arena");
 }

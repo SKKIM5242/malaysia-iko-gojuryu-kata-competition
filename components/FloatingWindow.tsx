@@ -182,6 +182,15 @@ export default function FloatingWindow({
     };
   }, [fitAspect]);
 
+  // Fallback for browsers without :has() -- same pairing the recorder uses.
+  // Cleaned up on restore AND on unmount, so closing a maximized window (or
+  // navigating away from one) can never strand the page blanked.
+  useEffect(() => {
+    if (!maximized || minimized) return;
+    document.body.classList.add("kata-recorder-fullscreen");
+    return () => document.body.classList.remove("kata-recorder-fullscreen");
+  }, [maximized, minimized]);
+
   const bringToFront = () => setZ(++zCounter);
 
   useEffect(() => {
@@ -270,6 +279,16 @@ export default function FloatingWindow({
   return (
     <div
       ref={winRef}
+      // Maximized, this takes over the page entirely: the stylesheet keys
+      // off this attribute to blank everything else in the body (see
+      // app/globals.css). Without it the site's own fixed footer kept
+      // painting along the bottom of a maximized Full View, eating the room
+      // the judges' score sheets needed and forcing a scroll to reach them
+      // -- z-index alone had already lost that fight, which is why the rule
+      // hides the rest of the page rather than trying to out-stack it.
+      // Non-maximized windows deliberately don't set it: a small floating
+      // window is meant to sit ON the page, not replace it.
+      data-kata-fullscreen={maximized && !minimized ? "" : undefined}
       className="fixed flex flex-col overflow-visible rounded-lg border-2 border-neutral-300 bg-white shadow-2xl"
       style={{ ...frame, zIndex: z, touchAction: "none" }}
       onPointerDown={(e) => {

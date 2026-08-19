@@ -174,7 +174,7 @@ export default function SiteAppearanceForm({
           <p className="mb-2 text-sm font-bold text-neutral-800">Subtitle</p>
           <div className="mb-3">
             <label htmlFor="subtitle_text" className={adminLabel}>Subtitle text</label>
-            <input id="subtitle_text" name="subtitle_text" defaultValue={s?.subtitle_text ?? ""} className={adminInput} placeholder="Goju-ryu or IKO Goju-ryu Version Only & Open Version for Kobudo (Weapon) Kata" />
+            <input id="subtitle_text" name="subtitle_text" defaultValue={s?.subtitle_text ?? ""} className={adminInput} placeholder="Goju-ryu or IKO Goju-ryu Version Only & Open Version for Kobudo(Weapon)Kata" />
             <p className="mt-1 text-xs text-neutral-400">Leave blank to keep the default subtitle.</p>
           </div>
           <StyleControls

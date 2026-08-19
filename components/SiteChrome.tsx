@@ -113,7 +113,10 @@ export async function SiteHeader() {
                   : "text-[clamp(5px,1.95vw,8.5px)] sm:text-sm lg:text-xs [@media(max-height:500px)_and_(orientation:landscape)]:text-[clamp(5px,1.5vw,6.5px)]"
               }`}
             >
-              {s?.subtitle_text || "Goju-ryu or IKO Goju-ryu Version Only & Open Version for Kobudo (Weapon) Kata"}
+              {/* "Kobudo(Weapon)Kata" is deliberately unspaced: with spaces,
+                  a phone in portrait breaks the line inside it and clips the
+                  final "a" of Kata, so the word never reads in full. */}
+              {s?.subtitle_text || "Goju-ryu or IKO Goju-ryu Version Only & Open Version for Kobudo(Weapon)Kata"}
             </span>
           </span>
         </Link>

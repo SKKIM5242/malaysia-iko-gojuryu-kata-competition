@@ -41,6 +41,12 @@ export interface ArenaEntry {
    * the same grouping the winners are decided on. Null for anything with no
    * usable score (nobody has judged it yet, or it is disqualified). */
   rank: number | null;
+  /** Another settled entry in the same category finished on exactly this
+   * score. A tie can't stand -- an Admin/Organizer or Chief Judge has to
+   * override one of them (they are alerted the moment it happens, see
+   * maybeNotifyScoreTie) -- so it is shown as unresolved rather than as two
+   * equal placings. */
+  tied: boolean;
   /** How many of the assigned judges have actually submitted a score —
    * compared against the competition's judges_required to know whether
    * judging is complete for this recording. */
@@ -152,8 +158,9 @@ export async function loadKataArena(
         finalScore: outcome.score,
         disqualified: outcome.status === "disqualified",
         status: outcome.status,
-        // Filled in below, once every entry's score is known.
+        // Both filled in below, once every entry's score is known.
         rank: null,
+        tied: false,
         scoresSubmitted: outcome.scored,
         judgeScores: assigned.map((uid) => ({
           judgeName: refereeName.get(uid) ?? uid.slice(0, 8),
@@ -179,16 +186,23 @@ export async function loadKataArena(
   }
   for (const list of byCategory.values()) {
     list.sort((a, b) => (b.finalScore ?? 0) - (a.finalScore ?? 0));
-    let lastScore: number | null = null;
+    // Compared at the 2 decimals everyone actually sees: two results that
+    // differ only in the 3rd decimal read as identical on screen and would
+    // be disputed as a tie regardless.
+    const shown = (e: ArenaEntry) => (e.finalScore ?? 0).toFixed(2);
+    const countByScore = new Map<string, number>();
+    for (const e of list) countByScore.set(shown(e), (countByScore.get(shown(e)) ?? 0) + 1);
+    let lastScore: string | null = null;
     let lastRank = 0;
     list.forEach((e, i) => {
-      if (lastScore != null && e.finalScore === lastScore) {
+      e.tied = (countByScore.get(shown(e)) ?? 0) > 1;
+      if (lastScore != null && shown(e) === lastScore) {
         e.rank = lastRank;
         return;
       }
       e.rank = i + 1;
       lastRank = i + 1;
-      lastScore = e.finalScore;
+      lastScore = shown(e);
     });
   }
   return entries;

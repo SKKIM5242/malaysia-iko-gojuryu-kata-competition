@@ -97,7 +97,21 @@ function StatusDot({ entry, judgesRequired }: { entry: ArenaEntry; judgesRequire
 
 /** Placing within this recording's own category, best first. Sits in the
  * same top-right column as the status and Watch, on its own row. */
-function RankChip({ rank }: { rank: number }) {
+function RankChip({ rank, tied }: { rank: number; tied: boolean }) {
+  // A tie is not a valid result -- it can't decide a placing, and the
+  // organizer's ruling is that one of the scores gets overridden. Shown as
+  // unresolved rather than as two equal placings; the Admin/Organizer and
+  // Chief Judges are alerted automatically when it happens.
+  if (tied) {
+    return (
+      <span
+        className="flex shrink-0 items-center gap-1 rounded-full border border-red-300 bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700"
+        title="Tied on the same score as another entry in this category — an Admin/Organizer or Chief Judge must override one of them to separate the placings."
+      >
+        ⚖️ Tied — needs review
+      </span>
+    );
+  }
   const medal = rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : null;
   return (
     <span
@@ -152,7 +166,7 @@ function RecordingCard({
             the full width it needs. */}
         <div className="flex shrink-0 flex-col items-end gap-1.5">
           <StatusDot entry={entry} judgesRequired={judgesRequired} />
-          {entry.rank != null && <RankChip rank={entry.rank} />}
+          {entry.rank != null && <RankChip rank={entry.rank} tied={entry.tied} />}
           <VideoWatchButton url={entry.playbackUrl} />
           {ownDelete && entry.playbackUrl && (
             <DeleteRecordingControls
