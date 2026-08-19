@@ -27,6 +27,10 @@ function DisqualificationReason({ reason, label }: { reason: string; label: stri
 
 export interface FullViewJudge {
   judgeName: string;
+  /** No longer rendered — the organizer asked for the country to come off
+   * the panel headings, where it was the first thing to push a long name
+   * onto a second line. Kept on the type because both callers already supply
+   * it and it costs nothing to carry if it is ever wanted back. */
   country: string | null;
   total: number | null;
   criteria: number[] | null;
@@ -79,6 +83,14 @@ export default function FullViewButton({
 
   const scoredCount = judges.filter((j) => j.total != null).length;
   const override = judges.find((j) => j.isOverride && j.total != null);
+  // "Judge 1 / 2 / 3" in panel order, so the columns are identifiable at a
+  // glance whatever the judges happened to name themselves. An Admin/
+  // Organizer override is NOT given a judge number -- it is not one of the
+  // panel, and numbering it as though it were would misrepresent who scored
+  // on a screen used to settle disputes. Counting skips it, so a real judge
+  // never loses their number to one.
+  let judgeNumber = 0;
+  const panelLabels = judges.map((j) => (j.isOverride ? "Override" : `Judge ${++judgeNumber}`));
 
   return (
     <>
@@ -139,9 +151,19 @@ export default function FullViewButton({
                   const values = isEstimated ? splitEvenly(j.total) : j.criteria!;
                   return (
                     <div key={`${j.judgeName}-${i}`} className="h-fit rounded-lg border border-neutral-200 p-2">
-                      <p className="mb-1 text-sm font-bold leading-tight text-neutral-900">
-                        {j.judgeName}
-                        {j.country ? <span className="font-normal text-neutral-400"> ({j.country})</span> : null}
+                      {/* One row, always. `truncate` clips an over-long name
+                          with an ellipsis rather than wrapping to a second
+                          line and pushing every panel's rubric out of
+                          alignment; the full name stays available on hover
+                          and to screen readers via `title`. The country that
+                          used to follow the name is gone at the organizer's
+                          request -- it was the first thing to force a wrap on
+                          a narrow column. */}
+                      <p
+                        className="mb-1 truncate text-xs font-bold leading-tight text-neutral-900"
+                        title={`${panelLabels[i]} - ${j.judgeName}`}
+                      >
+                        {panelLabels[i]} - {j.judgeName}
                       </p>
                       {j.total == null ? (
                         <p className="text-sm font-semibold text-amber-600">Score pending</p>
