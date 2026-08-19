@@ -95,11 +95,21 @@ export default function FullViewButton({
           onClose={() => setOpen(false)}
           initial="max"
         >
-          <div className="flex min-h-full flex-col">
-            <div className="h-[45vh] shrink-0 bg-black">
+          {/* Exactly two halves, and the whole thing fits the window: h-full
+              (not min-h-full) means this never grows past the window and
+              hands a scrollbar to the page. The recording takes the top 50%,
+              everything else lives in the bottom 50%, and the participant's
+              details stay pinned to the very bottom where they are always
+              readable -- previously they sat below the judges in normal flow,
+              so three tall score sheets pushed them off the bottom edge and
+              you had to scroll to find out whose recording you were even
+              looking at. Only the judges' row scrolls now, and only when the
+              panels genuinely need more than the half they are given. */}
+          <div className="flex h-full flex-col">
+            <div className="h-1/2 shrink-0 bg-black">
               <LockedVideo src={url} autoPlay />
             </div>
-            <div className="grid gap-4 border-t border-neutral-200 p-4 md:grid-cols-3">
+            <div className="grid min-h-0 flex-1 gap-2 overflow-y-auto border-t border-neutral-200 p-2 md:grid-cols-3">
               {judges.length === 0 ? (
                 <p className="text-sm text-neutral-400 md:col-span-3">No referees assigned yet.</p>
               ) : (
@@ -110,8 +120,8 @@ export default function FullViewButton({
                       j.criteria.length !== SHEET2_CRITERIA.length);
                   const values = isEstimated ? splitEvenly(j.total) : j.criteria!;
                   return (
-                    <div key={`${j.judgeName}-${i}`} className="rounded-lg border border-neutral-200 p-3">
-                      <p className="mb-2 text-sm font-bold text-neutral-900">
+                    <div key={`${j.judgeName}-${i}`} className="h-fit rounded-lg border border-neutral-200 p-2">
+                      <p className="mb-1 text-sm font-bold leading-tight text-neutral-900">
                         {j.judgeName}
                         {j.country ? <span className="font-normal text-neutral-400"> ({j.country})</span> : null}
                       </p>
@@ -147,13 +157,19 @@ export default function FullViewButton({
                 })
               )}
             </div>
-            <div className="border-t border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-700">
-              <p className="font-bold text-neutral-900">{participantName}</p>
-              <p className="text-xs text-neutral-500">
+            {/* shrink-0 so this is never the thing that gets squeezed, and
+                leading-tight throughout: three near-touching lines read as
+                one block and free the height back to the score sheets. */}
+            <div className="shrink-0 border-t border-neutral-200 bg-neutral-50 px-3 py-1.5 text-sm leading-tight text-neutral-700">
+              <p className="font-bold leading-tight text-neutral-900">{participantName}</p>
+              <p className="text-xs leading-tight text-neutral-500">
                 {categoryName ?? "—"}
                 {competitionName ? ` · ${competitionName}` : ""}
               </p>
-              <p className="mt-1 text-xs">
+              {/* Judging status and the view-only note share one line, on
+                  request -- two short lines of their own were costing a row
+                  of height each for very little. */}
+              <p className="text-xs leading-tight">
                 Judging {scoredCount}/{judgesRequired} complete
                 {disqualified
                   ? " · Disqualified (a judge gave a Total Score of 0)"
@@ -161,11 +177,11 @@ export default function FullViewButton({
                     ? ` · ${averageText}`
                     : ""}
                 {queuePosition != null ? ` · Winner-in-line position #${queuePosition}` : ""}
+                <span className="text-neutral-400"> — View only — nothing here can be edited.</span>
               </p>
-              <p className="mt-1 text-[11px] text-neutral-400">View only — nothing here can be edited.</p>
               {override && (
                 <>
-                  <p className="mt-1 text-xs font-semibold text-purple-700">
+                  <p className="text-xs font-semibold leading-tight text-purple-700">
                     Admin/Organizer override — {override.judgeName}: Score {override.total!.toFixed(2)}
                   </p>
                   {override.total === 0 && (

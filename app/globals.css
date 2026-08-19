@@ -37,6 +37,15 @@ body:has([data-kata-fullscreen]),
 body.kata-recorder-fullscreen {
   overflow: hidden !important;
 }
+/* The root element too, not just body: with only body locked the page still
+   scrolled underneath (confirmed -- window.scrollBy still moved it). Nothing
+   was visible to scroll, since the overlay is fixed and everything else is
+   blanked, but a stray swipe left the page parked somewhere else once the
+   overlay closed. */
+html:has([data-kata-fullscreen]),
+html:has(body.kata-recorder-fullscreen) {
+  overflow: hidden !important;
+}
 body:has([data-kata-fullscreen]) > *,
 body.kata-recorder-fullscreen > * {
   visibility: hidden !important;
