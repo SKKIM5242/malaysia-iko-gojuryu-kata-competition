@@ -18,7 +18,7 @@ import FilterableTable from "@/components/FilterableTable";
 import ScoreDetailButton from "@/components/ScoreDetailButton";
 import AutoAssignCriterionModal from "@/components/AutoAssignCriterionModal";
 import QuickScoreForm from "@/components/QuickScoreForm";
-import { finalScore, isDisqualified } from "@/lib/scoring";
+import { resolveScoreOutcome } from "@/lib/scoring";
 import { getTelegramLink } from "@/lib/telegram";
 import { winnersRevealed } from "@/lib/winners";
 
@@ -224,8 +224,19 @@ export default async function AdminJudging({
     const submittedScores = allScorers
       .map((uid) => scoreByKey.get(`${v.id}:${uid}`))
       .filter((s): s is number => s != null);
-    const final = finalScore(submittedScores);
-    const trimmed = submittedScores.length >= 5;
+    // Resolved through the SAME rule the Kata Arena and the winners ranking
+    // use, so all three quote the same number. Previously this averaged the
+    // assigned judges and any override together; an override now replaces
+    // the panel's average outright, per the organizer.
+    const assignedScores = assigned
+      .map((uid) => scoreByKey.get(`${v.id}:${uid}`))
+      .filter((s): s is number => s != null);
+    const overrideScores = overrides
+      .map((uid) => scoreByKey.get(`${v.id}:${uid}`))
+      .filter((s): s is number => s != null);
+    const outcome = resolveScoreOutcome(assignedScores, overrideScores, judgesRequired);
+    const final = outcome.score;
+    const trimmed = outcome.status !== "override" && assignedScores.length >= 5;
     const playbackUrl = playbackUrls.get(v.id);
     // A Referee/Judge may only score a recording they're formally assigned
     // to (Admin/Organizer/Staff can always score/override any recording).
@@ -809,7 +820,14 @@ export default async function AdminJudging({
                       const scores = assigned
                         .map((uid) => scoreByKey.get(`${v.id}:${uid}`))
                         .filter((s): s is number => s != null);
-                      return { v, dq: isDisqualified(scores), final: finalScore(scores) };
+                      // Overrides were left out of this leaderboard entirely,
+                      // so a recording whose score an Admin/Organizer had
+                      // taken over queued on the judges' average instead.
+                      const overrideScores = (overrideByVideo.get(v.id) ?? [])
+                        .map((uid) => scoreByKey.get(`${v.id}:${uid}`))
+                        .filter((s): s is number => s != null);
+                      const o = resolveScoreOutcome(scores, overrideScores, c.judges_required);
+                      return { v, dq: o.status === "disqualified", final: o.score };
                     });
                   const queueByVideoId = new Map<string, number>();
                   ranked

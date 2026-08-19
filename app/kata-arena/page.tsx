@@ -47,27 +47,68 @@ interface ProfileRow {
  * judge gave a Total Score of 0 (disqualified, no score shown); green with
  * the total once every required judge has scored and nobody gave a 0. */
 function StatusDot({ entry, judgesRequired }: { entry: ArenaEntry; judgesRequired: number }) {
-  const complete = entry.scoresSubmitted >= judgesRequired;
-  if (!complete) {
+  const pill = "flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold";
+  const dot = "h-2.5 w-2.5 rounded-full";
+  const score = entry.finalScore != null ? entry.finalScore.toFixed(2) : "—";
+
+  // An Admin/Organizer override replaces the panel's own average, so it is
+  // called out in red rather than passed off as the judges' result.
+  if (entry.status === "override") {
     return (
-      <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-neutral-300 bg-neutral-50 px-2.5 py-1 text-xs font-semibold text-neutral-500">
-        <span aria-hidden className="h-2.5 w-2.5 rounded-full bg-neutral-300" />
-        Judging {entry.scoresSubmitted}/{judgesRequired}
+      <span className={`${pill} border-red-300 bg-red-50 text-red-700`} title="Admin / Organizer override — replaces the judges' average">
+        <span aria-hidden className={`${dot} bg-red-600`} />
+        Score {score} (override)
       </span>
     );
   }
-  if (entry.disqualified) {
+  if (entry.status === "disqualified") {
     return (
-      <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-red-300 bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700">
-        <span aria-hidden className="h-2.5 w-2.5 rounded-full bg-red-600" />
+      <span className={`${pill} border-red-300 bg-red-50 text-red-700`}>
+        <span aria-hidden className={`${dot} bg-red-600`} />
         Disqualified
       </span>
     );
   }
+  if (entry.status === "pending") {
+    return (
+      <span className={`${pill} border-neutral-300 bg-neutral-50 text-neutral-500`}>
+        <span aria-hidden className={`${dot} bg-neutral-300`} />
+        Judging {entry.scoresSubmitted}/{judgesRequired}
+      </span>
+    );
+  }
+  // Some judges in, some still out: show the running average, but in amber
+  // so it can't be mistaken for a settled result.
+  if (entry.status === "partial") {
+    return (
+      <span className={`${pill} border-amber-300 bg-amber-50 text-amber-800`}>
+        <span aria-hidden className={`${dot} bg-amber-500`} />
+        Score {score} ({entry.scoresSubmitted}/{judgesRequired})
+      </span>
+    );
+  }
   return (
-    <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-green-300 bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-800">
-      <span aria-hidden className="h-2.5 w-2.5 rounded-full bg-green-600" />
-      Score {entry.finalScore != null ? entry.finalScore.toFixed(2) : "—"}
+    <span className={`${pill} border-green-300 bg-green-50 text-green-800`}>
+      <span aria-hidden className={`${dot} bg-green-600`} />
+      Score {score}
+    </span>
+  );
+}
+
+/** Placing within this recording's own category, best first. Sits in the
+ * same top-right column as the status and Watch, on its own row. */
+function RankChip({ rank }: { rank: number }) {
+  const medal = rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : null;
+  return (
+    <span
+      className={
+        "flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold " +
+        (medal ? "border-amber-300 bg-amber-50 text-amber-800" : "border-neutral-300 bg-neutral-50 text-neutral-600")
+      }
+      title="Placing within this category"
+    >
+      {medal && <span aria-hidden>{medal}</span>}
+      Rank {rank}
     </span>
   );
 }
@@ -111,6 +152,7 @@ function RecordingCard({
             the full width it needs. */}
         <div className="flex shrink-0 flex-col items-end gap-1.5">
           <StatusDot entry={entry} judgesRequired={judgesRequired} />
+          {entry.rank != null && <RankChip rank={entry.rank} />}
           <VideoWatchButton url={entry.playbackUrl} />
           {ownDelete && entry.playbackUrl && (
             <DeleteRecordingControls

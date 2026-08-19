@@ -1,5 +1,5 @@
 import type { createClient } from "@/lib/supabase/server";
-import { finalScore, isDisqualified } from "@/lib/scoring";
+import { OVERRIDE_ROLES, resolveScoreOutcome, splitScoreRows, type ScoreStatus } from "@/lib/scoring";
 import { kataBaseOf } from "@/lib/division";
 
 export interface JudgeScoreEntry {
@@ -13,6 +13,11 @@ export interface ArenaEntry {
   participantId: string | null;
   participantName: string;
   categoryName: string | null;
+  /** Ranking groups on this, not on the name: two different categories can
+   * carry identical names (the same event exists in more than one tier), and
+   * grouping by the label would rank entries from separate categories
+   * against each other. */
+  categoryId: string | null;
   /** Only used to scope a School/Sensei login's view to their own
    * students — never shown to anyone. */
   schoolId: string | null;
@@ -24,9 +29,18 @@ export interface ArenaEntry {
    * Winners page separately reveals rankings/standings 30 days after the
    * deadline regardless of this. */
   finalScore: number | null;
-  /** true if any one judge gave a Total Score of exactly 0 — the entry is
-   * disqualified regardless of what the other judges gave. */
+  /** true if any one ASSIGNED judge gave a Total Score of exactly 0 — the
+   * entry is disqualified regardless of what the other judges gave. */
   disqualified: boolean;
+  /** What state this recording's scoring is actually in — see
+   * resolveScoreOutcome. Drives the Kata Arena status pill's colour:
+   * green complete, amber partial, red for an override or a
+   * disqualification, grey while nobody has scored. */
+  status: ScoreStatus;
+  /** Position within this recording's own CATEGORY, by score, best first —
+   * the same grouping the winners are decided on. Null for anything with no
+   * usable score (nobody has judged it yet, or it is disqualified). */
+  rank: number | null;
   /** How many of the assigned judges have actually submitted a score —
    * compared against the competition's judges_required to know whether
    * judging is complete for this recording. */
@@ -54,7 +68,7 @@ export async function loadKataArena(
   const { data: videos } = await supabase
     .from("kata_videos")
     .select(
-      "id, storage_path, created_at, participant:participants(id, full_name, school_id, sensei_id), registration:registrations(category:categories(name))",
+      "id, storage_path, created_at, participant:participants(id, full_name, school_id, sensei_id), registration:registrations(category:categories(id, name))",
     )
     .in("registration_id", regIds);
   const videoList =
@@ -63,15 +77,30 @@ export async function loadKataArena(
       storage_path: string;
       created_at: string;
       participant: { id: string; full_name: string; school_id: string | null; sensei_id: string | null } | null;
-      registration: { category: { name: string } | null } | null;
+      registration: { category: { id: string; name: string } | null } | null;
     }>) ?? [];
   if (videoList.length === 0) return [];
 
   const videoIds = videoList.map((v) => v.id);
-  const [{ data: scores }, { data: assignments }] = await Promise.all([
+  const [{ data: scores }, { data: assignments }, { data: overrideProfiles }] = await Promise.all([
     supabase.from("video_scores").select("video_id, referee_user_id, score").in("video_id", videoIds),
     supabase.from("referee_assignments").select("video_id, referee_user_id").in("video_id", videoIds),
+    // Needed to tell an Admin/Organizer override apart from a score left
+    // behind by a referee who has since been unassigned: both are score rows
+    // with no assignment, but the first replaces the panel's average and the
+    // second must be ignored completely.
+    supabase.from("profiles").select("user_id").in("role", OVERRIDE_ROLES as unknown as string[]),
   ]);
+  const overrideUserIds = new Set((overrideProfiles ?? []).map((p) => p.user_id as string));
+  // Read here rather than taken from the caller, so the status and ranking
+  // below can't be computed against a different panel size than the one the
+  // page renders against.
+  const { data: comp } = await supabase
+    .from("competitions")
+    .select("judges_required")
+    .eq("id", competitionId)
+    .maybeSingle();
+  const judgesRequired = Number(comp?.judges_required ?? 3);
 
   const refereeIds = [...new Set((assignments ?? []).map((a) => a.referee_user_id as string))];
   const refereeName = new Map<string, string>();
@@ -85,12 +114,12 @@ export async function loadKataArena(
     }
   }
 
-  const scoresByVideo = new Map<string, number[]>();
+  const rowsByVideo = new Map<string, Array<{ refereeUserId: string; score: number }>>();
   const scoreByKey = new Map<string, number>();
   for (const s of scores ?? []) {
-    const list = scoresByVideo.get(s.video_id as string) ?? [];
-    list.push(Number(s.score));
-    scoresByVideo.set(s.video_id as string, list);
+    const list = rowsByVideo.get(s.video_id as string) ?? [];
+    list.push({ refereeUserId: s.referee_user_id as string, score: Number(s.score) });
+    rowsByVideo.set(s.video_id as string, list);
     scoreByKey.set(`${s.video_id}:${s.referee_user_id}`, Number(s.score));
   }
   const assignedByVideo = new Map<string, string[]>();
@@ -100,23 +129,32 @@ export async function loadKataArena(
     assignedByVideo.set(a.video_id as string, list);
   }
 
-  return Promise.all(
+  const entries: ArenaEntry[] = await Promise.all(
     videoList.map(async (v) => {
       const { data: signed } = await supabase.storage.from("kata-videos").createSignedUrl(v.storage_path, 3600);
       const assigned = assignedByVideo.get(v.id) ?? [];
-      const videoScores = scoresByVideo.get(v.id) ?? [];
+      const { assignedScores, overrideScores } = splitScoreRows(
+        rowsByVideo.get(v.id) ?? [],
+        assigned,
+        overrideUserIds,
+      );
+      const outcome = resolveScoreOutcome(assignedScores, overrideScores, judgesRequired);
       return {
         videoId: v.id,
         participantId: v.participant?.id ?? null,
         participantName: v.participant?.full_name ?? "Unknown participant",
         categoryName: v.registration?.category?.name ?? null,
+        categoryId: v.registration?.category?.id ?? null,
         schoolId: v.participant?.school_id ?? null,
         senseiId: v.participant?.sensei_id ?? null,
         playbackUrl: signed?.signedUrl ?? null,
         createdAt: v.created_at,
-        finalScore: finalScore(videoScores),
-        disqualified: isDisqualified(videoScores),
-        scoresSubmitted: videoScores.length,
+        finalScore: outcome.score,
+        disqualified: outcome.status === "disqualified",
+        status: outcome.status,
+        // Filled in below, once every entry's score is known.
+        rank: null,
+        scoresSubmitted: outcome.scored,
         judgeScores: assigned.map((uid) => ({
           judgeName: refereeName.get(uid) ?? uid.slice(0, 8),
           judgeUserId: uid,
@@ -125,6 +163,35 @@ export async function loadKataArena(
       };
     }),
   );
+
+  // Rank within each CATEGORY -- the same grouping winners are decided on,
+  // not the looser kata-event grouping the Arena lists under. Anything with
+  // no usable score sits outside the ranking rather than being given a
+  // last place it hasn't earned. Ties share a position (two firsts, then a
+  // third), which is how a placing is normally read.
+  const byCategory = new Map<string, ArenaEntry[]>();
+  for (const e of entries) {
+    if (e.finalScore == null || e.status === "disqualified") continue;
+    const key = e.categoryId ?? e.categoryName ?? "";
+    const list = byCategory.get(key) ?? [];
+    list.push(e);
+    byCategory.set(key, list);
+  }
+  for (const list of byCategory.values()) {
+    list.sort((a, b) => (b.finalScore ?? 0) - (a.finalScore ?? 0));
+    let lastScore: number | null = null;
+    let lastRank = 0;
+    list.forEach((e, i) => {
+      if (lastScore != null && e.finalScore === lastScore) {
+        e.rank = lastRank;
+        return;
+      }
+      e.rank = i + 1;
+      lastRank = i + 1;
+      lastScore = e.finalScore;
+    });
+  }
+  return entries;
 }
 
 /** Groups arena entries by kata event (the part of their category name
