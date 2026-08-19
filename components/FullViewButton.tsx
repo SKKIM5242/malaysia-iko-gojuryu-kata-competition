@@ -119,11 +119,13 @@ export default function FullViewButton({
                         <p className="text-sm font-semibold text-amber-600">Score pending</p>
                       ) : (
                         <>
-                          {isEstimated && (
-                            <p className="mb-1 text-[11px] text-amber-700">
-                              Even split of the total — per-row detail wasn&apos;t recorded for this score.
-                            </p>
-                          )}
+                          {/* The "even split of the total" note that used to
+                              sit here is gone at the organizer's request. The
+                              even split itself still happens (see `values`
+                              just above) -- only the caption explaining it
+                              was removed, since it appeared on every Score
+                              Sheet 2 panel and read as a fault rather than
+                              as the normal presentation of a total. */}
                           <RubricTable
                             values={values}
                             rubric={rubricFor(values)}

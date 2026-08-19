@@ -198,7 +198,13 @@ export function RubricTable({
     }
     if (colKey === "no") return <span className="text-neutral-400">{i + 1}.</span>;
     if (colKey === "criteria") {
-      const showDoubleReview = needsDoubleReview(c.max) && (!readOnly || canToggleDeductions);
+      // Dropped in FULL VIEW only, on the organizer's instruction -- there it
+      // repeated down every Score Sheet 2 panel in a three-across layout with
+      // no room to spare, and nobody reading a finished score can act on it.
+      // `dense` is the reliable tell: it is passed only by FullViewButton,
+      // never by ScoreDetailButton, so that modal keeps the warning exactly
+      // as before, and so does a judge filling in their own score sheet.
+      const showDoubleReview = needsDoubleReview(c.max) && (!readOnly || canToggleDeductions) && !dense;
       return (
         <span className="flex flex-col">
           <span>{c.label}</span>
