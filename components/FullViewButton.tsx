@@ -106,10 +106,28 @@ export default function FullViewButton({
               looking at. Only the judges' row scrolls now, and only when the
               panels genuinely need more than the half they are given. */}
           <div className="flex h-full flex-col">
-            <div className="h-1/2 shrink-0 bg-black">
+            {/* Starts at half the window and never exceeds it (grow 0), but
+                gives that height up readily when the score sheets below need
+                more room. The lopsided shrink factor against the judges' 1 is
+                what decides WHO yields: with equal factors both shrink
+                together and the sheets still end up scrolling. It has to be
+                this large rather than merely bigger -- shrinking is shared in
+                PROPORTION to the factors, so at 100:1 the judges still
+                absorbed ~1% of the deficit and were left scrolling by exactly
+                the 2px that cost them (measured). It stops at 25% so the
+                recording can never be squeezed away entirely; past that the
+                video can shrink no further and the judges' row scrolls again,
+                which is the honest trade when three full rubrics simply
+                cannot fit a short screen. */}
+            <div className="bg-black" style={{ flex: "0 10000 50%", minHeight: "25%" }}>
               <LockedVideo src={url} autoPlay />
             </div>
-            <div className="grid min-h-0 flex-1 gap-2 overflow-y-auto border-t border-neutral-200 p-2 md:grid-cols-3">
+            {/* grow 1 so a short set of sheets still fills the lower half
+                rather than leaving a gap above the details. */}
+            <div
+              className="grid min-h-0 gap-2 overflow-y-auto border-t border-neutral-200 p-2 md:grid-cols-3"
+              style={{ flex: "1 1 auto" }}
+            >
               {judges.length === 0 ? (
                 <p className="text-sm text-neutral-400 md:col-span-3">No referees assigned yet.</p>
               ) : (
