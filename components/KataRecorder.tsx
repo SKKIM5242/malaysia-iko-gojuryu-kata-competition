@@ -460,9 +460,12 @@ function daysBetween(from: Date, to: Date): number {
  * coming. Confirmed on a real take: frozen at 19.904s of a declared 20.304s,
  * with the whole file buffered. Anything keyed purely off the "ended" event
  * waits forever in that state. */
-function isEffectivelyEnded(v: HTMLVideoElement): boolean {
+function isEffectivelyEnded(v: HTMLVideoElement, knownDuration = 0): boolean {
   if (v.ended) return true;
-  const d = Number.isFinite(v.duration) ? v.duration : 0;
+  // knownDuration (the length the recorder timed itself) is what makes this
+  // work at all on a file reporting Infinity -- which is the common case, not
+  // an edge one.
+  const d = Number.isFinite(v.duration) && v.duration > 0 ? v.duration : knownDuration;
   return d > 0 && v.currentTime >= d - 0.75;
 }
 
@@ -596,6 +599,13 @@ export default function KataRecorder({
   // participant stuck in a confusing state with no reliable way out. With
   // no native controls at all, there's no OS chrome to conflict with the
   // app's own "✕ Exit full screen" button, which stays the one way to leave.
+  // When the current take started, on the monotonic clock, and how long it
+  // ran. This is the seek bar's real source of truth -- see recorder.start
+  // for why the recorded file's own duration cannot be trusted. Held in a
+  // ref as well as state because the <video>'s own event handlers need the
+  // latest value without being re-bound on every change.
+  const recordingStartMsRef = useRef(0);
+  const measuredDurationRef = useRef(0);
   // 0..1 while a submission is in flight, so a phone on a slow uplink shows
   // something moving instead of a "Submitting…" button that looks frozen for
   // a minute and invites the participant to leave the page.
@@ -1460,6 +1470,15 @@ export default function KataRecorder({
           clapDetectorStopRef.current();
           clapDetectorStopRef.current = null;
         }
+        // Fix the take's real length now, before anything tries to read it
+        // off the file. Capped at MAX_SECONDS so a stray clock reading can
+        // never claim a longer take than the recorder allows.
+        const measured =
+          recordingStartMsRef.current > 0
+            ? Math.min(MAX_SECONDS, (performance.now() - recordingStartMsRef.current) / 1000)
+            : 0;
+        measuredDurationRef.current = measured;
+        if (measured > 0) setReviewDuration(measured);
         const blob = new Blob(chunksRef.current, { type: mimeType });
         recordedBlobRef.current = blob;
         // Cached locally the instant a take finishes, before the
@@ -1497,6 +1516,16 @@ export default function KataRecorder({
       };
       recorder.start(1000);
       recorderRef.current = recorder;
+      // The authoritative length of this take. MediaRecorder writes a
+      // STREAMING container -- built to be emitted live, of unknown length --
+      // so it carries no duration in its header and the browser answers
+      // Infinity until it has scanned the entire file, which it may never
+      // bother to do. Timing the take ourselves is exact, immediate, and
+      // identical on every device and in every format, so nothing downstream
+      // has to interrogate the file at all. performance.now() rather than
+      // Date.now(): monotonic, so a clock adjustment mid-take can't produce a
+      // negative or wildly wrong length.
+      recordingStartMsRef.current = performance.now();
       // Auto-stop on a hand clap -- starts right as recording does, well
       // after the countdown's own ding-dong chime has already finished
       // playing, so the chime itself is never mistaken for the cue. Reuses
@@ -1532,10 +1561,32 @@ export default function KataRecorder({
     }
   }
 
+  /** Settles on a length for the seek bar, preferring the one we timed
+   * ourselves over whatever the file claims.
+   *
+   * The element's own duration is only believed when there's nothing
+   * measured to compare against (a take restored from this device's cache
+   * after a reload, which never went through this session's recorder) or
+   * when it broadly agrees with what we timed. A MediaRecorder file
+   * routinely reports Infinity, 0, or a value padded past its last real
+   * frame, and any of those becomes a seek bar that can't be dragged or a
+   * total time that reads as nonsense. */
+  function resolveReviewDuration(v: HTMLVideoElement) {
+    const measured = measuredDurationRef.current;
+    const fromFile = v.duration;
+    const fileUsable = Number.isFinite(fromFile) && fromFile > 0;
+    if (!measured) {
+      setReviewDuration(fileUsable ? fromFile : 0);
+      return;
+    }
+    const agrees = fileUsable && Math.abs(fromFile - measured) <= Math.max(2, measured * 0.25);
+    setReviewDuration(agrees ? fromFile : measured);
+  }
+
   function toggleReviewPlayback() {
     const v = reviewVideoRef.current;
     if (!v) return;
-    if (isEffectivelyEnded(v)) {
+    if (isEffectivelyEnded(v, measuredDurationRef.current)) {
       // Calling play() while currentTime is still sitting at duration
       // doesn't restart playback -- most browsers just fire "play" once,
       // with nothing left to actually play, and never fire "ended" again
@@ -1591,6 +1642,10 @@ export default function KataRecorder({
     setReviewPlaying(false);
     setReviewCurrentTime(0);
     setReviewDuration(0);
+    // Cleared with the take it belonged to, so a fresh recording can never
+    // inherit the previous one's length.
+    measuredDurationRef.current = 0;
+    recordingStartMsRef.current = 0;
     recordedBlobRef.current = null;
     // The take being discarded is no longer a valid "saved recording" to
     // offer for upload later -- without this, a stale previous take could
@@ -2321,24 +2376,21 @@ export default function KataRecorder({
               // a real OS-level gesture, not a guaranteed block on every
               // iOS version.
               onContextMenu={(e) => e.preventDefault()}
-              onLoadedMetadata={(e) => {
-                const v = e.currentTarget;
-                if (Number.isFinite(v.duration)) {
-                  setReviewDuration(v.duration);
-                  return;
-                }
-                // A freshly-created MediaRecorder blob commonly reports
-                // duration as Infinity in Chrome until the file is actually
-                // seeked through once -- without this, the seek bar below
-                // would have no usable max and never show a real length.
-                const onProbeTimeUpdate = () => {
-                  v.currentTime = 0;
-                  v.removeEventListener("timeupdate", onProbeTimeUpdate);
-                  setReviewDuration(Number.isFinite(v.duration) ? v.duration : 0);
-                };
-                v.addEventListener("timeupdate", onProbeTimeUpdate);
-                v.currentTime = Number.MAX_SAFE_INTEGER;
-              }}
+              // Both events resolve the same way, because a MediaRecorder
+              // file's duration can arrive late, never, or as Infinity
+              // forever depending on the browser and container.
+              //
+              // This replaces a "seek to Number.MAX_SAFE_INTEGER, wait for a
+              // timeupdate, seek back to 0" probe that used to live here to
+              // force the browser to scan the file for a length. That probe
+              // was unreliable -- it still left duration as Infinity on a
+              // real take -- and dragging the playhead past the end of a
+              // container with no index is very likely what left the
+              // demuxer unable to finish playback, which is the same stall
+              // that stopped the replay controls ever coming back. Nothing
+              // seeks speculatively any more.
+              onLoadedMetadata={(e) => resolveReviewDuration(e.currentTarget)}
+              onDurationChange={(e) => resolveReviewDuration(e.currentTarget)}
               // relative + z-0, not a bare block: iOS Safari promotes a
               // PLAYING video to its own hardware compositing layer, and a
               // promoted layer paints above ordinary siblings regardless of

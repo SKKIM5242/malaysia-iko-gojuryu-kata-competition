@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { submitKataVideo } from "@/app/actions/account";
 import { extensionForMimeType, bareMimeType } from "@/lib/media-recording";
 import { getLocalRecording, clearLocalRecording } from "@/lib/local-recording-store";
+import { uploadRecording } from "@/lib/upload-recording";
 import { kataFamilyOf, type KataFamily } from "@/lib/kata-families";
 import { kataBaseOf } from "@/lib/division";
 
@@ -100,6 +101,7 @@ export default function UploadSavedRecording({
   const [pickedFile, setPickedFile] = useState<File | null>(null);
   const [agreed, setAgreed] = useState(false);
   const [status, setStatus] = useState<"idle" | "uploading" | "error">("idle");
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   /** Last thing the browser actually told us when the picker closed. Shown
    * on screen because "nothing happened" is unreportable — this turns it
@@ -147,6 +149,7 @@ export default function UploadSavedRecording({
 
   async function doUpload(blob: Blob, mime: string) {
     setStatus("uploading");
+    setUploadProgress(0);
     setError(null);
     try {
       const supabase = createClient();
@@ -158,27 +161,27 @@ export default function UploadSavedRecording({
         setStatus("error");
         return;
       }
-      const path = `${user.id}/${crypto.randomUUID()}.${extensionForMimeType(mime)}`;
-      const { error: upErr } = await supabase.storage
-        .from("kata-videos")
-        .upload(path, blob, { contentType: bareMimeType(mime || "video/webm") });
-      if (upErr) {
-        // Storage's own size-limit rejection reads e.g. "The object exceeded
-        // the maximum allowed size" — telling someone to get a better
-        // connection is actively wrong advice for that one, so it gets its
-        // own message. Everything else (a real network drop, timeout) keeps
-        // the original advice.
-        const sizeRelated = /size|large|payload/i.test(upErr.message || "");
-        setError(
-          sizeRelated
-            ? `Upload failed: ${upErr.message}. Re-save your recording at 1080p or 720p, 30fps, then try again.`
-            : `Upload failed: ${upErr.message || "unknown error"} — please try again once you have a better connection.`,
-        );
+      // Same uploader the in-app recorder uses: a pre-signed URL over XHR,
+      // with retries and a size check on what actually landed. This panel is
+      // the fallback people are told to use when a direct submit fails, so
+      // leaving it on the plain fetch upload meant the fallback failed the
+      // same way on the same phones -- which is exactly what happened.
+      const ext = extensionForMimeType(mime);
+      const outcome = await uploadRecording(
+        supabase,
+        "kata-videos",
+        () => `${user.id}/${crypto.randomUUID()}.${ext}`,
+        blob,
+        bareMimeType(mime || "video/webm"),
+        { onProgress: setUploadProgress },
+      );
+      if (!outcome.ok || !outcome.path) {
+        setError(`${outcome.error ?? "Upload failed."}${outcome.detail ? ` (${outcome.detail})` : ""}`);
         setStatus("error");
         return;
       }
       const fd = new FormData();
-      fd.set("path", path);
+      fd.set("path", outcome.path);
       fd.set("mime", mime);
       fd.set("registration_id", registrationId);
       const result = await submitKataVideo({ ok: false }, fd);
@@ -334,7 +337,11 @@ export default function UploadSavedRecording({
                 onClick={() => doUpload(pickedFile, pickedMime)}
                 className="mt-2 w-full rounded-md bg-red-700 px-3 py-2 text-sm font-semibold text-white hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {status === "uploading" ? "Uploading…" : "⬆ Upload & submit this recording"}
+                {status === "uploading"
+                  ? uploadProgress > 0 && uploadProgress < 1
+                    ? `Uploading… ${Math.round(uploadProgress * 100)}%`
+                    : "Uploading…"
+                  : "⬆ Upload & submit this recording"}
               </button>
               {!agreed && (
                 <p className="mt-1 text-xs text-amber-700">Tick the confirmation above to enable submitting.</p>
