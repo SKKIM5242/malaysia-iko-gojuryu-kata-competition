@@ -9,6 +9,7 @@ import { pickVideoMimeType as pickMimeType, extensionForMimeType, bareMimeType }
 import { playDingDong, playAlarmTick } from "@/lib/chime";
 import { startClapDetector } from "@/lib/clap-detector";
 import { saveLocalRecording, clearLocalRecording } from "@/lib/local-recording-store";
+import { uploadRecording } from "@/lib/upload-recording";
 import { torchSupported, setTorch } from "@/lib/camera-torch";
 import type { WatermarkSettings } from "@/lib/watermark";
 
@@ -595,6 +596,10 @@ export default function KataRecorder({
   // participant stuck in a confusing state with no reliable way out. With
   // no native controls at all, there's no OS chrome to conflict with the
   // app's own "✕ Exit full screen" button, which stays the one way to leave.
+  // 0..1 while a submission is in flight, so a phone on a slow uplink shows
+  // something moving instead of a "Submitting…" button that looks frozen for
+  // a minute and invites the participant to leave the page.
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [reviewPlaying, setReviewPlaying] = useState(false);
   const [reviewCurrentTime, setReviewCurrentTime] = useState(0);
   const [reviewDuration, setReviewDuration] = useState(0);
@@ -1061,6 +1066,34 @@ export default function KataRecorder({
         noiseSuppression: false,
         autoGainControl: true,
       };
+      // Phones and tablets: capture from every direction, not just from
+      // whoever is in front of the phone.
+      //
+      // A phone has several microphones and, left alone, the browser hands
+      // the page a single beam-formed "voice" channel aimed at the front of
+      // the device -- correct for a call, wrong for a kata performed several
+      // metres away in a hall with sound arriving from all round. Asking for
+      // TWO channels is what actually engages more than one microphone, so
+      // the room is captured rather than a single aimed pickup; `ideal`
+      // means a device that only has one mic simply gives mono back instead
+      // of failing the whole request.
+      if (isMobileDevice()) {
+        audioConstraints.channelCount = { ideal: 2 };
+      }
+      // Chrome/Android keeps a second, older set of switches for the same
+      // processing chain, and honours these even when the standard ones
+      // above are already set -- they are what actually turns the
+      // beam-forming and directional noise gate off on a lot of Android
+      // builds. Unknown constraint keys are ignored everywhere else, so this
+      // is inert on browsers that never had them.
+      Object.assign(audioConstraints as Record<string, unknown>, {
+        googEchoCancellation: false,
+        googAutoGainControl: false,
+        googNoiseSuppression: false,
+        googHighpassFilter: false,
+        googTypingNoiseDetection: false,
+        googAudioMirroring: false,
+      });
       // Safari 17+ only, and not in the DOM typings yet. Apple's Voice
       // Isolation beam-forms toward whoever is speaking in front of the
       // phone and actively attenuates whatever arrives from other
@@ -1624,6 +1657,7 @@ export default function KataRecorder({
       return;
     }
     setPhase("uploading");
+    setUploadProgress(0);
     setError(null);
     try {
       const supabase = createClient();
@@ -1635,25 +1669,47 @@ export default function KataRecorder({
         setPhase("review");
         return;
       }
-      const path = `${user.id}/${crypto.randomUUID()}.${extensionForMimeType(blob.type)}`;
-      const { error: upErr } = await supabase.storage
-        .from("kata-videos")
-        .upload(path, blob, { contentType: bareMimeType(blob.type || "video/webm") });
-      if (upErr) {
-        // Includes the real Supabase error (mime type rejected, size limit,
-        // permission, etc.) instead of a generic message -- a first fix for
-        // an iOS-only upload failure (stripping MediaRecorder's own
-        // `;codecs=...` suffix from the Content-Type) didn't fully resolve
-        // it on a real device, so guessing again without the actual
-        // rejection reason isn't a safe next step.
+      // A fresh path per attempt -- see uploadRecording for why a retry
+      // cannot reuse one.
+      const ext = extensionForMimeType(blob.type);
+      const makePath = () => `${user.id}/${crypto.randomUUID()}.${ext}`;
+      // Keep the screen awake for the duration. An upload of tens of
+      // megabytes from a phone takes long enough that the display can dim
+      // and lock on its own, and iOS suspends the page when it does --
+      // killing the request mid-flight with no error worth showing. Not
+      // supported everywhere; where it isn't, the upload just runs as
+      // before.
+      let wakeLock: { release: () => Promise<void> } | null = null;
+      try {
+        const nav = navigator as Navigator & {
+          wakeLock?: { request: (t: "screen") => Promise<{ release: () => Promise<void> }> };
+        };
+        wakeLock = (await nav.wakeLock?.request("screen")) ?? null;
+      } catch {
+        // Denied or unsupported -- nothing to do, the upload still runs.
+      }
+      let outcome;
+      try {
+        outcome = await uploadRecording(
+          supabase,
+          "kata-videos",
+          makePath,
+          blob,
+          bareMimeType(blob.type || "video/webm"),
+          { onProgress: setUploadProgress },
+        );
+      } finally {
+        await wakeLock?.release().catch(() => {});
+      }
+      if (!outcome.ok || !outcome.path) {
         setError(
-          `Upload failed: ${upErr.message || "unknown error"} (type: ${blob.type || "unknown"}, size: ${(blob.size / 1024 / 1024).toFixed(1)}MB) — please try again or contact support with this message.`,
+          `${outcome.error ?? "Upload failed."} (type: ${blob.type || "unknown"}, size: ${(blob.size / 1024 / 1024).toFixed(1)}MB${outcome.detail ? ` — ${outcome.detail}` : ""})`,
         );
         setPhase("review");
         return;
       }
       const fd = new FormData();
-      fd.set("path", path);
+      fd.set("path", outcome.path);
       fd.set("mime", blob.type || "video/webm");
       fd.set("registration_id", registrationId);
       const result = await submitKataVideo({ ok: false }, fd);
@@ -2529,9 +2585,18 @@ export default function KataRecorder({
               : "flex flex-wrap justify-center gap-3"
           }
         >
-          <button disabled className="rounded-md bg-red-700 px-6 py-2.5 font-semibold text-white opacity-70">
-            Submitting…
-          </button>
+          <div className="flex flex-col items-center gap-2">
+            <button disabled className="rounded-md bg-red-700 px-6 py-2.5 font-semibold text-white opacity-70">
+              {uploadProgress > 0 && uploadProgress < 1
+                ? `Uploading… ${Math.round(uploadProgress * 100)}%`
+                : uploadProgress >= 1
+                  ? "Finishing…"
+                  : "Submitting…"}
+            </button>
+            <p className={fullscreen ? "text-xs text-white/70" : "text-xs text-neutral-500"}>
+              Keep this page open until it finishes — leaving or locking the phone stops the upload.
+            </p>
+          </div>
         </div>
       )}
       {agreementOpen && (

@@ -1,0 +1,19 @@
+{
+  "name": "Malaysia Open Virtual Karate-do Kata Competition",
+  "short_name": "Kata Competition",
+  "description": "Record and submit your kata for the Malaysia Open Virtual Karate-do Kata Competition. Organizer: IKO GOJU-RYU KARATE-DO MALAYSIA SDN BHD.",
+  "start_url": "/account",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0a0a0a",
+  "theme_color": "#0a0a0a",
+  "icons": [
+    {
+      "src": "/logo.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any"
+    }
+  ]
+}
