@@ -447,25 +447,57 @@ function daysBetween(from: Date, to: Date): number {
  * That's exactly what left desktop's fullscreen view heavily letterboxed
  * left/right even after the phone-orientation fix above. Desktop requests
  * the SAME shape as its own screen, never inverted. */
-function idealVideoDimensions(): { width: number; height: number } {
+/** Phone or tablet, as opposed to a desktop/laptop webcam. iPadOS 13+
+ * reports itself as a Mac, so the touch-point count is what separates a
+ * real iPad from desktop Safari. */
+function isMobileDevice(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent;
+  if (/Android|iP(hone|od|ad)/i.test(ua)) return true;
+  return navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
+}
+
+function idealVideoDimensions(): { width: number; height: number; constrainAspect: boolean } {
   if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
-    return { width: 1280, height: 720 };
+    return { width: 1280, height: 720, constrainAspect: true };
   }
   const landscape = window.matchMedia("(orientation: landscape)").matches;
+  // PHONE/TABLET: ask for a STANDARD 16:9 frame in the current orientation
+  // and never pin aspectRatio, so the camera is free to hand back its own
+  // native field of view.
+  //
+  // Asking for the screen's exact shape (what the desktop branch below
+  // still does) looks harmless but isn't on a phone: iOS honours a custom
+  // aspectRatio by CROPPING the sensor down to it. A portrait iPhone with
+  // Safari's toolbars up measures roughly 375x635, so this used to request
+  // 756x1280 -- a 0.59 ratio that matches no sensor -- and iOS delivered
+  // exactly that by slicing the sides off a native 16:9 (0.5625) or 4:3
+  // (0.75) frame. Nothing was distorted, but the recording was narrower
+  // than what the camera could actually see, and it moved every time
+  // Safari's chrome slid in or out. Landscape was worse: an ultra-wide
+  // 2.6-ish viewport asks for a shape no sensor has, so the crop was
+  // heavier still. Requesting a real preset instead gives the participant
+  // their camera's true framing, which is what was asked for; whatever
+  // letterboxing is left over is handled by the preview box, not by
+  // throwing away picture.
+  if (isMobileDevice()) {
+    return landscape
+      ? { width: 1280, height: 720, constrainAspect: false }
+      : { width: 720, height: 1280, constrainAspect: false };
+  }
   const screenLong = Math.max(window.innerWidth, window.innerHeight, 480);
   const screenShort = Math.max(Math.min(window.innerWidth, window.innerHeight), 240);
   const longEdge = 1280;
   const shortEdge = Math.max(400, Math.round(longEdge * (screenShort / screenLong)));
-  // Always ask for the screen's OWN shape, on every device. This used to
-  // ask phones for the opposite shape, to compensate for a preview that
-  // letterboxed whatever it was given -- but the canvas is now drawn at the
-  // screen's shape and center-crops the camera into it, so deliberately
-  // requesting the wrong shape means throwing most of the frame away: a
-  // landscape phone asking for a portrait stream keeps only ~32% of it,
-  // which is what was cropping the performer down to their forehead.
-  // Matching keeps ~100%, and any residual mismatch is bounded by the crop
-  // clamp in renderLoop rather than by guessing at the request.
-  return landscape ? { width: longEdge, height: shortEdge } : { width: shortEdge, height: longEdge };
+  // DESKTOP/LAPTOP: unchanged. A webcam is a fixed landscape sensor that
+  // reports a short list of real resolutions and simply picks the nearest
+  // one, so the shape hint steers it toward the widest available rather
+  // than cropping anything -- and asking for something other than the
+  // screen's shape here is what previously left desktop's fullscreen view
+  // heavily letterboxed left/right.
+  return landscape
+    ? { width: longEdge, height: shortEdge, constrainAspect: true }
+    : { width: shortEdge, height: longEdge, constrainAspect: true };
 }
 
 export default function KataRecorder({
@@ -815,12 +847,17 @@ export default function KataRecorder({
     if (phase !== "live") return;
     const track = streamRef.current?.getVideoTracks()[0];
     if (!track) return;
-    const { width, height } = idealVideoDimensions();
+    const { width, height, constrainAspect } = idealVideoDimensions();
     void track
       .applyConstraints({
         width: { ideal: width },
         height: { ideal: height },
-        aspectRatio: { ideal: width / height },
+        // Phones/tablets deliberately send no aspectRatio at all -- see
+        // idealVideoDimensions: pinning it there makes iOS crop the sensor
+        // to match, which is exactly the narrowing this removes. On a
+        // phone this call now only ever swaps the orientation's standard
+        // 16:9 preset (720x1280 <-> 1280x720), never a custom shape.
+        ...(constrainAspect ? { aspectRatio: { ideal: width / height } } : {}),
       })
       // Best-effort: a camera that can't honour the new shape just keeps
       // its old one, and the crop clamp still bounds how far the canvas
@@ -929,7 +966,7 @@ export default function KataRecorder({
   async function startCamera(requestedFacing: "user" | "environment" = facing) {
     setError(null);
     try {
-      const { width, height } = idealVideoDimensions();
+      const { width, height, constrainAspect } = idealVideoDimensions();
       // aspectRatio alongside width/height: a webcam's supported resolution
       // list rarely contains the exact pixels requested, and browsers weigh
       // width/height "ideal" hints fairly loosely when picking among what's
@@ -975,7 +1012,10 @@ export default function KataRecorder({
           // connection can realistically upload.
           width: { ideal: width, max: 1280 },
           height: { ideal: height, max: 1280 },
-          aspectRatio: { ideal: width / height },
+          // Desktop only -- see idealVideoDimensions for why a phone must
+          // not pin this (iOS crops the sensor to honour it, narrowing the
+          // participant's own field of view).
+          ...(constrainAspect ? { aspectRatio: { ideal: width / height } } : {}),
           frameRate: { ideal: 30, max: 30 },
         },
         audio: audioConstraints,
@@ -1508,37 +1548,38 @@ export default function KataRecorder({
   const mm = String(Math.floor(seconds / 60)).padStart(2, "0");
   const ss = String(seconds % 60).padStart(2, "0");
 
-  /** Sits UNDER the round Start/Stop button, separated by a clear gap
-   * rather than tucked tight against its edge, and shows from the moment
-   * the camera is on rather than only once recording has begun -- so the
-   * participant knows the clap option exists BEFORE they walk out to
-   * start, which is the only time they can actually plan around it.
-   * Absolutely positioned off the button's own wrapper so the button
-   * itself stays exactly centred on screen instead of being shoved
-   * off-centre by a sibling in normal flow. */
-  const clapHint = (
-    <span className="pointer-events-none absolute left-1/2 top-full mt-4 -translate-x-1/2 whitespace-nowrap rounded-full bg-black/70 px-2.5 py-0.5 text-xs font-semibold text-white">
-      👏 Clap to stop
-    </span>
-  );
-
-  /** Sits on the LEFT of the round button, so the button itself stays
-   * dead-centre. Rendered only where the hardware can actually switch the
-   * flash on -- see lib/camera-torch.ts for why that excludes every
-   * browser on iPhone. */
+  /** Sits ABOVE the round button now, not to its left -- the left and right
+   * flanks either side of that button are the camera controls' home (see
+   * the live-phase block below), and the torch used to overlap them. Only
+   * rendered where the hardware can actually switch the flash on, which is
+   * never any browser on iPhone -- see lib/camera-torch.ts. */
   const torchButton = torchAvailable ? (
     <button
       type="button"
       onClick={toggleTorch}
       aria-pressed={torchOn}
       className={
-        "absolute right-full top-1/2 mr-3 -translate-y-1/2 whitespace-nowrap rounded-full border px-3 py-1 text-xs font-semibold " +
+        "absolute bottom-full left-1/2 mb-3 -translate-x-1/2 whitespace-nowrap rounded-full border px-3 py-1 text-xs font-semibold " +
         (torchOn ? "border-amber-300 bg-amber-400/90 text-neutral-900" : "border-white/50 bg-black/60 text-white")
       }
     >
       {torchOn ? "🔦 Light on" : "🔦 Light off"}
     </button>
   ) : null;
+
+  /** Backs all the way out to "Enable camera". Paired with the camera
+   * switch below it: these two flank the round Start/Stop button, disable
+   * on the LEFT and switch on the RIGHT, so the round button stays exactly
+   * centred and neither control sits on top of anything else. */
+  const disableCameraButton = (
+    <button
+      type="button"
+      onClick={disableCamera}
+      className="shrink-0 whitespace-nowrap rounded-full border border-white/50 bg-black/45 px-3 py-1 text-[11px] font-semibold text-white/90 hover:bg-black/65"
+    >
+      Disable camera
+    </button>
+  );
 
   /** Switching cameras has to tear the stream down and open a new one:
    * facingMode cannot be changed on a track that is already running, and
@@ -1558,7 +1599,7 @@ export default function KataRecorder({
     <button
       type="button"
       onClick={switchCamera}
-      className="whitespace-nowrap rounded-full border border-white/50 bg-black/60 px-3 py-1 text-xs font-semibold text-white"
+      className="shrink-0 whitespace-nowrap rounded-full border border-white/50 bg-black/60 px-3 py-1 text-[11px] font-semibold text-white"
     >
       {facing === "environment" ? "🤳 Front camera" : "📷 Rear camera"}
     </button>
@@ -1897,15 +1938,30 @@ export default function KataRecorder({
               {debugBanner}
             </div>
           )}
+          {/* LIVE REC takes over the row the "canvas …" diagnostic occupies
+              while idle -- that line only renders during live/countdown, so
+              the two never fight for the same slot, and the recording badge
+              lands exactly where the diagnostic line was. */}
           {phase === "recording" && (
             <div className="flex flex-wrap gap-1.5 px-2 pt-1">
               <div className="inline-flex items-center gap-1.5 rounded-full bg-black/70 px-2.5 py-0.5 text-xs font-semibold text-white">
                 <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" /> LIVE REC {mm}:{ss} / 05:00
               </div>
-              {/* "Clap to stop" used to sit here beside the LIVE REC chip --
-                  moved down beside the Stop button itself (see the recording
-                  block further below), since it describes the alternative to
-                  pressing that button and reads better right next to it. */}
+            </div>
+          )}
+          {/* Clap-to-stop lives in this top-left stack, directly under the
+              row above, rather than under the round button where it used to
+              be absolutely positioned -- down there it overlapped the camera
+              controls sharing the same corner. Shown from the moment the
+              camera is on, not just once recording starts, so the
+              participant knows the option exists BEFORE walking out to
+              begin, which is the only time they can plan around it, and it
+              stays put through the take itself. */}
+          {(phase === "live" || phase === "countdown" || phase === "recording") && (
+            <div className="px-2 pt-1">
+              <span className="inline-block whitespace-nowrap rounded-full bg-black/70 px-2.5 py-0.5 text-xs font-semibold text-white">
+                👏 Clap to stop
+              </span>
             </div>
           )}
         </div>
@@ -2190,30 +2246,26 @@ export default function KataRecorder({
                 </button>
               ))}
             </div>
-            <div className="relative">
-              <button
-                onClick={startCountdown}
-                aria-label="Start countdown"
-                className="flex h-16 w-16 items-center justify-center rounded-full border-4 border-white/80 bg-red-600/90 text-2xl text-white shadow-lg active:scale-95"
-              >
-                ●
-              </button>
-              {torchButton}
-              {clapHint}
-            </div>
-            {/* Backs all the way out to "Enable camera" -- the only exit
-                from a live-but-not-recording session used to be leaving the
-                page entirely, since Exit full screen only drops the CSS
-                overlay and leaves the camera itself running underneath. */}
-            <div className="flex flex-wrap items-center justify-center gap-2">
+            {/* One row: Disable camera on the LEFT, the round Start button
+                dead-centre, camera switch on the RIGHT. These used to be
+                stacked in a separate row UNDER the button, with the clap
+                hint absolutely positioned over that same space -- which is
+                what left all three overlapping each other. Flanking the
+                button instead gives each control its own room and keeps the
+                button itself centred. */}
+            <div className="flex items-center justify-center gap-3">
+              {disableCameraButton}
+              <div className="relative shrink-0">
+                <button
+                  onClick={startCountdown}
+                  aria-label="Start countdown"
+                  className="flex h-16 w-16 items-center justify-center rounded-full border-4 border-white/80 bg-red-600/90 text-2xl text-white shadow-lg active:scale-95"
+                >
+                  ●
+                </button>
+                {torchButton}
+              </div>
               {cameraSwitchButton}
-              <button
-                type="button"
-                onClick={disableCamera}
-                className="rounded-full border border-white/50 bg-black/45 px-3 py-1 text-[11px] font-semibold text-white/90 hover:bg-black/65"
-              >
-                Disable camera
-              </button>
             </div>
           </div>
         )}
@@ -2236,10 +2288,13 @@ export default function KataRecorder({
             </button>
           </div>
         )}
-        {/* Stop button with the clap hint directly underneath it -- same
-            bottom-3 flex-col shape the live phase uses for its own Start
-            button, so the two phases' controls sit in exactly the same
-            place instead of jumping when recording begins. */}
+        {/* Stop button alone -- same bottom-3 flex-col shape the live phase
+            uses for its own Start button, so the round button doesn't jump
+            when recording begins. The clap hint now lives in the top-left
+            stack instead (it stays visible right through the take), and the
+            camera controls are deliberately absent: switching or disabling
+            the camera mid-take would change the picture halfway through a
+            performance that's being scored. */}
         {phase === "recording" && (
           <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 flex-col items-center gap-2">
             <div className="relative">
@@ -2251,7 +2306,6 @@ export default function KataRecorder({
                 ■
               </button>
               {torchButton}
-              {clapHint}
             </div>
           </div>
         )}
