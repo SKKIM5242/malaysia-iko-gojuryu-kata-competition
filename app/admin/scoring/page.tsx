@@ -128,14 +128,22 @@ export default async function AdminScoring({
                 const myScore = myScoreByVideo.get(v.id);
                 return (
                   <Card key={v.id}>
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
+                    {/* items-end pins the controls to the BOTTOM of the row,
+                        and ml-auto to the right -- including when a long
+                        category name wraps and pushes them onto a line of
+                        their own, which previously dropped them to the
+                        bottom LEFT and left every card's button in a
+                        different place. min-w-0 + flex-1 lets the category
+                        wrap inside its own column instead of shoving the
+                        controls down in the first place. */}
+                    <div className="flex flex-wrap items-end justify-between gap-3">
+                      <div className="min-w-0 flex-1">
                         <p className="font-bold text-neutral-900">{v.participant?.full_name ?? "Unknown participant"}</p>
                         <p className="text-sm text-neutral-500">
                           <CategoryName name={v.registration?.category?.name} />
                         </p>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="ml-auto flex shrink-0 items-center gap-2">
                         {myScore != null && (
                           <span className="rounded-full bg-neutral-900 px-2.5 py-1 text-xs font-semibold text-white">
                             Your Total Average Score {myScore.toFixed(2)}
