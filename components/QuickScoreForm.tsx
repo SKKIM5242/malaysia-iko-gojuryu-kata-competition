@@ -33,7 +33,16 @@ export default function QuickScoreForm({
   const submitDisabled = score === "" || (isZero && !finalReason);
 
   return (
-    <form action={submitScore} className="mt-3 border-t border-neutral-100 pt-3">
+    <form
+      // Wrapped rather than passed straight through: submitScore now reports
+      // whether the save succeeded, and a form `action` must resolve to void.
+      // This override field has no window to close, so the page simply
+      // re-renders from the action's own revalidate.
+      action={async (formData) => {
+        await submitScore(formData);
+      }}
+      className="mt-3 border-t border-neutral-100 pt-3"
+    >
       <input type="hidden" name="video_id" value={videoId} />
       {isZero && <input type="hidden" name="reason" value={finalReason} />}
       <div className="flex flex-wrap items-center gap-2">

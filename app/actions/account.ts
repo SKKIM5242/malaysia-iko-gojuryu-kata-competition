@@ -1095,9 +1095,22 @@ async function tieResolvers(
   return [...out.values()];
 }
 
+/** Whether the score actually reached the database.
+ *
+ * This used to return nothing, and the score sheet simply assumed success
+ * the moment the call came back -- it ticked "Score saved" even when the
+ * action had bailed out on a permission or validation check. That was
+ * survivable while the sheet stayed open (the judge's entries were still on
+ * screen), but the sheet now closes itself on success, so a false success
+ * would throw the judge's work away. The caller closes only on ok. */
+export interface ScoreSaveResult {
+  ok: boolean;
+  error?: string;
+}
+
 /** Referee: save a 0.0–10.0 score for an assigned video — the sum of the
  * official rubric's 7 criteria (1+1+1+1+1+3+3 = 11 max). */
-export async function submitScore(formData: FormData) {
+export async function submitScore(formData: FormData): Promise<ScoreSaveResult> {
   const videoId = String(formData.get("video_id") ?? "");
   const raw = String(formData.get("score") ?? "").trim();
   const score = Math.round(Number(raw) * 10) / 10;
@@ -1133,11 +1146,11 @@ export async function submitScore(formData: FormData) {
   } = await supabase.auth.getUser();
   if (!user || !videoId || Number.isNaN(score) || score < 0 || score > 10) {
     revalidatePath("/account");
-    return;
+    return { ok: false, error: "That score could not be saved — sign in again and re-enter it." };
   }
   if (score === 0 && !reason) {
     revalidatePath("/account");
-    return;
+    return { ok: false, error: "A score of 0 disqualifies the entry, so a reason is required." };
   }
 
   // A Referee/Judge may only score a recording formally assigned to them
@@ -1150,7 +1163,7 @@ export async function submitScore(formData: FormData) {
   if (!isJudgingManager) {
     if (scorerRole !== "referee") {
       revalidatePath("/account");
-      return;
+      return { ok: false, error: "Only an assigned judge can score this recording." };
     }
     const { data: assignment } = await supabase
       .from("referee_assignments")
@@ -1160,7 +1173,7 @@ export async function submitScore(formData: FormData) {
       .maybeSingle();
     if (!assignment) {
       revalidatePath("/account");
-      return;
+      return { ok: false, error: "You are no longer assigned to this recording, so it can't be scored." };
     }
   }
   // Admin/Organizer/Staff full-access override: they may score any
@@ -1179,17 +1192,24 @@ export async function submitScore(formData: FormData) {
       { video_id: videoId, referee_user_id: user.id, score, criteria, deductions, disqualification_reason },
       { onConflict: "video_id,referee_user_id" },
     );
-  if (!error) {
-    await writeAudit(supabase, {
-      table_name: "video_scores",
-      record_id: videoId,
-      action: "score_submitted",
-      new_value: { score, disqualification_reason },
-      actor_id: user.id,
-    });
-    await maybeNotifyParticipantScored(videoId);
-    await maybeNotifyScoreTie(videoId);
+  if (error) {
+    revalidatePath("/account");
+    return { ok: false, error: "The score could not be saved — please try again." };
   }
+  await writeAudit(supabase, {
+    table_name: "video_scores",
+    record_id: videoId,
+    action: "score_submitted",
+    new_value: { score, disqualification_reason },
+    actor_id: user.id,
+  });
+  await maybeNotifyParticipantScored(videoId);
+  await maybeNotifyScoreTie(videoId);
   revalidatePath("/account");
   revalidatePath("/kata-arena");
+  // The two staff surfaces a score is entered from, so the row behind the
+  // sheet shows the new total the moment the window closes.
+  revalidatePath("/admin/judging");
+  revalidatePath("/admin/scoring");
+  return { ok: true };
 }

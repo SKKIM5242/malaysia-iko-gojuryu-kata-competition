@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { submitScore } from "@/app/actions/account";
 import { CategoryName } from "@/components/ui";
 import FloatingWindow from "@/components/FloatingWindow";
@@ -463,6 +464,8 @@ export function ScoreSession({
   const [scoreOpen, setScoreOpen] = useState(true);
   const [saved, setSaved] = useState(item.existingScore != null);
   const [pending, setPending] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const router = useRouter();
   const [sheet1Values, setSheet1Values] = useState<number[]>(() => splitSheet1(item.existingScore));
   const [sheet2Values, setSheet2Values] = useState<number[]>(() => splitCapped(item.existingScore));
   // "Reduce Score System" deduction checkboxes — always start unticked,
@@ -633,9 +636,25 @@ export function ScoreSession({
     <form
       action={async (formData) => {
         setPending(true);
-        await submitScore(formData);
+        const result = await submitScore(formData);
         setPending(false);
+        if (!result?.ok) {
+          // Stay open with everything the judge entered still on screen --
+          // closing here would throw a whole score sheet away on a failure
+          // they never saw.
+          setSaveError(result?.error ?? "The score could not be saved — please try again.");
+          return;
+        }
+        setSaveError(null);
         setSaved(true);
+        // Show the tick briefly, then close BOTH windows (this sheet and the
+        // recording beside it) and refresh whatever page is underneath --
+        // Judging, Score Recordings or Kata Arena -- so the row shows the new
+        // total instead of the state it had before scoring.
+        setTimeout(() => {
+          router.refresh();
+          onExit();
+        }, 700);
       }}
       onKeyDown={(e) => {
         // Submitting is final, so never let a stray Enter in a score box
@@ -732,8 +751,15 @@ export function ScoreSession({
         >
           {pending ? "Saving…" : saved ? "Update score" : "Submit score"}
         </button>
-        {saved && <span className="text-xs font-semibold text-green-700">✔ Score saved</span>}
+        {saved && !saveError && (
+          <span className="text-xs font-semibold text-green-700">✔ Score saved — closing…</span>
+        )}
       </div>
+      {saveError && (
+        <p className="mt-2 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-xs font-semibold text-red-800">
+          {saveError}
+        </p>
+      )}
     </form>
   );
 
