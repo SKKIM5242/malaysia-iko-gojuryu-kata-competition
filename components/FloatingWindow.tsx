@@ -20,10 +20,21 @@ function isLandscape() {
 export function halfBounds(which: "first" | "second"): Bounds {
   const W = window.innerWidth;
   const H = window.innerHeight;
+  // The two halves tile the viewport exactly -- no outer margin, no gutter
+  // between them. The 8px inset and 12px gap this used to leave looked tidy
+  // on a desktop but cost a strip down the middle and a band along every
+  // edge, which is height the score sheet needs: every pixel given back here
+  // is a rubric row that doesn't have to be scrolled to.
+  const half = Math.floor(W / 2);
   if (isLandscape()) {
-    return { x: which === "first" ? 8 : W / 2 + 4, y: 8, w: W / 2 - 12, h: H - 16 };
+    return which === "first"
+      ? { x: 0, y: 0, w: half, h: H }
+      : { x: half, y: 0, w: W - half, h: H };
   }
-  return { x: 8, y: which === "first" ? 8 : H / 2 + 4, w: W - 16, h: H / 2 - 12 };
+  const halfH = Math.floor(H / 2);
+  return which === "first"
+    ? { x: 0, y: 0, w: W, h: halfH }
+    : { x: 0, y: halfH, w: W, h: H - halfH };
 }
 
 function centerBounds(w: number, h: number): Bounds {

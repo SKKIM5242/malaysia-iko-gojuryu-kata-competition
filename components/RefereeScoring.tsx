@@ -91,7 +91,9 @@ export function RubricTable({
   const total = useMemo(() => Math.round(values.reduce((a, b) => a + b, 0) * 10) / 10, [values]);
   const disqualifying = total === 0;
   const overMax = total > TOTAL_MAX;
-  const cellPad = dense ? "px-1 py-0.5" : "px-2 py-1.5";
+  // py-1 rather than py-1.5: across ten rubric rows that alone is ~20px, and
+  // the sheet is fighting for every row it can show without a scroll.
+  const cellPad = dense ? "px-1 py-0.5" : "px-2 py-1";
   const totalPad = dense ? "px-2 py-1" : "px-2 py-2";
   const textSize = dense ? "text-xs" : "text-sm";
   const rowKey = useCallback((c: RubricCriterion) => c.label, []);
@@ -140,9 +142,16 @@ export function RubricTable({
   );
 
   const baseColumns = [
-    { key: "no", label: "No.", width: 34 },
-    { key: "criteria", label: "Criteria", width: 125 },
-    ...DEDUCTION_OPTIONS.map((opt, i) => ({ key: `ded${i}`, label: opt.label, width: 48, amount: opt.amount })),
+    { key: "no", label: "No.", width: 30 },
+    // Criteria gets the lion's share, and the deduction columns give a little
+    // back. At 125px the longest label ("Conformance: Consistence in the
+    // performance of the KIHON") wrapped to three lines and made that single
+    // row 89px tall -- taller than two ordinary rows -- while table width sat
+    // unused to its right. Widening it is what stops the sheet needing a
+    // scroll, far more than shaving padding could. Still just a starting
+    // width: any column remains drag-resizable.
+    { key: "criteria", label: "Criteria", width: 210 },
+    ...DEDUCTION_OPTIONS.map((opt, i) => ({ key: `ded${i}`, label: opt.label, width: 44, amount: opt.amount })),
     { key: "score_range", label: "Score", width: 46 },
     { key: "your_score", label: readOnly ? "Points" : "Your score", width: 78 },
   ];
@@ -232,7 +241,7 @@ export function RubricTable({
         onChange={(e) => onChange?.(i, e.target.value)}
         onFocus={() => t.selectCell(rk, "your_score")}
         onContextMenu={t.getContextMenuHandler(String(values[i] ?? 0))}
-        className="w-16 rounded-md border border-neutral-300 px-1.5 py-1 text-sm"
+        className="w-16 rounded-md border border-neutral-300 px-1.5 py-0.5 text-sm"
       />
     );
   }
@@ -326,13 +335,15 @@ export function RubricTable({
 
   return (
     <>
-      <p className="mb-1 text-[11px] text-neutral-400">
-        Drag a column&apos;s label or a row&apos;s No. past a neighbor to reorder it; drag a
-        column&apos;s right edge to resize it. Click Your Score to select it, then drag its blue
-        corner handle to copy that value into other rows; right-click a value to copy it to the
-        clipboard.
-      </p>
-      <div className="overflow-x-auto rounded-md border border-neutral-200">
+      {/* These instructions used to sit here as their own paragraph, directly
+          above the rows a judge has to reach. They describe optional
+          conveniences -- reordering, resizing, copy-down -- none of which is
+          needed to score, so they moved onto the table as a tooltip and gave
+          their height back to the rubric. */}
+      <div
+        className="overflow-x-auto rounded-md border border-neutral-200"
+        title="Drag a column label or row No. to reorder, a column's right edge to resize. Select Your Score then drag its blue corner to copy that value down; right-click a value to copy it to the clipboard."
+      >
         <table
           className={`text-left ${textSize}`}
           style={{ tableLayout: "fixed", width: orderedColumns.reduce((sum, c) => sum + widthOf(c.key, c.width), 0) }}
@@ -661,7 +672,7 @@ export function ScoreSession({
         // submit the sheet — only the Submit button may.
         if (e.key === "Enter" && (e.target as HTMLElement).tagName === "INPUT") e.preventDefault();
       }}
-      className="p-4"
+      className="p-2"
     >
       <input type="hidden" name="video_id" value={item.videoId} />
       <input type="hidden" name="score" value={submittedScore} />
@@ -676,23 +687,27 @@ export function ScoreSession({
       />
       {sheet === 1 ? (
         <>
-          <div className="mb-3 rounded-md border-2 border-red-200 bg-red-50 p-3">
-            <label htmlFor={`quick1_${item.videoId}`} className="mb-1 block text-sm font-bold text-neutral-800">
-              Just input one Total Score (0–{TOTAL_MAX}) — the rows below self-populate
-            </label>
-            <input
-              id={`quick1_${item.videoId}`}
-              name="quick_total_display"
-              type="number"
-              min={0}
-              max={TOTAL_MAX}
-              step={0.1}
-              required
-              value={sheet1QuickTotal}
-              onChange={(e) => setSheet1Quick(e.target.value)}
-              className="w-32 rounded-md border border-neutral-300 px-3 py-2 text-lg font-bold"
-            />
-            <p className="mt-2 text-xs text-neutral-600">
+          <div className="mb-2 rounded-md border-2 border-red-200 bg-red-50 p-2">
+            {/* Label beside the box, not above it -- stacked they cost two
+                rows of height before a single criterion is visible. */}
+            <div className="flex items-center gap-2">
+              <input
+                id={`quick1_${item.videoId}`}
+                name="quick_total_display"
+                type="number"
+                min={0}
+                max={TOTAL_MAX}
+                step={0.1}
+                required
+                value={sheet1QuickTotal}
+                onChange={(e) => setSheet1Quick(e.target.value)}
+                className="w-24 shrink-0 rounded-md border border-neutral-300 px-2 py-1 text-lg font-bold"
+              />
+              <label htmlFor={`quick1_${item.videoId}`} className="text-sm font-bold leading-tight text-neutral-800">
+                Just input one Total Score (0–{TOTAL_MAX}) — the rows below self-populate
+              </label>
+            </div>
+            <p className="mt-1 text-[11px] leading-tight text-neutral-600">
               Self-population fills items 1–10 up to their 0–1 maximum, at 2 decimal points; the
               Total Score keeps to 1 decimal point. <strong>Not happy with the self-population?
               Adjust any row below yourself</strong> — the Total resyncs to your adjusted rows.
@@ -709,23 +724,25 @@ export function ScoreSession({
         </>
       ) : (
         <>
-          <div className="mb-3 rounded-md border-2 border-red-200 bg-red-50 p-3">
-            <label htmlFor={`quick_${item.videoId}`} className="mb-1 block text-sm font-bold text-neutral-800">
-              Just input one Total Score (0–{TOTAL_MAX}) — the rows below self-populate
-            </label>
-            <input
-              id={`quick_${item.videoId}`}
-              name="quick_total_display"
-              type="number"
-              min={0}
-              max={TOTAL_MAX}
-              step={0.1}
-              required
-              value={quickTotal}
-              onChange={(e) => setSheet2QuickTotal(e.target.value)}
-              className="w-32 rounded-md border border-neutral-300 px-3 py-2 text-lg font-bold"
-            />
-            <p className="mt-2 text-xs text-neutral-600">
+          <div className="mb-2 rounded-md border-2 border-red-200 bg-red-50 p-2">
+            <div className="flex items-center gap-2">
+              <input
+                id={`quick_${item.videoId}`}
+                name="quick_total_display"
+                type="number"
+                min={0}
+                max={TOTAL_MAX}
+                step={0.1}
+                required
+                value={quickTotal}
+                onChange={(e) => setSheet2QuickTotal(e.target.value)}
+                className="w-24 shrink-0 rounded-md border border-neutral-300 px-2 py-1 text-lg font-bold"
+              />
+              <label htmlFor={`quick_${item.videoId}`} className="text-sm font-bold leading-tight text-neutral-800">
+                Just input one Total Score (0–{TOTAL_MAX}) — the rows below self-populate
+              </label>
+            </div>
+            <p className="mt-1 text-[11px] leading-tight text-neutral-600">
               Self-population fills items 1–5 up to their 0–1 maximum and splits the rest equally
               between items 6 and 7. <strong>Not happy with the self-population? Adjust any row
               below yourself</strong> — the Total resyncs to your adjusted rows.
@@ -740,10 +757,10 @@ export function ScoreSession({
           />
         </>
       )}
-      <p className="mt-2 text-xs text-neutral-400">
+      <p className="mt-1.5 text-[11px] leading-tight text-neutral-400">
         Submitting is final — scores cannot be appealed or changed once judging closes.
       </p>
-      <div className="mt-2 flex flex-wrap items-center gap-3">
+      <div className="mt-1.5 flex flex-wrap items-center gap-3">
         <button
           type="submit"
           disabled={pending || submitBlocked}
@@ -809,16 +826,20 @@ export function ScoreSession({
           onClose={() => setScoreOpen(false)}
           initial="second-half"
         >
-          <div className="border-b border-neutral-100 px-4 pt-3 pb-2">
-            <p className="font-bold text-neutral-900">{item.participantName}</p>
-            <p className="text-xs text-neutral-500">
+          {/* Every line here is leading-tight and the padding is halved: this
+              header sits above the rubric and each row it costs is a rubric
+              row pushed below the fold. The standing hint is one line now
+              instead of three -- it explains controls that are visible on
+              screen anyway. */}
+          <div className="border-b border-neutral-100 px-3 pb-1 pt-1.5">
+            <p className="font-bold leading-tight text-neutral-900">{item.participantName}</p>
+            <p className="text-xs leading-tight text-neutral-500">
               {item.participantCountry ?? "—"} · <CategoryName name={item.categoryName} />
             </p>
-            <p className="mt-1 text-xs text-neutral-400">
-              Close this sheet (✕) to finish watching first — it pops back up the moment the
-              recording ends. Switch sheets with the Sheet 1 / Sheet 2 buttons on the recording
-              window.
-            </p>
+            {/* The line that used to explain ✕ and the Sheet 1 / Sheet 2
+                buttons is gone: all three are labelled and on screen, and the
+                row it cost is a rubric row the judge would otherwise have to
+                scroll to. */}
           </div>
           {scoreForm}
         </FloatingWindow>
