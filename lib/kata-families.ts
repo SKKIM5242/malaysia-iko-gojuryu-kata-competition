@@ -113,6 +113,17 @@ export function orderedKataBases(categories: Category[]): string[] {
   return kataBases(categories).sort((a, b) => (RANK_BY_KATA[a] ?? 999) - (RANK_BY_KATA[b] ?? 999));
 }
 
+/** The same canonical 1-24 ordering as orderedKataBases(), but for a list of
+ * bare kata names that has already been separated from its Category rows --
+ * e.g. the Kata filter on the judging / Score-this-recording list, which
+ * derives its names by splitting each assignment's category label. A plain
+ * .sort() there produced an alphabetical list ("Geiksai... IKO V2" above
+ * "Geksai Dai Ni", Kururunfa above Saifa) that matched nothing a judge sees
+ * on the Kata Categories page. Unknown names sort to the end. */
+export function sortKataNames(names: string[]): string[] {
+  return [...names].sort((a, b) => (RANK_BY_KATA[a.trim()] ?? 999) - (RANK_BY_KATA[b.trim()] ?? 999));
+}
+
 /** The kata event immediately above/below the given one in the canonical
  * 1-24 order -- the pairing "merge with kata above/below" acts on. Returns
  * null at either end of the list, and also null across a family boundary

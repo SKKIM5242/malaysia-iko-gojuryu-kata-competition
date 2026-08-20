@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRecordAttempt, submitKataVideo } from "@/app/actions/account";
 import BuyExtraAttemptsButton from "@/components/BuyExtraAttemptsButton";
@@ -736,6 +736,27 @@ export default function KataRecorder({
   // coming), which is what keeps the review controls pinned to the banner.
   const rawBannerRatioRef = useRef(0.13);
   const rawBannerOnlyRatioRef = useRef(0.08);
+  // Fraction of the box's WIDTH taken by the black pillarbox bar on each
+  // side -- the horizontal twin of bannerRatio. The canvas is drawn
+  // object-contain, so on any device whose camera frame is a different
+  // shape from the box (a 16:9 sensor in a 21:9 landscape window, a phone
+  // held sideways) there is dead black either side of the picture. Every
+  // overlay used to be pinned to inset-x-0, i.e. to the BOX, which put
+  // "Clap to stop", the canvas debug line, "✕ Exit full screen" and the
+  // deleted-recording counter out on those bars and, on a wide enough
+  // window, hard against (or past) the physical screen edge. Pinning them
+  // to this inset instead keeps every control on the picture itself, on
+  // every device, whatever its camera's native aspect ratio.
+  const [contentInsetRatio, setContentInsetRatio] = useState(0);
+  const contentInsetRatioRef = useRef(0);
+  // Left/right in place of inset-x-0 on every overlay row. Percentages, not
+  // pixels, so a rotation or a window resize moves the controls with the
+  // picture on the very next measured frame rather than needing its own
+  // listener.
+  const overlayInsetStyle = useMemo<CSSProperties>(
+    () => ({ left: `${contentInsetRatio * 100}%`, right: `${contentInsetRatio * 100}%` }),
+    [contentInsetRatio],
+  );
   // CSS `aspect-ratio` on a plain block element doesn't shrink-to-fit the
   // way it does on a replaced element (img/video) -- a statically-positioned
   // div with width:auto fills its container's full width first, THEN derives
@@ -1303,6 +1324,7 @@ export default function KataRecorder({
     const liveBoxRect = recordingBoxRef.current?.getBoundingClientRect();
     let finalRatio = rawBannerRatio;
     let finalBannerOnlyRatio = rawBannerOnlyRatio;
+    let finalInset = 0;
     if (liveBoxRect && liveBoxRect.width > 0 && liveBoxRect.height > 0) {
       const canvasAspect = canvas.width / canvas.height;
       const boxAspect = liveBoxRect.width / liveBoxRect.height;
@@ -1311,6 +1333,15 @@ export default function KataRecorder({
       const contentHeightFraction = contentHeightPx / liveBoxRect.height;
       finalRatio = contentTopFraction + rawBannerRatio * contentHeightFraction;
       finalBannerOnlyRatio = contentTopFraction + rawBannerOnlyRatio * contentHeightFraction;
+      // Pillarbox: the mirror of the letterbox maths above. Only one of the
+      // two can be non-zero for a given frame, so this is a no-op whenever
+      // the picture already fills the box edge to edge.
+      const contentWidthPx = canvasAspect > boxAspect ? liveBoxRect.width : liveBoxRect.height * canvasAspect;
+      finalInset = (liveBoxRect.width - contentWidthPx) / 2 / liveBoxRect.width;
+    }
+    if (Math.abs(contentInsetRatioRef.current - finalInset) > 0.002) {
+      contentInsetRatioRef.current = finalInset;
+      setContentInsetRatio(finalInset);
     }
     if (Math.abs(bannerRatioRef.current - finalRatio) > 0.002) {
       bannerRatioRef.current = finalRatio;
@@ -2224,7 +2255,10 @@ export default function KataRecorder({
             main banner instead of below the performer's name and category
             as well. */}
         {!fullscreen && phase !== "idle" && phase !== "review" && phase !== "uploading" && (
-          <div className="absolute inset-x-0 z-20 flex justify-end px-2 pt-1" style={{ top: `${bannerOnlyRatio * 100}%` }}>
+          <div
+            className="absolute z-20 flex justify-end px-2 pt-1"
+            style={{ top: `${bannerOnlyRatio * 100}%`, ...overlayInsetStyle }}
+          >
             <button
               type="button"
               onClick={enterFullscreen}
@@ -2236,8 +2270,12 @@ export default function KataRecorder({
         )}
         {fullscreen && phase !== "review" && phase !== "uploading" && (
           <div
-            className="absolute inset-x-0 z-20 flex items-start justify-end gap-2 px-3 py-2 text-white"
-            style={{ top: `${bannerOnlyRatio * 100}%`, textShadow: "0 1px 3px rgba(0,0,0,0.85)" }}
+            className="absolute z-20 flex items-start justify-end gap-2 px-3 py-2 text-white"
+            style={{
+              top: `${bannerOnlyRatio * 100}%`,
+              textShadow: "0 1px 3px rgba(0,0,0,0.85)",
+              ...overlayInsetStyle,
+            }}
           >
             {/* Deleted Recording sits right under Exit full screen, in the
                 SAME row as the title, instead of its own row below --
@@ -2288,8 +2326,9 @@ export default function KataRecorder({
           // rotating back to portrait. Scrolling this stack independently
           // keeps every case that already fit (most of them) pixel-identical
           // and just makes the cramped ones reachable instead of invisible.
-          className="absolute inset-x-0 z-30 flex transform-gpu flex-col overflow-y-auto"
+          className="absolute z-30 flex transform-gpu flex-col overflow-y-auto"
           style={{
+            ...overlayInsetStyle,
             // Straight off the burned-in banner's own measured height. The
             // canvas (and the recorded file the review <video> plays back)
             // is drawn at the screen's shape, so it displays without crop
@@ -2375,10 +2414,16 @@ export default function KataRecorder({
             // pixel-identical and makes the cramped ones reachable instead
             // of invisible -- the same treatment the live/recording stack
             // above already had.
-            className="absolute inset-x-0 z-30 flex transform-gpu flex-col gap-1.5 overflow-y-auto px-3 pt-2"
+            className="absolute z-30 flex transform-gpu flex-col gap-1.5 overflow-y-auto px-3 pt-2"
             style={{
               top: `calc(${bannerRatio * 100}% + 3.5rem)`,
               maxHeight: `calc(${100 - bannerRatio * 100}% - 3.5rem)`,
+              // Same picture-relative inset as the live controls: on a
+              // landscape window wider than the recording's own shape, Exit
+              // full screen / Delete & re-record on the left and Save to
+              // device / Submit on the right were sitting out on the black
+              // bars, right against the screen edge.
+              ...overlayInsetStyle,
             }}
           >
             <div className="flex items-center justify-between gap-2">

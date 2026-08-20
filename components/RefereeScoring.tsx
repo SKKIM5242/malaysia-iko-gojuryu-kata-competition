@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { submitScore } from "@/app/actions/account";
 import { CategoryName } from "@/components/ui";
@@ -20,10 +20,13 @@ import {
   scoreAfterDeductions,
   sumDeductions,
   needsDoubleReview,
+  round2,
   emptyDeductions,
   type RubricCriterion,
 } from "@/lib/scoring-rubric";
 import { splitCategoryName } from "@/lib/division";
+import { sortKataNames } from "@/lib/kata-families";
+import { shortTierName } from "@/lib/invitation-codes";
 
 export interface ScoringItem {
   videoId: string;
@@ -96,6 +99,11 @@ export function RubricTable({
   const cellPad = dense ? "px-1 py-0.5" : "px-2 py-1";
   const totalPad = dense ? "px-2 py-1" : "px-2 py-2";
   const textSize = dense ? "text-xs" : "text-sm";
+  // Score Sheet 2's seven labels ("Neat appearance of uniform and person",
+  // "Execution of techniques (sharpness)") run roughly twice as long as Sheet
+  // 1's, so at the same face they wrapped to three lines each and pushed
+  // Submit below the fold. One step down buys back a whole row.
+  const longLabels = rubric.length === SHEET2_CRITERIA.length;
   const rowKey = useCallback((c: RubricCriterion) => c.label, []);
 
   // Read-only: the 5 deduction columns start collapsed (a single "Show
@@ -141,20 +149,44 @@ export function RubricTable({
     [widthOf, handleResizeMove, handleResizeUp],
   );
 
+  // The editable table used to lay out at a HARD 584px (30 + 210 + 5x44 + 46
+  // + 78), so any container narrower than that -- a phone, a tablet, a
+  // snapped half-window -- grew a horizontal scrollbar and a judge had to
+  // swipe sideways to reach Your Score. Now every column except Criteria
+  // takes a small fixed width and CRITERIA IS LEFT WITHOUT ONE, so with
+  // table-layout:fixed + width:100% the browser hands it every pixel the
+  // others didn't use. No measuring, no ResizeObserver, no reflow after
+  // hydration: the table is simply always exactly as wide as its container,
+  // whatever that turns out to be. A wide window puts the labels on one
+  // line; a phone wraps them; neither ever puts a column out of reach.
+  const size = { no: 24, ded: 32, score: 36, yourScore: 46 };
+  // The narrow columns can't afford cellPad's px-2 (16px of the 24px "No."
+  // column would have been padding, and "10." then bled over the Criteria
+  // label beside it). Their content is 3-5 characters wide, so they get
+  // their own padding and keep essentially all of their width for text.
+  const padFor = (key: string) =>
+    key === "no" || key === "score_range" ? "px-0.5 py-1" : key.startsWith("ded") ? "px-0 py-1" : cellPad;
+  // The floor Criteria may not shrink past. Below this the wrapper scrolls
+  // rather than squeezing the labels to one word per line -- only reachable
+  // on a container under ~370px, i.e. narrower than any phone in portrait.
+  const CRITERIA_MIN = 88;
+  const fixedTotal = size.no + DEDUCTION_OPTIONS.length * size.ded + size.score + size.yourScore;
   const baseColumns = [
-    { key: "no", label: "No.", width: 30 },
-    // Criteria gets the lion's share, and the deduction columns give a little
-    // back. At 125px the longest label ("Conformance: Consistence in the
-    // performance of the KIHON") wrapped to three lines and made that single
-    // row 89px tall -- taller than two ordinary rows -- while table width sat
-    // unused to its right. Widening it is what stops the sheet needing a
-    // scroll, far more than shaving padding could. Still just a starting
-    // width: any column remains drag-resizable.
+    { key: "no", label: "No.", width: size.no },
+    // 210 is only the fallback used once a judge has hand-resized something
+    // (see userResized below); untouched, this column has no width at all.
     { key: "criteria", label: "Criteria", width: 210 },
-    ...DEDUCTION_OPTIONS.map((opt, i) => ({ key: `ded${i}`, label: opt.label, width: 44, amount: opt.amount })),
-    { key: "score_range", label: "Score", width: 46 },
-    { key: "your_score", label: readOnly ? "Points" : "Your score", width: 78 },
+    ...DEDUCTION_OPTIONS.map((opt, i) => ({ key: `ded${i}`, label: opt.label, width: size.ded, amount: opt.amount })),
+    { key: "score_range", label: "Score", width: size.score },
+    // 78 -> 48: the box only ever has to show "0.00" now that hand-typed
+    // values are rounded to 2dp, and the 30px it gives back goes to Criteria.
+    { key: "your_score", label: readOnly ? "Points" : "Your score", width: size.yourScore },
   ];
+  // Dragging any column edge switches the table back to the old
+  // sum-of-pixel-widths layout, so a deliberate resize behaves exactly as it
+  // always did (including growing past the container and scrolling) instead
+  // of being silently re-absorbed by the 100% auto-fit.
+  const userResized = Object.keys(colWidths).length > 0;
   const orderedColumns = readOnly ? baseColumns : t.orderColumnKeys(baseColumns.map((c) => c.key)).map((k) => baseColumns.find((c) => c.key === k)!).filter(Boolean);
   const orderedRows = readOnly ? rubric : t.orderRowKeys(rubric.map(rowKey)).map((k) => rubric.find((c) => rowKey(c) === k)).filter((c): c is RubricCriterion => !!c);
 
@@ -179,13 +211,13 @@ export function RubricTable({
         </span>
       );
     }
-    if (c.key === "score_range") return "Score";
+    if (c.key === "score_range") return <span className="text-[9px] @[420px]:text-[10px]">Score</span>;
     if (c.key === "your_score") return c.label;
-    if (c.key === "no") return "No.";
+    if (c.key === "no") return <span className="text-[9px] @[420px]:text-[10px]">No.</span>;
     return (
-      <span className="block text-center leading-tight">
+      <span className="block text-center text-[8px] leading-none @[420px]:text-[9px]">
         <span className="block">{c.label}</span>
-        <span className="block text-[9px] font-normal normal-case text-red-500">-{(c as { amount: number }).amount}</span>
+        <span className="block font-normal normal-case text-red-500">-{(c as { amount: number }).amount}</span>
       </span>
     );
   }
@@ -206,7 +238,8 @@ export function RubricTable({
         />
       );
     }
-    if (colKey === "no") return <span className="text-neutral-400">{i + 1}.</span>;
+    if (colKey === "no")
+      return <span className="whitespace-nowrap text-[11px] text-neutral-400 @[420px]:text-sm">{i + 1}.</span>;
     if (colKey === "criteria") {
       // Dropped in FULL VIEW only, on the organizer's instruction -- there it
       // repeated down every Score Sheet 2 panel in a three-across layout with
@@ -217,7 +250,20 @@ export function RubricTable({
       const showDoubleReview = needsDoubleReview(c.max) && (!readOnly || canToggleDeductions) && !dense;
       return (
         <span className="flex flex-col">
-          <span>{c.label}</span>
+          <span
+            className={
+              // Below ~420px of table (a phone in portrait) the labels drop a
+              // step so "Conformance: Consistence in the performance of the
+              // KIHON" costs three lines instead of four. Sheet 2's seven
+              // labels run about twice as long as Sheet 1's, so they keep the
+              // smaller face until there is a lot more room.
+              longLabels
+                ? "text-[11px] leading-snug @[560px]:text-sm"
+                : "text-[11px] leading-snug @[420px]:text-sm"
+            }
+          >
+            {c.label}
+          </span>
           {showDoubleReview && (
             <span className="mt-0.5 block text-[10px] font-normal normal-case text-amber-700">
               ⚠ Subtracts from 2.5, not 0–{c.max} — double-check this row.
@@ -226,7 +272,8 @@ export function RubricTable({
         </span>
       );
     }
-    if (colKey === "score_range") return <span className="text-neutral-400">0–{c.max}</span>;
+    if (colKey === "score_range")
+      return <span className="whitespace-nowrap text-[11px] text-neutral-400 @[420px]:text-sm">0–{c.max}</span>;
     // your_score
     if (readOnly) {
       return <span className="font-semibold text-neutral-800">{(values[i] ?? 0).toFixed(2)}</span>;
@@ -241,7 +288,7 @@ export function RubricTable({
         onChange={(e) => onChange?.(i, e.target.value)}
         onFocus={() => t.selectCell(rk, "your_score")}
         onContextMenu={t.getContextMenuHandler(String(values[i] ?? 0))}
-        className="w-16 rounded-md border border-neutral-300 px-1.5 py-0.5 text-sm"
+        className="w-full rounded-md border border-neutral-300 px-1 py-0.5 text-sm"
       />
     );
   }
@@ -341,22 +388,37 @@ export function RubricTable({
           needed to score, so they moved onto the table as a tooltip and gave
           their height back to the rubric. */}
       <div
-        className="overflow-x-auto rounded-md border border-neutral-200"
+        // @container: everything below sizes itself against THIS box, not the
+        // viewport. The sheet lives inside a draggable/snappable window, so a
+        // viewport media query says nothing useful about how much room it
+        // actually has -- a phone in portrait and a half-snapped desktop
+        // window are the same problem and now get the same answer.
+        className="@container overflow-x-auto rounded-md border border-neutral-200"
         title="Drag a column label or row No. to reorder, a column's right edge to resize. Select Your Score then drag its blue corner to copy that value down; right-click a value to copy it to the clipboard."
       >
         <table
           className={`text-left ${textSize}`}
-          style={{ tableLayout: "fixed", width: orderedColumns.reduce((sum, c) => sum + widthOf(c.key, c.width), 0) }}
+          style={
+            userResized
+              ? { tableLayout: "fixed", width: orderedColumns.reduce((sum, c) => sum + widthOf(c.key, c.width), 0) }
+              : { tableLayout: "fixed", width: "100%", minWidth: fixedTotal + CRITERIA_MIN }
+          }
         >
           <colgroup>
-            {orderedColumns.map((c) => (
-              <col key={c.key} style={{ width: widthOf(c.key, c.width) }} />
-            ))}
+            {orderedColumns.map((c) =>
+              !userResized && c.key === "criteria" ? (
+                // Deliberately width-less: the one column that absorbs
+                // whatever the fixed ones leave over.
+                <col key={c.key} />
+              ) : (
+                <col key={c.key} style={{ width: widthOf(c.key, c.width) }} />
+              ),
+            )}
           </colgroup>
           <thead className="border-b border-neutral-200 bg-neutral-50 text-[10px] uppercase tracking-wide text-neutral-500">
             <tr>
               {orderedColumns.map((c) => (
-                <th key={c.key} data-col-order-key={c.key} className={`relative ${cellPad}`}>
+                <th key={c.key} data-col-order-key={c.key} className={`relative ${padFor(c.key)}`}>
                   <span
                     onPointerDown={t.getColHeaderDownHandler(c.key, () => {})}
                     className="block cursor-pointer select-none pr-1"
@@ -398,7 +460,7 @@ export function RubricTable({
                             ? t.getContextMenuHandler(col.key === "criteria" ? c.label : `0–${c.max}`)
                             : undefined
                         }
-                        className={`relative ${cellPad} ${isHandle ? "cursor-pointer select-none" : ""} ${
+                        className={`relative ${padFor(col.key)} ${isHandle ? "cursor-pointer select-none" : ""} ${
                           col.key === "criteria" ? "whitespace-normal break-words" : ""
                         } ${isCellSelected || isScoreSelected ? "ring-2 ring-inset ring-blue-500" : ""} ${
                           isFillPreview ? "outline outline-2 -outline-offset-2 outline-blue-300" : ""
@@ -427,7 +489,7 @@ export function RubricTable({
             })}
             <tr className="bg-neutral-50 font-semibold">
               <td colSpan={orderedColumns.length - 2} className={`${totalPad} text-right`}>Total Score</td>
-              <td className={`${totalPad} text-neutral-400`}>0–{TOTAL_MAX}</td>
+              <td className={`${totalPad} whitespace-nowrap text-neutral-400`}>0–{TOTAL_MAX}</td>
               <td className={`${totalPad} ${disqualifying || overMax ? "text-red-700" : "text-neutral-900"}`}>
                 {total.toFixed(2)}
               </td>
@@ -506,7 +568,12 @@ export function ScoreSession({
   /** A hand-adjusted row overrides Sheet 1's self-population; its Total
    * box resyncs to the new row sum (1 decimal place). */
   function setSheet1Criterion(i: number, raw: string) {
-    const n = Math.max(0, Math.min(SHEET1_CRITERIA[i].max, Number(raw) || 0));
+    // round2: every other path into this array (splitSheet1, splitCapped,
+    // scoreAfterDeductions) already keeps 2dp. A hand-typed value -- or the
+    // number spinner stepping off a non-aligned figure -- was the one way a
+    // 0.988 could reach the column, and the column then had to be wide
+    // enough to show it. Clamped here so "0.00" is the widest it can be.
+    const n = round2(Math.max(0, Math.min(SHEET1_CRITERIA[i].max, Number(raw) || 0)));
     setSheet1Values((v) => {
       const next = v.map((x, idx) => (idx === i ? n : x));
       setSheet1QuickTotal(String(Math.round(next.reduce((a, b) => a + b, 0) * 10) / 10));
@@ -527,7 +594,7 @@ export function ScoreSession({
   /** A hand-adjusted row overrides the self-population; the Total box
    * resyncs to the new row sum so what the judge sees is what's saved. */
   function setSheet2Criterion(i: number, raw: string) {
-    const n = Math.max(0, Math.min(SHEET2_CRITERIA[i].max, Number(raw) || 0));
+    const n = round2(Math.max(0, Math.min(SHEET2_CRITERIA[i].max, Number(raw) || 0)));
     setSheet2Values((v) => {
       const next = v.map((x, idx) => (idx === i ? n : x));
       setQuickTotal(String(Math.round(next.reduce((a, b) => a + b, 0) * 10) / 10));
@@ -923,11 +990,20 @@ function FilterSelect({
   value,
   options,
   onChange,
+  renderOption,
+  widthClass = "w-44",
 }: {
   label: string;
   value: string;
   options: string[];
   onChange: (v: string) => void;
+  /** Shown in the dropdown in place of the raw value. The value itself is
+   * still what gets filtered on, so this only changes what a judge reads --
+   * used by Competition Tier, whose stored name is the full
+   * "Malaysia Open Virtual Karate-do Kata Competition 2026 - USD 10 Tier"
+   * and wrapped to three lines in the iPhone picker. */
+  renderOption?: (o: string) => string;
+  widthClass?: string;
 }) {
   return (
     <label className="flex flex-col gap-0.5 text-xs font-semibold text-neutral-500">
@@ -935,11 +1011,11 @@ function FilterSelect({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm font-normal text-neutral-800"
+        className={`truncate rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm font-normal text-neutral-800 ${widthClass}`}
       >
         <option value={ALL}>{ALL}</option>
         {options.map((o) => (
-          <option key={o} value={o}>{o}</option>
+          <option key={o} value={o}>{renderOption ? renderOption(o) : o}</option>
         ))}
       </select>
     </label>
@@ -977,7 +1053,9 @@ export default function RefereeScoring({
     }
     return {
       tiers: [...tiers].sort(),
-      katas: [...katas].sort(),
+      // Canonical 1-24 order, matching the Kata Categories page, rather than
+      // alphabetical -- see sortKataNames().
+      katas: sortKataNames([...katas]),
       belts: [...belts].sort(),
       ages: [...ages].sort(),
       sexes: [...sexes].sort(),
@@ -1010,8 +1088,15 @@ export default function RefereeScoring({
       </div>
       {items.length > 0 && (
         <div className="flex flex-wrap gap-3 rounded-md border border-neutral-200 bg-white px-4 py-3">
-          <FilterSelect label="Competition Tier" value={tier} options={opts.tiers} onChange={setTier} />
-          <FilterSelect label="Kata" value={kata} options={opts.katas} onChange={setKata} />
+          <FilterSelect
+            label="Competition Tier"
+            value={tier}
+            options={opts.tiers}
+            onChange={setTier}
+            renderOption={shortTierName}
+            widthClass="w-36"
+          />
+          <FilterSelect label="Kata" value={kata} options={opts.katas} onChange={setKata} widthClass="w-52" />
           <FilterSelect label="Belt Division" value={belt} options={opts.belts} onChange={setBelt} />
           <FilterSelect label="Age" value={age} options={opts.ages} onChange={setAge} />
           <FilterSelect label="Sex / Mix" value={sex} options={opts.sexes} onChange={setSex} />

@@ -84,6 +84,12 @@ export function splitEvenly(total: number | null): number[] {
   return SHEET2_CRITERIA.map(() => Math.round((total / SHEET2_CRITERIA.length) * 100) / 100);
 }
 
+/** Every per-row value in a score sheet is kept to 2 decimal places -- the
+ * judge's column is sized for "0.00" and nothing wider. */
+export function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
 /** Score Sheet 1's self-populate rule: the typed total (0–10) spreads
  * evenly across all 10 rows — total ÷ 10 each, capped at the row's 0–1
  * maximum, kept to 2 decimal places. The judge can then readjust any row
