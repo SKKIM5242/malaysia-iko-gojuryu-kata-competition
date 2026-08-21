@@ -567,6 +567,7 @@ export default async function AccountPage({
             registrationIds={myRegistrationIds}
             senseiId={profile.sensei_id}
             schoolId={profile.school_id}
+            displayName={profile.full_name}
             isSupport={profile.role === "customer_support"}
           />
           <div className="mt-4">{SignOutButton}</div>
@@ -715,6 +716,7 @@ export default async function AccountPage({
             registrationIds={myRegistrationIds}
             senseiId={profile.sensei_id}
             schoolId={profile.school_id}
+            displayName={profile.full_name}
             isSupport={false}
           />
           <div className="mt-4">{SignOutButton}</div>
@@ -781,6 +783,7 @@ export default async function AccountPage({
             registrationIds={myRegistrationIds}
             senseiId={profile.sensei_id}
             schoolId={profile.school_id}
+            displayName={profile.full_name}
             isSupport={false}
           />
           <div className="mt-4">{SignOutButton}</div>
@@ -873,6 +876,7 @@ export default async function AccountPage({
             registrationIds={myRegistrationIds}
             senseiId={profile.sensei_id}
             schoolId={profile.school_id}
+            displayName={profile.full_name}
             isSupport={false}
           />
           <div className="mt-4">{SignOutButton}</div>
@@ -1039,6 +1043,7 @@ export default async function AccountPage({
           registrationIds={myRegistrationIds}
           senseiId={profile.sensei_id}
           schoolId={profile.school_id}
+            displayName={profile.full_name}
           isSupport={false}
         />
         <div className="mt-6">{SignOutButton}</div>
