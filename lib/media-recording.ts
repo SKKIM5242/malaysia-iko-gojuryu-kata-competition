@@ -27,6 +27,12 @@ export function pickVideoMimeType(): string {
  * allowed size". Every recording in the app has to land under it. */
 export const UPLOAD_CEILING_BYTES = 50 * 1024 * 1024;
 
+/** Hard cap on a kata take. Lives here rather than inside KataRecorder so
+ * that everything sizing itself against a kata recording -- the recorder,
+ * and the saved-file upload panel that has to know how big an honest
+ * in-app file can be -- reads the same number. */
+export const KATA_MAX_SECONDS = 5 * 60;
+
 /** Fraction of the ceiling deliberately left unused. videoBitsPerSecond is
  * a TARGET, not a hard cap -- an encoder can run over it on very busy
  * footage (a fast kata against a detailed background is exactly that), and

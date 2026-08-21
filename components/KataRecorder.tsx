@@ -10,6 +10,7 @@ import {
   extensionForMimeType,
   bareMimeType,
   recordingBitrates,
+  KATA_MAX_SECONDS,
 } from "@/lib/media-recording";
 import { playDingDong, playAlarmTick } from "@/lib/chime";
 import { startClapDetector } from "@/lib/clap-detector";
@@ -18,7 +19,7 @@ import { uploadRecording } from "@/lib/upload-recording";
 import { torchSupported, setTorch } from "@/lib/camera-torch";
 import type { WatermarkSettings } from "@/lib/watermark";
 
-const MAX_SECONDS = 5 * 60;
+const MAX_SECONDS = KATA_MAX_SECONDS;
 const COUNTDOWN_CHOICES = [10, 15, 20, 25, 30] as const;
 /** Digital zoom range. 1x is the camera's untouched field of view; the 4x
  * ceiling is where a 720p-class frame starts visibly softening, since this

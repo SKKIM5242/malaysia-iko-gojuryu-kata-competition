@@ -154,8 +154,11 @@ export function PoseGuideOverlay({
   return (
     <div className={"pointer-events-none absolute inset-0 " + className} aria-hidden="true">
       <svg viewBox="0 0 300 400" preserveAspectRatio="xMidYMid meet" className="h-full w-full">
-        {/* Screen label, top left, matching the organizer's mock-up. */}
-        <text x={12} y={26} fill="#ffffff" fontSize={15} fontFamily="ui-sans-serif, system-ui, sans-serif">
+        {/* Screen label, top left, matching the organizer's mock-up. Sits
+            in the first few pixels of the PICTURE area -- this whole overlay
+            is already inset below the banner by its caller, so "top" here
+            means directly under the banner, never over it. */}
+        <text x={10} y={22} fill="#ffffff" fontSize={15} fontFamily="ui-sans-serif, system-ui, sans-serif">
           {label}
         </text>
 
@@ -168,18 +171,25 @@ export function PoseGuideOverlay({
           strokeLinejoin="round"
           opacity={0.95}
         >
-          {/* Head */}
-          <circle cx={150} cy={92} r={57} />
+          {/* Head. Moved DOWN (cy 92 -> 124) and widened along with the rest:
+              once the banner and footer bands are composited in, the picture
+              area is shorter than the outline was drawn for, and a speaker
+              lining themselves up found the circle sitting across their
+              forehead with their shoulders well outside the torso. */}
+          <circle cx={150} cy={124} r={62} />
           {/* Neck */}
-          <path d="M132 143 V166" />
-          <path d="M168 143 V166" />
+          <path d="M131 180 V206" />
+          <path d="M169 180 V206" />
           {/* Shoulders and torso — rounded, so it reads as a body rather
-              than a box, with the arms continuing off the bottom edge. */}
-          <path d="M78 400 V196 Q78 166 108 166 H192 Q222 166 222 196 V400" />
+              than a box, with the arms continuing off the bottom edge.
+              Widened from 144 to 186 units across (48% -> 62% of the frame):
+              a seated person at arm's length from a phone fills far more of
+              the width than the old outline allowed for. */}
+          <path d="M57 400 V240 Q57 206 91 206 H209 Q243 206 243 240 V400" />
           {/* Inner arm lines, so the arms read as arms and not as one solid
               block with the torso. */}
-          <path d="M112 305 V400" />
-          <path d="M188 305 V400" />
+          <path d="M95 336 V400" />
+          <path d="M205 336 V400" />
         </g>
 
         {/* The instruction sits INSIDE the torso rather than under the
@@ -189,7 +199,7 @@ export function PoseGuideOverlay({
             because SVG text has no automatic wrapping. */}
         <text
           x={150}
-          y={232}
+          y={278}
           fill="#ffffff"
           fontSize={16}
           fontFamily="ui-sans-serif, system-ui, sans-serif"

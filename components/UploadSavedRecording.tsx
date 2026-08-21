@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { submitKataVideo } from "@/app/actions/account";
-import { extensionForMimeType, bareMimeType } from "@/lib/media-recording";
+import { extensionForMimeType, bareMimeType, recordingBitrates, KATA_MAX_SECONDS } from "@/lib/media-recording";
 import { getLocalRecording, clearLocalRecording } from "@/lib/local-recording-store";
 import { uploadRecording } from "@/lib/upload-recording";
 import { kataFamilyOf, type KataFamily } from "@/lib/kata-families";
@@ -13,21 +13,42 @@ import { kataBaseOf } from "@/lib/division";
 const ATTESTATION_TEXT =
   "I confirm this is my own previously recorded kata video, submitted without any editing. Any editing is subject to disqualification.";
 
-/** A file made through the in-app recorder can never exceed these sizes —
- * they come straight from its fixed recording bitrate (~8.22 MB/minute)
- * times each family's own time limit (1.3 min for Elementary/Intermediate/
- * Advance, 1.5 min for Mastery, 5 min for Kobudo). A file bigger than this
- * was made some other way, almost always a phone camera app recording at a
- * far higher bitrate (4K/60fps) than this footage ever needs — re-saving at
- * 1080p/720p, 30fps brings it back under the limit without losing anything
- * a judge needs to see. */
-const MAX_UPLOAD_MB: Record<KataFamily, number> = {
-  Elementary: 10.69,
-  Intermediate: 10.69,
-  Advance: 10.69,
-  Mastery: 12.33,
-  Kobudo: 41.1,
+/** Each family's own performance time limit, in minutes — the basis for the
+ * upload size caps below. */
+const FAMILY_MINUTES: Record<KataFamily, number> = {
+  Elementary: 1.3,
+  Intermediate: 1.3,
+  Advance: 1.3,
+  Mastery: 1.5,
+  Kobudo: 5,
 };
+
+/** A file made through the in-app recorder can never exceed these sizes: the
+ * recorder's own bitrate times each family's time limit.
+ *
+ * DERIVED, never hardcoded. These used to be five literals worked out from a
+ * recording bitrate of ~8.22 MB/minute, and the moment that bitrate was
+ * raised they silently became too small — a Mastery take made in-app could
+ * reach 13.84MB while this panel still refused anything over 12.33MB, and
+ * told the competitor their own untouched recording had been made "some
+ * other way". Reading the figure from recordingBitrates() is what stops the
+ * two ever disagreeing again.
+ *
+ * A file genuinely bigger than this was made some other way, almost always a
+ * phone camera app recording at a far higher bitrate (4K/60fps) than this
+ * footage ever needs — re-saving at 1080p/720p, 30fps brings it back under
+ * the limit without losing anything a judge needs to see. */
+const RECORDER_MB_PER_MINUTE = (() => {
+  const { videoBitsPerSecond, audioBitsPerSecond } = recordingBitrates(KATA_MAX_SECONDS);
+  return ((videoBitsPerSecond + audioBitsPerSecond) * 60) / 8 / 1_000_000;
+})();
+
+const MAX_UPLOAD_MB = Object.fromEntries(
+  (Object.keys(FAMILY_MINUTES) as KataFamily[]).map((f) => [
+    f,
+    Math.round(FAMILY_MINUTES[f] * RECORDER_MB_PER_MINUTE * 100) / 100,
+  ]),
+) as Record<KataFamily, number>;
 
 /** Best guess at a real video content-type from the file name, for when the
  * browser reports none. Storage needs a truthful Content-Type or the video
