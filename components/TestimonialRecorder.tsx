@@ -10,9 +10,9 @@ import {
   extensionForMimeType,
   bareMimeType,
   recordingBitrates,
+  UPLOAD_CEILING_BYTES,
 } from "@/lib/media-recording";
-import { playDingDong, playAlarmTick } from "@/lib/chime";
-import { startClapDetector } from "@/lib/clap-detector";
+import { playDingDong } from "@/lib/chime";
 import {
   TESTIMONIAL_KIND_LABEL,
   TESTIMONIAL_MIN_VIDEO_SECONDS,
@@ -31,9 +31,12 @@ import { PoseGuideOverlay } from "@/components/RecordingChrome";
 import { chromeHeights, drawRecordingChrome } from "@/lib/recording-chrome-canvas";
 import { POSE_GUIDE_NOTE, type RecordingAppearance } from "@/lib/recording-appearance";
 
-const COUNTDOWN_CHOICES = [10, 15, 20, 25, 30] as const;
-
-type Phase = "idle" | "live" | "countdown" | "recording" | "review" | "uploading";
+// No countdown and no clap-to-stop here, unlike the kata recorder. Those
+// exist so a competitor can walk out to their mark and perform hands-free.
+// A testimonial is given sitting in front of the phone, within arm's reach
+// of the screen the whole time: a countdown only delays the start, and a
+// clap in the middle of a spoken sentence cut people off mid-word.
+type Phase = "idle" | "live" | "recording" | "review" | "uploading";
 
 type ScreenLightLevel = "off" | "low" | "medium" | "high";
 
@@ -52,6 +55,10 @@ const SCREEN_LIGHT_TONES: Record<Exclude<ScreenLightLevel, "off">, string> = {
   high: "#FFF3E3",
 };
 
+/** The project-wide Supabase upload ceiling, in whole MB, for the copy that
+ * tells a winner what they may pick. */
+const MAX_TESTIMONIAL_MB = Math.floor(UPLOAD_CEILING_BYTES / 1024 / 1024);
+
 function mmss(totalSeconds: number): string {
   const m = Math.floor(totalSeconds / 60);
   const s = Math.floor(totalSeconds % 60);
@@ -66,7 +73,16 @@ function mmss(totalSeconds: number): string {
  * edited in place (fill in the XXX and ______ before recording), and it can
  * be copied in one press. Local state starts from the shared template so
  * edits never leak between scripts or across sessions. */
-function ScriptDetail({ script }: { script: TestimonialScript }) {
+function ScriptDetail({
+  script,
+  onUseForMessage,
+}: {
+  script: TestimonialScript;
+  /** Hands this winner's EDITED text to the Type Message panel and switches
+   * to it, so a script they have just filled in doesn't have to be copied
+   * and re-pasted by hand. */
+  onUseForMessage?: (text: string) => void;
+}) {
   const [text, setText] = useState(() => scriptText(script));
   const [copied, setCopied] = useState(false);
 
@@ -79,6 +95,44 @@ function ScriptDetail({ script }: { script: TestimonialScript }) {
       // Clipboard permission can be refused — the textarea is still
       // selectable by hand, so this is not worth an error message.
     }
+  }
+
+  /** Saves the edited script as a plain .txt. Deliberately not a PDF: the
+   * point is a file that can be reopened and kept editing on a phone, and
+   * every device opens .txt. The full 40-script PDF is its own download at
+   * the top of the picker. */
+  function save() {
+    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${script.title.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  /** Prints just this script, at a size readable from a stand while
+   * speaking — which is what a printed script is for. Silently does nothing
+   * if a popup blocker refuses the window. */
+  function print() {
+    const w = window.open("", "_blank", "width=820,height=900");
+    if (!w) return;
+    const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    w.document.write(
+      "<!doctype html><html><head><title>" +
+        esc(script.title) +
+        "</title><style>body{font:16pt/1.7 Georgia,serif;margin:2.5cm}h1{font-size:18pt;margin:0 0 1em}" +
+        "pre{font:inherit;white-space:pre-wrap}</style></head><body><h1>" +
+        esc(script.title) +
+        "</h1><pre>" +
+        esc(text) +
+        "</pre></body></html>",
+    );
+    w.document.close();
+    w.focus();
+    w.print();
   }
 
   return (
@@ -94,17 +148,42 @@ function ScriptDetail({ script }: { script: TestimonialScript }) {
         </ol>
       </div>
       <div>
-        <div className="mb-1 flex items-center justify-between gap-2">
+        {onUseForMessage && (
+          <button
+            type="button"
+            onClick={() => onUseForMessage(text)}
+            className="mb-1.5 w-full rounded-md bg-neutral-900 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-neutral-700"
+          >
+            💬 Use this script for Message Testimonial
+          </button>
+        )}
+        <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
           <p className="text-[11px] font-bold uppercase tracking-wide text-neutral-400">
             Your script — edit the blanks
           </p>
-          <button
-            type="button"
-            onClick={copy}
-            className="rounded border border-neutral-300 px-2 py-0.5 text-[11px] font-semibold text-neutral-600 hover:bg-neutral-50"
-          >
-            {copied ? "✓ Copied" : "Copy"}
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={save}
+              className="rounded border border-neutral-300 px-2 py-0.5 text-[11px] font-semibold text-neutral-600 hover:bg-neutral-50"
+            >
+              💾 Save
+            </button>
+            <button
+              type="button"
+              onClick={copy}
+              className="rounded border border-neutral-300 px-2 py-0.5 text-[11px] font-semibold text-neutral-600 hover:bg-neutral-50"
+            >
+              {copied ? "✓ Copied" : "Copy"}
+            </button>
+            <button
+              type="button"
+              onClick={print}
+              className="rounded border border-neutral-300 px-2 py-0.5 text-[11px] font-semibold text-neutral-600 hover:bg-neutral-50"
+            >
+              🖨 Print
+            </button>
+          </div>
         </div>
         <textarea
           value={text}
@@ -127,7 +206,7 @@ function ScriptDetail({ script }: { script: TestimonialScript }) {
  * Shown for Video/Voice/Message, the three "make it yourself" paths — not
  * for Choose file, since there's nothing left to prepare once you already
  * have a finished recording. */
-function ScriptPicker() {
+function ScriptPicker({ onUseForMessage }: { onUseForMessage?: (text: string) => void }) {
   const [band, setBand] = useState<ScriptLengthBand | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const bands: ScriptLengthBand[] = ["3min", "5min", "10min"];
@@ -171,7 +250,7 @@ function ScriptPicker() {
                 {script.title}
                 <span className="text-neutral-400">{openId === script.id ? "▲" : "▼"}</span>
               </button>
-              {openId === script.id && <ScriptDetail script={script} />}
+              {openId === script.id && <ScriptDetail script={script} onUseForMessage={onUseForMessage} />}
             </li>
           ))}
         </ul>
@@ -190,6 +269,7 @@ function MediaTestimonialPanel({
   mode,
   registrationId,
   onDone,
+  onExit,
   recordingAppearance,
   recordingLogoUrl,
 }: {
@@ -197,6 +277,9 @@ function MediaTestimonialPanel({
   mode: "submit" | "edit";
   registrationId: string;
   onDone: () => void;
+  /** Leave without submitting — releases the camera and collapses the panel
+   * back to the page it was opened from. */
+  onExit: () => void;
   recordingAppearance: RecordingAppearance | null;
   recordingLogoUrl: string | null;
 }) {
@@ -232,15 +315,10 @@ function MediaTestimonialPanel({
    * right choice when someone else is filming them. */
   const [facing, setFacing] = useState<"user" | "environment">("user");
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  // Tap-to-start countdown + clap-to-stop -- same hands-free flow as the
-  // kata recorder (see components/KataRecorder.tsx and lib/clap-detector.ts
-  // for why: no phone browser can ever see a Bluetooth shutter remote's
-  // button press, since those work by emulating the volume key).
-  const [countdownDuration, setCountdownDuration] = useState<number>(10);
-  const [countdownSeconds, setCountdownSeconds] = useState(0);
-  const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Kept only for the one short chime that plays as a take begins. The
+  // kata recorder's countdown and clap-to-stop are deliberately absent here
+  // -- see the note at the top of this file.
   const audioContextRef = useRef<AudioContext | null>(null);
-  const clapDetectorStopRef = useRef<(() => void) | null>(null);
 
   const isVideo = kind === "video";
   const minSeconds = isVideo ? TESTIMONIAL_MIN_VIDEO_SECONDS : 0;
@@ -264,8 +342,6 @@ function MediaTestimonialPanel({
       streamRef.current?.getTracks().forEach((t) => t.stop());
       if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
       if (timerRef.current) clearInterval(timerRef.current);
-      if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
-      if (clapDetectorStopRef.current) clapDetectorStopRef.current();
       if (audioContextRef.current) void audioContextRef.current.close().catch(() => {});
       if (blobUrl) URL.revokeObjectURL(blobUrl);
     },
@@ -349,16 +425,12 @@ function MediaTestimonialPanel({
     }
   }
 
-  /** Tap Start -> visible countdown -> ding-dong chime -> recording begins
-   * on its own. Replaces startRecording as the Start button's own handler;
-   * startRecording now only fires once the countdown reaches 0. */
-  function startCountdown() {
+  /** Tap Start -> one short chime -> recording. The AudioContext is still
+   * created here, on the tap itself, because that is a real user gesture and
+   * iOS Safari silently refuses to play sound from a context that was never
+   * unlocked by one. */
+  async function beginTake() {
     setError(null);
-    // Created on the tap itself (a real user gesture), reused for both the
-    // chime and the clap detector -- creating it later inside the
-    // countdown's own timer callback would not count as a gesture, and iOS
-    // Safari silently refuses to play sound from a context that was never
-    // unlocked that way.
     if (!audioContextRef.current) {
       try {
         audioContextRef.current = new AudioContext();
@@ -367,32 +439,8 @@ function MediaTestimonialPanel({
       }
     }
     if (audioContextRef.current && audioContextRef.current.state === "suspended") {
-      void audioContextRef.current.resume().catch(() => {});
+      await audioContextRef.current.resume().catch(() => {});
     }
-    setCountdownSeconds(countdownDuration);
-    setPhase("countdown");
-    if (audioContextRef.current) playAlarmTick(audioContextRef.current);
-    countdownTimerRef.current = setInterval(() => {
-      setCountdownSeconds((s) => {
-        if (s <= 1) {
-          if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
-          countdownTimerRef.current = null;
-          void beginRecordingAfterCountdown();
-          return 0;
-        }
-        if (audioContextRef.current) playAlarmTick(audioContextRef.current);
-        return s - 1;
-      });
-    }, 1000);
-  }
-
-  function cancelCountdown() {
-    if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
-    countdownTimerRef.current = null;
-    setPhase("live");
-  }
-
-  async function beginRecordingAfterCountdown() {
     const ctx = audioContextRef.current;
     if (ctx) {
       try {
@@ -507,10 +555,6 @@ function MediaTestimonialPanel({
       if (e.data.size > 0) chunksRef.current.push(e.data);
     };
     recorder.onstop = () => {
-      if (clapDetectorStopRef.current) {
-        clapDetectorStopRef.current();
-        clapDetectorStopRef.current = null;
-      }
       const blob = new Blob(chunksRef.current, { type: mimeType });
       recordedBlobRef.current = blob;
       setBlobUrl(URL.createObjectURL(blob));
@@ -518,14 +562,6 @@ function MediaTestimonialPanel({
     };
     recorderRef.current = recorder;
     recorder.start();
-    // Auto-stop on a hand clap -- starts right as recording does, well
-    // after the countdown's own chime has already finished, so the chime
-    // itself is never mistaken for the cue. Reuses the SAME AudioContext
-    // the chime just played through (created on the Start tap itself)
-    // rather than a fresh one -- see startClapDetector's own doc comment.
-    if (audioContextRef.current) {
-      clapDetectorStopRef.current = startClapDetector(audioContextRef.current, stream, { onClap: stopRecording });
-    }
     setSeconds(0);
     setPhase("recording");
     timerRef.current = setInterval(() => {
@@ -545,21 +581,58 @@ function MediaTestimonialPanel({
     if (timerRef.current) clearInterval(timerRef.current);
   }
 
-  function retake() {
+  /** Setting phase back to "live" was NOT enough. Stopping a take ends the
+   * camera tracks, and with them the render loop that paints the canvas — so
+   * the next screen showed the banner and the framing guide over a frozen
+   * black canvas, with no picture and no microphone. That is exactly what
+   * "Actual recording" looked like: Practice seemed fine only because it was
+   * usually the first take of the session, before anything had been stopped.
+   * Re-acquiring the camera is the whole fix, and is what the kata recorder
+   * already does between attempts. */
+  async function retake() {
     if (blobUrl) URL.revokeObjectURL(blobUrl);
     setBlobUrl(null);
     recordedBlobRef.current = null;
-    setPhase("live");
+    setSeconds(0);
+    setPhase("idle");
+    await startLive();
+  }
+
+  /** Saves the take straight to the device. Offered on every review screen,
+   * not only after a failed upload: a testimonial can run ten minutes, and
+   * nobody should be one flaky connection away from losing it. */
+  function saveToDevice() {
+    const blob = recordedBlobRef.current;
+    if (!blob) return;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `testimonial-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.${extensionForMimeType(blob.type)}`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  /** Leaves the recorder without submitting: releases the camera and mic
+   * (which otherwise stay live behind the collapsed panel) and hands control
+   * back to the page underneath. */
+  function exitRecorder() {
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+    if (blobUrl) URL.revokeObjectURL(blobUrl);
+    onExit();
+  }
+
+  /** Discards the practice take and moves to the real one. Split out of
+   * useThisTake, which now always submits — on request, a practice take that
+   * came out well can be submitted directly rather than performed again. */
+  async function recordTheActualOne() {
+    setTakeType("actual");
+    await retake();
   }
 
   async function useThisTake() {
-    if (takeType === "practice") {
-      // Rehearsal only — clear back to live and switch straight into the
-      // real recording, timing already dialed in.
-      retake();
-      setTakeType("actual");
-      return;
-    }
     const blob = recordedBlobRef.current;
     if (!blob) return;
     setPhase("uploading");
@@ -617,7 +690,7 @@ function MediaTestimonialPanel({
   // screen.
   const [screenLight, setScreenLight] = useState<ScreenLightLevel>("off");
   const screenLightOn =
-    screenLight !== "off" && isVideo && (phase === "live" || phase === "countdown" || phase === "recording");
+    screenLight !== "off" && isVideo && (phase === "live" || phase === "recording");
 
   return (
     <>
@@ -667,7 +740,7 @@ function MediaTestimonialPanel({
         </button>
       )}
 
-      {isVideo && (phase === "live" || phase === "countdown" || phase === "recording") && (
+      {isVideo && (phase === "live" || phase === "recording") && (
         <>
           {/* What is shown here is the CANVAS being recorded, not the raw
               camera — banner and watermark included — so the preview is
@@ -695,24 +768,77 @@ function MediaTestimonialPanel({
                 className="absolute inset-x-0"
                 style={{ top: `${bannerRatio * 100}%`, bottom: `${footerRatio * 100}%` }}
               >
-                <PoseGuideOverlay label="Testimonial" note={POSE_GUIDE_NOTE} />
+                {/* The dotted body outline is a framing aid, useful only
+                    BEFORE the take starts -- during recording it just sits
+                    across the speaker's own face. The "Testimonial" label
+                    stays in both, top-left directly under the banner. This
+                    wrapper is already inset past the banner and footer
+                    bands, so "top" here means under the banner, never over
+                    it. */}
+                {phase === "live" ? (
+                  <PoseGuideOverlay label="Testimonial" note={POSE_GUIDE_NOTE} />
+                ) : (
+                  <span
+                    className="absolute left-2 top-1 text-xs font-semibold text-white"
+                    style={{ textShadow: "0 1px 3px rgba(0,0,0,0.85)" }}
+                  >
+                    Testimonial
+                  </span>
+                )}
+              </div>
+              {/* Controls sit ON the picture rather than in a row beneath
+                  it: on a phone the preview already fills the screen, so a
+                  Start button below the fold meant scrolling away from your
+                  own framing in order to press it. */}
+              {phase === "recording" && (
+                <div className="absolute right-2 top-1 flex flex-col items-end gap-0.5">
+                  <span className="rounded-full bg-black/70 px-2 py-0.5 font-mono text-[11px] font-bold text-white">
+                    ● {mmss(seconds)} / {mmss(maxSeconds)}
+                  </span>
+                  {takeType === "actual" && seconds < minSeconds && (
+                    <span className="rounded-full bg-amber-500/90 px-2 py-0.5 text-[10px] font-semibold text-white">
+                      Keep going — {mmss(minSeconds)} needed
+                    </span>
+                  )}
+                </div>
+              )}
+              <div className="absolute inset-x-0 bottom-2 flex items-center justify-center gap-3">
+                {phase === "live" ? (
+                  <button
+                    type="button"
+                    onClick={switchCamera}
+                    className="rounded-full border border-white/50 bg-black/50 px-3 py-1.5 text-xs font-semibold text-white hover:bg-black/70"
+                  >
+                    {facing === "user" ? "📷 Rear" : "🤳 Front"}
+                  </button>
+                ) : (
+                  <span className="w-16" />
+                )}
+                <button
+                  type="button"
+                  onClick={phase === "live" ? () => void beginTake() : stopRecording}
+                  aria-label={phase === "live" ? "Start recording" : "Stop recording"}
+                  className={
+                    "flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-4 border-white/80 text-xl text-white shadow-lg active:scale-95 " +
+                    (phase === "live" ? "bg-red-600/90" : "bg-neutral-800/90")
+                  }
+                >
+                  {phase === "live" ? "●" : "■"}
+                </button>
+                <span
+                  className="w-16 text-center text-[10px] font-semibold text-white/85"
+                  style={{ textShadow: "0 1px 3px rgba(0,0,0,0.85)" }}
+                >
+                  {phase === "live" ? "Tap to start" : "Tap to stop"}
+                </span>
               </div>
             </div>
           </div>
           {phase === "live" && (
-            <div className="mb-3">
-              <button
-                type="button"
-                onClick={switchCamera}
-                className="rounded-full border border-neutral-300 bg-white px-3 py-1 text-xs font-semibold text-neutral-700 hover:bg-neutral-50"
-              >
-                {facing === "user" ? "📷 Switch to rear camera" : "🤳 Switch to front camera"}
-              </button>
-              <p className="mt-1 text-[11px] text-neutral-500">
-                Front camera lets you see yourself and read your script. Rear camera is sharper, and is the
-                right choice if someone else is filming you.
-              </p>
-            </div>
+            <p className="mb-3 text-[11px] text-neutral-500">
+              Front camera lets you see yourself and read your script. Rear camera is sharper, and is the right
+              choice if someone else is filming you.
+            </p>
           )}
           <div className="mb-3">
             <div className="flex flex-wrap items-center gap-1">
@@ -744,55 +870,21 @@ function MediaTestimonialPanel({
         </>
       )}
 
-      {phase === "live" && (
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1 rounded-full border border-neutral-300 bg-white px-1.5 py-1">
-            {COUNTDOWN_CHOICES.map((d) => (
-              <button
-                key={d}
-                type="button"
-                onClick={() => setCountdownDuration(d)}
-                aria-pressed={countdownDuration === d}
-                className={`rounded-full px-2 py-1 text-[11px] font-semibold ${
-                  countdownDuration === d ? "bg-neutral-900 text-white" : "text-neutral-500 hover:text-neutral-800"
-                }`}
-              >
-                {d}s
-              </button>
-            ))}
-          </div>
-          <button type="button" onClick={startCountdown} className="rounded-md bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-600">
-            ⏺ Start recording
-          </button>
-        </div>
+      {/* Video's Start/Stop is drawn on the picture itself (above). Voice
+          has no picture, so it keeps plain buttons down here. */}
+      {phase === "live" && !isVideo && (
+        <button
+          type="button"
+          onClick={() => void beginTake()}
+          className="rounded-md bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-600"
+        >
+          ⏺ Start recording
+        </button>
       )}
 
-      {phase === "countdown" && (
-        <div className="flex flex-col items-center gap-2 rounded-md border border-neutral-200 bg-white py-6">
-          <span className="text-5xl font-black text-neutral-900" aria-live="assertive">
-            {countdownSeconds}
-          </span>
-          <p className="text-sm font-semibold text-neutral-600">Get ready…</p>
-          <button
-            type="button"
-            onClick={cancelCountdown}
-            className="mt-1 rounded-md border border-neutral-300 px-4 py-1.5 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
-          >
-            Cancel
-          </button>
-        </div>
-      )}
-
-      {phase === "recording" && (
+      {phase === "recording" && !isVideo && (
         <div>
-          <p className="mb-2 font-mono text-lg font-bold text-red-700">
-            ● {mmss(seconds)}
-            {isVideo ? ` / max ${mmss(maxSeconds)}` : ""}
-          </p>
-          {isVideo && takeType === "actual" && seconds < minSeconds && (
-            <p className="mb-2 text-xs text-amber-700">Keep going — at least {mmss(minSeconds)} needed.</p>
-          )}
-          <p className="mb-2 text-xs font-semibold text-neutral-500">👏 Clap once to stop, or tap Stop below.</p>
+          <p className="mb-2 font-mono text-lg font-bold text-red-700">● {mmss(seconds)}</p>
           <button
             type="button"
             onClick={stopRecording}
@@ -817,23 +909,54 @@ function MediaTestimonialPanel({
           )}
           <p className="mb-2 text-xs text-neutral-500">Length: {mmss(seconds)}</p>
           {tooShort && (
-            <p className="mb-2 text-xs font-semibold text-red-700">Too short — needs at least {mmss(minSeconds)}. Please retake.</p>
+            <p className="mb-2 text-xs font-semibold text-red-700">
+              Too short — needs at least {mmss(minSeconds)}. Please retake.
+            </p>
           )}
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={retake}
+              onClick={() => void retake()}
               className="rounded-md border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-50"
             >
               🔁 Retake
             </button>
+            {/* Save to device sits beside Submit, not behind a failure: if
+                the upload does fall over, the take is already on the phone
+                and nothing has been lost. */}
             <button
               type="button"
-              onClick={useThisTake}
-              disabled={tooShort}
-              className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-semibold text-white hover:bg-neutral-700 disabled:opacity-40"
+              onClick={saveToDevice}
+              className="rounded-md border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-50"
             >
-              {takeType === "practice" ? "✓ Done practicing — record the actual one" : "✅ Submit this testimonial"}
+              💾 Save to device
+            </button>
+            {takeType === "practice" && (
+              <button
+                type="button"
+                onClick={() => void recordTheActualOne()}
+                className="rounded-md border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-50"
+              >
+                ✓ Done practicing — record the actual one
+              </button>
+            )}
+            {/* Submit is offered on a PRACTICE take too, on request: if the
+                rehearsal came out well there is no reason to make someone
+                perform the whole thing a second time. */}
+            <button
+              type="button"
+              onClick={() => void useThisTake()}
+              disabled={tooShort}
+              className="rounded-md bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-40"
+            >
+              ✅ Submit this testimonial
+            </button>
+            <button
+              type="button"
+              onClick={exitRecorder}
+              className="rounded-md border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-500 hover:bg-neutral-50"
+            >
+              ✕ Exit
             </button>
           </div>
         </div>
@@ -850,12 +973,19 @@ function MessageTestimonialPanel({
   mode,
   registrationId,
   onDone,
+  onExit,
+  initialMessage = "",
 }: {
   mode: "submit" | "edit";
   registrationId: string;
   onDone: () => void;
+  onExit: () => void;
+  /** Pre-filled when a winner pressed "Use this script for Message
+   * Testimonial" on one of the samples — their own edited text, not the
+   * blank template. */
+  initialMessage?: string;
 }) {
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(initialMessage);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -880,6 +1010,21 @@ function MessageTestimonialPanel({
     onDone();
   }
 
+  /** A typed testimonial can be several hundred words. Losing it to a
+   * mis-tap or a session timeout would be as bad as losing a recording, so
+   * it gets the same "keep a copy" escape as the media panels. */
+  function saveDraft() {
+    const blob = new Blob([message], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `testimonial-${new Date().toISOString().slice(0, 10)}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
   return (
     <div className="mt-3 rounded-md border border-neutral-200 bg-neutral-50 p-4">
       <textarea
@@ -890,14 +1035,31 @@ function MessageTestimonialPanel({
         placeholder="Share your experience competing with us…"
         className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
       />
-      <button
-        type="button"
-        onClick={submit}
-        disabled={pending}
-        className="mt-2 rounded-md bg-neutral-900 px-4 py-2 text-sm font-semibold text-white hover:bg-neutral-700 disabled:opacity-60"
-      >
-        {pending ? "Submitting…" : "✅ Submit testimonial"}
-      </button>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={submit}
+          disabled={pending}
+          className="rounded-md bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-60"
+        >
+          {pending ? "Submitting…" : "✅ Submit testimonial"}
+        </button>
+        <button
+          type="button"
+          onClick={saveDraft}
+          className="rounded-md border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-50"
+        >
+          💾 Save to device
+        </button>
+        <button
+          type="button"
+          onClick={onExit}
+          disabled={pending}
+          className="rounded-md border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-500 hover:bg-neutral-50 disabled:opacity-60"
+        >
+          ✕ Exit
+        </button>
+      </div>
       {error && <p className="mt-2 text-sm font-semibold text-red-700">{error}</p>}
     </div>
   );
@@ -911,10 +1073,12 @@ function UploadTestimonialPanel({
   mode,
   registrationId,
   onDone,
+  onExit,
 }: {
   mode: "submit" | "edit";
   registrationId: string;
   onDone: (kind: TestimonialKind) => void;
+  onExit: () => void;
 }) {
   const [kind, setKind] = useState<"video" | "voice" | null>(null);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
@@ -1003,6 +1167,28 @@ function UploadTestimonialPanel({
           >
             📁 Choose a video or audio file
           </button>
+          {/* Spelled out BEFORE the picker opens, not after a rejection: on
+              a phone the file picker is a full-screen takeover, and finding
+              out a 200MB 4K clip is no good only once you are back is the
+              worst possible moment to learn it. */}
+          <div className="mt-3 rounded-md border border-neutral-200 bg-white p-3 text-xs text-neutral-600">
+            <p className="mb-1 font-bold text-neutral-700">What you can upload</p>
+            <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+              <dt className="font-semibold text-neutral-400">Video</dt>
+              <dd>MP4, MOV, WEBM, M4V — 3 to 10 minutes long</dd>
+              <dt className="font-semibold text-neutral-400">Audio</dt>
+              <dd>M4A, MP3, AAC, WAV, WEBM, OGG — up to 15 minutes</dd>
+              <dt className="font-semibold text-neutral-400">Max size</dt>
+              <dd>
+                <strong>{MAX_TESTIMONIAL_MB} MB</strong> for either
+              </dd>
+            </dl>
+            <p className="mt-2 leading-relaxed text-neutral-500">
+              Bigger than that? It was almost certainly recorded at 4K or 60fps, which a talking-head testimonial
+              never needs. Re-save it at <strong>1080p or 720p, 30fps</strong> and it will come back well under the
+              limit with nothing lost.
+            </p>
+          </div>
           <input
             ref={inputRef}
             type="file"
@@ -1047,9 +1233,17 @@ function UploadTestimonialPanel({
               type="button"
               onClick={submit}
               disabled={uploading || tooShort}
-              className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-semibold text-white hover:bg-neutral-700 disabled:opacity-40"
+              className="rounded-md bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-40"
             >
               {uploading ? "Uploading…" : "✅ Submit this testimonial"}
+            </button>
+            <button
+              type="button"
+              onClick={onExit}
+              disabled={uploading}
+              className="rounded-md border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-500 hover:bg-neutral-50 disabled:opacity-60"
+            >
+              ✕ Exit
             </button>
           </div>
         </div>
@@ -1098,8 +1292,28 @@ export default function TestimonialRecorder({
   const [chosen, setChosen] = useState<ChooserOption | null>(null);
   const [done, setDone] = useState(false);
   const [submittedKind, setSubmittedKind] = useState<TestimonialKind | null>(null);
+  /** Carried across from a sample script when the winner presses "Use this
+   * script for Message Testimonial", so the typing panel opens already
+   * holding the version they filled in rather than an empty box. */
+  const [seededMessage, setSeededMessage] = useState("");
+
+  /** Leave whichever panel is open and go back to the chooser — the page
+   * this recorder was embedded in is then exactly as it was. */
+  function backToChooser() {
+    setChosen(null);
+  }
+
+  function useScriptForMessage(text: string) {
+    setSeededMessage(text);
+    setChosen("message");
+  }
 
   function handleDone(kind: TestimonialKind) {
+    // Close the recorder/typing panel FIRST, then refresh. Leaving the panel
+    // open behind the confirmation meant the camera stayed live and the
+    // winner had to find their own way out of a screen whose work was
+    // already finished.
+    setChosen(null);
     router.refresh();
     if (mode === "edit") {
       onSaved?.();
@@ -1145,23 +1359,40 @@ export default function TestimonialRecorder({
       </div>
       {chosen === "video" && (
         <div className="mt-3">
-          <ScriptPicker />
-          <MediaTestimonialPanel kind="video" mode={mode} registrationId={registrationId} onDone={() => handleDone("video")} recordingAppearance={recordingAppearance} recordingLogoUrl={recordingLogoUrl} />
+          <ScriptPicker onUseForMessage={useScriptForMessage} />
+          <MediaTestimonialPanel kind="video" mode={mode} registrationId={registrationId} onDone={() => handleDone("video")} onExit={() => setChosen(null)} recordingAppearance={recordingAppearance} recordingLogoUrl={recordingLogoUrl} />
         </div>
       )}
       {chosen === "voice" && (
         <div className="mt-3">
-          <ScriptPicker />
-          <MediaTestimonialPanel kind="voice" mode={mode} registrationId={registrationId} onDone={() => handleDone("voice")} recordingAppearance={recordingAppearance} recordingLogoUrl={recordingLogoUrl} />
+          <ScriptPicker onUseForMessage={useScriptForMessage} />
+          <MediaTestimonialPanel kind="voice" mode={mode} registrationId={registrationId} onDone={() => handleDone("voice")} onExit={() => setChosen(null)} recordingAppearance={recordingAppearance} recordingLogoUrl={recordingLogoUrl} />
         </div>
       )}
       {chosen === "message" && (
         <div className="mt-3">
-          <ScriptPicker />
-          <MessageTestimonialPanel mode={mode} registrationId={registrationId} onDone={() => handleDone("message")} />
+          <ScriptPicker onUseForMessage={useScriptForMessage} />
+          <MessageTestimonialPanel
+            mode={mode}
+            registrationId={registrationId}
+            onDone={() => handleDone("message")}
+            onExit={backToChooser}
+            /* Remounts when a different script is chosen, so the textarea
+               actually picks up the new seed instead of keeping the first
+               one it was initialised with. */
+            key={seededMessage.slice(0, 40)}
+            initialMessage={seededMessage}
+          />
         </div>
       )}
-      {chosen === "upload" && <UploadTestimonialPanel mode={mode} registrationId={registrationId} onDone={handleDone} />}
+      {chosen === "upload" && (
+        <UploadTestimonialPanel
+          mode={mode}
+          registrationId={registrationId}
+          onDone={handleDone}
+          onExit={backToChooser}
+        />
+      )}
     </div>
   );
 }
