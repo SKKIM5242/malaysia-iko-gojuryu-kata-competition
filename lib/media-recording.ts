@@ -52,16 +52,38 @@ const HEADROOM = 0.12;
  * less reliably on mobile data -- which was its own source of failed
  * submissions. */
 const VIDEO_CEILING_BPS = 1_200_000;
-const VIDEO_FLOOR_BPS = 400_000;
 
-export function recordingBitrates(
-  maxSeconds: number,
-  audioBitsPerSecond = 96_000,
-): { videoBitsPerSecond: number; audioBitsPerSecond: number } {
+/** Never encode video below this, whatever the arithmetic says. Under about
+ * half a megabit even a static talking head at 480p starts showing blocking
+ * on every movement, and a recording nobody wants to watch is worse than a
+ * shorter one. When the floor and the ceiling disagree the LENGTH gives way,
+ * not the quality -- see fitsSeconds below. */
+const VIDEO_FLOOR_BPS = 500_000;
+
+export interface RecordingBitrates {
+  videoBitsPerSecond: number;
+  audioBitsPerSecond: number;
+  /** The longest recording that still lands inside the budget at these
+   * bitrates. Normally equal to the maxSeconds asked for; SHORTER when the
+   * requested length would have needed a bitrate below VIDEO_FLOOR_BPS.
+   *
+   * Callers must cap their own recording at this, not at their nominal
+   * maximum -- otherwise the floor silently wins and produces a file that
+   * cannot be uploaded, which is precisely the failure this whole helper
+   * exists to make impossible. */
+  fitsSeconds: number;
+}
+
+export function recordingBitrates(maxSeconds: number, audioBitsPerSecond = 96_000): RecordingBitrates {
   const budgetBits = UPLOAD_CEILING_BYTES * 8 * (1 - HEADROOM);
-  const totalBps = budgetBits / Math.max(1, maxSeconds);
-  const video = Math.min(VIDEO_CEILING_BPS, Math.max(VIDEO_FLOOR_BPS, Math.floor(totalBps - audioBitsPerSecond)));
-  return { videoBitsPerSecond: video, audioBitsPerSecond };
+  const wanted = maxSeconds > 0 ? maxSeconds : 1;
+  const totalBps = budgetBits / wanted;
+  const videoBitsPerSecond = Math.min(
+    VIDEO_CEILING_BPS,
+    Math.max(VIDEO_FLOOR_BPS, Math.floor(totalBps - audioBitsPerSecond)),
+  );
+  const fitsSeconds = Math.min(wanted, Math.floor(budgetBits / (videoBitsPerSecond + audioBitsPerSecond)));
+  return { videoBitsPerSecond, audioBitsPerSecond, fitsSeconds };
 }
 
 /** Same Safari/iOS caveat as pickVideoMimeType, for an audio-only stream. */

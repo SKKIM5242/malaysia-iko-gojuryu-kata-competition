@@ -248,7 +248,16 @@ function MediaTestimonialPanel({
   // option, and people read a prepared speech noticeably slower than the
   // word count suggests, so a 10 minute cap was cutting off the longest
   // scripts mid-sentence.
-  const maxSeconds = isVideo ? TESTIMONIAL_MAX_VIDEO_SECONDS : 15 * 60;
+  const nominalMaxSeconds = isVideo ? TESTIMONIAL_MAX_VIDEO_SECONDS : 15 * 60;
+  // What the encoder settings can actually deliver inside the 50MB upload
+  // ceiling. For today's caps this is a no-op -- a 10:00 video fits, and a
+  // 15:00 voice-only take is barely 10MB -- but it makes the cap and the
+  // bitrate impossible to drift apart: raise TESTIMONIAL_MAX_VIDEO_SECONDS
+  // to 15:00 and the recorder shortens itself rather than producing a file
+  // Supabase will refuse. Video only; audio-only has no video budget to
+  // trade against and is nowhere near the ceiling.
+  const videoBudget = recordingBitrates(nominalMaxSeconds);
+  const maxSeconds = isVideo ? Math.min(nominalMaxSeconds, videoBudget.fitsSeconds) : nominalMaxSeconds;
 
   useEffect(
     () => () => {
@@ -304,16 +313,24 @@ function MediaTestimonialPanel({
       const stream = await navigator.mediaDevices.getUserMedia(
         isVideo
           ? {
-              // HD 30fps, fixed -- matches the kata recorder so both
-              // submissions arrive in one consistent format.
+              // 480p24, NOT the kata recorder's 720p30 -- deliberately a
+              // different spec for a different job. A testimonial may run
+              // ten minutes, twice a kata's cap, so its share of the 50MB
+              // ceiling works out at about 0.52 Mbit/s. Spending that on
+              // 720p30 gives 0.019 bits per pixel per frame, which is
+              // genuinely bad -- blocky on every gesture. The same 0.52
+              // Mbit/s at 854x480 and 24fps is 0.053 bits per pixel, ahead
+              // of even the kata recording's 0.041, because a person
+              // sitting and talking has a fraction of a kata's motion and
+              // none of its fine detail to preserve. Fewer, better pixels.
               video: {
                 // Not "exact": a laptop webcam reports no facing mode, and
                 // an exact constraint fails outright there instead of
                 // falling back to the only camera available.
                 facingMode: requestedFacing,
-                width: { ideal: 1280, max: 1280 },
-                height: { ideal: 720, max: 1280 },
-                frameRate: { ideal: 30, max: 30 },
+                width: { ideal: 854, max: 854 },
+                height: { ideal: 854, max: 854 },
+                frameRate: { ideal: 24, max: 24 },
               },
               audio: audioConstraints,
             }
@@ -477,7 +494,13 @@ function MediaTestimonialPanel({
     // 44MB and the ceiling is unreachable by construction.
     const recorder = new MediaRecorder(
       recordStream,
-      isVideo ? { mimeType, ...recordingBitrates(maxSeconds) } : { mimeType },
+      isVideo
+        ? {
+            mimeType,
+            videoBitsPerSecond: videoBudget.videoBitsPerSecond,
+            audioBitsPerSecond: videoBudget.audioBitsPerSecond,
+          }
+        : { mimeType },
     );
     chunksRef.current = [];
     recorder.ondataavailable = (e) => {

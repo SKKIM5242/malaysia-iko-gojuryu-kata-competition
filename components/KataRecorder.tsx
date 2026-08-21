@@ -970,15 +970,36 @@ export default function KataRecorder({
       points.delete(e.pointerId);
       if (points.size < 2) startGap = 0;
     }
+    // iOS Safari zooms the PAGE on a two-finger pinch, and it does so
+    // through its own non-standard gesture* events -- which is why the
+    // whole interface (Clap to stop, Exit full screen, the countdown row,
+    // the record button) ballooned to several times its size the moment a
+    // participant tried to zoom the camera. Our handler was setting the
+    // canvas zoom correctly at the same time; the two were simply running
+    // in parallel. preventDefault on gesturestart/gesturechange is the only
+    // thing that stops Safari's half.
+    function blockBrowserZoom(e: Event) {
+      e.preventDefault();
+    }
+    // passive: false on pointermove too -- without it Safari ignores the
+    // preventDefault inside move() entirely (a passive listener may not
+    // cancel), so the page kept scrolling and rubber-banding under the
+    // gesture as well.
     el.addEventListener("pointerdown", down);
-    el.addEventListener("pointermove", move);
+    el.addEventListener("pointermove", move, { passive: false });
     el.addEventListener("pointerup", up);
     el.addEventListener("pointercancel", up);
+    el.addEventListener("gesturestart", blockBrowserZoom);
+    el.addEventListener("gesturechange", blockBrowserZoom);
+    el.addEventListener("gestureend", blockBrowserZoom);
     return () => {
       el.removeEventListener("pointerdown", down);
       el.removeEventListener("pointermove", move);
       el.removeEventListener("pointerup", up);
       el.removeEventListener("pointercancel", up);
+      el.removeEventListener("gesturestart", blockBrowserZoom);
+      el.removeEventListener("gesturechange", blockBrowserZoom);
+      el.removeEventListener("gestureend", blockBrowserZoom);
     };
   }, [phase, applyZoom]);
 
@@ -1580,10 +1601,8 @@ export default function KataRecorder({
       // earns actually goes into the picture. Smaller files also upload far
       // faster and more reliably on mobile data, which is why the helper
       // caps the video rate rather than simply spending the whole budget.
-      const recorder = new MediaRecorder(recordStream, {
-        mimeType,
-        ...recordingBitrates(MAX_SECONDS),
-      });
+      const { videoBitsPerSecond, audioBitsPerSecond } = recordingBitrates(MAX_SECONDS);
+      const recorder = new MediaRecorder(recordStream, { mimeType, videoBitsPerSecond, audioBitsPerSecond });
       chunksRef.current = [];
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data);
@@ -2214,9 +2233,14 @@ export default function KataRecorder({
           // the real fixed box, leaving a sliver at the very bottom edge
           // where whatever else on the page also sits fixed-to-bottom
           // (the site footer) could show through.
-          fullscreen
+          // touch-pan-y (touch-action: pan-y): the declarative half of the
+          // same fix as the gesture* listeners above. It tells the browser
+          // this box handles pinch itself, while still allowing a one-finger
+          // vertical drag so the review controls' own overflow-y-auto stack
+          // stays scrollable in cramped landscape.
+          (fullscreen
             ? "relative h-full w-full overflow-hidden bg-black"
-            : "relative mx-auto overflow-hidden rounded-lg border border-neutral-300 bg-black"
+            : "relative mx-auto overflow-hidden rounded-lg border border-neutral-300 bg-black") + " touch-pan-y"
         }
         style={
           fullscreen
@@ -2279,13 +2303,13 @@ export default function KataRecorder({
               <button
                 type="button"
                 onClick={exitFullscreen}
-                className="rounded border border-white/50 bg-black/30 px-2.5 py-1 text-xs font-semibold hover:bg-black/50"
+                className="rounded border border-white/50 bg-black/30 px-2 py-0.5 text-[10px] font-semibold hover:bg-black/50"
                 style={{ textShadow: "none" }}
               >
                 ✕ Exit full screen
               </button>
               {(phase === "live" || phase === "countdown" || phase === "recording") && (
-                <span className="text-[10px] font-semibold leading-tight">
+                <span className="text-[9px] font-semibold leading-tight">
                   Deleted Recording: {attempts} / {maxAttempts}
                 </span>
               )}
