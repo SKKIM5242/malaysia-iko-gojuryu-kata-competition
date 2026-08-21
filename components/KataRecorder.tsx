@@ -708,14 +708,6 @@ export default function KataRecorder({
     const ua = navigator.userAgent;
     setIsIOS(/iP(hone|od|ad)/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
   }, []);
-  // TEMPORARY diagnostic -- a participant confirmed the video picture fills
-  // the screen correctly but the button row still doesn't line up with it,
-  // which rules out the canvas/box aspect mismatch this file's other recent
-  // fix targets (that fix is a no-op whenever the two already agree, which
-  // they do here). Shows the actual numbers from a real device instead of
-  // guessing at another fix blind. Remove once the real cause is found.
-  const [debugBanner, setDebugBanner] = useState("");
-  const debugBannerRef = useRef("");
   // How tall the burned-in header banner actually came out (as a fraction
   // of frame height), reported back by drawFrame -- the DOM title bar below
   // uses this to sit directly under the real banner instead of a fixed
@@ -1350,13 +1342,6 @@ export default function KataRecorder({
     if (Math.abs(bannerOnlyRatioRef.current - finalBannerOnlyRatio) > 0.002) {
       bannerOnlyRatioRef.current = finalBannerOnlyRatio;
       setBannerOnlyRatio(finalBannerOnlyRatio);
-    }
-    const dbg =
-      `canvas ${canvas.width}x${canvas.height} box ${Math.round(liveBoxRect?.width ?? 0)}x${Math.round(liveBoxRect?.height ?? 0)} ` +
-      `raw ${rawBannerRatio.toFixed(3)} final ${finalRatio.toFixed(3)} rec ${recorderRef.current?.state ?? "none"}`;
-    if (dbg !== debugBannerRef.current) {
-      debugBannerRef.current = dbg;
-      setDebugBanner(dbg);
     }
   }
 
@@ -2341,20 +2326,14 @@ export default function KataRecorder({
           {error && phase !== "review" && phase !== "uploading" && (
             <div className="bg-red-50/95 px-4 py-2 text-sm text-red-800 backdrop-blur-sm">{error}</div>
           )}
-          {/* Positioned via bannerRatio (below name/category too), not
-              bannerOnlyRatio -- moved here specifically so it reads as part
-              of this stack, right under the identity row, rather than
-              floating up against the banner where Exit full screen now
-              sits (see the independent block above this whole stack). */}
-          {(phase === "live" || phase === "countdown") && debugBanner && (
-            <div className="px-2 py-0.5 text-[10px] text-white/80" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.85)" }}>
-              {debugBanner}
-            </div>
-          )}
-          {/* LIVE REC takes over the row the "canvas …" diagnostic occupies
-              while idle -- that line only renders during live/countdown, so
-              the two never fight for the same slot, and the recording badge
-              lands exactly where the diagnostic line was. */}
+          {/* LIVE REC is the first thing in this stack now that the
+              "canvas WxH box WxH raw… final… rec…" diagnostic above it is
+              gone. That line was added to find out why the button row
+              wasn't lining up with the picture; the answer turned out to
+              be that every overlay was pinned to the BOX rather than to
+              the letterboxed picture inside it (see contentInsetRatio), so
+              the diagnostic has done its job and no longer ships to
+              participants. */}
           {phase === "recording" && (
             <div className="flex flex-wrap gap-1.5 px-2 pt-1">
               <div className="inline-flex items-center gap-1.5 rounded-full bg-black/70 px-2.5 py-0.5 text-xs font-semibold text-white">
