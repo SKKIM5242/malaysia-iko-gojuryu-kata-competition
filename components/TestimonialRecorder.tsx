@@ -4,7 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { submitTestimonial, editTestimonial } from "@/app/actions/account";
-import { pickVideoMimeType, pickAudioMimeType, extensionForMimeType, bareMimeType } from "@/lib/media-recording";
+import {
+  pickVideoMimeType,
+  pickAudioMimeType,
+  extensionForMimeType,
+  bareMimeType,
+  recordingBitrates,
+} from "@/lib/media-recording";
 import { playDingDong, playAlarmTick } from "@/lib/chime";
 import { startClapDetector } from "@/lib/clap-detector";
 import {
@@ -461,9 +467,17 @@ function MediaTestimonialPanel({
       if (audioTrack) audioTrack.enabled = true;
     }
 
+    // Sized against THIS recording's own cap, not the kata recorder's. A
+    // video testimonial may run to 10 minutes -- twice a kata's 5 -- and at
+    // the flat 1.0 Mbit/s this used to share with KataRecorder that came out
+    // at 78.4MB, well past Supabase's 50MB project ceiling. Anything longer
+    // than 6:23 simply could not be uploaded, while the screen above invites
+    // winners to record up to 10:00. recordingBitrates() derives the figure
+    // from maxSeconds instead, so a full-length testimonial now lands around
+    // 44MB and the ceiling is unreachable by construction.
     const recorder = new MediaRecorder(
       recordStream,
-      isVideo ? { mimeType, videoBitsPerSecond: 1_000_000, audioBitsPerSecond: 96_000 } : { mimeType },
+      isVideo ? { mimeType, ...recordingBitrates(maxSeconds) } : { mimeType },
     );
     chunksRef.current = [];
     recorder.ondataavailable = (e) => {

@@ -21,6 +21,49 @@ export function pickVideoMimeType(): string {
   return "video/webm";
 }
 
+/** Supabase's PROJECT-WIDE upload ceiling. Not the kata-videos bucket's own
+ * limit (500MB), which sits above this and never applies -- this is the one
+ * that actually rejects an upload, with "object exceeded the maximum
+ * allowed size". Every recording in the app has to land under it. */
+export const UPLOAD_CEILING_BYTES = 50 * 1024 * 1024;
+
+/** Fraction of the ceiling deliberately left unused. videoBitsPerSecond is
+ * a TARGET, not a hard cap -- an encoder can run over it on very busy
+ * footage (a fast kata against a detailed background is exactly that), and
+ * a take that overshoots into a rejected upload is the worst possible
+ * outcome: the participant performs the whole thing before finding out. */
+const HEADROOM = 0.12;
+
+/** Video/audio bitrates sized so a recording of this type CANNOT exceed the
+ * upload ceiling at its own maximum length.
+ *
+ * This has to be per-type, because the types have very different caps. Left
+ * on one shared 1.0 Mbit/s figure:
+ *   - a 5:00 kata came out at 39.2MB -- comfortably under, and leaving
+ *     quality on the table it could have spent;
+ *   - a 10:00 video testimonial came out at 78.4MB -- over the ceiling, so
+ *     anything longer than 6:23 could not be uploaded at all, even though
+ *     the on-screen instructions invite up to 10 minutes.
+ * Deriving the bitrate from the cap fixes both at once.
+ *
+ * VIDEO_CEILING keeps the short-cap types from being handed a bitrate
+ * higher than the picture can actually use: past roughly 1.2 Mbit/s at
+ * 720p30 the returns fall off quickly, and bigger files upload slower and
+ * less reliably on mobile data -- which was its own source of failed
+ * submissions. */
+const VIDEO_CEILING_BPS = 1_200_000;
+const VIDEO_FLOOR_BPS = 400_000;
+
+export function recordingBitrates(
+  maxSeconds: number,
+  audioBitsPerSecond = 96_000,
+): { videoBitsPerSecond: number; audioBitsPerSecond: number } {
+  const budgetBits = UPLOAD_CEILING_BYTES * 8 * (1 - HEADROOM);
+  const totalBps = budgetBits / Math.max(1, maxSeconds);
+  const video = Math.min(VIDEO_CEILING_BPS, Math.max(VIDEO_FLOOR_BPS, Math.floor(totalBps - audioBitsPerSecond)));
+  return { videoBitsPerSecond: video, audioBitsPerSecond };
+}
+
 /** Same Safari/iOS caveat as pickVideoMimeType, for an audio-only stream. */
 export function pickAudioMimeType(): string {
   const candidates = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/aac"];

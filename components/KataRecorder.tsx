@@ -5,7 +5,12 @@ import { createClient } from "@/lib/supabase/client";
 import { useRecordAttempt, submitKataVideo } from "@/app/actions/account";
 import BuyExtraAttemptsButton from "@/components/BuyExtraAttemptsButton";
 import { formatDate, formatDateTime } from "@/components/ui";
-import { pickVideoMimeType as pickMimeType, extensionForMimeType, bareMimeType } from "@/lib/media-recording";
+import {
+  pickVideoMimeType as pickMimeType,
+  extensionForMimeType,
+  bareMimeType,
+  recordingBitrates,
+} from "@/lib/media-recording";
 import { playDingDong, playAlarmTick } from "@/lib/chime";
 import { startClapDetector } from "@/lib/clap-detector";
 import { saveLocalRecording, clearLocalRecording } from "@/lib/local-recording-store";
@@ -1566,16 +1571,18 @@ export default function KataRecorder({
       // size" failure participants were hitting.
       //
       // MAX_SECONDS is the hard recording cap, so budgeting against it
-      // bounds the worst case rather than the typical one: ~1.1 Mbit/s over
-      // 5 minutes is roughly 41MB, leaving real headroom under 50MB even
-      // though these are targets the encoder can overshoot on very busy
-      // footage. Smaller files also upload far faster and far more reliably
-      // on mobile data, which is its own win given how often submissions
-      // were failing mid-upload.
+      // bounds the worst case rather than the typical one. The figures now
+      // come from recordingBitrates(), which derives them from that cap and
+      // the upload ceiling instead of hardcoding one number for every kind
+      // of recording in the app -- see the note there. For a 5:00 kata that
+      // works out at ~1.13 Mbit/s (about 44MB worst case), up from the flat
+      // 1.0 Mbit/s this used to use, so the extra room the shorter cap
+      // earns actually goes into the picture. Smaller files also upload far
+      // faster and more reliably on mobile data, which is why the helper
+      // caps the video rate rather than simply spending the whole budget.
       const recorder = new MediaRecorder(recordStream, {
         mimeType,
-        videoBitsPerSecond: 1_000_000,
-        audioBitsPerSecond: 96_000,
+        ...recordingBitrates(MAX_SECONDS),
       });
       chunksRef.current = [];
       recorder.ondataavailable = (e) => {
