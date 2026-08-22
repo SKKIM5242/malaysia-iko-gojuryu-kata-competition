@@ -7,59 +7,163 @@ import { formatBytes, type StorageObject } from "@/lib/storage-usage";
 
 const PAGE = 100;
 
+/** Shown in the Participant filter for a file no database row claims.
+ *
+ * Needs its own sentinel because "" already means "no filter". Deliberately
+ * a loud token rather than something subtle like a leading space: the first
+ * attempt used " unclaimed", the space did not survive into the rendered
+ * option value, the browser silently rejected the assignment and reset the
+ * select to "" -- so the filter appeared to do nothing at all. No real
+ * participant name can collide with this. */
+const UNCLAIMED = "__UNCLAIMED__";
+
+type SortKey = "participant" | "kind" | "bucket" | "path" | "bytes";
+type SortDir = "asc" | "desc";
+
 function fileHref(o: StorageObject, download: boolean): string {
   const q = new URLSearchParams({ bucket: o.bucket, path: o.path });
   if (download) q.set("download", "1");
   return `/api/storage/file?${q.toString()}`;
 }
 
+/** A header cell that both sorts and filters. The label sorts on click; the
+ * control underneath filters. Keeping them in one cell is what makes this
+ * read as "this column", rather than a row of anonymous boxes above a table
+ * whose alignment you have to count across. */
+function HeadCell({
+  label,
+  sortKey,
+  sort,
+  onSort,
+  children,
+  align = "left",
+}: {
+  label: string;
+  sortKey?: SortKey;
+  sort: { key: SortKey; dir: SortDir };
+  onSort: (k: SortKey) => void;
+  children?: React.ReactNode;
+  align?: "left" | "right";
+}) {
+  const active = sortKey && sort.key === sortKey;
+  return (
+    <th className={`px-3 py-2 align-top ${align === "right" ? "text-right" : ""}`}>
+      {sortKey ? (
+        <button
+          type="button"
+          onClick={() => onSort(sortKey)}
+          className={
+            "flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide hover:text-neutral-700 " +
+            (active ? "text-neutral-800" : "text-neutral-500") +
+            (align === "right" ? " ml-auto" : "")
+          }
+          title={`Sort by ${label}`}
+        >
+          {label}
+          <span className={active ? "" : "text-neutral-300"}>
+            {active ? (sort.dir === "asc" ? "▲" : "▼") : "↕"}
+          </span>
+        </button>
+      ) : (
+        <span className="text-[10px] font-bold uppercase tracking-wide text-neutral-500">{label}</span>
+      )}
+      {children && <div className="mt-1 font-normal normal-case">{children}</div>}
+    </th>
+  );
+}
+
+const selectCls =
+  "w-full max-w-[11rem] rounded border border-neutral-300 bg-white px-1 py-0.5 text-[11px] font-normal text-neutral-700";
+const inputCls = "w-full max-w-[11rem] rounded border border-neutral-300 px-1 py-0.5 text-[11px] font-normal";
+
 /**
- * Every stored file, newest-largest first, with the person it belongs to and
- * what it is.
+ * Every stored file, with the person it belongs to and what it is.
  *
- * Replaces the old "20 largest" sample. That was useful for spotting what
- * was eating space and useless for everything else — finding one
- * competitor's recording, checking what an orphan actually is, removing a
- * bad file. Search covers the participant name, the kind, the bucket and the
- * path at once, so any of those is a way in.
+ * Each column filters and sorts from its own header. The value lists are
+ * built from the WHOLE set, not from what is currently showing — otherwise
+ * narrowing by bucket would quietly empty the Participant list of everyone
+ * you had just filtered away, and there would be no way back to them.
  *
- * View and Download go through /api/storage/file rather than pre-signed
- * URLs baked into the page: a listing of a few thousand recordings would
- * otherwise sign a few thousand URLs on every render, nearly all unused, and
- * every one of them would be a live link to an unreleased recording sitting
- * in the HTML.
+ * View and Download go through /api/storage/file rather than pre-signed URLs
+ * baked into the page: a listing of a few thousand recordings would sign a
+ * few thousand URLs on every render, nearly all unused, and would put a live
+ * link to every unreleased recording into the page's HTML.
  */
 export default function StorageFileTable({
   files,
   canDelete,
 }: {
   files: StorageObject[];
-  /** Admin/Organizer. The server re-checks, and additionally refuses any
-   * file a live database row still points at. */
+  /** Admin/Organizer. The server re-checks, and additionally refuses any file
+   * a live database row still points at. */
   canDelete: boolean;
 }) {
-  const [query, setQuery] = useState("");
+  const [participant, setParticipant] = useState("");
+  const [kind, setKind] = useState("");
   const [bucket, setBucket] = useState("");
+  const [path, setPath] = useState("");
+  const [minMb, setMinMb] = useState("");
+  const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: "bytes", dir: "desc" });
   const [shown, setShown] = useState(PAGE);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
+  const participants = useMemo(
+    () => [...new Set(files.map((f) => f.participantName).filter((n): n is string => !!n))].sort(),
+    [files],
+  );
+  const kinds = useMemo(() => [...new Set(files.map((f) => f.kind))].sort(), [files]);
   const buckets = useMemo(() => [...new Set(files.map((f) => f.bucket))].sort(), [files]);
+  const hasUnclaimed = useMemo(() => files.some((f) => !f.participantName), [files]);
+
+  const activeFilters = [participant, kind, bucket, path.trim(), minMb.trim()].filter(Boolean).length;
+
+  function reset<T>(setter: (v: T) => void) {
+    return (v: T) => {
+      setter(v);
+      setShown(PAGE);
+    };
+  }
+
+  function clearAll() {
+    setParticipant("");
+    setKind("");
+    setBucket("");
+    setPath("");
+    setMinMb("");
+    setShown(PAGE);
+  }
+
+  function toggleSort(key: SortKey) {
+    setSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: key === "bytes" ? "desc" : "asc" }));
+  }
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return files.filter((f) => {
+    const q = path.trim().toLowerCase();
+    const min = Number(minMb) > 0 ? Number(minMb) * 1024 * 1024 : 0;
+    const rows = files.filter((f) => {
+      if (participant === UNCLAIMED ? !!f.participantName : participant && f.participantName !== participant) {
+        return false;
+      }
+      if (kind && f.kind !== kind) return false;
       if (bucket && f.bucket !== bucket) return false;
-      if (!q) return true;
-      return (
-        f.path.toLowerCase().includes(q) ||
-        f.kind.toLowerCase().includes(q) ||
-        f.bucket.toLowerCase().includes(q) ||
-        (f.participantName ?? "").toLowerCase().includes(q)
-      );
+      if (q && !f.path.toLowerCase().includes(q)) return false;
+      if (min && f.bytes < min) return false;
+      return true;
     });
-  }, [files, query, bucket]);
+    const dir = sort.dir === "asc" ? 1 : -1;
+    return [...rows].sort((a, b) => {
+      if (sort.key === "bytes") return (a.bytes - b.bytes) * dir;
+      const av =
+        sort.key === "participant" ? (a.participantName ?? "") : sort.key === "kind" ? a.kind : sort.key === "bucket" ? a.bucket : a.path;
+      const bv =
+        sort.key === "participant" ? (b.participantName ?? "") : sort.key === "kind" ? b.kind : sort.key === "bucket" ? b.bucket : b.path;
+      return av.localeCompare(bv) * dir;
+    });
+  }, [files, participant, kind, bucket, path, minMb, sort]);
+
+  const filteredBytes = useMemo(() => filtered.reduce((s, f) => s + f.bytes, 0), [filtered]);
 
   async function remove(o: StorageObject) {
     setBusy(o.bucket + "/" + o.path);
@@ -78,40 +182,23 @@ export default function StorageFileTable({
 
   return (
     <section>
-      <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
+      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-sm font-bold uppercase tracking-wide text-neutral-500">
           All files{" "}
           <span className="font-normal normal-case text-neutral-400">
             ({filtered.length.toLocaleString()}
-            {filtered.length !== files.length ? ` of ${files.length.toLocaleString()}` : ""})
+            {filtered.length !== files.length ? ` of ${files.length.toLocaleString()}` : ""} · {formatBytes(filteredBytes)})
           </span>
         </h2>
-        <div className="flex flex-wrap items-center gap-2">
-          <select
-            value={bucket}
-            onChange={(e) => {
-              setBucket(e.target.value);
-              setShown(PAGE);
-            }}
-            className="rounded-md border border-neutral-300 bg-white px-2 py-1 text-xs font-semibold text-neutral-700"
+        {activeFilters > 0 && (
+          <button
+            type="button"
+            onClick={clearAll}
+            className="rounded border border-neutral-300 px-2 py-0.5 text-[11px] font-semibold text-neutral-600 hover:bg-neutral-50"
           >
-            <option value="">All buckets</option>
-            {buckets.map((b) => (
-              <option key={b} value={b}>
-                {b}
-              </option>
-            ))}
-          </select>
-          <input
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setShown(PAGE);
-            }}
-            placeholder="Search name, type, path…"
-            className="w-56 rounded-md border border-neutral-300 px-2 py-1 text-xs"
-          />
-        </div>
+            ✕ Clear {activeFilters} filter{activeFilters === 1 ? "" : "s"}
+          </button>
+        )}
       </div>
 
       {error && (
@@ -121,15 +208,63 @@ export default function StorageFileTable({
       )}
 
       <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white shadow-sm">
-        <table className="w-full min-w-[56rem] text-left text-sm">
-          <thead className="border-b border-neutral-200 bg-neutral-50 text-[10px] uppercase tracking-wide text-neutral-500">
+        <table className="w-full min-w-[64rem] text-left text-sm">
+          <thead className="border-b border-neutral-200 bg-neutral-50">
             <tr>
-              <th className="px-3 py-2">Participant</th>
-              <th className="px-3 py-2">Recording type</th>
-              <th className="px-3 py-2">Bucket</th>
-              <th className="px-3 py-2">File</th>
-              <th className="px-3 py-2 text-right">Size</th>
-              <th className="px-3 py-2">Actions</th>
+              <HeadCell label="Participant" sortKey="participant" sort={sort} onSort={toggleSort}>
+                <select value={participant} onChange={(e) => reset(setParticipant)(e.target.value)} className={selectCls}>
+                  <option value="">All ({participants.length})</option>
+                  {hasUnclaimed && <option value={UNCLAIMED}>— unclaimed</option>}
+                  {participants.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+              </HeadCell>
+
+              <HeadCell label="Recording type" sortKey="kind" sort={sort} onSort={toggleSort}>
+                <select value={kind} onChange={(e) => reset(setKind)(e.target.value)} className={selectCls}>
+                  <option value="">All ({kinds.length})</option>
+                  {kinds.map((k) => (
+                    <option key={k} value={k}>
+                      {k}
+                    </option>
+                  ))}
+                </select>
+              </HeadCell>
+
+              <HeadCell label="Bucket" sortKey="bucket" sort={sort} onSort={toggleSort}>
+                <select value={bucket} onChange={(e) => reset(setBucket)(e.target.value)} className={selectCls}>
+                  <option value="">All ({buckets.length})</option>
+                  {buckets.map((b) => (
+                    <option key={b} value={b}>
+                      {b}
+                    </option>
+                  ))}
+                </select>
+              </HeadCell>
+
+              <HeadCell label="File" sortKey="path" sort={sort} onSort={toggleSort}>
+                <input
+                  value={path}
+                  onChange={(e) => reset(setPath)(e.target.value)}
+                  placeholder="contains…"
+                  className={inputCls}
+                />
+              </HeadCell>
+
+              <HeadCell label="Size" sortKey="bytes" sort={sort} onSort={toggleSort} align="right">
+                <input
+                  value={minMb}
+                  onChange={(e) => reset(setMinMb)(e.target.value)}
+                  inputMode="decimal"
+                  placeholder="min MB"
+                  className={`${inputCls} text-right`}
+                />
+              </HeadCell>
+
+              <HeadCell label="Actions" sort={sort} onSort={toggleSort} />
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100">
@@ -190,7 +325,7 @@ export default function StorageFileTable({
             {filtered.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-3 py-6 text-center text-sm text-neutral-400">
-                  Nothing matches.
+                  Nothing matches these filters.
                 </td>
               </tr>
             )}
@@ -209,10 +344,11 @@ export default function StorageFileTable({
       )}
 
       <p className="mt-2 max-w-3xl text-[11px] text-neutral-500">
-        <strong>&quot;— unclaimed&quot;</strong> means no database row points at the file. That is what a leftover from
-        deleted test data looks like, and it is the safest thing to remove. Delete refuses any file a live
-        submission or testimonial still references, so a recording someone cannot re-perform is protected even from
-        a mis-click.
+        Click a column heading to sort, use the box under it to filter. The count and total size in the heading
+        follow the filters, so narrowing to one participant or one bucket also tells you what they are costing.{" "}
+        <strong>&quot;— unclaimed&quot;</strong> means no database row points at the file — what a leftover from
+        deleted test data looks like, and the only kind that is safe to remove. Delete refuses any file a live
+        submission or testimonial still references.
       </p>
     </section>
   );
