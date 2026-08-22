@@ -60,12 +60,12 @@ export default function KataGroupDragZone({
   });
 
   return (
-    // basis-full on small screens: the name, the family control and the
-    // order box get a row to themselves, and the merge buttons wrap
-    // underneath instead of crushing the name into a one-word-per-line
-    // column ("Kata / Taikyoku / Tora / Guchi" stacked vertically). From sm
-    // up it shares the row again but with a floor it cannot shrink past.
-    <div className="flex min-w-0 basis-full flex-wrap items-center gap-2 rounded sm:min-w-[22rem] sm:flex-1 sm:basis-auto">
+    // No flex-grow and no basis of its own any more: this is the grip plus
+    // whatever the page puts next to it, and the page decides the rows. When
+    // this wrapper tried to lay the whole header out, the No. box and the
+    // family badge landed in a different place on every row depending on how
+    // long the kata's name was.
+    <div className="flex flex-wrap items-center gap-2 rounded">
       <span
         onPointerDown={(e) => startDrag(e, base, base)}
         onClick={(e) => e.stopPropagation()}

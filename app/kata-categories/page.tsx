@@ -258,36 +258,41 @@ export default async function KataCategoriesPage() {
                               const kataTaken = subCats.reduce((n, cat) => n + (categoryTaken.get(cat.id) ?? 0), 0);
                               return (
                               <details key={base} data-drag-item={base} className="rounded-lg border border-neutral-200 bg-white shadow-sm">
-                                <summary className="flex cursor-pointer flex-wrap items-center gap-2 px-4 py-2.5 text-sm font-semibold text-neutral-800 hover:bg-neutral-50">
-                                  {canManageKata ? (
-                                    <KataGroupDragZone competitionId={competition.id} base={base} returnTo="/kata-categories">
-                                      <span className="min-w-[9rem] flex-1">
-                                        <NoTranslate>{base}</NoTranslate>{" "}
-                                        <span className="font-normal text-neutral-400">({subCats.length} sub-categories)</span>
-                                      </span>
-                                      <KataOrderControl
-                                        competitionId={competition.id}
-                                        base={base}
-                                        position={kataIndex + 1}
-                                        total={kataGroups.length}
-                                        returnTo="/kata-categories"
-                                      />
-                                      <KataFamilyControl
-                                        competitionId={competition.id}
-                                        base={base}
-                                        currentFamily={familyOfGroup(base, subCats)}
-                                        isOverridden={subCats.some((cat) => isKataFamily(cat.kata_family))}
-                                        returnTo="/kata-categories"
-                                      />
-                                    </KataGroupDragZone>
-                                  ) : (
-                                    <span>
-                                      <NoTranslate>{base}</NoTranslate>{" "}
-                                      <span className="font-normal text-neutral-400">({subCats.length} sub-categories)</span>
+                                {/* Three fixed rows, never a wrapping row:
+                                    1. grip, No. box, family
+                                    2. the kata's name
+                                    3. the action buttons
+                                    Everything used to share one wrapping
+                                    row, so the No. box and family badge sat
+                                    somewhere different on every line
+                                    depending on how long the name was. */}
+                                <summary className="cursor-pointer flex-col gap-1.5 px-4 py-2.5 text-sm font-semibold text-neutral-800 hover:bg-neutral-50 [&::-webkit-details-marker]:hidden flex marker:hidden">
+                                  {canManageKata && (
+                                    <span className="flex flex-wrap items-center gap-2">
+                                      <KataGroupDragZone competitionId={competition.id} base={base} returnTo="/kata-categories">
+                                        <KataOrderControl
+                                          competitionId={competition.id}
+                                          base={base}
+                                          position={kataIndex + 1}
+                                          total={kataGroups.length}
+                                          returnTo="/kata-categories"
+                                        />
+                                        <KataFamilyControl
+                                          competitionId={competition.id}
+                                          base={base}
+                                          currentFamily={familyOfGroup(base, subCats)}
+                                          isOverridden={subCats.some((cat) => isKataFamily(cat.kata_family))}
+                                          returnTo="/kata-categories"
+                                        />
+                                      </KataGroupDragZone>
                                     </span>
                                   )}
+                                  <span className="block w-full">
+                                    <NoTranslate>{base}</NoTranslate>{" "}
+                                    <span className="font-normal text-neutral-400">({subCats.length} sub-categories)</span>
+                                  </span>
                                   {canManageKata && (
-                                    <span className="ml-auto flex flex-wrap items-center gap-1">
+                                    <span className="flex w-full flex-wrap items-center gap-1">
                                       <RenameKataControl competitionId={competition.id} base={base} returnTo="/kata-categories" />
                                       {kataTaken > 0 ? (
                                         <span

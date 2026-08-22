@@ -562,32 +562,43 @@ export default async function AdminCompetitions({
                             className="group rounded border border-neutral-100"
                             open={params.openkata === base || cats.some((cat) => cat.id === params.editcat)}
                           >
-                            <summary className="flex cursor-pointer flex-wrap items-center gap-2 px-2 py-1.5 text-sm font-semibold text-neutral-800 [&::-webkit-details-marker]:hidden marker:hidden hover:bg-neutral-50">
-                              <span className="inline-block shrink-0 text-neutral-400 transition-transform group-open:rotate-90">
-                                ▶
-                              </span>
-                              {canManageCompetition ? (
-                                <KataGroupDragZone competitionId={c.id} base={base} returnTo={categoryReturnTo(c.id, base)}>
-                                  <span className="min-w-[9rem] flex-1">
-                                    <NoTranslate>{base}</NoTranslate>{" "}
-                                    <span className="font-normal text-neutral-400">({cats.length} sub-categories)</span>
-                                  </span>
-                                  <KataFamilyControl
-                                    competitionId={c.id}
-                                    base={base}
-                                    currentFamily={familyOfGroup(base, cats)}
-                                    isOverridden={cats.some((cat) => isKataFamily(cat.kata_family))}
-                                    returnTo={categoryReturnTo(c.id, base)}
-                                  />
-                                </KataGroupDragZone>
-                              ) : (
-                                <span>
-                                  <NoTranslate>{base}</NoTranslate>{" "}
-                                  <span className="font-normal text-neutral-400">({cats.length} sub-categories)</span>
+                            {/* Three fixed rows, never one wrapping row:
+                                1. disclosure arrow, grip, No. box, family
+                                2. the kata's name
+                                3. the action buttons
+                                Sharing one row meant the No. box and family
+                                badge landed somewhere different on every
+                                line, depending on how long the name was. */}
+                            <summary className="flex cursor-pointer flex-col gap-1.5 px-2 py-1.5 text-sm font-semibold text-neutral-800 [&::-webkit-details-marker]:hidden marker:hidden hover:bg-neutral-50">
+                              <span className="flex flex-wrap items-center gap-2">
+                                <span className="inline-block shrink-0 text-neutral-400 transition-transform group-open:rotate-90">
+                                  ▶
                                 </span>
-                              )}
+                                {canManageCompetition && (
+                                  <KataGroupDragZone competitionId={c.id} base={base} returnTo={categoryReturnTo(c.id, base)}>
+                                    <KataOrderControl
+                                      competitionId={c.id}
+                                      base={base}
+                                      position={kataIndex + 1}
+                                      total={kataGroups.length}
+                                      returnTo={categoryReturnTo(c.id, base)}
+                                    />
+                                    <KataFamilyControl
+                                      competitionId={c.id}
+                                      base={base}
+                                      currentFamily={familyOfGroup(base, cats)}
+                                      isOverridden={cats.some((cat) => isKataFamily(cat.kata_family))}
+                                      returnTo={categoryReturnTo(c.id, base)}
+                                    />
+                                  </KataGroupDragZone>
+                                )}
+                              </span>
+                              <span className="block w-full">
+                                <NoTranslate>{base}</NoTranslate>{" "}
+                                <span className="font-normal text-neutral-400">({cats.length} sub-categories)</span>
+                              </span>
                               {canManageCompetition && (
-                                <span className="ml-auto flex flex-wrap items-center gap-1">
+                                <span className="flex w-full flex-wrap items-center gap-1">
                                   <RenameKataControl competitionId={c.id} base={base} returnTo={categoryReturnTo(c.id, base)} />
                                   {kataTaken > 0 ? (
                                     <span
