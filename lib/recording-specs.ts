@@ -112,3 +112,37 @@ export function referenceBpp(): number {
   const px = RESOLUTION_PIXELS[d.resolution as ResolutionChoice];
   return (d.videoKbps * 1000) / (px.w * px.h * d.fps);
 }
+
+/** A spec in the shape the recorders actually need: pixels and bits per
+ * second, not the UI's kbps/label form. Null anywhere means "no applied
+ * spec — use the code default", which is the state of every install until
+ * an organizer deliberately turns one on. */
+export interface AppliedSpec {
+  width: number;
+  height: number;
+  fps: number;
+  videoBitsPerSecond: number;
+  audioBitsPerSecond: number;
+}
+
+export function toAppliedSpec(spec: {
+  resolution: string;
+  fps: number;
+  videoKbps: number;
+  audioKbps: number;
+}): AppliedSpec | null {
+  const px = RESOLUTION_PIXELS[spec.resolution as ResolutionChoice];
+  if (!px || spec.fps <= 0 || spec.videoKbps <= 0) return null;
+  return {
+    width: px.w,
+    height: px.h,
+    fps: spec.fps,
+    videoBitsPerSecond: spec.videoKbps * 1000,
+    audioBitsPerSecond: spec.audioKbps * 1000,
+  };
+}
+
+/** Rows the organizer has explicitly switched on, keyed by recording kind.
+ * Everything else falls back to the code, so this is additive: an empty map
+ * behaves exactly as the app did before specs existed. */
+export type AppliedSpecMap = Partial<Record<SpecId, AppliedSpec>>;

@@ -7373,44 +7373,66 @@ async function tierFeeUsd(
   return Number(data?.registration_fee_usd ?? 0);
 }
 
+export interface SpecSaveResult {
+  ok: boolean;
+  error?: string;
+}
+
 /** Saves one row of the recording specification table on /admin/storage.
  *
- * These are DELIBERATELY inert by default. `applied` is what would make a
- * spec drive real recording, and nothing reads it yet -- the recorders still
- * take their settings from lib/media-recording.ts. Changing the quality of
- * recordings that competitors have already been told to make is not
- * something a form should do as a side effect of somebody modelling costs,
- * so the two are kept separate until wiring it up is an explicit decision.
+ * Returns a RESULT instead of redirecting. The first version called backTo(),
+ * which redirects to the same URL without revalidating, so the server
+ * component re-rendered from cache and the row came back showing the OLD
+ * numbers -- indistinguishable from the Edit button doing nothing at all.
+ * The client now awaits this, surfaces any error, and refreshes only once
+ * the write has actually landed.
  */
-export async function saveRecordingSpec(formData: FormData) {
+export async function saveRecordingSpec(formData: FormData): Promise<SpecSaveResult> {
   const id = String(formData.get("id") ?? "");
-  const returnTo = String(formData.get("return_to") ?? "") || "/admin/storage";
-  if (!SPEC_IDS.includes(id as SpecId)) backTo(returnTo, { error: "Unknown recording type." });
+  if (!SPEC_IDS.includes(id as SpecId)) return { ok: false, error: "Unknown recording type." };
 
   const { supabase, actorId } = await getActor();
   const role = await getActorRole(supabase, actorId);
   if (!["admin", "organizer"].includes(role ?? "")) {
-    backTo(returnTo, { error: "Only Admin / Organizer can change recording specifications." });
+    return { ok: false, error: "Only Admin / Organizer can change recording specifications." };
   }
 
-  // "reset" restores whatever the CODE currently does, rather than a figure
-  // stored here that could have drifted away from it.
-  if (String(formData.get("reset") ?? "") === "1") {
-    const d = codeDefault(id as SpecId);
-    const { error } = await createAdminClient()
+  const admin = createAdminClient();
+  const mode = String(formData.get("mode") ?? "save");
+
+  // Apply / Unapply only flips the switch and never edits the numbers, so
+  // turning a spec on cannot quietly change it at the same time.
+  if (mode === "apply" || mode === "unapply") {
+    const { error } = await admin
       .from("recording_specs")
-      .upsert({
-        id,
-        resolution: d.resolution,
-        fps: d.fps,
-        video_kbps: d.videoKbps,
-        audio_kbps: d.audioKbps,
-        applied: false,
-        updated_at: new Date().toISOString(),
-        updated_by: actorId,
-      });
-    if (error) backTo(returnTo, { error: `Could not reset: ${error.message}` });
-    backTo(returnTo, { ok: `${id} reset to the current system default.` });
+      .update({ applied: mode === "apply", updated_at: new Date().toISOString(), updated_by: actorId })
+      .eq("id", id);
+    if (error) return { ok: false, error: error.message };
+    revalidatePath("/admin/storage");
+    revalidatePath("/account");
+    revalidatePath("/winners");
+    return { ok: true };
+  }
+
+  // Restores whatever the CODE currently does, rather than a figure stored
+  // here that could have drifted away from it.
+  if (mode === "reset") {
+    const d = codeDefault(id as SpecId);
+    const { error } = await admin.from("recording_specs").upsert({
+      id,
+      resolution: d.resolution,
+      fps: d.fps,
+      video_kbps: d.videoKbps,
+      audio_kbps: d.audioKbps,
+      applied: false,
+      updated_at: new Date().toISOString(),
+      updated_by: actorId,
+    });
+    if (error) return { ok: false, error: error.message };
+    revalidatePath("/admin/storage");
+    revalidatePath("/account");
+    revalidatePath("/winners");
+    return { ok: true };
   }
 
   const resolution = String(formData.get("resolution") ?? "").trim();
@@ -7418,21 +7440,81 @@ export async function saveRecordingSpec(formData: FormData) {
   const videoKbps = Math.round(Number(formData.get("video_mbps") ?? 0) * 1000);
   const audioKbps = Math.round(Number(formData.get("audio_kbps") ?? 96));
   if (!resolution || !Number.isFinite(fps) || !Number.isFinite(videoKbps)) {
-    backTo(returnTo, { error: "Those numbers don't look right — try again." });
+    return { ok: false, error: "Those numbers don't look right — try again." };
   }
 
-  const { error } = await createAdminClient()
-    .from("recording_specs")
-    .upsert({
-      id,
-      resolution,
-      fps,
-      video_kbps: videoKbps,
-      audio_kbps: audioKbps,
-      applied: false,
-      updated_at: new Date().toISOString(),
-      updated_by: actorId,
-    });
-  if (error) backTo(returnTo, { error: `Could not save: ${error.message}` });
-  backTo(returnTo, { ok: "Recording specification saved." });
+  // Editing drops the row back to "not applied". Otherwise a figure would go
+  // live the instant it was typed, which is the exact thing the separate
+  // apply step exists to prevent.
+  const { error } = await admin.from("recording_specs").upsert({
+    id,
+    resolution,
+    fps,
+    video_kbps: videoKbps,
+    audio_kbps: audioKbps,
+    applied: false,
+    updated_at: new Date().toISOString(),
+    updated_by: actorId,
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/admin/storage");
+  revalidatePath("/account");
+  revalidatePath("/winners");
+  return { ok: true };
+}
+
+/** Permanently removes every object in a bucket, for clearing test data out.
+ *
+ * Goes through the Storage API rather than deleting from storage.objects
+ * directly: a raw SQL delete drops the metadata row but leaves the bytes in
+ * the backing store, so the space is never actually reclaimed.
+ *
+ * Refuses to touch a bucket whose rows are still referenced, so this can
+ * never orphan a live recording -- a competitor cannot re-perform a finished
+ * competition, which makes that the one mistake with no way back.
+ */
+export async function deleteStorageObjects(formData: FormData): Promise<SpecSaveResult> {
+  const bucket = String(formData.get("bucket") ?? "");
+  const confirm = String(formData.get("confirm") ?? "");
+  if (!bucket) return { ok: false, error: "No bucket given." };
+  if (confirm !== bucket) return { ok: false, error: `Type "${bucket}" exactly to confirm.` };
+
+  const { supabase, actorId } = await getActor();
+  const role = await getActorRole(supabase, actorId);
+  if (role !== "admin") return { ok: false, error: "Only Admin can delete stored files." };
+
+  const admin = createAdminClient();
+
+  if (bucket === "kata-videos") {
+    const { count } = await admin.from("kata_videos").select("id", { count: "exact", head: true });
+    if ((count ?? 0) > 0) {
+      return {
+        ok: false,
+        error: `${count} recording row(s) still point into this bucket. Remove those first — emptying it now would break them permanently.`,
+      };
+    }
+  }
+  if (bucket === "testimonials") {
+    const { count } = await admin.from("winner_testimonials").select("id", { count: "exact", head: true });
+    if ((count ?? 0) > 0) return { ok: false, error: `${count} testimonial row(s) still point into this bucket.` };
+  }
+
+  // Recurse: paths here are userId/file, and admin uploads add a level.
+  const names: string[] = [];
+  const walk = async (prefix: string, depth: number): Promise<void> => {
+    if (depth > 3) return;
+    const { data } = await admin.storage.from(bucket).list(prefix, { limit: 1000 });
+    for (const item of data ?? []) {
+      const full = prefix ? `${prefix}/${item.name}` : item.name;
+      if (item.id === null && item.metadata === null) await walk(full, depth + 1);
+      else names.push(full);
+    }
+  };
+  await walk("", 0);
+  if (names.length === 0) return { ok: true };
+
+  const { error } = await admin.storage.from(bucket).remove(names);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/admin/storage");
+  return { ok: true };
 }

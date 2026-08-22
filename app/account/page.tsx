@@ -13,6 +13,8 @@ import VideoWatchButton from "@/components/VideoWatchButton";
 import DeleteRecordingControls from "@/components/DeleteRecordingControls";
 import RefereeScoring, { type ScoringItem } from "@/components/RefereeScoring";
 import CertificatesSection from "@/components/CertificatesSection";
+import { getAppliedSpecs } from "@/lib/recording-specs-server";
+import type { AppliedSpec } from "@/lib/recording-specs";
 import IssueReportForm from "@/components/IssueReportForm";
 import TelegramConnectStatus from "@/components/TelegramConnectStatus";
 import JudgeSelfIntroForm from "@/components/JudgeSelfIntroForm";
@@ -149,6 +151,9 @@ interface RecordingContext {
    * per competition, Create/Edit Competition page) -- was a single
    * hardcoded string+styling shared by every tier. */
   watermark: WatermarkSettings;
+  /** Resolution/fps/bitrate an organizer has switched on for kata recording
+   * on /admin/storage, or null to use the code default. */
+  appliedSpec: AppliedSpec | null;
 }
 
 /** Everything needed to render the personal recording card for whichever
@@ -256,6 +261,7 @@ async function getRecordingContext(
     categoryName,
     participantName,
     watermark: resolveWatermarkSettings(competition),
+    appliedSpec: (await getAppliedSpecs()).kata ?? null,
   };
 }
 

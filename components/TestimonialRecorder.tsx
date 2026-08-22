@@ -30,6 +30,7 @@ import LockedVideo from "@/components/LockedVideo";
 import { PoseGuideOverlay } from "@/components/RecordingChrome";
 import { chromeHeights, drawRecordingChrome } from "@/lib/recording-chrome-canvas";
 import { POSE_GUIDE_NOTE, type RecordingAppearance } from "@/lib/recording-appearance";
+import type { AppliedSpec } from "@/lib/recording-specs";
 
 // No countdown and no clap-to-stop here, unlike the kata recorder. Those
 // exist so a competitor can walk out to their mark and perform hands-free.
@@ -272,6 +273,7 @@ function MediaTestimonialPanel({
   onExit,
   recordingAppearance,
   recordingLogoUrl,
+  appliedSpec,
 }: {
   kind: "video" | "voice";
   mode: "submit" | "edit";
@@ -282,6 +284,8 @@ function MediaTestimonialPanel({
   onExit: () => void;
   recordingAppearance: RecordingAppearance | null;
   recordingLogoUrl: string | null;
+  /** Organizer-applied video settings, or null to use the code default. */
+  appliedSpec: AppliedSpec | null;
 }) {
   const [takeType, setTakeType] = useState<"practice" | "actual">("practice");
   const [phase, setPhase] = useState<Phase>("idle");
@@ -404,9 +408,9 @@ function MediaTestimonialPanel({
                 // an exact constraint fails outright there instead of
                 // falling back to the only camera available.
                 facingMode: requestedFacing,
-                width: { ideal: 854, max: 854 },
-                height: { ideal: 854, max: 854 },
-                frameRate: { ideal: 24, max: 24 },
+                width: { ideal: appliedSpec?.width ?? 854, max: appliedSpec?.width ?? 854 },
+                height: { ideal: appliedSpec?.width ?? 854, max: appliedSpec?.width ?? 854 },
+                frameRate: { ideal: appliedSpec?.fps ?? 24, max: appliedSpec?.fps ?? 24 },
               },
               audio: audioConstraints,
             }
@@ -545,8 +549,8 @@ function MediaTestimonialPanel({
       isVideo
         ? {
             mimeType,
-            videoBitsPerSecond: videoBudget.videoBitsPerSecond,
-            audioBitsPerSecond: videoBudget.audioBitsPerSecond,
+            videoBitsPerSecond: appliedSpec?.videoBitsPerSecond ?? videoBudget.videoBitsPerSecond,
+            audioBitsPerSecond: appliedSpec?.audioBitsPerSecond ?? videoBudget.audioBitsPerSecond,
           }
         : { mimeType },
     );
@@ -1265,7 +1269,12 @@ export default function TestimonialRecorder({
   onSaved,
   recordingAppearance = null,
   recordingLogoUrl = null,
+  appliedSpec = null,
 }: {
+  /** Organizer-applied video settings for testimonials, from
+   * /admin/storage. Null — the state until somebody deliberately applies
+   * one — means use the code's own settings. */
+  appliedSpec?: AppliedSpec | null;
   /** "edit" re-records/re-types an already-submitted testimonial (calls
    * editTestimonial, an UPDATE) instead of the default first-time "submit"
    * (calls submitTestimonial, an INSERT) — see WinnerTestimonialInline.tsx,
@@ -1360,13 +1369,13 @@ export default function TestimonialRecorder({
       {chosen === "video" && (
         <div className="mt-3">
           <ScriptPicker onUseForMessage={useScriptForMessage} />
-          <MediaTestimonialPanel kind="video" mode={mode} registrationId={registrationId} onDone={() => handleDone("video")} onExit={() => setChosen(null)} recordingAppearance={recordingAppearance} recordingLogoUrl={recordingLogoUrl} />
+          <MediaTestimonialPanel kind="video" mode={mode} registrationId={registrationId} onDone={() => handleDone("video")} onExit={() => setChosen(null)} recordingAppearance={recordingAppearance} recordingLogoUrl={recordingLogoUrl} appliedSpec={appliedSpec} />
         </div>
       )}
       {chosen === "voice" && (
         <div className="mt-3">
           <ScriptPicker onUseForMessage={useScriptForMessage} />
-          <MediaTestimonialPanel kind="voice" mode={mode} registrationId={registrationId} onDone={() => handleDone("voice")} onExit={() => setChosen(null)} recordingAppearance={recordingAppearance} recordingLogoUrl={recordingLogoUrl} />
+          <MediaTestimonialPanel kind="voice" mode={mode} registrationId={registrationId} onDone={() => handleDone("voice")} onExit={() => setChosen(null)} recordingAppearance={recordingAppearance} recordingLogoUrl={recordingLogoUrl} appliedSpec={appliedSpec} />
         </div>
       )}
       {chosen === "message" && (

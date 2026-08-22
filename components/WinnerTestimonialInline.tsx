@@ -4,6 +4,7 @@ import { useState } from "react";
 import { TESTIMONIAL_KIND_LABEL, TESTIMONIAL_GATE_NOTE, TESTIMONIAL_VIDEO_GUIDANCE_NOTE, type TestimonialKind } from "@/lib/testimonials";
 import TestimonialRecorder from "@/components/TestimonialRecorder";
 import type { RecordingAppearance } from "@/lib/recording-appearance";
+import type { AppliedSpec } from "@/lib/recording-specs";
 import TestimonialDeleteButton from "@/components/TestimonialDeleteButton";
 import LockedVideo from "@/components/LockedVideo";
 import { formatDate } from "@/components/ui";
@@ -49,7 +50,11 @@ export default function WinnerTestimonialInline({
   editDeadlineISO,
   recordingAppearance = null,
   recordingLogoUrl = null,
+  appliedSpec = null,
 }: {
+  /** Organizer-applied testimonial video settings, or null for the code
+   * default. Passed straight through to the recorder. */
+  appliedSpec?: AppliedSpec | null;
   /** Which registration this testimonial is for — a login linked to
    * several participants (a Sensei recording for several students) needs
    * this passed explicitly, since it may not be the account's own primary
@@ -129,6 +134,7 @@ export default function WinnerTestimonialInline({
             onSaved={() => setEditing(false)}
             recordingAppearance={recordingAppearance}
             recordingLogoUrl={recordingLogoUrl}
+            appliedSpec={appliedSpec}
           />
         </div>
       );
@@ -279,6 +285,7 @@ export default function WinnerTestimonialInline({
           registrationId={registrationId}
           recordingAppearance={recordingAppearance}
           recordingLogoUrl={recordingLogoUrl}
+            appliedSpec={appliedSpec}
         />
       </div>
     </div>

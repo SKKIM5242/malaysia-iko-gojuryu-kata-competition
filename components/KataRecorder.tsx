@@ -18,6 +18,7 @@ import { saveLocalRecording, clearLocalRecording } from "@/lib/local-recording-s
 import { uploadRecording } from "@/lib/upload-recording";
 import { torchSupported, setTorch } from "@/lib/camera-torch";
 import type { WatermarkSettings } from "@/lib/watermark";
+import type { AppliedSpec } from "@/lib/recording-specs";
 
 const MAX_SECONDS = KATA_MAX_SECONDS;
 const COUNTDOWN_CHOICES = [10, 15, 20, 25, 30] as const;
@@ -559,7 +560,13 @@ export default function KataRecorder({
   recordingEnd,
   categoryName,
   participantName,
+  appliedSpec = null,
 }: {
+  /** Resolution / frame rate / bitrate an organizer has switched on for kata
+   * recording on /admin/storage. Null — the state of every install until
+   * somebody deliberately applies one — means use the code's own settings,
+   * so this is purely additive. */
+  appliedSpec?: AppliedSpec | null;
   /** Which linked registration this recording is for — a login tied to
    * several participants (e.g. a Sensei recording for several students)
    * can have more than one; this is what tells the server which one a
@@ -1262,13 +1269,16 @@ export default function KataRecorder({
           // back 1080p60 is actually held to it. Every judge sees the same
           // format, and the file stays a size a participant on a modest
           // connection can realistically upload.
-          width: { ideal: width, max: 1280 },
-          height: { ideal: height, max: 1280 },
+          // An organizer-applied spec overrides the built-in 720p cap.
+          // Same shape of constraint, just a different ceiling, so nothing
+          // about how the constraint behaves changes -- see appliedSpec.
+          width: { ideal: appliedSpec ? appliedSpec.width : width, max: appliedSpec ? appliedSpec.width : 1280 },
+          height: { ideal: appliedSpec ? appliedSpec.height : height, max: appliedSpec ? appliedSpec.height : 1280 },
           // Desktop only -- see idealVideoDimensions for why a phone must
           // not pin this (iOS crops the sensor to honour it, narrowing the
           // participant's own field of view).
           ...(constrainAspect ? { aspectRatio: { ideal: width / height } } : {}),
-          frameRate: { ideal: 30, max: 30 },
+          frameRate: { ideal: appliedSpec?.fps ?? 30, max: appliedSpec?.fps ?? 30 },
         },
         audio: audioConstraints,
       });
@@ -1602,7 +1612,13 @@ export default function KataRecorder({
       // earns actually goes into the picture. Smaller files also upload far
       // faster and more reliably on mobile data, which is why the helper
       // caps the video rate rather than simply spending the whole budget.
-      const { videoBitsPerSecond, audioBitsPerSecond } = recordingBitrates(MAX_SECONDS);
+      // An applied spec wins over the derived figure. It is the organizer's
+      // deliberate choice, made on /admin/storage where the resulting file
+      // sizes and the 50MB ceiling are shown alongside it, so it is not
+      // second-guessed here.
+      const derived = recordingBitrates(MAX_SECONDS);
+      const videoBitsPerSecond = appliedSpec?.videoBitsPerSecond ?? derived.videoBitsPerSecond;
+      const audioBitsPerSecond = appliedSpec?.audioBitsPerSecond ?? derived.audioBitsPerSecond;
       const recorder = new MediaRecorder(recordStream, { mimeType, videoBitsPerSecond, audioBitsPerSecond });
       chunksRef.current = [];
       recorder.ondataavailable = (e) => {

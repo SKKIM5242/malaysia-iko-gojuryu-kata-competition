@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { winnersRevealed, winnersRevealDateFor, testimonialEditDeadline } from "@/lib/winners";
 import { computeCategoryRankings } from "@/lib/winners-ranking";
 import { getRecordingAppearance } from "@/lib/recording-appearance-server";
+import { getAppliedSpecs } from "@/lib/recording-specs-server";
 import { shortTierName } from "@/lib/invitation-codes";
 import { splitCategoryName } from "@/lib/division";
 import WinnerTestimonialInline, { type WinnerTestimonialInfo } from "@/components/WinnerTestimonialInline";
@@ -327,7 +328,7 @@ export default async function CertificatesSection({
   displayName?: string | null;
 }) {
   const supabase = await createClient();
-  const [linkGroups, { settings: recordingAppearance, logoUrl: recordingLogoUrl }] = await Promise.all([
+  const [linkGroups, { settings: recordingAppearance, logoUrl: recordingLogoUrl }, appliedSpecs] = await Promise.all([
     Promise.all([
       Promise.all(registrationIds.map((id) => participantLinks(supabase, id))).then((groups) => groups.flat()),
       refereeLinks(supabase, userId, displayName),
@@ -336,6 +337,7 @@ export default async function CertificatesSection({
       isSupport ? supportLinks(supabase, userId, displayName) : Promise.resolve([]),
     ]),
     getRecordingAppearance(),
+    getAppliedSpecs(),
   ]);
   const links = linkGroups.flat();
   if (links.length === 0) return null;
@@ -400,6 +402,7 @@ export default async function CertificatesSection({
                                   editDeadlineISO={l.editDeadlineISO ?? null}
                                   recordingAppearance={recordingAppearance}
                                   recordingLogoUrl={recordingLogoUrl}
+                                  appliedSpec={appliedSpecs.testimonial_video ?? null}
                                 />
                               </div>
                             )}
@@ -444,6 +447,7 @@ export default async function CertificatesSection({
                                   editDeadlineISO={l.editDeadlineISO ?? null}
                                   recordingAppearance={recordingAppearance}
                                   recordingLogoUrl={recordingLogoUrl}
+                                  appliedSpec={appliedSpecs.testimonial_video ?? null}
                                 />
                               </div>
                             )}

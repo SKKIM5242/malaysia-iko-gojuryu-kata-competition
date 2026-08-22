@@ -11,6 +11,7 @@ import {
 } from "@/lib/storage-usage";
 import { createAdminClient } from "@/lib/supabase/admin";
 import RecordingSpecTable from "@/components/RecordingSpecTable";
+import BucketPurgeButton from "@/components/BucketPurgeButton";
 import { SPEC_IDS, codeDefault, type RecordingSpec, type SpecId } from "@/lib/recording-specs";
 
 export const dynamic = "force-dynamic";
@@ -26,10 +27,19 @@ function perRecordingEstimates() {
   const bytesFor = (b: { videoBitsPerSecond: number; audioBitsPerSecond: number }, seconds: number) =>
     ((b.videoBitsPerSecond + b.audioBitsPerSecond) * seconds) / 8;
   return [
-    { label: "Kata recording, typical (2:00)", bytes: bytesFor(kata, 120) },
-    { label: `Kata recording, full length (${KATA_MAX_SECONDS / 60}:00)`, bytes: bytesFor(kata, KATA_MAX_SECONDS) },
-    { label: "Video testimonial, minimum (3:00)", bytes: bytesFor(testimonial, 180) },
-    { label: "Video testimonial, full length (10:00)", bytes: bytesFor(testimonial, 600) },
+    // The three kata family time limits, then the hard cap — so the cost of
+    // an Elementary take and a Kobudo one can be told apart at a glance
+    // instead of hiding behind a single "typical" figure.
+    { label: "Kata recording — Elementary / Intermediate / Advance limit (1:18)", bytes: bytesFor(kata, 78) },
+    { label: "Kata recording — Mastery limit (1:30)", bytes: bytesFor(kata, 90) },
+    { label: "Kata recording — typical take (2:00)", bytes: bytesFor(kata, 120) },
+    { label: "Kata recording — 2:30", bytes: bytesFor(kata, 150) },
+    { label: `Kata recording — Kobudo / full length (${KATA_MAX_SECONDS / 60}:00)`, bytes: bytesFor(kata, KATA_MAX_SECONDS) },
+    { label: "Video testimonial — minimum (3:00)", bytes: bytesFor(testimonial, 180) },
+    { label: "Video testimonial — 5:00", bytes: bytesFor(testimonial, 300) },
+    { label: "Video testimonial — full length (10:00)", bytes: bytesFor(testimonial, 600) },
+    { label: "Video testimonial — 15:00 (over the ceiling — not allowed)", bytes: bytesFor(testimonial, 900) },
+    { label: "Voice testimonial — full length (15:00)", bytes: (96_000 * 900) / 8 },
   ];
 }
 
@@ -92,6 +102,9 @@ export default async function AdminStorage() {
     };
   });
   const canEditSpecs = ["admin", "organizer"].includes((myProfile?.role as string) ?? "");
+  // Emptying a bucket is Admin-only and irreversible, so it is a narrower
+  // gate than everything else on this page.
+  const isOwner = (myProfile?.role as string) === "admin";
 
   return (
     <AdminShell title="Storage" active="/admin/storage">
@@ -166,6 +179,7 @@ export default async function AdminStorage() {
                 <th className="px-3 py-2 text-right">Share</th>
                 <th className="px-3 py-2">Visibility</th>
                 <th className="px-3 py-2">Max per file</th>
+                {isOwner && <th className="px-3 py-2">Danger</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100">
@@ -217,10 +231,16 @@ export default async function AdminStorage() {
           <table className="w-full text-left text-sm">
             <tbody className="divide-y divide-neutral-100">
               {estimates.map((e) => (
-                <tr key={e.label}>
+                <tr key={e.label} className={e.bytes > UPLOAD_CEILING_BYTES ? "bg-red-50" : ""}>
                   <td className="px-3 py-2 text-neutral-700">{e.label}</td>
-                  <td className="px-3 py-2 text-right font-semibold tabular-nums text-neutral-900">
+                  <td
+                    className={
+                      "px-3 py-2 text-right font-semibold tabular-nums " +
+                      (e.bytes > UPLOAD_CEILING_BYTES ? "text-red-700" : "text-neutral-900")
+                    }
+                  >
                     {formatBytes(e.bytes)}
+                    {e.bytes > UPLOAD_CEILING_BYTES ? " ✗" : ""}
                   </td>
                   <td className="px-3 py-2 text-right text-xs tabular-nums text-neutral-500">
                     {Math.floor((1024 ** 3) / e.bytes).toLocaleString()} per GB

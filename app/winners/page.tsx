@@ -10,6 +10,8 @@ import CertificatePreviewButton from "@/components/CertificatePreviewButton";
 import WinnerTestimonialInline, { type WinnerTestimonialInfo } from "@/components/WinnerTestimonialInline";
 import type { Competition } from "@/lib/types";
 import { getRecordingAppearance } from "@/lib/recording-appearance-server";
+import { getAppliedSpecs } from "@/lib/recording-specs-server";
+import type { AppliedSpec } from "@/lib/recording-specs";
 import type { RecordingAppearance } from "@/lib/recording-appearance";
 
 export const dynamic = "force-dynamic";
@@ -387,6 +389,7 @@ export default async function WinnersPage() {
   // Fetched once here rather than per tier: it is a singleton row, and the
   // testimonial recorder needs it before the camera view appears.
   const { settings: recordingAppearance, logoUrl: recordingLogoUrl } = await getRecordingAppearance();
+  const appliedSpecs = await getAppliedSpecs();
 
   const {
     data: { user },
