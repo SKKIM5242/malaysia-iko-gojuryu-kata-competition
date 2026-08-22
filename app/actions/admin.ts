@@ -7481,7 +7481,9 @@ export async function deleteStorageObjects(formData: FormData): Promise<SpecSave
 
   const { supabase, actorId } = await getActor();
   const role = await getActorRole(supabase, actorId);
-  if (role !== "admin") return { ok: false, error: "Only Admin can delete stored files." };
+  if (!["admin", "organizer"].includes(role ?? "")) {
+    return { ok: false, error: "Only Admin / Organizer can delete stored files." };
+  }
 
   const admin = createAdminClient();
 

@@ -107,9 +107,13 @@ export default async function AdminStorage() {
     };
   });
   const canEditSpecs = ["admin", "organizer"].includes((myProfile?.role as string) ?? "");
-  // Emptying a bucket is Admin-only and irreversible, so it is a narrower
-  // gate than everything else on this page.
-  const isOwner = (myProfile?.role as string) === "admin";
+  // Emptying a whole bucket is irreversible, but it is the organizer who
+  // actually runs the competition and clears its test data, so gating it to
+  // Admin alone just meant asking someone else to press the button. Same
+  // tier as every other control here; the real protection is the typed
+  // bucket name and the server's refusal to touch a bucket whose files are
+  // still referenced.
+  const canPurgeBucket = ["admin", "organizer"].includes((myProfile?.role as string) ?? "");
 
   return (
     <AdminShell title="Storage" active="/admin/storage">
@@ -218,7 +222,7 @@ export default async function AdminStorage() {
                     <td className="px-3 py-2">
                       <div className="flex flex-wrap items-center gap-1">
                         <BucketDownloadButton bucket={b.id} files={usage.files} />
-                        {isOwner && <BucketPurgeButton bucket={b.id} files={b.files} />}
+                        {canPurgeBucket && <BucketPurgeButton bucket={b.id} files={b.files} />}
                       </div>
                     </td>
                   </tr>
