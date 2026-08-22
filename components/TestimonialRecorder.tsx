@@ -1182,6 +1182,21 @@ function UploadTestimonialPanel({
   async function submit() {
     const file = fileRef.current;
     if (!file || !kind) return;
+    // Checked here rather than left to Storage: a rejection on the far side
+    // arrives only after the whole file has gone up, which on a phone means
+    // watching a 100MB upload finish and then fail. The message also names
+    // the actual cause, which "object exceeded the maximum allowed size"
+    // does not.
+    if (file.size > UPLOAD_CEILING_BYTES) {
+      const isWav = /wav|wave/i.test(file.type) || /\.wav$/i.test(file.name);
+      setError(
+        `This file is ${(file.size / 1024 / 1024).toFixed(1)}MB — the limit is ${MAX_TESTIMONIAL_MB}MB. ` +
+          (isWav
+            ? "WAV stores sound uncompressed (about 10 MB a minute). Re-save it as M4A or MP3 and the same recording will be a fraction of the size."
+            : "Re-save it at 1080p or 720p, 30fps and it should come back well under the limit."),
+      );
+      return;
+    }
     setUploading(true);
     setError(null);
     try {
@@ -1240,18 +1255,24 @@ function UploadTestimonialPanel({
             <p className="mb-1 font-bold text-neutral-700">What you can upload</p>
             <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
               <dt className="font-semibold text-neutral-400">Video</dt>
-              <dd>MP4, MOV, WEBM, M4V — 3 to 10 minutes long</dd>
+              <dd>MP4, MOV, M4V, WEBM — 3 to 10 minutes</dd>
               <dt className="font-semibold text-neutral-400">Audio</dt>
-              <dd>M4A, MP3, AAC, WAV, WEBM, OGG — up to 15 minutes</dd>
+              <dd>M4A, MP3, AAC, OGG, WEBM, WAV — up to 15 minutes</dd>
               <dt className="font-semibold text-neutral-400">Max size</dt>
               <dd>
                 <strong>{MAX_TESTIMONIAL_MB} MB</strong> for either
               </dd>
             </dl>
             <p className="mt-2 leading-relaxed text-neutral-500">
-              Bigger than that? It was almost certainly recorded at 4K or 60fps, which a talking-head testimonial
-              never needs. Re-save it at <strong>1080p or 720p, 30fps</strong> and it will come back well under the
-              limit with nothing lost.
+              Too big? A video was almost certainly recorded at 4K or 60fps, which a talking-head testimonial never
+              needs — re-save it at <strong>1080p or 720p, 30fps</strong> and it comes back well under the limit
+              with nothing lost.
+            </p>
+            <p className="mt-1 leading-relaxed text-neutral-500">
+              <strong>WAV is the one to watch.</strong> It stores sound uncompressed, about 10 MB per minute, so
+              roughly <strong>5 minutes</strong> is all that fits — a 15-minute WAV would be around 152 MB. Every
+              other audio format here is compressed and gets a full 15 minutes comfortably, so save as M4A or MP3
+              if your recorder offers the choice.
             </p>
           </div>
           <input
