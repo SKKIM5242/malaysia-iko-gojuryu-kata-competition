@@ -8,7 +8,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { writeAudit } from "@/lib/audit";
 import { headers } from "next/headers";
 import { kataBaseOf, groupByKata, ageAt, resolveCategory, AGE_BRACKETS } from "@/lib/division";
-import { KATA_FAMILIES, categoriesInFamily, adjacentKataOf, type KataFamily } from "@/lib/kata-families";
+import { KATA_FAMILIES, categoriesInFamily, adjacentKataOf, isKataFamily, type KataFamily } from "@/lib/kata-families";
 import { WATERMARK_DIRECTIONS } from "@/lib/watermark";
 import {
   logCategoryMerge, snapshotRegistrationCategories, undoLastCategoryMerge,
@@ -1682,6 +1682,51 @@ async function persistCategoryOrder(
  * among the other kata groups in the same competition -- lets the
  * organizer reorder which event appears first without touching any
  * individual sub-category's own ordering within that group. */
+/** Moves one kata into a different family — or clears the override so it
+ * falls back to the canonical family from lib/kata-families.ts.
+ *
+ * A kata "is" a family only by way of that hardcoded 24-entry map, so before
+ * this existed there was nothing to write and a cross-family drag silently
+ * did nothing. The override is per COMPETITION: the same kata can sit in
+ * different families in different tiers, which is the whole point of it
+ * being editable.
+ *
+ * Every category sharing the kata's base name is written together, so the
+ * group can never end up split across two family boxes.
+ */
+export async function setKataFamily(formData: FormData) {
+  const competitionId = String(formData.get("competition_id") ?? "");
+  const base = String(formData.get("kata_base") ?? "");
+  const raw = String(formData.get("family") ?? "").trim();
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/competitions";
+  if (!competitionId || !base) backTo(returnTo, { error: "Could not move that kata — try again." });
+  // "" clears the override (the Delete button); anything else must be one of
+  // the five real families, never free text from the wire.
+  if (raw && !isKataFamily(raw)) backTo(returnTo, { error: "That is not a kata family." });
+
+  const { supabase, actorId } = await getActor();
+  await requireCompetitionManager(supabase, actorId, returnTo);
+
+  const { data: all } = await supabase
+    .from("categories")
+    .select("id, name")
+    .eq("competition_id", competitionId);
+  const ids = (all ?? []).filter((c) => kataBaseOf(c.name as string) === base).map((c) => c.id as string);
+  if (ids.length === 0) backTo(returnTo, { error: "Could not find that kata in this competition." });
+
+  const { error } = await supabase
+    .from("categories")
+    .update({ kata_family: raw || null })
+    .in("id", ids);
+  if (error) backTo(returnTo, { error: `Could not save: ${error.message}` });
+
+  revalidatePath("/");
+  revalidatePath("/kata-categories");
+  backTo(returnTo, {
+    ok: raw ? `${base} moved to ${raw}.` : `${base} reset to its default family.`,
+  });
+}
+
 export async function reorderCategoryGroups(formData: FormData) {
   const competitionId = String(formData.get("competition_id") ?? "");
   const sourceBase = String(formData.get("source_base") ?? "");
@@ -1693,6 +1738,23 @@ export async function reorderCategoryGroups(formData: FormData) {
   }
   const { supabase, actorId } = await getActor();
   await requireCompetitionManager(supabase, actorId, returnTo);
+
+  // A drop into ANOTHER family box carries that box's name, so the same
+  // gesture both reorders and re-files the kata. Empty means the drop stayed
+  // inside its own family and only the order changes.
+  const targetFamily = String(formData.get("target_family") ?? "").trim();
+  if (targetFamily && isKataFamily(targetFamily)) {
+    const { data: sourceCats } = await supabase
+      .from("categories")
+      .select("id, name")
+      .eq("competition_id", competitionId);
+    const ids = (sourceCats ?? [])
+      .filter((c) => kataBaseOf(c.name as string) === sourceBase)
+      .map((c) => c.id as string);
+    if (ids.length > 0) {
+      await supabase.from("categories").update({ kata_family: targetFamily }).in("id", ids);
+    }
+  }
 
   const { data: all } = await supabase
     .from("categories")

@@ -77,6 +77,25 @@ export function kataFamilyOf(kataBaseName: string): KataFamily | null {
  * is dropped into its own "Other" bucket at the end rather than silently
  * disappearing.
  */
+/** True for one of the five real family names. Guards the free-text
+ * categories.kata_family column, so a typo or a stale value in the database
+ * can never invent a sixth family box. */
+export function isKataFamily(value: string | null | undefined): value is KataFamily {
+  return !!value && (KATA_FAMILIES as readonly string[]).includes(value);
+}
+
+/** Which family this kata sits in FOR THIS COMPETITION: the organizer's own
+ * override if one has been set, otherwise the canonical map.
+ *
+ * The override lives on every category row sharing the kata's base name (see
+ * setKataFamily, which writes them together), so reading the first one that
+ * carries a valid value is enough. */
+export function familyOfGroup(base: string, cats: Category[]): KataFamily | "Other" {
+  const override = cats.find((c) => isKataFamily(c.kata_family))?.kata_family;
+  if (isKataFamily(override)) return override;
+  return kataFamilyOf(base) ?? "Other";
+}
+
 export function groupByFamily(
   categories: Category[],
 ): Array<[KataFamily | "Other", Array<[string, Category[]]>]> {
@@ -84,8 +103,8 @@ export function groupByFamily(
   const buckets = new Map<KataFamily | "Other", Array<[string, Category[]]>>();
   for (const family of KATA_FAMILIES) buckets.set(family, []);
   for (const entry of byKata) {
-    const [base] = entry;
-    const family = kataFamilyOf(base) ?? "Other";
+    const [base, cats] = entry;
+    const family = familyOfGroup(base, cats);
     if (!buckets.has(family)) buckets.set(family, []);
     buckets.get(family)!.push(entry);
   }
@@ -99,7 +118,9 @@ export function groupByFamily(
  * family, for a single competition -- the input a family-wide merge acts
  * on. */
 export function categoriesInFamily(categories: Category[], family: KataFamily): Category[] {
-  return categories.filter((c) => kataFamilyOf(kataBaseOf(c.name)) === family);
+  return categories.filter((c) =>
+    isKataFamily(c.kata_family) ? c.kata_family === family : kataFamilyOf(kataBaseOf(c.name)) === family,
+  );
 }
 
 /** Unique kata event names for the given categories, in the organizer's

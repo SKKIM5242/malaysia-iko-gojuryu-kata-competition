@@ -3,7 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { schemaReady, getCategories } from "@/lib/data";
 import { getAllCompetitions } from "@/lib/admin-data";
 import { loadRecordingsByCategory } from "@/lib/arena";
-import { groupByFamily, adjacentKataOf } from "@/lib/kata-families";
+import { groupByFamily, adjacentKataOf, familyOfGroup, isKataFamily } from "@/lib/kata-families";
+import KataFamilyControl from "@/components/KataFamilyControl";
 import { kataBaseOf } from "@/lib/division";
 import KataGroupDragZone from "@/components/KataGroupDragZone";
 import SubcategoryDragZone from "@/components/SubcategoryDragZone";
@@ -217,7 +218,7 @@ export default async function KataCategoriesPage() {
                   {cats.length === 0 ? (
                     <p className="text-sm text-neutral-400">Categories have not been published yet.</p>
                   ) : (
-                    <div className="space-y-6">
+                    <div className="space-y-6" data-drag-list={`kata-cat-groups-${competition.id}`}>
                       {groupByFamily(cats).map(([family, kataGroups]) => {
                         const totalCats = kataGroups.reduce((sum, [, subCats]) => sum + subCats.length, 0);
                         const alreadyMerged =
@@ -242,7 +243,7 @@ export default async function KataCategoriesPage() {
                               </CategoryActionButton>
                             )}
                           </div>
-                          <div className="space-y-2" data-drag-list={`kata-cat-groups-${competition.id}-${family}`}>
+                          <div className="space-y-2" data-drag-family={family}>
                             {kataGroups.map(([base, subCats]) => {
                               const neighborAbove = adjacentKataOf(base, "above");
                               const neighborBelow = adjacentKataOf(base, "below");
@@ -259,10 +260,17 @@ export default async function KataCategoriesPage() {
                                 <summary className="flex cursor-pointer items-center gap-2 px-4 py-2.5 text-sm font-semibold text-neutral-800 hover:bg-neutral-50">
                                   {canManageKata ? (
                                     <KataGroupDragZone competitionId={competition.id} base={base} returnTo="/kata-categories">
-                                      <span>
+                                      <span className="min-w-0 flex-1">
                                         <NoTranslate>{base}</NoTranslate>{" "}
                                         <span className="font-normal text-neutral-400">({subCats.length} sub-categories)</span>
                                       </span>
+                                      <KataFamilyControl
+                                        competitionId={competition.id}
+                                        base={base}
+                                        currentFamily={familyOfGroup(base, subCats)}
+                                        isOverridden={subCats.some((cat) => isKataFamily(cat.kata_family))}
+                                        returnTo="/kata-categories"
+                                      />
                                     </KataGroupDragZone>
                                   ) : (
                                     <span>

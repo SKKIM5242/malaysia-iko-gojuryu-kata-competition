@@ -40,6 +40,20 @@ export default function KataGroupDragZone({
     fd.set("target_base", targetBase);
     fd.set("position", position);
     fd.set("return_to", returnTo);
+    // Which family box the kata was dropped INTO. Read off the DOM at drop
+    // time rather than tracked through the drag, because the only thing that
+    // decides it is where the pointer finally landed. Empty when the drop
+    // stayed in the kata's own family, in which case the action just
+    // reorders and leaves the family alone.
+    const targetEl = document.querySelector<HTMLElement>(
+      `[data-drag-item="${CSS.escape(targetBase)}"]`,
+    );
+    const targetFamily = targetEl?.closest<HTMLElement>("[data-drag-family]")?.dataset.dragFamily ?? "";
+    const sourceEl = document.querySelector<HTMLElement>(
+      `[data-drag-item="${CSS.escape(sourceBase)}"]`,
+    );
+    const sourceFamily = sourceEl?.closest<HTMLElement>("[data-drag-family]")?.dataset.dragFamily ?? "";
+    if (targetFamily && targetFamily !== sourceFamily) fd.set("target_family", targetFamily);
     startTransition(() => {
       reorderCategoryGroups(fd);
     });

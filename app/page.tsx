@@ -205,13 +205,13 @@ export default async function Home() {
                           </>
                         )}
                       </p>
-                      <div className="space-y-6">
+                      <div className="space-y-6" data-drag-list={`home-kata-groups-${competition.id}`}>
                         {groupByFamily(cats).map(([family, kataGroups]) => (
                           <div key={family}>
                             <h4 className="mb-2 text-xs font-bold uppercase tracking-wide text-neutral-500">
                               {family} Kata
                             </h4>
-                            <div className="space-y-2" data-drag-list={`home-kata-groups-${competition.id}-${family}`}>
+                            <div className="space-y-2" data-drag-family={family}>
                               {kataGroups.map(([base, subCats]) => {
                                 const neighborAbove = adjacentKataOf(base, "above");
                                 const neighborBelow = adjacentKataOf(base, "below");

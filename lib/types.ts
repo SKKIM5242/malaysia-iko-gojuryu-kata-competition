@@ -143,6 +143,10 @@ export interface Category {
   gender: string | null;
   sort_order: number;
   max_participants: number | null;
+  /** Per-competition override of the canonical kata family. NULL means use
+   * the CANONICAL_KATA_ORDER map in lib/kata-families.ts, which is the case
+   * for every row until an organizer moves a kata. */
+  kata_family?: string | null;
   created_at: string;
 }
 

@@ -13,7 +13,8 @@ import CategoryActionButton from "@/components/CategoryActionButton";
 import { AddKataForm, RenameKataControl } from "@/components/KataAdminControls";
 import DateField from "@/components/DateField";
 import { kataBaseOf } from "@/lib/division";
-import { groupByFamily, adjacentKataOf } from "@/lib/kata-families";
+import { groupByFamily, adjacentKataOf, familyOfGroup, isKataFamily } from "@/lib/kata-families";
+import KataFamilyControl from "@/components/KataFamilyControl";
 import {
   WATERMARK_FONT_OPTIONS, WATERMARK_DIRECTION_OPTIONS,
   DEFAULT_WATERMARK_TEXT, DEFAULT_WATERMARK_FONT_FAMILY, DEFAULT_WATERMARK_COLOR,
@@ -515,7 +516,7 @@ export default async function AdminCompetitions({
                     {(categoriesByCompetition.get(c.id) ?? []).length === 0 ? (
                       <p className="text-sm text-neutral-400">None yet — click &quot;+ Add category&quot; above to add one.</p>
                     ) : (
-                      <div className="space-y-4">
+                      <div className="space-y-4" data-drag-list={`kata-groups-${c.id}`}>
                         {groupByFamily(categoriesByCompetition.get(c.id) ?? []).map(([family, kataGroups]) => {
                           const totalCats = kataGroups.reduce((sum, [, cats]) => sum + cats.length, 0);
                           const alreadyMerged =
@@ -538,7 +539,7 @@ export default async function AdminCompetitions({
                                   </CategoryActionButton>
                                 )}
                               </div>
-                              <div className="space-y-2" data-drag-list={`kata-groups-${c.id}-${family}`}>
+                              <div className="space-y-2" data-drag-family={family}>
                                 {kataGroups.map(([base, cats]) => {
                           const kyuCats = cats.filter((cat) => cat.belt_group === "kyu");
                           const danCats = cats.filter((cat) => cat.belt_group === "dan");
@@ -566,10 +567,17 @@ export default async function AdminCompetitions({
                               </span>
                               {canManageCompetition ? (
                                 <KataGroupDragZone competitionId={c.id} base={base} returnTo={categoryReturnTo(c.id, base)}>
-                                  <span>
+                                  <span className="min-w-0 flex-1">
                                     <NoTranslate>{base}</NoTranslate>{" "}
                                     <span className="font-normal text-neutral-400">({cats.length} sub-categories)</span>
                                   </span>
+                                  <KataFamilyControl
+                                    competitionId={c.id}
+                                    base={base}
+                                    currentFamily={familyOfGroup(base, cats)}
+                                    isOverridden={cats.some((cat) => isKataFamily(cat.kata_family))}
+                                    returnTo={categoryReturnTo(c.id, base)}
+                                  />
                                 </KataGroupDragZone>
                               ) : (
                                 <span>
