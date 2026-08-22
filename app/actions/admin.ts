@@ -7518,3 +7518,51 @@ export async function deleteStorageObjects(formData: FormData): Promise<SpecSave
   revalidatePath("/admin/storage");
   return { ok: true };
 }
+
+/** Deletes ONE stored object. Admin/Organizer only.
+ *
+ * Separate from deleteStorageObjects (which empties a whole bucket) because
+ * the risk is different: this is the surgical case — a bad take, a
+ * duplicate, a test file — and it refuses to remove a file a live database
+ * row still points at, which is the mistake that cannot be undone.
+ */
+export async function deleteStorageObject(formData: FormData): Promise<SpecSaveResult> {
+  const bucket = String(formData.get("bucket") ?? "");
+  const path = String(formData.get("path") ?? "");
+  if (!bucket || !path) return { ok: false, error: "Missing file." };
+
+  const { supabase, actorId } = await getActor();
+  const role = await getActorRole(supabase, actorId);
+  if (!["admin", "organizer"].includes(role ?? "")) {
+    return { ok: false, error: "Only Admin / Organizer can delete stored files." };
+  }
+
+  const admin = createAdminClient();
+
+  // A recording still attached to a submission is the one file that must not
+  // vanish: the competitor cannot perform it again once their competition is
+  // over. Unlink it first if it really has to go.
+  if (bucket === "kata-videos") {
+    const { count } = await admin
+      .from("kata_videos")
+      .select("id", { count: "exact", head: true })
+      .eq("storage_path", path);
+    if ((count ?? 0) > 0) {
+      return { ok: false, error: "A submitted recording still points at this file — delete the submission first." };
+    }
+  }
+  if (bucket === "testimonials") {
+    const { count } = await admin
+      .from("winner_testimonials")
+      .select("id", { count: "exact", head: true })
+      .eq("media_path", path);
+    if ((count ?? 0) > 0) {
+      return { ok: false, error: "A testimonial still points at this file — remove the testimonial first." };
+    }
+  }
+
+  const { error } = await admin.storage.from(bucket).remove([path]);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/admin/storage");
+  return { ok: true };
+}

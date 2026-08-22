@@ -12,11 +12,16 @@ import {
 import { createAdminClient } from "@/lib/supabase/admin";
 import RecordingSpecTable from "@/components/RecordingSpecTable";
 import BucketPurgeButton from "@/components/BucketPurgeButton";
+import BucketDownloadButton from "@/components/BucketDownloadButton";
+import StorageFileTable from "@/components/StorageFileTable";
 import { SPEC_IDS, codeDefault, type RecordingSpec, type SpecId } from "@/lib/recording-specs";
 
 export const dynamic = "force-dynamic";
 
-const STAFF_ROLES = ["admin", "organizer", "staff"];
+// Admin / Organizer only. Staff and Participant Support are deliberately out:
+// this page lists every competitor unreleased recording by name and hands out
+// working download links for them.
+const STAFF_ROLES = ["admin", "organizer"];
 
 /** What one recording of each kind costs, straight from the same helper the
  * recorders use — so this page can never quote a figure the app has since
@@ -179,7 +184,7 @@ export default async function AdminStorage() {
                 <th className="px-3 py-2 text-right">Share</th>
                 <th className="px-3 py-2">Visibility</th>
                 <th className="px-3 py-2">Max per file</th>
-                {isOwner && <th className="px-3 py-2">Danger</th>}
+                <th className="px-3 py-2">Files</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100">
@@ -209,6 +214,12 @@ export default async function AdminStorage() {
                           (bucket says {formatBytes(b.fileSizeLimit as number)})
                         </span>
                       )}
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="flex flex-wrap items-center gap-1">
+                        <BucketDownloadButton bucket={b.id} files={usage.files} />
+                        {isOwner && <BucketPurgeButton bucket={b.id} files={b.files} />}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -258,48 +269,8 @@ export default async function AdminStorage() {
 
       <RecordingSpecTable specs={specs} returnTo="/admin/storage" canEdit={canEditSpecs} />
 
-      {/* ---- Largest objects ---- */}
-      <section>
-        <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-neutral-500">20 largest files</h2>
-        <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white shadow-sm">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-neutral-200 bg-neutral-50 text-[10px] uppercase tracking-wide text-neutral-500">
-              <tr>
-                <th className="px-3 py-2">Bucket</th>
-                <th className="px-3 py-2">Path</th>
-                <th className="px-3 py-2 text-right">Size</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-100">
-              {usage.largest.map((o) => (
-                <tr key={`${o.bucket}/${o.path}`}>
-                  <td className="px-3 py-2 whitespace-nowrap text-xs font-semibold text-neutral-700">{o.bucket}</td>
-                  <td className="px-3 py-2 break-all font-mono text-[11px] text-neutral-500">{o.path}</td>
-                  <td
-                    className={
-                      "px-3 py-2 text-right font-semibold tabular-nums " +
-                      (o.bytes > UPLOAD_CEILING_BYTES ? "text-red-700" : "text-neutral-900")
-                    }
-                  >
-                    {formatBytes(o.bytes)}
-                  </td>
-                </tr>
-              ))}
-              {usage.largest.length === 0 && (
-                <tr>
-                  <td colSpan={3} className="px-3 py-4 text-center text-sm text-neutral-400">
-                    Nothing stored yet.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-        <p className="mt-2 max-w-3xl text-[11px] text-neutral-500">
-          Anything in red is larger than the current upload ceiling — it predates the ceiling or the current
-          recording settings, and is the first place to look when freeing space.
-        </p>
-      </section>
+      <StorageFileTable files={usage.files} canDelete={canEditSpecs} />
+
     </AdminShell>
   );
 }
