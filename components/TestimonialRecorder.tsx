@@ -509,13 +509,26 @@ function MediaTestimonialPanel({
       const { bannerH, footerH } = chromeHeights(width, recordingAppearance);
       chromeRef.current = { bannerH, footerH };
       canvas.width = width;
-      canvas.height = video.videoHeight + bannerH + footerH;
+      // The footer no longer gets height of its own. It used to add a band
+      // BELOW the picture, so the bottom of every testimonial was a strip of
+      // black with a line of text on it. Now the picture runs all the way to
+      // the bottom of the frame and the watermark floats over it -- which is
+      // what "see-through" has to mean, since a transparent band over black
+      // is still black. The banner keeps its own height: it carries the
+      // competition title and has to be readable, not a watermark.
+      canvas.height = video.videoHeight + bannerH;
+      // These drive the DOM overlay's inset. They were declared and never
+      // assigned, so both sat at 0 and the overlay spanned the WHOLE canvas
+      // -- which is why the "Testimonial" label rode up over the banner and
+      // the record button landed on top of the watermark.
+      setBannerRatio(bannerH / canvas.height);
+      setFooterRatio(footerH / canvas.height);
     }
     const { bannerH, footerH } = chromeRef.current;
 
     ctx.fillStyle = "#000000";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(video, 0, bannerH, canvas.width, canvas.height - bannerH - footerH);
+    ctx.drawImage(video, 0, bannerH, canvas.width, canvas.height - bannerH);
     drawRecordingChrome(ctx, canvas.width, canvas.height, bannerH, footerH, recordingAppearance, logoRef.current);
 
     rafRef.current = requestAnimationFrame(renderLoop);
@@ -817,62 +830,72 @@ function MediaTestimonialPanel({
                     wrapper is already inset past the banner and footer
                     bands, so "top" here means under the banner, never over
                     it. */}
-                {phase === "live" ? (
-                  <PoseGuideOverlay label="Testimonial" note={POSE_GUIDE_NOTE} />
-                ) : (
+                {phase === "live" && <PoseGuideOverlay label="" note={POSE_GUIDE_NOTE} />}
+
+                {/* One stack, top-left, in the order asked for: the word,
+                    then the timer with its red dot, then the "keep going"
+                    note. All three live INSIDE this inset wrapper, which
+                    spans banner-bottom to footer-top, so none of them can
+                    ride up over the banner the way the SVG's own label did
+                    -- that label sat in the guide's letterboxed coordinate
+                    space, not in the picture's. */}
+                <div className="pointer-events-none absolute left-2 top-1 flex flex-col items-start gap-1">
                   <span
-                    className="absolute left-2 top-1 text-xs font-semibold text-white"
+                    className="text-xs font-semibold text-white"
                     style={{ textShadow: "0 1px 3px rgba(0,0,0,0.85)" }}
                   >
                     Testimonial
                   </span>
-                )}
-              </div>
-              {/* Controls sit ON the picture rather than in a row beneath
-                  it: on a phone the preview already fills the screen, so a
-                  Start button below the fold meant scrolling away from your
-                  own framing in order to press it. */}
-              {phase === "recording" && (
-                <div className="absolute right-2 top-1 flex flex-col items-end gap-0.5">
-                  <span className="rounded-full bg-black/70 px-2 py-0.5 font-mono text-[11px] font-bold text-white">
-                    ● {mmss(seconds)} / {mmss(maxSeconds)}
-                  </span>
-                  {takeType === "actual" && seconds < minSeconds && (
-                    <span className="rounded-full bg-amber-500/90 px-2 py-0.5 text-[10px] font-semibold text-white">
-                      Keep going — {mmss(minSeconds)} needed
-                    </span>
+                  {phase === "recording" && (
+                    <>
+                      <span className="flex items-center gap-1.5 rounded-full bg-black/70 px-2 py-0.5 font-mono text-[11px] font-bold text-white">
+                        <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" />
+                        {mmss(seconds)} / {mmss(maxSeconds)}
+                      </span>
+                      {takeType === "actual" && seconds < minSeconds && (
+                        <span className="rounded-full bg-amber-400/95 px-2 py-0.5 text-[10px] font-semibold text-neutral-900">
+                          Keep going — {mmss(minSeconds)} needed
+                        </span>
+                      )}
+                    </>
                   )}
                 </div>
-              )}
-              <div className="absolute inset-x-0 bottom-2 flex items-center justify-center gap-3">
-                {phase === "live" ? (
+
+                {/* Sits at the BOTTOM of the picture area, so it clears the
+                    footer watermark instead of covering it. Inside the inset
+                    wrapper is what makes that automatic -- pinned to the
+                    outer box it tracked the canvas edge and landed on top of
+                    the watermark. */}
+                <div className="absolute inset-x-0 bottom-2 flex items-center justify-center gap-3">
+                  {phase === "live" ? (
+                    <button
+                      type="button"
+                      onClick={switchCamera}
+                      className="rounded-full border border-white/50 bg-black/50 px-3 py-1.5 text-xs font-semibold text-white hover:bg-black/70"
+                    >
+                      {facing === "user" ? "📷 Rear" : "🤳 Front"}
+                    </button>
+                  ) : (
+                    <span className="w-16" />
+                  )}
                   <button
                     type="button"
-                    onClick={switchCamera}
-                    className="rounded-full border border-white/50 bg-black/50 px-3 py-1.5 text-xs font-semibold text-white hover:bg-black/70"
+                    onClick={phase === "live" ? () => void beginTake() : stopRecording}
+                    aria-label={phase === "live" ? "Start recording" : "Stop recording"}
+                    className={
+                      "flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-4 border-white/80 text-xl text-white shadow-lg active:scale-95 " +
+                      (phase === "live" ? "bg-red-600/90" : "bg-neutral-800/90")
+                    }
                   >
-                    {facing === "user" ? "📷 Rear" : "🤳 Front"}
+                    {phase === "live" ? "●" : "■"}
                   </button>
-                ) : (
-                  <span className="w-16" />
-                )}
-                <button
-                  type="button"
-                  onClick={phase === "live" ? () => void beginTake() : stopRecording}
-                  aria-label={phase === "live" ? "Start recording" : "Stop recording"}
-                  className={
-                    "flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-4 border-white/80 text-xl text-white shadow-lg active:scale-95 " +
-                    (phase === "live" ? "bg-red-600/90" : "bg-neutral-800/90")
-                  }
-                >
-                  {phase === "live" ? "●" : "■"}
-                </button>
-                <span
-                  className="w-16 text-center text-[10px] font-semibold text-white/85"
-                  style={{ textShadow: "0 1px 3px rgba(0,0,0,0.85)" }}
-                >
-                  {phase === "live" ? "Tap to start" : "Tap to stop"}
-                </span>
+                  <span
+                    className="w-16 text-center text-[10px] font-semibold text-white/85"
+                    style={{ textShadow: "0 1px 3px rgba(0,0,0,0.85)" }}
+                  >
+                    {phase === "live" ? "Tap to start" : "Tap to stop"}
+                  </span>
+                </div>
               </div>
             </div>
           </div>

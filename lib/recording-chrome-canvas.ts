@@ -189,8 +189,20 @@ export function drawRecordingChrome(
   const footer = footerLine(settings);
   if (footer && footerH > 0) {
     const top = canvasHeight - footerH;
-    ctx.fillStyle = "rgba(0,0,0,0.7)";
-    ctx.fillRect(0, top, canvasWidth, footerH);
+    // No band behind the footer any more -- it is a WATERMARK, so the
+    // picture shows straight through it. The solid black bar it used to sit
+    // on was costing real height at the bottom of every testimonial for
+    // nothing but a background.
+    //
+    // A drop shadow replaces the band: white text alone disappears over a
+    // pale wall or a bright window, which is most of the rooms people record
+    // in. The shadow tracks the text rather than a rectangle, so it stays
+    // legible without taking the picture back.
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.85)";
+    ctx.shadowBlur = 4 * scale;
+    ctx.shadowOffsetY = 1 * scale;
     drawLine(ctx, footer, canvasWidth, top + FOOTER_PAD_Y * scale, scale);
+    ctx.restore();
   }
 }
