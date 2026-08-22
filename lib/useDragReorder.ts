@@ -52,7 +52,26 @@ export function useDragReorder(onReorder: (sourceKey: string, targetKey: string,
     const list = handle.closest<HTMLElement>("[data-drag-list]");
     if (!item || !list) return;
 
-    const siblings = Array.from(list.querySelectorAll<HTMLElement>("[data-drag-item]"));
+    // Only the TOP-LEVEL drag items of this list are valid drop targets.
+    //
+    // querySelectorAll is recursive, so on the kata pages it also matched
+    // every sub-category row nested inside each kata group — those rows
+    // carry data-drag-item too (their own id, for reordering belts/ages
+    // within a kata). Dropping a kata group onto one of them sent that
+    // row's category UUID as `target_base`, which matches no kata name, so
+    // reorderCategoryGroups bailed with "Could not reorder — try again."
+    // Since the groups are normally expanded when you are looking at them,
+    // those nested rows covered most of the drop area and reordering
+    // appeared to do nothing at all.
+    //
+    // A target counts as top-level when it has no OTHER drag item between
+    // it and this list. That keeps sub-category dragging working too: for
+    // their own list the enclosing kata group sits outside it, so it is not
+    // an intermediate ancestor.
+    const siblings = Array.from(list.querySelectorAll<HTMLElement>("[data-drag-item]")).filter((el) => {
+      const parentItem = el.parentElement?.closest<HTMLElement>("[data-drag-item]");
+      return !parentItem || !list.contains(parentItem);
+    });
     const targets = siblings
       .filter((el) => el !== item)
       .map((el) => ({ key: el.getAttribute("data-drag-item")!, rect: el.getBoundingClientRect() }));
