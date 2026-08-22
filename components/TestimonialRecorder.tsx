@@ -417,12 +417,15 @@ function MediaTestimonialPanel({
           : { audio: audioConstraints },
       );
       streamRef.current = stream;
-      if (isVideo && videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play().catch(() => {});
-        rafRef.current = requestAnimationFrame(renderLoop);
-      }
       setFacing(requestedFacing);
+      // Attaching the stream to the <video> USED to happen right here, and
+      // it could not work: this function runs while the phase is still
+      // "idle", and the <video> is only rendered once the phase is "live".
+      // videoRef.current was therefore null, the assignment was skipped
+      // silently, the render loop never started -- and the canvas (which is
+      // what gets recorded) stayed black for the whole take. Flipping the
+      // phase is all this does now; the effect below wires the stream up
+      // once the element actually exists.
       setPhase("live");
     } catch {
       setError("Could not access your camera/microphone. Check your browser permissions and try again.");
@@ -465,6 +468,32 @@ function MediaTestimonialPanel({
    * mid-recording disturbs the video track that captureStream() already
    * handed to MediaRecorder, which is a corrupted take rather than a
    * cosmetic glitch. */
+  /** Connects the camera to the <video>, and the <video> to the canvas
+   * render loop, as soon as BOTH exist.
+   *
+   * Keyed on phase because the <video> mounts with the "live" phase, one
+   * render after startLive() has the stream in hand. Doing it here rather
+   * than inside startLive() removes the ordering assumption entirely: it no
+   * longer matters whether the element or the stream arrives first.
+   *
+   * Idempotent on purpose — it re-runs on every phase change (live ->
+   * recording -> review), and starting a second requestAnimationFrame loop
+   * would double the frame rate written into the canvas. */
+  useEffect(() => {
+    if (!isVideo) return;
+    const video = videoRef.current;
+    const stream = streamRef.current;
+    if (!video || !stream) return;
+    if (video.srcObject !== stream) {
+      video.srcObject = stream;
+      void video.play().catch(() => {});
+    }
+    if (rafRef.current == null) rafRef.current = requestAnimationFrame(renderLoop);
+    // renderLoop is stable for the life of the component and re-creating
+    // this effect on every render would restart the loop constantly.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, isVideo]);
+
   function renderLoop() {
     const video = videoRef.current;
     const canvas = canvasRef.current;
@@ -501,6 +530,10 @@ function MediaTestimonialPanel({
   async function switchCamera() {
     const next = facing === "user" ? "environment" : "user";
     if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+    // Null, not just cancelled: the attach effect uses this as its "is a
+    // loop already running?" guard, and a stale handle would stop it ever
+    // starting a new one.
+    rafRef.current = null;
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
     chromeRef.current = null;
@@ -598,6 +631,11 @@ function MediaTestimonialPanel({
     setBlobUrl(null);
     recordedBlobRef.current = null;
     setSeconds(0);
+    if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+    rafRef.current = null;
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    chromeRef.current = null;
     setPhase("idle");
     await startLive();
   }

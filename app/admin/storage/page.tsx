@@ -14,6 +14,7 @@ import RecordingSpecTable from "@/components/RecordingSpecTable";
 import BucketPurgeButton from "@/components/BucketPurgeButton";
 import BucketDownloadButton from "@/components/BucketDownloadButton";
 import StorageFileTable from "@/components/StorageFileTable";
+import StorageProjections from "@/components/StorageProjections";
 import { SPEC_IDS, codeDefault, type RecordingSpec, type SpecId } from "@/lib/recording-specs";
 
 export const dynamic = "force-dynamic";
@@ -272,6 +273,8 @@ export default async function AdminStorage() {
       </section>
 
       <RecordingSpecTable specs={specs} returnTo="/admin/storage" canEdit={canEditSpecs} />
+
+      <StorageProjections />
 
       <StorageFileTable files={usage.files} canDelete={canEditSpecs} />
 
