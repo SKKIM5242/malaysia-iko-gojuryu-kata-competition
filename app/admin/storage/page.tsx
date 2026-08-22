@@ -9,6 +9,9 @@ import {
   formatBytes,
   PLAN_QUOTAS,
 } from "@/lib/storage-usage";
+import { createAdminClient } from "@/lib/supabase/admin";
+import RecordingSpecTable from "@/components/RecordingSpecTable";
+import { SPEC_IDS, codeDefault, type RecordingSpec, type SpecId } from "@/lib/recording-specs";
 
 export const dynamic = "force-dynamic";
 
@@ -68,6 +71,27 @@ export default async function AdminStorage() {
   const usage = await getStorageUsage();
   const projectRef = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").replace("https://", "").split(".")[0];
   const estimates = perRecordingEstimates();
+
+  // Falls back to what the code does for any row not yet in the table, so
+  // this renders correctly even before the migration's seed has run.
+  const { data: specRows } = await createAdminClient()
+    .from("recording_specs")
+    .select("id, resolution, fps, video_kbps, audio_kbps, applied, updated_at");
+  const byId = new Map((specRows ?? []).map((r) => [r.id as string, r]));
+  const specs: RecordingSpec[] = SPEC_IDS.map((id) => {
+    const row = byId.get(id);
+    const d = codeDefault(id as SpecId);
+    return {
+      id,
+      resolution: (row?.resolution as string) ?? d.resolution,
+      fps: (row?.fps as number) ?? d.fps,
+      videoKbps: (row?.video_kbps as number) ?? d.videoKbps,
+      audioKbps: (row?.audio_kbps as number) ?? d.audioKbps,
+      applied: Boolean(row?.applied),
+      updatedAt: (row?.updated_at as string) ?? null,
+    };
+  });
+  const canEditSpecs = ["admin", "organizer"].includes((myProfile?.role as string) ?? "");
 
   return (
     <AdminShell title="Storage" active="/admin/storage">
@@ -211,6 +235,8 @@ export default async function AdminStorage() {
           quality is ever changed.
         </p>
       </section>
+
+      <RecordingSpecTable specs={specs} returnTo="/admin/storage" canEdit={canEditSpecs} />
 
       {/* ---- Largest objects ---- */}
       <section>

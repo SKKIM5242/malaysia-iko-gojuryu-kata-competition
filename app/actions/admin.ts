@@ -9,6 +9,7 @@ import { writeAudit } from "@/lib/audit";
 import { headers } from "next/headers";
 import { kataBaseOf, groupByKata, ageAt, resolveCategory, AGE_BRACKETS } from "@/lib/division";
 import { KATA_FAMILIES, categoriesInFamily, adjacentKataOf, isKataFamily, type KataFamily } from "@/lib/kata-families";
+import { SPEC_IDS, codeDefault, type SpecId } from "@/lib/recording-specs";
 import { WATERMARK_DIRECTIONS } from "@/lib/watermark";
 import {
   logCategoryMerge, snapshotRegistrationCategories, undoLastCategoryMerge,
@@ -7370,4 +7371,68 @@ async function tierFeeUsd(
     .eq("id", competitionId)
     .maybeSingle();
   return Number(data?.registration_fee_usd ?? 0);
+}
+
+/** Saves one row of the recording specification table on /admin/storage.
+ *
+ * These are DELIBERATELY inert by default. `applied` is what would make a
+ * spec drive real recording, and nothing reads it yet -- the recorders still
+ * take their settings from lib/media-recording.ts. Changing the quality of
+ * recordings that competitors have already been told to make is not
+ * something a form should do as a side effect of somebody modelling costs,
+ * so the two are kept separate until wiring it up is an explicit decision.
+ */
+export async function saveRecordingSpec(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const returnTo = String(formData.get("return_to") ?? "") || "/admin/storage";
+  if (!SPEC_IDS.includes(id as SpecId)) backTo(returnTo, { error: "Unknown recording type." });
+
+  const { supabase, actorId } = await getActor();
+  const role = await getActorRole(supabase, actorId);
+  if (!["admin", "organizer"].includes(role ?? "")) {
+    backTo(returnTo, { error: "Only Admin / Organizer can change recording specifications." });
+  }
+
+  // "reset" restores whatever the CODE currently does, rather than a figure
+  // stored here that could have drifted away from it.
+  if (String(formData.get("reset") ?? "") === "1") {
+    const d = codeDefault(id as SpecId);
+    const { error } = await createAdminClient()
+      .from("recording_specs")
+      .upsert({
+        id,
+        resolution: d.resolution,
+        fps: d.fps,
+        video_kbps: d.videoKbps,
+        audio_kbps: d.audioKbps,
+        applied: false,
+        updated_at: new Date().toISOString(),
+        updated_by: actorId,
+      });
+    if (error) backTo(returnTo, { error: `Could not reset: ${error.message}` });
+    backTo(returnTo, { ok: `${id} reset to the current system default.` });
+  }
+
+  const resolution = String(formData.get("resolution") ?? "").trim();
+  const fps = Number(formData.get("fps") ?? 0);
+  const videoKbps = Math.round(Number(formData.get("video_mbps") ?? 0) * 1000);
+  const audioKbps = Math.round(Number(formData.get("audio_kbps") ?? 96));
+  if (!resolution || !Number.isFinite(fps) || !Number.isFinite(videoKbps)) {
+    backTo(returnTo, { error: "Those numbers don't look right — try again." });
+  }
+
+  const { error } = await createAdminClient()
+    .from("recording_specs")
+    .upsert({
+      id,
+      resolution,
+      fps,
+      video_kbps: videoKbps,
+      audio_kbps: audioKbps,
+      applied: false,
+      updated_at: new Date().toISOString(),
+      updated_by: actorId,
+    });
+  if (error) backTo(returnTo, { error: `Could not save: ${error.message}` });
+  backTo(returnTo, { ok: "Recording specification saved." });
 }
