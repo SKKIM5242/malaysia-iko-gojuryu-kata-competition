@@ -5,6 +5,7 @@ import { getAllCompetitions } from "@/lib/admin-data";
 import { loadRecordingsByCategory } from "@/lib/arena";
 import { groupByFamily, adjacentKataOf, familyOfGroup, isKataFamily } from "@/lib/kata-families";
 import KataFamilyControl from "@/components/KataFamilyControl";
+import KataOrderControl from "@/components/KataOrderControl";
 import { kataBaseOf } from "@/lib/division";
 import KataGroupDragZone from "@/components/KataGroupDragZone";
 import SubcategoryDragZone from "@/components/SubcategoryDragZone";
@@ -244,7 +245,7 @@ export default async function KataCategoriesPage() {
                             )}
                           </div>
                           <div className="space-y-2" data-drag-family={family}>
-                            {kataGroups.map(([base, subCats]) => {
+                            {kataGroups.map(([base, subCats], kataIndex) => {
                               const neighborAbove = adjacentKataOf(base, "above");
                               const neighborBelow = adjacentKataOf(base, "below");
                               const kyuCats = subCats.filter((cat) => cat.belt_group === "kyu");
@@ -257,13 +258,20 @@ export default async function KataCategoriesPage() {
                               const kataTaken = subCats.reduce((n, cat) => n + (categoryTaken.get(cat.id) ?? 0), 0);
                               return (
                               <details key={base} data-drag-item={base} className="rounded-lg border border-neutral-200 bg-white shadow-sm">
-                                <summary className="flex cursor-pointer items-center gap-2 px-4 py-2.5 text-sm font-semibold text-neutral-800 hover:bg-neutral-50">
+                                <summary className="flex cursor-pointer flex-wrap items-center gap-2 px-4 py-2.5 text-sm font-semibold text-neutral-800 hover:bg-neutral-50">
                                   {canManageKata ? (
                                     <KataGroupDragZone competitionId={competition.id} base={base} returnTo="/kata-categories">
-                                      <span className="min-w-0 flex-1">
+                                      <span className="min-w-[9rem] flex-1">
                                         <NoTranslate>{base}</NoTranslate>{" "}
                                         <span className="font-normal text-neutral-400">({subCats.length} sub-categories)</span>
                                       </span>
+                                      <KataOrderControl
+                                        competitionId={competition.id}
+                                        base={base}
+                                        position={kataIndex + 1}
+                                        total={kataGroups.length}
+                                        returnTo="/kata-categories"
+                                      />
                                       <KataFamilyControl
                                         competitionId={competition.id}
                                         base={base}
@@ -279,7 +287,7 @@ export default async function KataCategoriesPage() {
                                     </span>
                                   )}
                                   {canManageKata && (
-                                    <span className="ml-auto flex flex-wrap gap-1">
+                                    <span className="ml-auto flex flex-wrap items-center gap-1">
                                       <RenameKataControl competitionId={competition.id} base={base} returnTo="/kata-categories" />
                                       {kataTaken > 0 ? (
                                         <span

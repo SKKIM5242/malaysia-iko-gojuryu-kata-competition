@@ -15,6 +15,7 @@ import DateField from "@/components/DateField";
 import { kataBaseOf } from "@/lib/division";
 import { groupByFamily, adjacentKataOf, familyOfGroup, isKataFamily } from "@/lib/kata-families";
 import KataFamilyControl from "@/components/KataFamilyControl";
+import KataOrderControl from "@/components/KataOrderControl";
 import {
   WATERMARK_FONT_OPTIONS, WATERMARK_DIRECTION_OPTIONS,
   DEFAULT_WATERMARK_TEXT, DEFAULT_WATERMARK_FONT_FAMILY, DEFAULT_WATERMARK_COLOR,
@@ -540,7 +541,7 @@ export default async function AdminCompetitions({
                                 )}
                               </div>
                               <div className="space-y-2" data-drag-family={family}>
-                                {kataGroups.map(([base, cats]) => {
+                                {kataGroups.map(([base, cats], kataIndex) => {
                           const kyuCats = cats.filter((cat) => cat.belt_group === "kyu");
                           const danCats = cats.filter((cat) => cat.belt_group === "dan");
                           const kyuMerged = kyuCats.length === 1 && kyuCats[0].name === `${base} — Color/Kyu Belt — Combined (All Ages & Genders)`;
@@ -561,13 +562,13 @@ export default async function AdminCompetitions({
                             className="group rounded border border-neutral-100"
                             open={params.openkata === base || cats.some((cat) => cat.id === params.editcat)}
                           >
-                            <summary className="flex cursor-pointer items-center gap-2 px-2 py-1.5 text-sm font-semibold text-neutral-800 [&::-webkit-details-marker]:hidden marker:hidden hover:bg-neutral-50">
+                            <summary className="flex cursor-pointer flex-wrap items-center gap-2 px-2 py-1.5 text-sm font-semibold text-neutral-800 [&::-webkit-details-marker]:hidden marker:hidden hover:bg-neutral-50">
                               <span className="inline-block shrink-0 text-neutral-400 transition-transform group-open:rotate-90">
                                 ▶
                               </span>
                               {canManageCompetition ? (
                                 <KataGroupDragZone competitionId={c.id} base={base} returnTo={categoryReturnTo(c.id, base)}>
-                                  <span className="min-w-0 flex-1">
+                                  <span className="min-w-[9rem] flex-1">
                                     <NoTranslate>{base}</NoTranslate>{" "}
                                     <span className="font-normal text-neutral-400">({cats.length} sub-categories)</span>
                                   </span>
@@ -586,7 +587,7 @@ export default async function AdminCompetitions({
                                 </span>
                               )}
                               {canManageCompetition && (
-                                <span className="ml-auto flex flex-wrap gap-1">
+                                <span className="ml-auto flex flex-wrap items-center gap-1">
                                   <RenameKataControl competitionId={c.id} base={base} returnTo={categoryReturnTo(c.id, base)} />
                                   {kataTaken > 0 ? (
                                     <span

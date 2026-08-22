@@ -8,7 +8,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { writeAudit } from "@/lib/audit";
 import { headers } from "next/headers";
 import { kataBaseOf, groupByKata, ageAt, resolveCategory, AGE_BRACKETS } from "@/lib/division";
-import { KATA_FAMILIES, categoriesInFamily, adjacentKataOf, isKataFamily, type KataFamily } from "@/lib/kata-families";
+import { KATA_FAMILIES, categoriesInFamily, adjacentKataOf, isKataFamily, familyOfGroup, type KataFamily } from "@/lib/kata-families";
 import { SPEC_IDS, codeDefault, type SpecId } from "@/lib/recording-specs";
 import { WATERMARK_DIRECTIONS } from "@/lib/watermark";
 import {
@@ -7566,5 +7566,80 @@ export async function deleteStorageObject(formData: FormData): Promise<SpecSaveR
   const { error } = await admin.storage.from(bucket).remove([path]);
   if (error) return { ok: false, error: error.message };
   revalidatePath("/admin/storage");
+  return { ok: true };
+}
+
+/** Moves a kata to an explicit position within its family, by number.
+ *
+ * The drag handle has been unreliable enough, often enough, that ordering
+ * needs a way that cannot fail: a box you type a number into. It also works
+ * on a phone, where dragging between two family boxes that are not on screen
+ * together never really had a chance.
+ *
+ * Renumbers the WHOLE competition afterwards -- families in their canonical
+ * order, kata in their family order, sub-categories in theirs -- so the
+ * numbers shown are always 1..n with no gaps, and stay meaningful after
+ * every move.
+ */
+export async function setKataPosition(formData: FormData): Promise<SpecSaveResult> {
+  const competitionId = String(formData.get("competition_id") ?? "");
+  const base = String(formData.get("kata_base") ?? "");
+  const wanted = Number(formData.get("position") ?? 0);
+  if (!competitionId || !base || !Number.isFinite(wanted) || wanted < 1) {
+    return { ok: false, error: "Give a position of 1 or more." };
+  }
+
+  const { supabase, actorId } = await getActor();
+  const role = await getActorRole(supabase, actorId);
+  if (!["admin", "organizer"].includes(role ?? "")) {
+    return { ok: false, error: "Only Admin / Organizer can reorder kata." };
+  }
+
+  const { data: all } = await supabase
+    .from("categories")
+    .select("id, name, sort_order, kata_family")
+    .eq("competition_id", competitionId)
+    .order("sort_order")
+    .order("name");
+  const rows = (all ?? []) as Category[];
+  if (rows.length === 0) return { ok: false, error: "No categories in this competition." };
+
+  const groups = groupByKata(rows);
+  // Bucket the kata groups by the family actually shown on screen (override
+  // first, canonical second) -- reordering has to act on what the organizer
+  // is looking at, not on the built-in taxonomy.
+  const order: Array<KataFamily | "Other"> = [...KATA_FAMILIES, "Other"];
+  const byFamily = new Map<KataFamily | "Other", Array<[string, Category[]]>>();
+  for (const f of order) byFamily.set(f, []);
+  for (const g of groups) {
+    const f = familyOfGroup(g[0], g[1]);
+    byFamily.get(f)!.push(g);
+  }
+
+  const mine = [...byFamily.entries()].find(([, list]) => list.some(([b]) => b === base));
+  if (!mine) return { ok: false, error: "Could not find that kata." };
+  const [family, list] = mine;
+  const from = list.findIndex(([b]) => b === base);
+  const to = Math.min(Math.max(1, Math.round(wanted)), list.length) - 1;
+  if (from === to) return { ok: true };
+  const [moved] = list.splice(from, 1);
+  list.splice(to, 0, moved);
+  byFamily.set(family, list);
+
+  // Flatten every family back into one sequence and renumber from zero.
+  let n = 0;
+  const changes: Array<{ id: string; sort_order: number }> = [];
+  for (const f of order) {
+    for (const [, cats] of byFamily.get(f) ?? []) {
+      for (const cat of cats) {
+        if (cat.sort_order !== n) changes.push({ id: cat.id, sort_order: n });
+        n += 1;
+      }
+    }
+  }
+  await persistCategoryOrder(supabase, changes);
+  revalidatePath("/");
+  revalidatePath("/kata-categories");
+  revalidatePath("/admin/competitions");
   return { ok: true };
 }
