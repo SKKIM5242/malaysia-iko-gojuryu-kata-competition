@@ -429,7 +429,22 @@ function MediaTestimonialPanel({
       const audioConstraints: MediaTrackConstraints = {
         echoCancellation: noiseRemovalNow,
         noiseSuppression: noiseRemovalNow,
-        autoGainControl: true,
+        // OFF, deliberately, and this is the fix for the ringing.
+        //
+        // Measured against the same microphone recorded two ways: in the
+        // in-app take, energy during PAUSES was 200% of speech level at
+        // 3-6 kHz and 319% at 6-10 kHz -- the silences were louder than the
+        // voice up there, which is precisely the "eeee-ing-ing-ing" whine.
+        // The same mic through Audacity: 0-2%. Genuinely silent.
+        //
+        // That is automatic gain control doing what it does. During a pause
+        // it winds the gain up hunting for signal, lifting the microphone's
+        // own noise floor into audibility, then winds back down when speech
+        // returns. On a voice already 16 dB too quiet it was working at full
+        // range the entire time. The compressor and fixed make-up gain in
+        // buildAudioChain replace it with something that does not move on
+        // its own, so a pause stays a pause.
+        autoGainControl: false,
       };
       // Chrome/Edge only, ignored elsewhere. A stronger, model-based version
       // of the same idea — worth asking for when it exists.
@@ -755,7 +770,13 @@ function MediaTestimonialPanel({
             videoBitsPerSecond: appliedSpec?.videoBitsPerSecond ?? videoBudget.videoBitsPerSecond,
             audioBitsPerSecond: appliedSpec?.audioBitsPerSecond ?? videoBudget.audioBitsPerSecond,
           }
-        : { mimeType },
+        : // Voice takes used to pass NO bitrate at all, so they got whatever
+          // the browser felt like -- which for a mono Opus track can be as
+          // little as 32 kbps, and starving a codec is its own source of
+          // warbling. 128 kbps is generous for speech and still cheap: a
+          // full 15-minute voice testimonial comes to about 14 MB against a
+          // 50 MB ceiling, so there is no reason to be frugal here.
+          { mimeType, audioBitsPerSecond: 128_000 },
     );
     chunksRef.current = [];
     recorder.ondataavailable = (e) => {
