@@ -323,6 +323,22 @@ function MediaTestimonialPanel({
    * note where the constraints are built for why this differs from the kata
    * recorder. */
   const [noiseRemoval, setNoiseRemoval] = useState(true);
+  /** Live microphone level, 0..1, for the on-screen meter. */
+  const [micLevel, setMicLevel] = useState(0);
+  /** Running average of the level DURING a take, so the review screen can
+   * say "that came out very quiet" instead of leaving it to be discovered
+   * on playback. */
+  const takeLevelRef = useRef<{ sum: number; n: number }>({ sum: 0, n: 0 });
+  const [tookQuiet, setTookQuiet] = useState(false);
+  /** source -> compressor -> gain -> destination, plus an analyser tap.
+   * The DESTINATION's track is what gets recorded, not the raw microphone. */
+  const chainRef = useRef<{
+    ctx: AudioContext;
+    analyser: AnalyserNode;
+    outTrack: MediaStreamTrack;
+    stop: () => void;
+  } | null>(null);
+  const meterRafRef = useRef<number | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // Kept only for the one short chime that plays as a take begins. The
   // kata recorder's countdown and clap-to-stop are deliberately absent here
@@ -349,6 +365,10 @@ function MediaTestimonialPanel({
   useEffect(
     () => () => {
       streamRef.current?.getTracks().forEach((t) => t.stop());
+      chainRef.current?.stop();
+      chainRef.current = null;
+      if (meterRafRef.current != null) cancelAnimationFrame(meterRafRef.current);
+      meterRafRef.current = null;
       if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
       if (timerRef.current) clearInterval(timerRef.current);
       if (audioContextRef.current) void audioContextRef.current.close().catch(() => {});
@@ -441,6 +461,10 @@ function MediaTestimonialPanel({
           : { audio: audioConstraints },
       );
       streamRef.current = stream;
+      // Replaces the raw microphone with the boosted, compressed version for
+      // everything downstream — the recorder AND the meter.
+      buildAudioChain(stream);
+      if (meterRafRef.current == null) meterRafRef.current = requestAnimationFrame(pumpMeter);
       setFacing(requestedFacing);
       // Attaching the stream to the <video> USED to happen right here, and
       // it could not work: this function runs while the phase is still
@@ -558,6 +582,94 @@ function MediaTestimonialPanel({
     rafRef.current = requestAnimationFrame(renderLoop);
   }
 
+  /** Lifts a quiet voice to a usable level, and evens it out.
+   *
+   * Built after a real recording came back at -37 dBFS average, where
+   * healthy speech sits around -18 to -24. Everything in it was faint, so a
+   * natural 1.5-second pause dropped below what a phone speaker can render
+   * and the whole thing sounded like the microphone had cut out. It had
+   * not: that file contains ZERO samples of digital silence.
+   *
+   * The browser's own autoGainControl was already on and did not rescue it
+   * — AGC is tuned for a phone held to the face and moves slowly. A
+   * compressor plus fixed make-up gain is far more decisive.
+   *
+   * The compressor comes BEFORE the gain deliberately: squash the peaks
+   * first, then lift everything, so raising a quiet voice by 16 dB cannot
+   * turn an occasional loud word into clipping.
+   */
+  function buildAudioChain(stream: MediaStream): MediaStreamTrack | null {
+    const micTrack = stream.getAudioTracks()[0];
+    if (!micTrack) return null;
+    try {
+      const ctx = new AudioContext();
+      const source = ctx.createMediaStreamSource(new MediaStream([micTrack]));
+
+      const comp = ctx.createDynamicsCompressor();
+      comp.threshold.value = -34;
+      comp.knee.value = 28;
+      comp.ratio.value = 5;
+      comp.attack.value = 0.006;
+      comp.release.value = 0.25;
+
+      const gain = ctx.createGain();
+      // +14 dB. Enough to bring a -37 dBFS voice up near -23, and with the
+      // compressor ahead of it a normal speaker is held short of clipping
+      // rather than pushed into it.
+      gain.gain.value = 5;
+
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 1024;
+
+      const dest = ctx.createMediaStreamDestination();
+      source.connect(comp);
+      comp.connect(gain);
+      gain.connect(analyser);
+      gain.connect(dest);
+
+      const outTrack = dest.stream.getAudioTracks()[0];
+      chainRef.current = {
+        ctx,
+        analyser,
+        outTrack,
+        stop: () => {
+          try {
+            source.disconnect();
+            comp.disconnect();
+            gain.disconnect();
+            void ctx.close();
+          } catch {
+            // Already torn down; nothing to do.
+          }
+        },
+      };
+      return outTrack;
+    } catch {
+      // Web Audio unavailable or blocked: fall back to the raw microphone,
+      // which is exactly the behaviour before this existed. A quiet
+      // recording beats no recording.
+      chainRef.current = null;
+      return null;
+    }
+  }
+
+  /** Drives the level meter and, during a take, accumulates the average so
+   * the review screen can flag a quiet recording. */
+  function pumpMeter() {
+    const chain = chainRef.current;
+    if (!chain) return;
+    const buf = new Float32Array(chain.analyser.fftSize);
+    chain.analyser.getFloatTimeDomainData(buf);
+    let sum = 0;
+    for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+    const rms = Math.sqrt(sum / buf.length);
+    setMicLevel(rms);
+    const t = takeLevelRef.current;
+    t.sum += rms;
+    t.n += 1;
+    meterRafRef.current = requestAnimationFrame(pumpMeter);
+  }
+
   /** Re-opens the camera/microphone with a different noise-removal setting.
    * Only ever called from the live phase, so nothing is being recorded when
    * the stream drops for a moment. */
@@ -596,10 +708,17 @@ function MediaTestimonialPanel({
     if (!stream) return;
     const mimeType = isVideo ? pickVideoMimeType() : pickAudioMimeType();
 
-    // Voice takes have no picture to composite, so they still record the
-    // microphone stream directly. Video takes record the CANVAS instead, so
-    // the banner and watermark end up in the file and not just on screen.
-    let recordStream: MediaStream = stream;
+    // The PROCESSED audio track (compressed + boosted) wherever the chain
+    // built successfully; the raw microphone only as a fallback, which is
+    // what every take used to get.
+    const processed = chainRef.current?.outTrack ?? null;
+    const micTrack = processed ?? stream.getAudioTracks()[0];
+    takeLevelRef.current = { sum: 0, n: 0 };
+    setTookQuiet(false);
+
+    // Voice takes carry only the audio track. Video takes record the CANVAS,
+    // so the banner and watermark end up in the file and not just on screen.
+    let recordStream: MediaStream = micTrack ? new MediaStream([micTrack]) : stream;
     if (isVideo) {
       const canvas = canvasRef.current;
       if (!canvas || typeof canvas.captureStream !== "function") {
@@ -607,7 +726,7 @@ function MediaTestimonialPanel({
         return;
       }
       const canvasStream = canvas.captureStream(30);
-      const audioTrack = stream.getAudioTracks()[0];
+      const audioTrack = micTrack;
       // Built as ONE stream carrying both tracks rather than addTrack()-ing
       // the microphone on afterwards: several WebKit/iOS versions only mux
       // the tracks a MediaStream was CONSTRUCTED with and silently drop
@@ -667,6 +786,11 @@ function MediaTestimonialPanel({
   function stopRecording() {
     recorderRef.current?.stop();
     if (timerRef.current) clearInterval(timerRef.current);
+    // Averaged across the take. 0.02 RMS is about -34 dBFS: below that, the
+    // recording that prompted all of this (-37 dBFS) would have been caught
+    // and offered a retake instead of being submitted and discovered later.
+    const { sum, n } = takeLevelRef.current;
+    setTookQuiet(n > 0 && sum / n < 0.02);
   }
 
   /** Setting phase back to "live" was NOT enough. Stopping a take ends the
@@ -943,6 +1067,43 @@ function MediaTestimonialPanel({
               choice if someone else is filming you.
             </p>
           )}
+          {/* A level meter, because the one thing a speaker cannot judge
+              is how loud they are ARRIVING. The take that prompted this ran
+              90 seconds at -37 dBFS and nobody knew until playback. */}
+          <div className="mb-3">
+            <div className="mb-1 flex items-center gap-2">
+              <span className="shrink-0 text-xs font-semibold text-neutral-600">🎚 Your voice</span>
+              <span className="relative h-2.5 flex-1 overflow-hidden rounded-full bg-neutral-200">
+                <span
+                  className={
+                    "absolute inset-y-0 left-0 rounded-full transition-[width] duration-75 " +
+                    (micLevel < 0.02 ? "bg-red-500" : micLevel < 0.05 ? "bg-amber-400" : "bg-green-500")
+                  }
+                  // Square-rooted so ordinary speech uses the middle of the
+                  // bar rather than a sliver at the far left -- loudness is
+                  // perceived closer to a curve than to raw amplitude.
+                  style={{ width: Math.min(100, Math.sqrt(micLevel) * 210) + "%" }}
+                />
+                {/* The "loud enough" mark. Sitting left of it is exactly the
+                    fault that produced a testimonial nobody could hear. */}
+                <span className="absolute inset-y-0 left-[32%] w-px bg-neutral-500/60" />
+              </span>
+              <span
+                className={
+                  "w-24 shrink-0 text-right text-[10px] font-semibold " +
+                  (micLevel < 0.02 ? "text-red-700" : micLevel < 0.05 ? "text-amber-700" : "text-green-700")
+                }
+              >
+                {micLevel < 0.005 ? "silent" : micLevel < 0.02 ? "too quiet" : micLevel < 0.05 ? "a bit quiet" : "good"}
+              </span>
+            </div>
+            <p className="text-[11px] text-neutral-500">
+              Speak normally and watch the bar. It should reach past the line while you talk. If it stays in the
+              red, <strong>move closer to the phone</strong> — about an arm&apos;s length — rather than speaking
+              louder; distance affects this far more than volume does.
+            </p>
+          </div>
+
           <div className="mb-3">
             <div className="flex flex-wrap items-center gap-1">
               <span className="mr-1 text-xs font-semibold text-neutral-600">🎙 Background noise</span>
@@ -1050,6 +1211,16 @@ function MediaTestimonialPanel({
             <audio src={blobUrl} controls className="mb-3 w-full max-w-md" />
           )}
           <p className="mb-2 text-xs text-neutral-500">Length: {mmss(seconds)}</p>
+          {tookQuiet && (
+            <div className="mb-2 rounded-md border-2 border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-900">
+              <p className="font-bold">⚠ This take came out very quiet</p>
+              <p className="mt-0.5 leading-relaxed">
+                Play it back before submitting. If it is hard to hear, retake it sitting closer to the phone —
+                about an arm&apos;s length. A quiet recording does not sound quiet so much as broken: normal pauses
+                drop to nothing and it seems like the microphone cut out.
+              </p>
+            </div>
+          )}
           {tooShort && (
             <p className="mb-2 text-xs font-semibold text-red-700">
               Too short — needs at least {mmss(minSeconds)}. Please retake.
