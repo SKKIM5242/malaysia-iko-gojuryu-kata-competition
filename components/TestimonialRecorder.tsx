@@ -32,6 +32,7 @@ import { PoseGuideOverlay } from "@/components/RecordingChrome";
 import { chromeHeights, drawRecordingChrome } from "@/lib/recording-chrome-canvas";
 import { POSE_GUIDE_NOTE, type RecordingAppearance } from "@/lib/recording-appearance";
 import type { AppliedSpec } from "@/lib/recording-specs";
+import { VoiceRecorder, voiceRecorderSupported } from "@/lib/pcm-recorder";
 
 // No countdown and no clap-to-stop here, unlike the kata recorder. Those
 // exist so a competitor can walk out to their mark and perform hands-free.
@@ -332,12 +333,11 @@ function MediaTestimonialPanel({
   const [tookQuiet, setTookQuiet] = useState(false);
   /** source -> compressor -> gain -> destination, plus an analyser tap.
    * The DESTINATION's track is what gets recorded, not the raw microphone. */
-  const chainRef = useRef<{
-    ctx: AudioContext;
-    analyser: AnalyserNode;
-    outTrack: MediaStreamTrack;
-    stop: () => void;
-  } | null>(null);
+  const chainRef = useRef<{ ctx: AudioContext; analyser: AnalyserNode; stop: () => void } | null>(null);
+  /** Voice takes only. Raw PCM in, normalised WAV out — see
+   * lib/pcm-recorder.ts for why this exists instead of MediaRecorder. */
+  const voiceRecRef = useRef<VoiceRecorder | null>(null);
+  const [voiceNote, setVoiceNote] = useState<string | null>(null);
   const meterRafRef = useRef<number | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // Kept only for the one short chime that plays as a take begins. The
@@ -411,6 +411,24 @@ function MediaTestimonialPanel({
   ) {
     const noiseRemovalNow = noiseOverride ?? noiseRemoval;
     setError(null);
+
+    // Voice takes do not go through MediaRecorder at all. See
+    // lib/pcm-recorder.ts: the browser's own capture path is what was
+    // putting a ring between the words.
+    if (!isVideo && voiceRecorderSupported()) {
+      try {
+        const rec = new VoiceRecorder();
+        await rec.start();
+        voiceRecRef.current = rec;
+        if (meterRafRef.current == null) meterRafRef.current = requestAnimationFrame(pumpMeter);
+        setPhase("live");
+        return;
+      } catch {
+        setError("Could not access your microphone. Check your browser permissions and try again.");
+        return;
+      }
+    }
+
     try {
       // Same audio treatment as the kata recorder: the browser defaults are
       // tuned for a phone held to your face on a call, and echo cancellation
@@ -476,9 +494,7 @@ function MediaTestimonialPanel({
           : { audio: audioConstraints },
       );
       streamRef.current = stream;
-      // Replaces the raw microphone with the boosted, compressed version for
-      // everything downstream — the recorder AND the meter.
-      buildAudioChain(stream);
+      buildMeterTap(stream);
       if (meterRafRef.current == null) meterRafRef.current = requestAnimationFrame(pumpMeter);
       setFacing(requestedFacing);
       // Attaching the stream to the <video> USED to happen right here, and
@@ -597,91 +613,60 @@ function MediaTestimonialPanel({
     rafRef.current = requestAnimationFrame(renderLoop);
   }
 
-  /** Lifts a quiet voice to a usable level, and evens it out.
+  /** An analyser tapped off the microphone PURELY to drive the on-screen
+   * meter. Nothing here is in the recording path.
    *
-   * Built after a real recording came back at -37 dBFS average, where
-   * healthy speech sits around -18 to -24. Everything in it was faint, so a
-   * natural 1.5-second pause dropped below what a phone speaker can render
-   * and the whole thing sounded like the microphone had cut out. It had
-   * not: that file contains ZERO samples of digital silence.
-   *
-   * The browser's own autoGainControl was already on and did not rescue it
-   * — AGC is tuned for a phone held to the face and moves slowly. A
-   * compressor plus fixed make-up gain is far more decisive.
-   *
-   * The compressor comes BEFORE the gain deliberately: squash the peaks
-   * first, then lift everything, so raising a quiet voice by 16 dB cannot
-   * turn an occasional loud word into clipping.
+   * An earlier version put a compressor and +14 dB of make-up gain in the
+   * path instead, to rescue a quiet voice. It made things worse, and the
+   * arithmetic says why: it lifted the hiss by the same 14 dB as the voice,
+   * so the speech-to-noise ratio stayed at 23 dB while the noise went from
+   * inaudible to obvious. Level is now decided ONCE at the end of a take,
+   * against the whole recording — see lib/pcm-recorder.ts.
    */
-  function buildAudioChain(stream: MediaStream): MediaStreamTrack | null {
+  function buildMeterTap(stream: MediaStream): void {
     const micTrack = stream.getAudioTracks()[0];
-    if (!micTrack) return null;
+    if (!micTrack) return;
     try {
       const ctx = new AudioContext();
       const source = ctx.createMediaStreamSource(new MediaStream([micTrack]));
-
-      const comp = ctx.createDynamicsCompressor();
-      comp.threshold.value = -34;
-      comp.knee.value = 28;
-      comp.ratio.value = 5;
-      comp.attack.value = 0.006;
-      comp.release.value = 0.25;
-
-      const gain = ctx.createGain();
-      // +14 dB. Enough to bring a -37 dBFS voice up near -23, and with the
-      // compressor ahead of it a normal speaker is held short of clipping
-      // rather than pushed into it.
-      gain.gain.value = 5;
-
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 1024;
-
-      const dest = ctx.createMediaStreamDestination();
-      source.connect(comp);
-      comp.connect(gain);
-      gain.connect(analyser);
-      gain.connect(dest);
-
-      const outTrack = dest.stream.getAudioTracks()[0];
+      source.connect(analyser);
       chainRef.current = {
         ctx,
         analyser,
-        outTrack,
         stop: () => {
           try {
             source.disconnect();
-            comp.disconnect();
-            gain.disconnect();
+            analyser.disconnect();
             void ctx.close();
           } catch {
-            // Already torn down; nothing to do.
+            // Already torn down.
           }
         },
       };
-      return outTrack;
     } catch {
-      // Web Audio unavailable or blocked: fall back to the raw microphone,
-      // which is exactly the behaviour before this existed. A quiet
-      // recording beats no recording.
       chainRef.current = null;
-      return null;
     }
   }
 
   /** Drives the level meter and, during a take, accumulates the average so
    * the review screen can flag a quiet recording. */
   function pumpMeter() {
-    const chain = chainRef.current;
-    if (!chain) return;
-    const buf = new Float32Array(chain.analyser.fftSize);
-    chain.analyser.getFloatTimeDomainData(buf);
-    let sum = 0;
-    for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
-    const rms = Math.sqrt(sum / buf.length);
+    const live = voiceRecRef.current;
+    let rms = 0;
+    if (live) {
+      // The PCM recorder measures every frame on the audio thread, so this
+      // stays accurate even when the page's animation frames are throttled.
+      rms = live.level;
+    } else if (chainRef.current) {
+      const buf = new Float32Array(chainRef.current.analyser.fftSize);
+      chainRef.current.analyser.getFloatTimeDomainData(buf);
+      let sum = 0;
+      for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+      rms = Math.sqrt(sum / buf.length);
+    }
     setMicLevel(rms);
-    const t = takeLevelRef.current;
-    t.sum += rms;
-    t.n += 1;
     meterRafRef.current = requestAnimationFrame(pumpMeter);
   }
 
@@ -719,15 +704,32 @@ function MediaTestimonialPanel({
   }
 
   function startRecording() {
+    // Voice: the PCM recorder is already open, so a take is just a marker.
+    const voice = voiceRecRef.current;
+    if (voice) {
+      voice.beginTake();
+      setVoiceNote(null);
+      setSeconds(0);
+      setPhase("recording");
+      timerRef.current = setInterval(() => {
+        setSeconds((s) => {
+          const next = s + 1;
+          if (next >= maxSeconds) void finishVoiceTake();
+          return next;
+        });
+      }, 1000);
+      return;
+    }
+
     const stream = streamRef.current;
     if (!stream) return;
     const mimeType = isVideo ? pickVideoMimeType() : pickAudioMimeType();
 
-    // The PROCESSED audio track (compressed + boosted) wherever the chain
-    // built successfully; the raw microphone only as a fallback, which is
-    // what every take used to get.
-    const processed = chainRef.current?.outTrack ?? null;
-    const micTrack = processed ?? stream.getAudioTracks()[0];
+    // The RAW microphone. Nothing sits between it and the recorder: every
+    // attempt to "help" in the live path — the browser's AGC, and then a
+    // compressor of our own — turned out to be what was damaging these
+    // recordings.
+    const micTrack = stream.getAudioTracks()[0];
     takeLevelRef.current = { sum: 0, n: 0 };
     setTookQuiet(false);
 
@@ -804,7 +806,39 @@ function MediaTestimonialPanel({
     }, 1000);
   }
 
+  /** Ends a voice take and turns the captured samples into the finished
+   * WAV, level decided against the whole recording. */
+  async function finishVoiceTake() {
+    const voice = voiceRecRef.current;
+    if (!voice) return;
+    if (timerRef.current) clearInterval(timerRef.current);
+    const result = await voice.finish();
+    if (!result) {
+      setError("Nothing was recorded — please try again.");
+      setPhase("live");
+      return;
+    }
+    recordedBlobRef.current = result.blob;
+    setBlobUrl(URL.createObjectURL(result.blob));
+    setSeconds(Math.round(result.durationSeconds));
+    const a = result.analysis;
+    // Reported in plain terms. "Held back" is the case worth acting on: the
+    // voice could not be brought up to a normal level without bringing the
+    // room up with it, and the answer to that is distance, not volume.
+    setTookQuiet(a.gainLimitedByNoise || a.snrDb < 18);
+    setVoiceNote(
+      a.gainLimitedByNoise || a.snrDb < 18
+        ? `Your voice was ${Math.abs(a.snrDb).toFixed(0)} dB above the room noise. Sitting closer to the phone is the one thing that improves this — turning the volume up raises the room with you.`
+        : `Levels look good (voice ${a.snrDb.toFixed(0)} dB above the room).`,
+    );
+    setPhase("review");
+  }
+
   function stopRecording() {
+    if (voiceRecRef.current) {
+      void finishVoiceTake();
+      return;
+    }
     recorderRef.current?.stop();
     if (timerRef.current) clearInterval(timerRef.current);
     // Averaged across the take. 0.02 RMS is about -34 dBFS: below that, the
@@ -1232,6 +1266,9 @@ function MediaTestimonialPanel({
             <audio src={blobUrl} controls className="mb-3 w-full max-w-md" />
           )}
           <p className="mb-2 text-xs text-neutral-500">Length: {mmss(seconds)}</p>
+          {voiceNote && !tookQuiet && (
+            <p className="mb-2 text-xs font-semibold text-green-700">✓ {voiceNote}</p>
+          )}
           {tookQuiet && (
             <div className="mb-2 rounded-md border-2 border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-900">
               <p className="font-bold">⚠ This take came out very quiet</p>
