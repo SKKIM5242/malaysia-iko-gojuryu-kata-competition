@@ -27,6 +27,7 @@ import {
   type TestimonialScript,
 } from "@/lib/testimonial-scripts";
 import LockedVideo from "@/components/LockedVideo";
+import CompressionNote from "@/components/CompressionNote";
 import { PoseGuideOverlay } from "@/components/RecordingChrome";
 import { chromeHeights, drawRecordingChrome } from "@/lib/recording-chrome-canvas";
 import { POSE_GUIDE_NOTE, type RecordingAppearance } from "@/lib/recording-appearance";
@@ -318,6 +319,10 @@ function MediaTestimonialPanel({
    * offered because it is the better sensor on every phone, and is the
    * right choice when someone else is filming them. */
   const [facing, setFacing] = useState<"user" | "environment">("user");
+  /** Background/mic noise removal. On by default for testimonials — see the
+   * note where the constraints are built for why this differs from the kata
+   * recorder. */
+  const [noiseRemoval, setNoiseRemoval] = useState(true);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // Kept only for the one short chime that plays as a take begins. The
   // kata recorder's countdown and clap-to-stop are deliberately absent here
@@ -377,19 +382,38 @@ function MediaTestimonialPanel({
     };
   }, [isVideo, recordingLogoUrl]);
 
-  async function startLive(requestedFacing: "user" | "environment" = facing) {
+  async function startLive(
+    requestedFacing: "user" | "environment" = facing,
+    /** Passed explicitly by restartAudio: React state has not committed yet
+     * at that point, so reading noiseRemoval here would use the OLD value
+     * and the switch would appear to do nothing. */
+    noiseOverride?: boolean,
+  ) {
+    const noiseRemovalNow = noiseOverride ?? noiseRemoval;
     setError(null);
     try {
       // Same audio treatment as the kata recorder: the browser defaults are
       // tuned for a phone held to your face on a call, and echo cancellation
       // in particular gates out a voice speaking from across a room, which
       // is how a testimonial is usually recorded.
+      // The kata recorder turns all of this OFF on purpose: a competitor
+      // performs several metres from the phone, and noise gates treat a
+      // voice from across a room as background and cut it out.
+      //
+      // A testimonial is the opposite situation — the speaker sits directly
+      // in front of the phone, close and loud — which is exactly the case
+      // these filters were designed for. So the default here is ON, with a
+      // switch, because they are not free: aggressive gating can clip the
+      // start of a sentence or thin out a quiet voice, and someone who hears
+      // that happening needs a way to turn it off.
       const audioConstraints: MediaTrackConstraints = {
-        echoCancellation: false,
-        noiseSuppression: false,
+        echoCancellation: noiseRemovalNow,
+        noiseSuppression: noiseRemovalNow,
         autoGainControl: true,
       };
-      (audioConstraints as Record<string, unknown>).voiceIsolation = false;
+      // Chrome/Edge only, ignored elsewhere. A stronger, model-based version
+      // of the same idea — worth asking for when it exists.
+      (audioConstraints as Record<string, unknown>).voiceIsolation = noiseRemovalNow;
       const stream = await navigator.mediaDevices.getUserMedia(
         isVideo
           ? {
@@ -532,6 +556,20 @@ function MediaTestimonialPanel({
     drawRecordingChrome(ctx, canvas.width, canvas.height, bannerH, footerH, recordingAppearance, logoRef.current);
 
     rafRef.current = requestAnimationFrame(renderLoop);
+  }
+
+  /** Re-opens the camera/microphone with a different noise-removal setting.
+   * Only ever called from the live phase, so nothing is being recorded when
+   * the stream drops for a moment. */
+  async function restartAudio(nextNoiseRemoval: boolean) {
+    if (phase !== "live") return;
+    if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+    rafRef.current = null;
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    chromeRef.current = null;
+    setPhase("idle");
+    await startLive(facing, nextNoiseRemoval);
   }
 
   /** facingMode cannot be changed on a running track, and applyConstraints
@@ -905,6 +943,45 @@ function MediaTestimonialPanel({
               choice if someone else is filming you.
             </p>
           )}
+          <div className="mb-3">
+            <div className="flex flex-wrap items-center gap-1">
+              <span className="mr-1 text-xs font-semibold text-neutral-600">🎙 Background noise</span>
+              {([true, false] as const).map((on) => (
+                <button
+                  key={String(on)}
+                  type="button"
+                  disabled={phase === "recording"}
+                  onClick={() => {
+                    if (on === noiseRemoval) return;
+                    setNoiseRemoval(on);
+                    // Restarted rather than applied to the running track:
+                    // applyConstraints() for these is honoured on some
+                    // browsers and silently ignored on others, which would
+                    // leave the button saying one thing and the microphone
+                    // doing another. Only reachable before recording starts.
+                    void restartAudio(on);
+                  }}
+                  aria-pressed={noiseRemoval === on}
+                  className={
+                    "rounded-full border px-3 py-1 text-xs font-semibold disabled:opacity-50 " +
+                    (noiseRemoval === on
+                      ? "border-emerald-500 bg-emerald-100 text-emerald-900"
+                      : "border-neutral-300 bg-white text-neutral-600 hover:bg-neutral-50")
+                  }
+                >
+                  {on ? "Remove" : "Keep all"}
+                </button>
+              ))}
+            </div>
+            <p className="mb-3 mt-1 text-[11px] text-neutral-500">
+              <strong>Remove</strong> filters out steady background sound — a fan, air-conditioning, traffic, room
+              hum — and the echo of your own voice off hard walls. It suits a testimonial, where you sit close to
+              the phone. Switch to <strong>Keep all</strong> if your voice sounds thin or the first word of a
+              sentence keeps getting clipped: the filter is guessing what is speech and what is not, and a quiet
+              voice can be guessed wrong.
+            </p>
+          </div>
+
           <div className="mb-3">
             <div className="flex flex-wrap items-center gap-1">
               <span className="mr-1 text-xs font-semibold text-neutral-600">💡 Screen light</span>

@@ -15,6 +15,14 @@ const CERT_FORMATS: Array<{ fmt: string; bytes: number; note?: string }> = [
 
 const CERT_COUNTS = [5_000, 12_000, 25_000, 50_000];
 
+/** Measured from a real file a winner tried to upload — 14.4 MB for 1:25 —
+ * rather than taken from a spec sheet, so it reflects what their recorder
+ * actually produces. */
+const WAV_BYTES_PER_SEC = (14.4 * 1024 * 1024) / 85;
+/** What the app itself records a voice testimonial at: 96 kbps. */
+const COMPRESSED_BYTES_PER_SEC = 96_000 / 8;
+const AUDIO_LENGTHS = [3, 5, 10, 15];
+
 /** The organizer's own scenario: 13 kata from Elementary to Advance, 16
  * sub-categories each, top 3 in every one, plus the two larger families. */
 const WINNERS = [
@@ -150,6 +158,61 @@ export default function StorageProjections() {
         typed message costs essentially nothing and does not touch Storage at all — so which type winners are
         encouraged toward is worth far more than any compression setting.
       </p>
+
+      {/* ---- Uploaded voice testimonials ---- */}
+      <h3 className="mb-1 mt-4 text-xs font-bold uppercase tracking-wide text-neutral-500">
+        Voice testimonial uploaded with Choose file — WAV vs compressed
+      </h3>
+      <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white shadow-sm">
+        <table className="w-full min-w-[30rem] text-left text-sm">
+          <thead className="border-b border-neutral-200 bg-neutral-50 text-[10px] uppercase tracking-wide text-neutral-500">
+            <tr>
+              <th className="px-3 py-2">Length</th>
+              <th className="px-3 py-2 text-right">WAV</th>
+              <th className="px-3 py-2 text-right">M4A / MP3 / AAC</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-neutral-100">
+            {AUDIO_LENGTHS.map((m) => {
+              const wav = WAV_BYTES_PER_SEC * m * 60;
+              const cmp = COMPRESSED_BYTES_PER_SEC * m * 60;
+              const wavOver = wav > UPLOAD_CEILING_BYTES;
+              return (
+                <tr key={m}>
+                  <td className="px-3 py-2 font-semibold text-neutral-800">{m} minutes</td>
+                  <td
+                    className={
+                      "px-3 py-2 text-right tabular-nums " +
+                      (wavOver ? "font-bold text-red-700" : "font-semibold text-green-700")
+                    }
+                  >
+                    {formatBytes(wav)} {wavOver ? "✗" : "✓"}
+                  </td>
+                  <td className="px-3 py-2 text-right font-semibold tabular-nums text-green-700">
+                    {formatBytes(cmp)} ✓
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div className="mt-1 max-w-3xl space-y-1 text-[11px] leading-relaxed text-neutral-500">
+        <p>
+          <strong>Rates:</strong> WAV runs at {(WAV_BYTES_PER_SEC * 60 / 1024 / 1024).toFixed(2)} MB/min, compressed
+          audio at {(COMPRESSED_BYTES_PER_SEC * 60 / 1024 / 1024).toFixed(2)} MB/min —{" "}
+          <strong>WAV is {Math.round(WAV_BYTES_PER_SEC / COMPRESSED_BYTES_PER_SEC)}× the size</strong> of the same
+          recording. Longest that fits the {formatBytes(UPLOAD_CEILING_BYTES)} ceiling:{" "}
+          <strong>WAV {(UPLOAD_CEILING_BYTES / WAV_BYTES_PER_SEC / 60).toFixed(1)} minutes</strong>, M4A/MP3/AAC{" "}
+          {Math.round(UPLOAD_CEILING_BYTES / COMPRESSED_BYTES_PER_SEC / 60)} minutes — far past the 15-minute cap.
+        </p>
+        <p>
+          Note the 5-minute WAV row: it fails, but only <strong>by 0.8 MB</strong>. It is not comfortably over, it
+          is a hair over — which is exactly the kind of near-miss that reads as a bug to whoever hits it.{" "}
+          <strong>3 minutes is the safe WAV length</strong>; anything past about 4:50 will be rejected. The WAV rate
+          is measured from a real file a winner tried to upload (14.4 MB for 1:25), not taken from a spec sheet.
+        </p>
+      </div>
 
       {/* ---- Branding ---- */}
       <h3 className="mb-1 mt-4 text-xs font-bold uppercase tracking-wide text-neutral-500">
