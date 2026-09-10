@@ -611,6 +611,7 @@ export async function bulkRegister(_prev: BulkState, formData: FormData): Promis
       subject: `Registration confirmed — ${competition.name}`,
       referenceId,
       telegramCategory: "participant",
+      playbookRole: "participant",
       bodyLines: [
         `This confirms your registration for ${competition.name} (${row.kata_base}), submitted via bulk registration.`,
         "Your registration fee has already been paid by your school/sensei — no further payment is needed from you.",
@@ -965,6 +966,7 @@ export async function bulkRegisterCsv(_prev: CsvBulkState, formData: FormData): 
         subject: `Registration confirmed — ${competition.name}`,
         referenceId: v.registrationId.slice(0, 8).toUpperCase(),
         telegramCategory: "participant" as const,
+        playbookRole: "participant" as const,
         bodyLines: [
           `This confirms your registration for ${competition.name} (${v.kataBase}), submitted via CSV bulk upload.`,
           "Your registration fee has already been paid by your school/sensei — no further payment is needed from you.",

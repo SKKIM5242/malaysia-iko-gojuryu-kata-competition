@@ -22,7 +22,7 @@ import {
   notifyOrganizersBulkPaymentConfirmed, notifyOrganizersBulkTallyDone, notifySenseiBulkPaymentConfirmed,
   notifySenseiBulkCsvConfirmed, notifyOrganizersDirectoryBulkUpload, sendAdminTelegramDM,
   notifyParticipantEmailChanged, notifyTestimonialDeleted, sendStaffEmail, sendStaffTelegramDM,
-  refereeVideoNotice, notifyVideoAssignment, isStagingEnv,
+  refereeVideoNotice, notifyVideoAssignment, isStagingEnv, type PlaybookRole,
 } from "@/lib/notify";
 import { autoAssignForVideos } from "@/lib/auto-assign";
 import { applySubscriptionRenewalTerms } from "@/lib/finalize";
@@ -330,6 +330,9 @@ async function notifyRegistrationStatusChange(
       telegramGroups: participantGroup
         ? [{ label: participantGroup.label, url: participantGroup.url, memberUrl: participantGroup.memberUrl }]
         : null,
+      // Only the transition to paid unlocks anything -- pending/rejected
+      // shouldn't hand out the Playbook link.
+      playbookRole: status === "paid" ? "participant" : null,
     });
   } catch {
     // Best-effort
@@ -2773,6 +2776,25 @@ async function communityTelegramGroups(
   return group ? [{ label: group.label, url: group.url, memberUrl: group.memberUrl }] : null;
 }
 
+/** Which table+field+value combination is the actual moment that unlocks
+ * access for that role -- referees/staff unlock on approval, the others
+ * (no separate approval step) unlock on their fee being paid or waived.
+ * Returns null for every other status change (pending, rejected, refunded,
+ * forfeited, or a field that isn't the unlocking one for that table) so the
+ * Playbook link only ever goes out once, at the right moment. */
+function communityPlaybookRole(table: string, field: string, value: string): PlaybookRole | null {
+  const unlocked = value === "approved" || value === "paid" || value === "waived";
+  if (!unlocked) return null;
+  switch (table) {
+    case "referees": return field === "status" ? "referee" : null;
+    case "audiences": return field === "payment_status" ? "audience" : null;
+    case "schools": return field === "payment_status" ? "school" : null;
+    case "senseis": return field === "payment_status" ? "sensei" : null;
+    case "staff_applications": return field === "status" ? "staff" : null;
+    default: return null;
+  }
+}
+
 /** Best-effort — never throws, so a notification hiccup can't undo a
  * status update that already succeeded. */
 async function notifyCommunityStatusChange(
@@ -2794,6 +2816,7 @@ async function notifyCommunityStatusChange(
       fieldLabel,
       valueLabel: STATUS_VALUE_LABELS[value] ?? value,
       telegramGroups: await communityTelegramGroups(table, recipient.roleRequested),
+      playbookRole: communityPlaybookRole(table, field, value),
     });
   } catch {
     // Best-effort

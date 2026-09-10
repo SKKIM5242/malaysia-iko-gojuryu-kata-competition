@@ -319,6 +319,7 @@ export async function finalizeStripeSession(sessionId: string): Promise<Finalize
     recipientName: v.full_name,
     subject: `Payment successful — registration confirmed — ${events.length} event${events.length === 1 ? "" : "s"}`,
     telegramCategory: "participant",
+    playbookRole: "participant",
     bodyLines: [
       `This confirms your paid registration — ${events.length} kata event${events.length === 1 ? "" : "s"}: ${tierSummary}.`,
       `Your reference ID${referenceIds.length > 1 ? "s" : ""}: ${referenceIds.join(", ")}.`,

@@ -23,6 +23,25 @@ function appUrl(): string {
   return process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 }
 
+/** Which step-by-step Playbook PDF (public/playbooks/*.pdf) a person gets
+ * linked to once they've paid or been approved -- one per registrant type,
+ * finer-grained than TelegramCategory (which folds "school" and "sensei"
+ * into the same group). */
+export type PlaybookRole = "participant" | "school" | "sensei" | "referee" | "audience" | "staff";
+
+const PLAYBOOK_FILES: Record<PlaybookRole, string> = {
+  participant: "participant.pdf",
+  school: "school.pdf",
+  sensei: "sensei.pdf",
+  referee: "judge.pdf",
+  audience: "audience.pdf",
+  staff: "participant-support.pdf",
+};
+
+function playbookUrl(role: PlaybookRole | null | undefined): string | null {
+  return role ? `${appUrl()}/playbooks/${PLAYBOOK_FILES[role]}` : null;
+}
+
 /** Vercel sets VERCEL_ENV="preview" for the staging deployment (and any
  * other Preview build) automatically -- a real production build gets
  * "production". Staging reuses the same real Telegram bot as production
@@ -284,6 +303,10 @@ export interface ConfirmationEmailInput {
   bodyLines: string[];
   referenceId?: string | null;
   telegramCategory?: TelegramCategory | null;
+  /** Set on the email that confirms payment/registration -- links to that
+   * role's step-by-step Playbook PDF. Omitted for emails that aren't a
+   * first confirmation (e.g. a sensei's own bulk-batch summary). */
+  playbookRole?: PlaybookRole | null;
 }
 
 interface TelegramLinksForEmail {
@@ -303,6 +326,13 @@ function buildConfirmationBody(input: ConfirmationEmailInput, telegram: Telegram
     `Kata Arena log in: ${appUrl()}/account`,
     `App: ${appUrl()}`,
   );
+  const pbUrl = playbookUrl(input.playbookRole);
+  if (pbUrl) {
+    lines.push(
+      `Your step-by-step Playbook: ${pbUrl}`,
+      "It walks through exactly what to do next, with screenshots for every screen.",
+    );
+  }
   if (telegram.url) {
     lines.push(
       `Join the Telegram group: ${telegram.url}`,
@@ -360,6 +390,15 @@ function buildConfirmationHtml(input: ConfirmationEmailInput, telegram: Telegram
   parts.push(p("Keep this email for your records."));
   parts.push(p(`Kata Arena log in: <a href="${appUrl()}/account">${appUrl()}/account</a>`));
   parts.push(p(`App: <a href="${appUrl()}">${appUrl()}</a>`));
+  const pbUrl = playbookUrl(input.playbookRole);
+  if (pbUrl) {
+    parts.push(
+      p(
+        `Your step-by-step Playbook: <a href="${pbUrl}">${escapeHtml(pbUrl)}</a> — it walks through ` +
+          `exactly what to do next, with screenshots for every screen.`,
+      ),
+    );
+  }
   if (telegram.url) {
     parts.push(p(`Join the Telegram group: <a href="${telegram.url}">${escapeHtml(telegram.url)}</a>`));
     parts.push(
@@ -815,6 +854,9 @@ interface StatusChangeNotice {
    * Each entry carries both the invite link (to join, for new members) and
    * the Announcements-topic link (only opens for existing members). */
   telegramGroups?: Array<{ label: string; url: string; memberUrl?: string | null }> | null;
+  /** Set only on the change that actually unlocks access (Approved / Paid)
+   * -- links to that role's step-by-step Playbook PDF. */
+  playbookRole?: PlaybookRole | null;
 }
 
 function telegramGroupsBlock(
@@ -836,6 +878,10 @@ function telegramGroupsBlock(
 
 async function sendStatusChangeEmail(notice: StatusChangeNotice): Promise<void> {
   if (!notice.email) return;
+  const pbUrl = playbookUrl(notice.playbookRole);
+  const playbookLine = pbUrl
+    ? `Your step-by-step Playbook: ${pbUrl}\nIt walks through exactly what to do next, with screenshots for every screen.\n\n`
+    : "";
   await sendEmail(
     notice.email,
     `Your ${notice.fieldLabel.toLowerCase()} has changed to ${notice.valueLabel}`,
@@ -843,6 +889,7 @@ async function sendStatusChangeEmail(notice: StatusChangeNotice): Promise<void> 
       `Your ${notice.fieldLabel.toLowerCase()} for the Malaysia Open Virtual Karate-do Kata ` +
       `Championship has been updated to: ${notice.valueLabel}.\n\n` +
       `Sign in to your account for details: ${appUrl()}/account\n\n` +
+      playbookLine +
       telegramGroupsBlock(notice.telegramGroups) +
       `— Malaysia Open Virtual Karate-do Kata Competition`,
   );
