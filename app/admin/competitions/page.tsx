@@ -230,7 +230,7 @@ export default async function AdminCompetitions({
                 </div>
                 <div>
                   <label htmlFor="description" className={adminLabel}>Description</label>
-                  <textarea id="description" name="description" rows={3} defaultValue={editing?.description ?? ""} className={adminInput} />
+                  <textarea id="description" name="description" rows={15} defaultValue={editing?.description ?? ""} className={adminInput} />
                 </div>
 
                 {/* Participant sign-in window for this tier. Every account whose
