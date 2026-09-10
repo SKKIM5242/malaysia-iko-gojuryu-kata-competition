@@ -31,7 +31,7 @@ export const WATERMARK_FONT_OPTIONS: Array<{ value: string; label: string }> = [
  * order and the wording in sync with it. Also kept in sync with the CHECK
  * constraint on competitions.watermark_direction (migration 0100). */
 export const WATERMARK_DIRECTION_OPTIONS: Array<{ value: WatermarkDirection; label: string }> = [
-  { value: "ltr", label: "Normal — Left to Right" },
+  { value: "ltr", label: "Normal — Left to Right (At the bottom of the recording screen)" },
   { value: "vertical_ltr_left", label: "Top to Bottom — at left border" },
   { value: "vertical_rtl_left", label: "Bottom to Top — at left border" },
   { value: "diagonal_up", label: "Left Bottom to Right Top — Diagonally" },
