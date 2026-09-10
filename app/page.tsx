@@ -147,9 +147,9 @@ export default async function Home() {
                 );
               })}
             </div>
-            <div className="mt-4 rounded-md border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
+            <div className="mt-4 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
               Event date → Registration deadline is the participants&apos; recording-submission
-              timeline; referees start scoring only after the deadline. Participants, senseis, or
+              timeline; Judges start scoring only after the deadline. Participants, senseis, or
               anyone else can also register as audience to create an audience account and sign in
               before the Winners announce date to see other participants&apos; or competitors&apos;
               recordings if you&apos;re unable to wait until the Winners announcement date. Audience
