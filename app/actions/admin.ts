@@ -417,6 +417,7 @@ export async function saveCompetition(formData: FormData) {
       : null,
     status: String(formData.get("status") ?? "draft"),
     description: String(formData.get("description") ?? "").trim() || null,
+    kata_events_note: String(formData.get("kata_events_note") ?? "").trim() || null,
     winners_announce_date: String(formData.get("winners_announce_date") ?? "") || null,
     audience_signin_date: String(formData.get("audience_signin_date") ?? "") || null,
     default_sign_in_valid_from: String(formData.get("default_sign_in_valid_from") ?? "") || null,
@@ -2161,6 +2162,33 @@ export async function saveSiteAppearance(formData: FormData) {
   revalidatePath("/");
   revalidatePath("/admin/competitions");
   backTo(returnTo, { ok: "Site appearance saved." });
+}
+
+/** The homepage's single "Event date → Registration deadline is…" note,
+ * lives on the same site_appearance singleton row Site Appearance already
+ * uses. A small Edit/Save/Cancel/Delete control (HomepageNoteForm) calls
+ * this directly and reads the {ok,error} result back, rather than a
+ * full-page form submit — same shape as saveRecordingSpec. "delete" clears
+ * the override so the homepage falls back to its hardcoded default text. */
+export async function saveHomepageNote(formData: FormData): Promise<{ ok: boolean; error?: string }> {
+  const { supabase, actorId } = await getActor();
+  const role = await getActorRole(supabase, actorId);
+  if (!["admin", "organizer", "staff"].includes(role ?? "")) {
+    return { ok: false, error: "Only Admin / Organizer / Staff can edit the homepage note." };
+  }
+  const mode = String(formData.get("mode") ?? "save");
+  const note = mode === "delete" ? null : String(formData.get("note") ?? "").trim() || null;
+
+  const { error } = await supabase.from("site_appearance").update({ homepage_note: note }).eq("id", true);
+  if (error) return { ok: false, error: error.message };
+
+  await writeAudit(supabase, {
+    table_name: "site_appearance", record_id: null, action: "homepage_note_updated",
+    new_value: { homepage_note: note }, actor_id: actorId,
+  });
+  revalidatePath("/");
+  revalidatePath("/admin/competitions");
+  return { ok: true };
 }
 
 /** Branding for the recording screens — the banner logo, its two lines, and

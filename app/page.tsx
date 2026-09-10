@@ -23,6 +23,8 @@ import KataGroupDragZone from "@/components/KataGroupDragZone";
 import CategoryActionButton from "@/components/CategoryActionButton";
 import { createClient } from "@/lib/supabase/server";
 import { winnersRevealDateFor } from "@/lib/winners";
+import { getSiteAppearance } from "@/lib/site-appearance-server";
+import { DEFAULT_HOMEPAGE_NOTE } from "@/lib/site-appearance";
 import type { Category } from "@/lib/types";
 
 function announceDateOf(c: { registration_deadline: string | null; winners_announce_date: string | null }): string | null {
@@ -46,9 +48,10 @@ export default async function Home() {
     );
   }
 
-  const [competitions, announcements] = await Promise.all([
+  const [competitions, announcements, { settings: siteAppearance }] = await Promise.all([
     getOpenCompetitions(),
     getPublishedAnnouncements(5),
+    getSiteAppearance(),
   ]);
 
   // Kata drag-to-reorder on this public page is admin-tier only — everyone
@@ -147,14 +150,8 @@ export default async function Home() {
                 );
               })}
             </div>
-            <div className="mt-4 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-              Event date → Registration deadline is the participants&apos; recording-submission
-              timeline; Judges start scoring only after the deadline. Participants, senseis, or
-              anyone else can also register as audience to create an audience account and sign in
-              before the Winners announce date to see other participants&apos; or competitors&apos;
-              recordings if you&apos;re unable to wait until the Winners announcement date. Audience
-              sign-in is USD 10 / 100 / 200 per sign-in, per competition tier. Thank you for your
-              support — all the best to every participant!
+            <div className="mt-4 whitespace-pre-line rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              {siteAppearance?.homepage_note?.trim() || DEFAULT_HOMEPAGE_NOTE}
             </div>
             <Link href="/participants" className="mt-4 inline-block text-sm font-medium text-red-700 underline underline-offset-2">
               View confirmed participants →
@@ -185,26 +182,32 @@ export default async function Home() {
                     <EmptyState>Categories have not been published yet.</EmptyState>
                   ) : (
                     <>
-                      <p className="mb-4 text-sm text-neutral-500">
-                        Every kata event is divided into <strong>Male</strong>, <strong>Female</strong> or{" "}
-                        <strong>Mix (Male &amp; Female)</strong> sub-categories, then{" "}
-                        <strong>Color/Kyu Belt</strong> and <strong>Black Belt &amp; Dan Holders</strong>{" "}
-                        sub-sub-categories, each with age groups <strong>4–14</strong>, <strong>15–40</strong>,{" "}
-                        <strong>41–65</strong> and <strong>66–99</strong>. Your sub-category is assigned
-                        automatically when you register. The same kata list applies to every registration tier.
-                        {" "}Male and Female sub-categories are listed for the initial registration stage
-                        {cap != null && (
-                          <>
-                            {" "}— once the registration deadline is reached, any Male or Female sub-category
-                            with fewer than <strong>{cap}</strong> participants is merged into a{" "}
-                            <strong>Mix (Male &amp; Female)</strong> category. Each age group with fewer than{" "}
-                            <strong>{cap}</strong> participants will also merge with a neighboring age group
-                            — whichever of the lower or upper group has fewer participants — and if needed,
-                            both the lower and upper groups may merge together, to keep within the available
-                            budget.
-                          </>
-                        )}
-                      </p>
+                      {competition.kata_events_note ? (
+                        <p className="mb-4 whitespace-pre-line text-sm text-neutral-500">
+                          {competition.kata_events_note}
+                        </p>
+                      ) : (
+                        <p className="mb-4 text-sm text-neutral-500">
+                          Every kata event is divided into <strong>Male</strong>, <strong>Female</strong> or{" "}
+                          <strong>Mix (Male &amp; Female)</strong> sub-categories, then{" "}
+                          <strong>Color/Kyu Belt</strong> and <strong>Black Belt &amp; Dan Holders</strong>{" "}
+                          sub-sub-categories, each with age groups <strong>4–14</strong>, <strong>15–40</strong>,{" "}
+                          <strong>41–65</strong> and <strong>66–99</strong>. Your sub-category is assigned
+                          automatically when you register. The same kata list applies to every registration tier.
+                          {" "}Male and Female sub-categories are listed for the initial registration stage
+                          {cap != null && (
+                            <>
+                              {" "}— once the registration deadline is reached, any Male or Female sub-category
+                              with fewer than <strong>{cap}</strong> participants is merged into a{" "}
+                              <strong>Mix (Male &amp; Female)</strong> category. Each age group with fewer than{" "}
+                              <strong>{cap}</strong> participants will also merge with a neighboring age group
+                              — whichever of the lower or upper group has fewer participants — and if needed,
+                              both the lower and upper groups may merge together, to keep within the available
+                              budget.
+                            </>
+                          )}
+                        </p>
+                      )}
                       <div className="space-y-6" data-drag-list={`home-kata-groups-${competition.id}`}>
                         {groupByFamily(cats).map(([family, kataGroups]) => (
                           <div key={family}>

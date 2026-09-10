@@ -11,6 +11,10 @@ export interface Competition {
   registration_fee_usd: number | null;
   status: CompetitionStatus;
   description: string | null;
+  /** Overrides the default "Every kata event is divided into…" paragraph
+   * shown under this tier's Kata events heading on the homepage. Null =
+   * the computed default (which folds in this tier's merge threshold). */
+  kata_events_note: string | null;
   judges_required: number;
   max_participants: number | null;
   /** Manual override of the "deadline + 30 days, next Malaysia working

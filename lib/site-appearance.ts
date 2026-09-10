@@ -5,6 +5,19 @@
 // contaminate that client bundle even though the form itself never calls
 // getSiteAppearance().
 
+/** Shown beneath the tier cards on the homepage whenever no custom
+ * homepage_note is set. Shared between app/page.tsx (the fallback it
+ * actually renders) and HomepageNoteForm (shown as a reference/placeholder
+ * while editing), so the two can never drift out of sync with each other. */
+export const DEFAULT_HOMEPAGE_NOTE =
+  "Event date → Registration deadline is the participants' recording-submission " +
+  "timeline; Judges start scoring only after the deadline. Participants, senseis, or " +
+  "anyone else can also register as audience to create an audience account and sign in " +
+  "before the Winners announce date to see other participants' or competitors' " +
+  "recordings if you're unable to wait until the Winners announcement date. Audience " +
+  "sign-in is USD 10 / 100 / 200 per sign-in, per competition tier. Thank you for your " +
+  "support — all the best to every participant!";
+
 export const TEXT_ALIGN_OPTIONS = ["left", "center", "right"] as const;
 export type TextAlign = (typeof TEXT_ALIGN_OPTIONS)[number];
 
@@ -49,6 +62,11 @@ export interface SiteButton {
 export interface SiteAppearance {
   id: true;
   logo_path: string | null;
+
+  /** Overrides the "Event date → Registration deadline is…" note shown
+   * once beneath the tier cards on the homepage. Null = the hardcoded
+   * default text. */
+  homepage_note: string | null;
 
   title_text: string | null;
   title_align: TextAlign;

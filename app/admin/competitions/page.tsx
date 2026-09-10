@@ -21,7 +21,9 @@ import {
   DEFAULT_WATERMARK_TEXT, DEFAULT_WATERMARK_FONT_FAMILY, DEFAULT_WATERMARK_COLOR,
 } from "@/lib/watermark";
 import { getSiteAppearance } from "@/lib/site-appearance-server";
+import { DEFAULT_HOMEPAGE_NOTE } from "@/lib/site-appearance";
 import SiteAppearanceForm from "@/components/SiteAppearanceForm";
+import HomepageNoteForm from "@/components/HomepageNoteForm";
 import { getRecordingAppearance } from "@/lib/recording-appearance-server";
 import RecordingAppearanceForm from "@/components/RecordingAppearanceForm";
 import type { Category } from "@/lib/types";
@@ -231,6 +233,25 @@ export default async function AdminCompetitions({
                 <div>
                   <label htmlFor="description" className={adminLabel}>Description</label>
                   <textarea id="description" name="description" rows={15} defaultValue={editing?.description ?? ""} className={adminInput} />
+                </div>
+                <div>
+                  <label htmlFor="kata_events_note" className={adminLabel}>
+                    Kata events note{" "}
+                    <span className="font-normal text-neutral-400">
+                      (blank = default explanation of Male/Female/Mix sub-categories and the merge rule)
+                    </span>
+                  </label>
+                  <textarea
+                    id="kata_events_note"
+                    name="kata_events_note"
+                    rows={5}
+                    defaultValue={editing?.kata_events_note ?? ""}
+                    className={adminInput}
+                  />
+                  <p className="mt-1 text-xs text-neutral-400">
+                    Shown on the homepage under this tier&apos;s &quot;Kata events&quot; heading, in place of the
+                    default paragraph.
+                  </p>
                 </div>
 
                 {/* Participant sign-in window for this tier. Every account whose
@@ -871,6 +892,20 @@ export default async function AdminCompetitions({
             never silently changes what appears around a competitor&apos;s recording.
           </p>
           <RecordingAppearanceForm settings={recordingAppearance} logoUrl={recordingLogoUrl} />
+        </div>
+      )}
+      {canManageCompetition && (
+        <div className="mt-10 border-t border-neutral-200 pt-8">
+          <h2 className="mb-1 text-lg font-bold">Homepage Note</h2>
+          <p className="mb-3 max-w-3xl text-sm text-neutral-500">
+            The single note shown once beneath the tier cards on the homepage — the &quot;Event date →
+            Registration deadline is…&quot; box. Deleting the custom text falls back to the default shown below it.
+          </p>
+          <HomepageNoteForm
+            note={siteAppearance?.homepage_note ?? null}
+            defaultText={DEFAULT_HOMEPAGE_NOTE}
+            canEdit={canManageCompetition}
+          />
         </div>
       )}
     </AdminShell>
